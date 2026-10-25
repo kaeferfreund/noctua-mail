@@ -116,16 +116,20 @@ test("production shard-opening inventory routes every writable shard connection 
     .filter(file => /\.tsx?$/.test(file) && !/\.test\.|\/test[^/]*|\/testFixtures\//.test(file));
   const openers = files.filter(file => /new\s+(?:Database|DatabaseCtor)\s*\(|Database\.open\(/.test(source(file))).sort();
   expect(openers).toEqual([
-    "lib/db/connection.ts", "lib/mail/spam/evalData.ts", "lib/membershipCleanup.ts", "scripts/checkShardMessageCollisions.ts",
-    "scripts/dev-fixture/store.ts", "scripts/spam-apply.ts", "scripts/verifyAdmissionCleanup.ts"
+    "lib/db/connection.ts", "lib/db/messages/senderKeyBackfill.ts", "lib/mail/spam/evalData.ts", "lib/membershipCleanup.ts",
+    "scripts/checkShardMessageCollisions.ts", "scripts/dev-fixture/store.ts", "scripts/spam-apply.ts", "scripts/verifyAdmissionCleanup.ts"
   ]);
   const markerCallers = files.filter(file => /configureAccountDb\(/.test(source(file))).sort();
-  expect(markerCallers).toEqual(["lib/db/connection.ts", "lib/membershipCleanup.ts"]);
+  expect(markerCallers).toEqual(["lib/db/connection.ts", "lib/db/messages/senderKeyBackfill.ts", "lib/membershipCleanup.ts"]);
+  // The sender-key backfill reads main + shards read-only; its only writer connection is configured like the app's.
+  expect(source("lib/db/messages/senderKeyBackfill.ts").match(/new Database\([^\n]*, \{ readonly: true \}\);/g)).toHaveLength(2);
+  expect(source("lib/db/messages/senderKeyBackfill.ts").match(/new Database\(/g)).toHaveLength(3);
+  expect(source("lib/db/messages/senderKeyBackfill.ts")).toContain("configureAccountDb(db)");
   expect(source("lib/db/connection.ts")).toContain("configureAccountDb(accountDb)");
   expect(source("lib/membershipCleanup.ts")).toContain("configureAccountDb(db, 0)");
   expect(source("scripts/checkShardMessageCollisions.ts")).toContain("{ readonly: true }");
-  // The spam eval and the profile backfill dry run read data dirs read-only and immutable (no -wal/-shm access).
-  expect(source("lib/mail/spam/evalData.ts")).toContain("?immutable=1`, flags)");
+  // The spam eval and the profile backfill dry run read data dirs read-only (mode=ro: WAL-aware, never writes or checkpoints).
+  expect(source("lib/mail/spam/evalData.ts")).toContain("?mode=ro`, flags)");
   expect(source("lib/mail/spam/evalData.ts")).toContain("SQLITE_OPEN_READONLY | (constants as Record<string, number>).SQLITE_OPEN_URI");
   expect(source("lib/mail/spam/evalData.ts").match(/new Database\(/g)).toHaveLength(1);
   // The spam apply script inspects shards read-only; its writes go through the common DB API.

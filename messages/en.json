@@ -476,6 +476,7 @@
       "autoMove": "Move suspicious messages to the Junk folder automatically",
       "threshold": "Own threshold (empty = {threshold, number} from the administration)",
       "thresholdHelp": "Between 0.5 and 1. Higher means fewer marks.",
+      "thresholdInvalid": "Enter a number between 0.5 and 1, or leave the field empty.",
       "save": "Save",
       "saved": "Saved.",
       "loading": "Loading …",
@@ -523,8 +524,7 @@
     },
     "drafts": "Drafts",
     "mailboxes": {
-      "mine": "My mailboxes",
-      "shared": "Shared mailboxes",
+      "sharedMailbox": "Shared mailbox",
       "add": "Add mailbox",
       "none": "No mailbox yet",
       "unreadUnavailable": "Unread count unavailable",

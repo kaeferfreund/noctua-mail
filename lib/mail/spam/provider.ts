@@ -1,8 +1,8 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
-import type { LanguageModel, SystemModelMessage } from "ai";
+import type { JSONValue, LanguageModel, SystemModelMessage } from "ai";
 import type { SpamConfig } from "./config";
 
-export type SpamModelProviderOptions = Record<string, Record<string, string>>;
+export type SpamModelProviderOptions = Record<string, Record<string, JSONValue>>;
 
 /**
  * The AI SDK model for the configured provider, or null when it cannot be
@@ -18,9 +18,14 @@ export function getSpamLanguageModel(config: SpamConfig): LanguageModel | null {
   }
 }
 
-/** Classification needs little reasoning: low effort keeps latency and cost down. */
+/**
+ * Classification needs little reasoning: low effort and no thinking keep
+ * latency and cost down, and the whole output budget goes to the verdict.
+ * Models that always think drop the `disabled` setting (with a provider
+ * warning) and stay within SPAM_MAX_OUTPUT_TOKENS.
+ */
 export function getSpamProviderOptions(config: SpamConfig): SpamModelProviderOptions | undefined {
-  return config.provider === "anthropic" ? { anthropic: { effort: "low" } } : undefined;
+  return config.provider === "anthropic" ? { anthropic: { effort: "low", thinking: { type: "disabled" } } } : undefined;
 }
 
 /**

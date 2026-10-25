@@ -7,7 +7,7 @@
  * Builds every account's profiles from its stored rows in one pass per shard
  * (only the first 64 KB of each source: header block and attachment names) and
  * imports the stored "Als Spam" decisions. The default is a dry run: the data
- * dir is opened read-only (immutable=1) and the plan is printed; --out writes
+ * dir is opened read-only (mode=ro) and the plan is printed; --out writes
  * the sender histories as JSON for `spam-eval --trust-profiles <file>` (it
  * names senders: keep it outside the data dir and the repository).
  * --write reads over the app's DB layer and replaces each account's

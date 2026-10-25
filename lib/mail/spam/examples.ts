@@ -15,8 +15,11 @@ export const SPAM_EXAMPLE_LIMIT = 16;
 const MIN_PER_LABEL = 3;
 const SNIPPET_LENGTH = 280;
 
-/** `move-*`: a folder move into / out of Junk (moveLearning.ts), stored with the same payload as the buttons. */
-export type SpamExampleSource = "mark-spam" | "not-spam" | "not-suspicious" | "move-junk" | "move-from-junk";
+/**
+ * `move-*`: a folder move into / out of Junk (moveLearning.ts), stored with the same payload as the buttons.
+ * `server-flag-backfill`: the one-time move of server-flagged INBOX mail (scripts/spam-apply.ts --server-flagged).
+ */
+export type SpamExampleSource = "mark-spam" | "not-spam" | "not-suspicious" | "move-junk" | "move-from-junk" | "server-flag-backfill";
 export type SpamExampleTarget = { senderEmail: string | null; subject: string };
 
 export function senderParts(from: string | null | undefined) {
@@ -86,17 +89,23 @@ export function buildSpamExample(message: Pick<Message, "from" | "subject" | "bo
   };
 }
 
-/** Never throws: a failed example write must not fail the user's action. */
+/**
+ * Never throws: a failed example write must not fail the user's action.
+ * `createdAt` (default now) dates a backfilled decision at the mail's arrival,
+ * so it does not crowd the users' recent decisions out of the prompt.
+ */
 export async function recordSpamDecision(params: {
   accountId: string;
   message: Pick<Message, "id" | "from" | "subject" | "body" | "preview">;
   label: SpamLabel;
   source: SpamExampleSource;
   userId?: string | null;
+  createdAt?: number;
 }) {
   try {
     await saveSpamExample(params.accountId, {
       ...buildSpamExample(params.message, params.label),
+      ...(params.createdAt !== undefined ? { createdAt: params.createdAt } : {}),
       messageId: params.message.id,
       source: params.source,
       decidedByUserId: params.userId ?? null

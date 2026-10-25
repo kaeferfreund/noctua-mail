@@ -1,7 +1,7 @@
 /**
  * Spam detection configuration (doc/SPAM-DETECTION.md). Environment values are
  * defaults; the admin setting (master table `spam_settings`, scope "global")
- * overrides enabled/model/threshold. Per-mailbox settings add an own on/off
+ * overrides enabled/model/threshold. Per-mailbox settings (scope "account:<id>") add an own on/off
  * switch (default on), auto-move and an optional threshold override.
  */
 export const DEFAULT_SPAM_PROVIDER = "anthropic";

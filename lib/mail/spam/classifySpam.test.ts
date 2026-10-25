@@ -4,7 +4,11 @@ import { tmpdir } from "os";
 import path from "path";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { MockLanguageModelV4 } from "ai/test";
-import { buildSpamPrompt, buildSpamSystemPrompt, classifySpam, shouldMarkAsSpam, spamVerdictSchema } from "./classifySpam";
+import { APICallError, RetryError } from "ai";
+import { buildSpamPrompt, buildSpamSystemPrompt, classifySpam, isRetryableSpamError, shouldMarkAsSpam, SPAM_MAX_OUTPUT_TOKENS,
+  SpamOutputTruncatedError, spamVerdictSchema } from "./classifySpam";
+import { getSpamProviderOptions } from "./provider";
+import { resolveSpamConfig } from "./config";
 import { createSpamQueue } from "./queue";
 import { EMPTY_STATIC_RULES, loadStaticRules, parseStaticRules } from "./staticRules";
 import { isTrustCanary } from "./senderProfile";
@@ -19,6 +23,8 @@ const input: SpamInput = {
   listId: null, listUnsubscribe: null, authenticationResults: ["mx.example.test; spf=fail"], spamHeaders: ["x-spam-status: Yes, score=7.1"],
   linkDomains: ["claim.example.test"], attachments: [], text: "Klicken Sie hier, um Ihren Gewinn abzuholen."
 };
+/** The same mail with SPF passing for the sender's domain: unauthenticated allow entries apply only then. */
+const authed: SpamInput = { ...input, authenticationResults: ["mx.example.test; spf=pass smtp.mailfrom=bounce@lottery.example.test"] };
 const example = (label: "spam" | "ham", subject: string): SpamExample =>
   ({ senderEmail: "x@example.test", senderDomain: "example.test", subject, snippet: "Synthetischer Text", label, createdAt: 1 });
 const answer = (value: object) => JSON.stringify(value);
@@ -63,11 +69,46 @@ describe("classifySpam", () => {
     await expect(classifySpam({ input, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model })).rejects.toThrow();
   });
 
+  test("bounds the schema cannot carry to the model are applied after parsing", async () => {
+    const long = "x".repeat(200);
+    const model = mockSpamModel(answer({ verdict: "spam", confidence: 0.9, reasons: [" a ", "", long, "b", "c", "d", "e", "f"] }));
+    const decision = await classifySpam({ input, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model });
+    expect(decision?.reasons).toEqual(["a", "x".repeat(160), "b", "c", "d"]);
+    expect(spamVerdictSchema.safeParse(decision).success).toBe(true);
+  });
+
+  test("thinking is off and the output budget leaves room; a cut-off answer is a retryable error", async () => {
+    expect(getSpamProviderOptions(resolveSpamConfig(null, {}))).toEqual({ anthropic: { effort: "low", thinking: { type: "disabled" } } });
+    const model = mockSpamModel(answer({ verdict: "ham", confidence: 0.8, reasons: [] }));
+    await classifySpam({ input, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model });
+    expect(model.doGenerateCalls[0].maxOutputTokens).toBe(SPAM_MAX_OUTPUT_TOKENS);
+    const truncated = new MockLanguageModelV4({
+      doGenerate: async () => ({
+        content: [{ type: "text", text: "{\"verdict\":\"spam\",\"confid" }],
+        finishReason: { unified: "length", raw: "max_tokens" },
+        usage: { inputTokens: { total: 10, noCache: 10, cacheRead: undefined, cacheWrite: undefined }, outputTokens: { total: 4096, text: 4096, reasoning: undefined } },
+        warnings: []
+      })
+    });
+    const error = await classifySpam({ input, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model: truncated }).catch((caught) => caught);
+    expect(error).toBeInstanceOf(SpamOutputTruncatedError);
+    expect(isRetryableSpamError(error)).toBe(true);
+  });
+
+  test("only provider rejections of the request itself are not retried", () => {
+    const apiError = (statusCode: number) => new APICallError({ message: "synthetic", url: "https://api.example.test", requestBodyValues: {}, statusCode });
+    for (const status of [400, 401, 403, 404]) expect(isRetryableSpamError(apiError(status))).toBe(false);
+    for (const status of [408, 429, 500, 529]) expect(isRetryableSpamError(apiError(status))).toBe(true);
+    expect(isRetryableSpamError(new RetryError({ message: "x", reason: "maxRetriesExceeded", errors: [apiError(401)] }))).toBe(false);
+    expect(isRetryableSpamError(new Error("network down"))).toBe(true);
+    expect(isRetryableSpamError(new DOMException("timed out", "TimeoutError"))).toBe(true);
+  });
+
   test("allowlist and static rules short-circuit before the model", async () => {
     const model = mockSpamModel(answer({ verdict: "spam", confidence: 1, reasons: [] }));
     const allowlist = { ownAddresses: new Set<string>(), ownDomains: new Set<string>(),
       isCorrespondent: async (email: string) => email === "winner@lottery.example.test", latestDecision: async () => null };
-    expect(await classifySpam({ input, allowlist, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model }))
+    expect(await classifySpam({ input: authed, allowlist, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model }))
       .toMatchObject({ verdict: "ham", source: "allowlist" });
     const deny = parseStaticRules({ deny: [{ type: "domain", value: "lottery.example.test", safe: true }] });
     expect(await classifySpam({ input, staticRules: deny, getExamples: async () => [], model }))
@@ -82,16 +123,16 @@ describe("classifySpam", () => {
     const sameSender: SpamExample = { ...example("spam", "Sie haben gewonnen"), senderEmail: "winner@lottery.example.test" };
     const model = mockSpamModel(answer({ verdict: "spam", confidence: 0.95, reasons: ["Vom Nutzer als Spam markiert"] }));
 
-    expect(await classifySpam({ input, allowlist: context(null), staticRules: allow, getExamples: async () => [sameSender], model }))
+    expect(await classifySpam({ input: authed, allowlist: context(null), staticRules: allow, getExamples: async () => [sameSender], model }))
       .toMatchObject({ verdict: "ham", source: "static-allow" });
     expect(model.doGenerateCalls).toHaveLength(0);
 
-    expect(await classifySpam({ input, allowlist: context("spam"), staticRules: allow, getExamples: async () => [sameSender], model }))
+    expect(await classifySpam({ input: authed, allowlist: context("spam"), staticRules: allow, getExamples: async () => [sameSender], model }))
       .toMatchObject({ verdict: "spam", confidence: 0.95, source: "model" });
     expect(model.doGenerateCalls).toHaveLength(1);
     expect(JSON.stringify(model.doGenerateCalls[0].prompt)).toContain("[Spam] Von: winner@lottery.example.test | Betreff: Sie haben gewonnen");
 
-    expect(await classifySpam({ input, allowlist: context("ham"), staticRules: allow, getExamples: async () => [sameSender], model }))
+    expect(await classifySpam({ input: authed, allowlist: context("ham"), staticRules: allow, getExamples: async () => [sameSender], model }))
       .toMatchObject({ verdict: "ham", source: "allowlist" });
     expect(model.doGenerateCalls).toHaveLength(1);
   });

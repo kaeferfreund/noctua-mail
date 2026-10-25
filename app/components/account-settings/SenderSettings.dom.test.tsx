@@ -8,7 +8,8 @@ import IdentitiesTabContent from "./tabs/IdentitiesTabContent";
 import SignaturesTabContent from "./tabs/SignaturesTabContent";
 import PreferencesTabContent from "./tabs/PreferencesTabContent";
 import type { AdminFetch } from "@/app/hooks/useAdminApi";
-afterEach(cleanup);
+// Storage is shared by every DOM test file in the run; leave none behind for the next one.
+afterEach(() => { cleanup(); localStorage.clear(); sessionStorage.clear(); });
 const account = { id: "a", email: "primary@example.test", accessRole: "manager", settings: { signatures: [{ id: "shared", name: "Shared template", body: "{{user.name}}\n{{identity.email}}" }], defaultSignatureId: "shared" } } as Account;
 const identities = ["primary", "alias", "disabled"].map(id => ({ id, accountId: "a", email: `${id}@example.test`, displayName: `Synthetic ${id}`, enabled: id !== "disabled", isDefault: id === "primary" } as SenderIdentity));
 const response = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });

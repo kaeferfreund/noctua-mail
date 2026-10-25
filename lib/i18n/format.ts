@@ -43,6 +43,23 @@ export function displayDayNumber(value: Date | number, zone = timeZone) {
   return Date.UTC(part("year"), part("month") - 1, part("day")) / 86_400_000;
 }
 
+/** Milliseconds until the next calendar day starts in the display zone (23/25-hour DST days included). */
+export function msUntilNextDisplayDay(nowMs: number, zone = timeZone) {
+  const clock = cached(dates, `display-clock:${zone}`, () => new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23", timeZone: zone
+  }));
+  const sinceMidnight = (value: number) => {
+    const parts = clock.formatToParts(value);
+    const part = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value);
+    return ((part("hour") * 60 + part("minute")) * 60 + part("second")) * 1000 + (((value % 1000) + 1000) % 1000);
+  };
+  let next = nowMs + 86_400_000 - sinceMidnight(nowMs);
+  // A DST change before that point shifts the wall clock by up to an hour; land on midnight.
+  const drift = sinceMidnight(next);
+  next += drift < 43_200_000 ? -drift : 86_400_000 - drift;
+  return next - nowMs;
+}
+
 /** Start of a SQLite %W bucket, including the partial W00 before the first Monday.
  * Keep persisted bucket IDs; they are not ISO week numbers. UTC noon represents
  * the computed calendar date safely in the explicit Europe/Berlin display zone.

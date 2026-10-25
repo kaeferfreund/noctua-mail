@@ -183,3 +183,32 @@ describe("row menu delete", () => {
     expect(menu.deletes).toEqual([["root", true]]);
   });
 });
+
+describe("row menu focus return", () => {
+  it("returns keyboard focus to ⋮ after the menu closes without reopening its tooltip", async () => {
+    // Escape is a keyboard interaction, so browsers mark the returned focus :focus-visible.
+    const originalMatches = Element.prototype.matches;
+    Element.prototype.matches = function (this: Element, selector: string) {
+      return selector === ":focus-visible" ? this === document.activeElement : originalMatches.call(this, selector);
+    } as typeof Element.prototype.matches;
+    try {
+      const menu = setup();
+      const trigger = menu.view.getByRole("button", { name: "Message actions" });
+      act(() => { trigger.focus(); });
+      await menu.open();
+      // Radix returns focus from a 0 ms timer after the menu unmounts. No
+      // waitFor here: its polling starves happy-dom's timers for seconds.
+      await act(async () => {
+        fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+        await new Promise(resolve => setTimeout(resolve, 50));
+      });
+      expect(menu.view.queryByRole("menu")).toBeNull();
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
+      expect(document.activeElement).toBe(trigger);
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 800)); });
+      expect(menu.view.queryByRole("tooltip")).toBeNull();
+    } finally {
+      Element.prototype.matches = originalMatches;
+    }
+  });
+});

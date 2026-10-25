@@ -476,6 +476,7 @@
       "autoMove": "Verdächtige Nachrichten automatisch in den Spam-Ordner verschieben",
       "threshold": "Eigene Schwelle (leer = {threshold, number} aus der Verwaltung)",
       "thresholdHelp": "Zwischen 0,5 und 1. Höher bedeutet weniger Markierungen.",
+      "thresholdInvalid": "Bitte eine Zahl zwischen 0,5 und 1 eingeben oder das Feld leer lassen.",
       "save": "Speichern",
       "saved": "Gespeichert.",
       "loading": "Lädt …",
@@ -523,8 +524,7 @@
     },
     "drafts": "Entwürfe",
     "mailboxes": {
-      "mine": "Eigene Postfächer",
-      "shared": "Gemeinsame Postfächer",
+      "sharedMailbox": "Geteiltes Postfach",
       "add": "Postfach hinzufügen",
       "none": "Noch kein Postfach",
       "unreadUnavailable": "Anzahl ungelesener E-Mails nicht verfügbar",
@@ -1726,7 +1726,7 @@
       "cancel": "Abbrechen",
       "send": "Senden",
       "sending": "Wird gesendet …",
-      "loadingAttachments": "Lädt Anhänge …",
+      "loadingAttachments": "Anhänge werden geladen …",
       "attachmentsFailedTitle": "Lade die fehlgeschlagenen Anhänge erneut oder entferne sie.",
       "close": "Schließen"
     },
