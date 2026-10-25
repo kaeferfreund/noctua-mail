@@ -147,7 +147,7 @@ access plus `hiddenMailboxCount` for the others; the primary `accountId` is not 
 | Mode | Stored scopes | Allowed operations |
 | --- | --- | --- |
 | `read` — Nur lesen | `["read"]` | list, search, check new mail, get |
-| `drafts` — Lesen und Entwürfe anlegen (kein Senden) | `["read","drafts"]` | read, create drafts, flags/todo/topics, thread status/assignment/comments |
+| `drafts` — Lesen und Entwürfe anlegen (kein Senden) | `["read","drafts"]` | read, create and edit drafts, flags/todo/topics, thread status/assignment/comments |
 | `full` — Vollzugriff (auch senden) | `["read","drafts","manage","send"]` | all current tools including sender identity/preferences management; send permission reserved |
 
 Scopes only narrow mailbox roles. Sender identity writes still require manager;
@@ -197,6 +197,47 @@ Assigned-to-me uses the token creator. For example:
 
 ```json
 {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"assign_thread","arguments":{"threadId":"<request@example.test>","assigneeUserId":"me"}}}
+```
+
+### MCP draft tools
+
+Drafts are edited in place; clients never need to create a second version and delete the
+old one. The tool descriptions say so, so AI clients stop proposing that workaround.
+
+| Tool | Scope / role | Input | Structured success |
+| --- | --- | --- | --- |
+| `list_draft_messages` | `read` / viewer | `{accountId?,page?,pageSize?}` | `{ok:true,folderId,drafts:[{draftId,subject,to,cc,updatedAt,editable}],total,hasMore,page,pageSize}` |
+| `get_draft_message` | `read` / viewer | `{accountId?,draftId}` | `{ok:true,draft:{draftId,identityId,from,to,cc,bcc,subject,composeFormat,text,html,markdown,inReplyTo,references,forwardedMessageId,attachments:[{id,filename,contentType,size,inline}],updatedAt}}` |
+| `create_draft_message` | `drafts` / editor | see [MCP sender tools](#mcp-sender-tools) | `{ok:true,mode,referenceMessageId,identityId,draftId,message}` |
+| `update_draft_message` | `drafts` / editor | `{accountId?,draftId,identityId?,to?,cc?,bcc?,subject?,text?,markdown?,html?,composeFormat?,appendBody?}` | `{ok:true,mode,identityId,draftId,previousDraftId,draftIdChanged,message}` |
+
+- Only messages in the mailbox's Drafts folder with the IMAP `\Draft` flag count as drafts
+  (the draft-send guard); any other id returns `{ok:false,code:"invalid_draft"}` with
+  "is not a draft", an unknown id "Draft not found". `editable:false` in the listing marks
+  Drafts-folder messages without the flag. `search_messages` with badge `draft` also finds drafts.
+- `get_draft_message` returns `text` (text/plain part; for Markdown drafts the Markdown source,
+  repeated in `markdown`) and `html` as stored. Inline images in `html` point at attachment
+  URLs. Attachment bytes are never returned.
+- `update_draft_message` is partial: omitted fields keep the stored value; `to`/`cc`/`bcc`
+  replace the whole field (empty string clears it). `text`/`html`/`markdown` replace the whole
+  body with the same rules as `create_draft_message` (format follows the richest field unless
+  `composeFormat` is given; Markdown keeps its source as text/plain; HTML without `text` gets a
+  derived text/plain part). `appendBody` adds a plain-text paragraph after the authored text and
+  before a quoted original, in the draft's format; it cannot be combined with the body fields.
+  Reply/forward headers, the calendar invite and all attachments are kept; an
+  attachment that is not available locally fails the update (409) instead of being dropped.
+  `identityId` is optional and keeps the draft's sender; a disabled sender fails like the save
+  route (`identity_unavailable`).
+- The save rewrites the IMAP message (APPEND + delete of the old UID) through
+  `saveDraftForAccount` with the live `drafts` scope and editor re-check, `clientId:mcp:<tokenId>`
+  and the AI-modified marker, like `create_draft_message`. The Message-ID is preserved, so the
+  draft id usually stays the same; if it changes, `draftIdChanged` is true and clients must
+  continue with the returned `draftId`. No MCP tool has a separate rate limit.
+
+```json
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_draft_message","arguments":{"draftId":"imap-0123456789abcdef"}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"update_draft_message","arguments":{"draftId":"imap-0123456789abcdef","appendBody":"Bitte bestätigen Sie den Termin bis Freitag."}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"update_draft_message","arguments":{"draftId":"imap-0123456789abcdef","cc":"praxis@example.test","subject":"Terminbestätigung"}}}
 ```
 
 ## Send responses
@@ -414,6 +455,7 @@ send tool; clients create drafts and use the existing application send paths.
 | `get_sender_preferences` | `{accountId?}` | `{ok:true,prefs:{defaultIdentityId?,defaultSignatureId?,signatureOverride?}}`; viewer, creator's own sparse row |
 | `set_sender_preferences` | `{accountId?,patch:{defaultIdentityId?:string\|null,defaultSignatureId?:string\|null,signatureOverride?:string\|null}}` | Same own sparse subset after merge; viewer; null restores inheritance, empty signature means none |
 | `create_draft_message` | Existing new/reply/forward/body/attachment/reference fields plus `identityId?` | `{ok:true,mode,referenceMessageId,identityId,draftId,message}`; editor |
+| `update_draft_message` | `{accountId?,draftId,identityId?,…}`, see [MCP draft tools](#mcp-draft-tools) | `{ok:true,mode,identityId,draftId,previousDraftId,draftIdChanged,message}`; editor |
 
 Unknown mutation keys are rejected. Signature references must be in this mailbox;
 personal defaults cannot reference foreign/disabled identities. Another user's prefs
