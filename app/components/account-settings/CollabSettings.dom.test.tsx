@@ -101,9 +101,16 @@ describe("Preferences tab", () => {
       return response({ ok: true, prefs: { defaultSignatureId: "synthetic-signature" } });
     }} /></Theme>);
     await waitFor(() => expect((page.getByLabelText("Default signature") as HTMLSelectElement).value).toBe("synthetic-signature"));
-    for (const [label, value] of [["Default layout", "compact"], ["Date format", "ymd"], ["Color rows by topic", "false"], ["Show sender icons", "true"], ["Week starts on", "sunday"], ["Include threads across folders", "false"], ["New mail notifications", "true"], ["Default signature", "inherit"]]) fireEvent.change(page.getByLabelText(label), { target: { value } });
+    for (const [label, value] of [["Default layout", "compact"], ["Date format", "ymd"], ["Color rows by topic", "false"], ["Show sender icons", "true"], ["Week starts on", "sunday"], ["Include threads across folders", "false"], ["Mark opened messages as read", "never"], ["New mail notifications", "true"], ["Default signature", "inherit"]]) fireEvent.change(page.getByLabelText(label), { target: { value } });
     fireEvent.click(page.getByRole("button", { name: "Save preferences" })); await page.findByText("Preferences saved.");
-    expect(patch).toEqual({ layout: { defaultView: "compact" }, appearance: { dateFormat: "ymd", topicColorRows: false, senderIcons: true }, calendar: { weekStartsOn: "sunday" }, threading: { includeAcrossFolders: false }, notifications: { newMail: true }, defaultSignatureId: null });
+    expect(patch).toEqual({ layout: { defaultView: "compact" }, appearance: { dateFormat: "ymd", topicColorRows: false, senderIcons: true }, calendar: { weekStartsOn: "sunday" }, threading: { includeAcrossFolders: false }, reading: { autoMarkRead: "never" }, notifications: { newMail: true }, defaultSignatureId: null });
+  });
+  it("offers the auto-read dwell options with the shared read-state hint", async () => {
+    const page = render(<Theme><PreferencesTabContent editingAccount={account} onClose={() => {}} apiFetch={async () => response({ ok: true, prefs: { reading: { autoMarkRead: "after3s" } } })} /></Theme>);
+    const select = page.getByLabelText("Mark opened messages as read") as HTMLSelectElement;
+    await waitFor(() => expect(select.value).toBe("after3s"));
+    expect([...select.options].map(option => option.text)).toEqual(["Inherit mailbox default", "Immediately", "After 1 second", "After 3 seconds", "Never (manually)"]);
+    expect(document.getElementById(select.getAttribute("aria-describedby")!)?.textContent).toContain("applies to all members of the mailbox. Viewers cannot mark messages.");
   });
 });
 
