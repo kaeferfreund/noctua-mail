@@ -35,9 +35,10 @@ sed -e "s/$BASE_VIEWBOX/viewBox=\"0 0 1600 1600\" width=\"180\" height=\"180\"/"
     -e 's/ rx="350" ry="350"//' "$SOURCE" > "$TMP/apple.svg"
 rsvg-convert -w 180 -h 180 -b "#4643B5" "$TMP/apple.svg" -o public/icons/apple-touch-180.png
 
-# Crop to the envelope, hide the background and the grey flap line, and cut
-# the flap line out of the white envelope instead.
-sed -e "s/$BASE_VIEWBOX/viewBox=\"220 232 1160 1160\" width=\"96\" height=\"96\"/" "$SOURCE" > "$TMP/mono.svg"
+# Crop to the envelope (crop square scaled with the envelope so the badge keeps
+# its margin), hide the background and the grey flap line, and cut the flap
+# line out of the white envelope instead.
+sed -e "s/$BASE_VIEWBOX/viewBox=\"171 184 1259 1259\" width=\"96\" height=\"96\"/" "$SOURCE" > "$TMP/mono.svg"
 cat > "$TMP/mono.css" <<'CSS'
 #iconBackground, #envelopeFlapLine { display: none; }
 #envelope { fill: #ffffff; filter: none; mask: url(#envelopeFlapCut); }
