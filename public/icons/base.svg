@@ -3,7 +3,9 @@
        raster icon (build-scripts/generate_icons.sh) and of the sidebar logo
        (app/icons/logo.svg). Keep the viewBox and the 1600 px rounded
        background: the logo's environment ribbon and the icon script rely on
-       them. The envelope is drawn on a 1024 grid and scaled to 1600. -->
+       them. The envelope is drawn on a 1024 grid, enlarged by 1.085 around
+       the tile centre (about 70 % x 48 % of the tile, like the iOS Mail
+       icon) and scaled to 1600. -->
   <defs>
     <!-- Iris gradient around the app's primary colour (iris-9 #5b5bd6). -->
     <linearGradient id="irisLinearGradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -34,7 +36,7 @@
     </mask>
   </defs>
   <rect id="iconBackground" x="0" y="0" width="1600" height="1600" rx="350" ry="350" fill="url(#irisLinearGradient)" />
-  <g transform="scale(1.5625)">
+  <g transform="scale(1.5625) translate(512 512) scale(1.085) translate(-512 -512)">
     <rect id="envelope" x="182" y="292" width="660" height="456" rx="52" fill="url(#envelopePaper)" filter="url(#envelopeShadow)" />
     <g id="envelopeFlapLine" clip-path="url(#envelopeClip)">
       <use href="#envelopeFlap" stroke="#C3C7D1" stroke-width="22" />

@@ -5,7 +5,7 @@ const REMINDER_META_URL = "/__noctua/reminder-meta";
 // Icon files keep their names and are cached for a day, so the URLs carry the
 // art version. Must equal APP_ICON_VERSION in lib/appBranding.ts
 // (serviceWorker.test.ts checks it).
-const APP_ICON_VERSION = "3";
+const APP_ICON_VERSION = "4";
 const NOTIFICATION_ICON = `/icons/icon-192.png?v=${APP_ICON_VERSION}`;
 const NOTIFICATION_BADGE_ICON = `/icons/icon-96-mono.png?v=${APP_ICON_VERSION}`;
 
