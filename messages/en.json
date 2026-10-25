@@ -1258,7 +1258,8 @@
         "again": "New check",
         "noSubject": "(no subject)",
         "running": "Check running",
-        "latest": "Last check: {items, plural, =0 {no hits} one {# hit} other {# hits}}"
+        "latest": "Last check: {items, plural, =0 {no hits} one {# hit} other {# hits}}",
+        "noMailboxes": "You are not a member of any mailbox. Only mailboxes you are a member of can be checked."
       }
     },
     "domainIcons": {

@@ -1258,7 +1258,8 @@
         "again": "Neue Prüfung",
         "noSubject": "(kein Betreff)",
         "running": "Prüfung läuft",
-        "latest": "Letzte Prüfung: {items, plural, =0 {keine Treffer} one {# Treffer} other {# Treffer}}"
+        "latest": "Letzte Prüfung: {items, plural, =0 {keine Treffer} one {# Treffer} other {# Treffer}}",
+        "noMailboxes": "Du bist in keinem Postfach Mitglied. Geprüft werden können nur Postfächer, in denen du Mitglied bist."
       }
     },
     "domainIcons": {

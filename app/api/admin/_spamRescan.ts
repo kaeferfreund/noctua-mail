@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAccountById } from "@/lib/serverDb";
+import { resolveAccountRole } from "@/lib/accountAccess";
 import { getAccountIdFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { createRateLimiter, getRequestIp } from "@/lib/rateLimit";
 
@@ -23,7 +24,13 @@ export function spamRescanRateLimited(request: Request, userId: string) {
   return actor || ip ? spamRescanFailure(429, "rate_limited", { "Retry-After": "60" }) : null;
 }
 
-export async function resolveSpamRescanAccount(params: AccountRouteParams["params"]) {
+/**
+ * The mailbox of the route, only when the admin is a member of it (owner or any
+ * role, resolved like requireAccountContext). Unknown and foreign mailboxes are
+ * both null (404), so the answer does not confirm that a mailbox exists.
+ */
+export async function resolveSpamRescanAccount(params: AccountRouteParams["params"], userId: string) {
   const accountId = await getAccountIdFromParams(params);
-  return accountId && await getAccountById(accountId) ? accountId : null;
+  if (!accountId || !await resolveAccountRole(userId, accountId)) return null;
+  return await getAccountById(accountId) ? accountId : null;
 }

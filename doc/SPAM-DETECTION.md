@@ -479,7 +479,11 @@ shows or sets a mailbox's own threshold through the admin UI's helper.
 
 The same cleanup from the UI, for one mailbox at a time and without server
 access: Verwaltung → Spam-Erkennung → „Posteingang jetzt prüfen“ next to each
-mailbox (admins only). Code: `lib/mail/spam/rescan.ts`, UI
+mailbox the admin is a member of (owner or any role, also viewer). Admins see
+neither the mailboxes they are not a member of nor their jobs (list, preview,
+move, status and activity panel); the routes answer 404 for them, the same as
+for an unknown mailbox, so the answer does not confirm that it exists (user
+decision 2026-10-25). Code: `lib/mail/spam/rescan.ts`, UI
 `app/components/admin/AdminSpamRescan.tsx`, progress in the activity panel
 („Hintergrundaufgaben“).
 
@@ -533,10 +537,14 @@ restart) reads as „abgebrochen“ (`error: interrupted`), a move as ready agai
 with its unprocessed selection cleared — moving is a separate step, so there is
 no half-moved scan. Hits of a cancelled scan can still be moved.
 
-**Routes** (admin session, same origin, start/cancel/move 10 per minute per
-admin and 30 per IP): `GET|POST /api/admin/accounts/:accountId/spam-rescan`
+**Routes** (admin session and membership of the mailbox, else 404; same
+origin; start/cancel/move 10 per minute per admin and 30 per IP): `GET|POST /api/admin/accounts/:accountId/spam-rescan`
 (counts and latest job with its list; start `{ period, withModel, modelLimit }`),
 `POST …/spam-rescan/cancel`, `POST …/spam-rescan/move`, and
-`GET /api/admin/spam-rescan` (running jobs for the activity panel). The admin
+`GET /api/admin/spam-rescan` (running jobs of the admin's own mailboxes for the
+activity panel). `GET /api/admin/spam-settings` lists those mailboxes as
+`rescanMailboxes`. A move takes the job over for the running server process
+(`ownerInstance`), so the restart reconciliation never resets it mid-move, also
+when the scan ran before a restart. The admin
 log gets `spam_rescan.start` (job, period, model step, limit, INBOX count) and
 `spam_rescan.move` (job, selected and listed count).

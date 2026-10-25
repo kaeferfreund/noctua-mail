@@ -157,10 +157,12 @@ export async function listSpamRescanItems(jobId: string): Promise<StoredSpamResc
 /**
  * Marks the selected items of a finished job as pending and switches it to
  * "moving", with the audit entry, in one transaction. Items already moved are
- * not selected again. Returns the number of selected items, or null when the
- * job is not in a state that allows a move.
+ * not selected again. The job now belongs to `ownerInstance` (the process
+ * running the move), so reconcileInterruptedSpamRescans never resets it while
+ * it moves, also when the scan ran in an earlier process. Returns the number
+ * of selected items, or null when the job is not in a state that allows a move.
  */
-export async function beginSpamRescanMove(jobId: string, messageIds: readonly string[], userId: string) {
+export async function beginSpamRescanMove(jobId: string, messageIds: readonly string[], userId: string, ownerInstance: string) {
   return withDbWriteRetry("beginSpamRescanMove", async () => {
     const db = await getDb();
     return db.transaction(() => {
@@ -177,8 +179,8 @@ export async function beginSpamRescanMove(jobId: string, messageIds: readonly st
           .run(jobId, ...chunk).changes;
       }
       if (!selected) return 0;
-      db.prepare(`UPDATE spam_rescan_jobs SET status = 'moving', phase = 'moving', processed = 0, total = ?, error = NULL, updatedAt = ? WHERE id = ?`)
-        .run(selected, Date.now(), jobId);
+      db.prepare(`UPDATE spam_rescan_jobs SET status = 'moving', phase = 'moving', processed = 0, total = ?, error = NULL, ownerInstance = ?,
+          updatedAt = ? WHERE id = ?`).run(selected, ownerInstance, Date.now(), jobId);
       recordAdminAuditRow(db, { actorUserId: userId, action: "spam_rescan.move", targetAccountId: job.accountId,
         payload: { jobId, selected, listed: (parseJson<SpamRescanCounts>(job.counts, {}).items ?? 0) } });
       return selected;

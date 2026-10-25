@@ -26,13 +26,14 @@ const isActive = (job: SpamRescanJob | null) => job?.status === "running" || job
 const movable = (item: SpamRescanItem) => item.moveStatus === null || item.moveStatus === "error";
 const announce = () => window.dispatchEvent(new CustomEvent(SPAM_RESCAN_EVENT));
 
-/** „Posteingang jetzt prüfen“ per mailbox (doc/SPAM-DETECTION.md): one panel open at a time. */
+/** „Posteingang jetzt prüfen“ per own mailbox (doc/SPAM-DETECTION.md): one panel open at a time. */
 export default function AdminSpamRescan({ apiFetch, mailboxes }: { apiFetch: AdminFetch; mailboxes: Mailbox[] }) {
   const t = useTranslations("Admin.spam.rescan");
   const [open, setOpen] = useState<string | null>(null);
   return <section className="space-y-3" aria-labelledby="spam-rescan-heading">
     <h3 id="spam-rescan-heading" className="font-medium">{t("heading")}</h3>
     <p className="max-w-2xl text-sm text-muted-foreground">{t("help")}</p>
+    {mailboxes.length === 0 && <p className="text-sm">{t("noMailboxes")}</p>}
     <ul className="m-0 list-none space-y-3 p-0">
       {mailboxes.map((mailbox) => <li key={mailbox.accountId} className="space-y-3 rounded-md border p-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

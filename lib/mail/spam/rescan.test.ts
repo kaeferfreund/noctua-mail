@@ -177,7 +177,46 @@ describe("admin INBOX rescan", () => {
     const master = await getDb();
     master.prepare("UPDATE spam_rescan_jobs SET status = 'running', ownerInstance = 'stopped-process', error = NULL WHERE accountId = ?").run(f.accountId);
     expect((await rescan.loadSpamRescanState(f.accountId)).job).toMatchObject({ status: "cancelled", error: "interrupted" });
-    expect(await rescan.listSpamRescanActivity()).not.toContainEqual(expect.objectContaining({ accountId: f.accountId }));
+    expect(await rescan.listSpamRescanActivity(ADMIN)).not.toContainEqual(expect.objectContaining({ accountId: f.accountId }));
+  });
+
+  test("moving a job scanned by an earlier process is not reset by reconcile", async () => {
+    const f = await fixture();
+    const [first, second] = await f.seed(f.mail({ subject: "Eins" }), f.mail({ subject: "Zwei" }));
+    const job = await f.run(() => rescan.startSpamRescan({ accountId: f.accountId, period: "30d", withModel: true, modelLimit: 2, userId: ADMIN }));
+    const master = await getDb();
+    // The scan ran before a restart: its row carries the stopped process's id.
+    master.prepare("UPDATE spam_rescan_jobs SET ownerInstance = 'stopped-process' WHERE id = ?").run(job.id);
+    const other = await fixture();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    let moving!: () => void;
+    const started = new Promise<void>((resolve) => { moving = resolve; });
+    const moved: string[] = [];
+    await f.run(async () => {
+      expect(await rescan.startSpamRescanMove({ accountId: f.accountId, jobId: job.id, ids: [first.id, second.id], userId: ADMIN })).toBe(2);
+      await started;
+      // A job another process left running makes the next read reconcile; the running move must survive it.
+      master.prepare(`INSERT INTO spam_rescan_jobs (id, accountId, status, period, withModel, modelLimit, ownerInstance, createdByUserId, createdAt, updatedAt)
+        VALUES (?, ?, 'running', 'all', 0, 0, 'stopped-process', ?, ?, ?)`).run(crypto.randomUUID(), other.accountId, ADMIN, Date.now(), Date.now());
+      expect((await rescan.loadSpamRescanState(other.accountId)).job).toMatchObject({ status: "cancelled", error: "interrupted" });
+      expect((await rescan.loadSpamRescanState(f.accountId)).job).toMatchObject({ status: "moving", error: null });
+      await expect(rescan.startSpamRescanMove({ accountId: f.accountId, jobId: job.id, ids: [first.id, second.id], userId: ADMIN }))
+        .rejects.toMatchObject({ name: "SpamRescanBusyError" });
+      release();
+    }, {
+      moveToJunk: async ({ message }) => {
+        moved.push(message.id);
+        moving();
+        await gate;
+        await f.db.prepare("UPDATE messages SET folderId = ?, mailboxPath = 'Junk' WHERE accountId = ? AND id = ?").run(f.junkId, f.accountId, message.id);
+        return { junkFolderId: f.junkId, junkMailbox: "Junk", flags: [], previousMessageId: message.id, messageId: message.id };
+      }
+    });
+    expect(moved.sort()).toEqual([first.id, second.id].sort());
+    const state = await rescan.loadSpamRescanState(f.accountId);
+    expect(state.job).toMatchObject({ status: "ready", error: null, counts: { moved: 2, gone: 0, changed: 0, errors: 0 } });
+    expect(state.items.map((item) => item.moveStatus)).toEqual(["moved", "moved"]);
   });
 
   test("deleting the mailbox removes its rescan rows (they name senders and subjects)", async () => {

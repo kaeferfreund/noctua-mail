@@ -8,14 +8,14 @@ import { loadSpamRescanState, previewSpamRescan, SpamRescanBusyError, SpamRescan
 import { isSpamRescanPeriod } from "@/lib/mail/spam/rescanTypes";
 
 /**
- * „Posteingang jetzt prüfen“ for one mailbox, admin only. GET `?period=30d|12m|all`:
+ * „Posteingang jetzt prüfen“ for one mailbox, admins who are members of it only (else 404). GET `?period=30d|12m|all`:
  * the counts before a start plus the latest job and its preview list. POST
  * `{ period, withModel, modelLimit }` starts a scan; it never moves mail.
  */
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const session = await requireAdminSessionOr403(request); if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
-    const accountId = await resolveSpamRescanAccount(params);
+    const accountId = await resolveSpamRescanAccount(params, session.userId);
     if (!accountId) return spamRescanFailure(404, "account_not_found");
     const period = new URL(request.url).searchParams.get("period") ?? "30d";
     if (!isSpamRescanPeriod(period)) return spamRescanFailure(400, "invalid_period");
@@ -29,7 +29,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   const session = await requireAdminSessionOr403(request); if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
     const limited = spamRescanRateLimited(request, session.userId); if (limited) return limited;
-    const accountId = await resolveSpamRescanAccount(params);
+    const accountId = await resolveSpamRescanAccount(params, session.userId);
     if (!accountId) return spamRescanFailure(404, "account_not_found");
     const body = await request.json().catch(() => null) as { period?: unknown; withModel?: unknown; modelLimit?: unknown } | null;
     if (!isSpamRescanPeriod(body?.period)) return spamRescanFailure(400, "invalid_period");

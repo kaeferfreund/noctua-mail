@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   const session = await requireAdminSessionOr403(request); if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
     const limited = spamRescanRateLimited(request, session.userId); if (limited) return limited;
-    const accountId = await resolveSpamRescanAccount(params);
+    const accountId = await resolveSpamRescanAccount(params, session.userId);
     if (!accountId) return spamRescanFailure(404, "account_not_found");
     const body = await request.json().catch(() => null) as { jobId?: unknown; ids?: unknown } | null;
     if (typeof body?.jobId !== "string") return spamRescanFailure(400, "invalid_selection");

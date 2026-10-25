@@ -6,7 +6,6 @@ import {
   countSpamRescanRows,
   createSpamRescanJob,
   finishSpamRescanMove,
-  getAccounts,
   getFolders,
   getLatestSpamRescanJob,
   getMessageById,
@@ -22,6 +21,7 @@ import {
   type StoredSpamRescanItem,
   type StoredSpamRescanJob
 } from "@/lib/db";
+import { listAccessibleAccountsForUser } from "@/lib/accountAccess";
 import type { Message } from "@/lib/data";
 import { isNonJunkKeyword } from "@/lib/messageFlags";
 import { getSourcesDir } from "@/lib/runtimePaths";
@@ -147,14 +147,22 @@ export async function loadSpamRescanState(accountId: string) {
   return { job: job ? publicJob(job) : null, items: job ? (await listSpamRescanItems(job.id)).map(publicItem) : [] };
 }
 
-/** Running scans and moves of all mailboxes, for the activity panel. */
-export async function listSpamRescanActivity(): Promise<SpamRescanActivity[]> {
+/**
+ * Mailboxes an admin may check: only those they are a member of (owner or any
+ * role), never every mailbox of the household (user decision 2026-10-25).
+ */
+export async function listSpamRescanMailboxes(userId: string) {
+  return (await listAccessibleAccountsForUser(userId)).map(({ account }) => ({ accountId: account.id, email: account.email }));
+}
+
+/** Running scans and moves of the user's own mailboxes, for the activity panel. */
+export async function listSpamRescanActivity(userId: string): Promise<SpamRescanActivity[]> {
   await reconcile();
   const jobs = await listActiveSpamRescanJobs();
   if (!jobs.length) return [];
-  const names = new Map((await getAccounts()).map((account) => [account.id, account.name || account.email]));
-  return jobs.map((job) => ({
-    id: job.id, accountId: job.accountId, mailbox: names.get(job.accountId) ?? job.accountId, status: job.status, phase: job.phase,
+  const names = new Map((await listAccessibleAccountsForUser(userId)).map(({ account }) => [account.id, account.name || account.email]));
+  return jobs.filter((job) => names.has(job.accountId)).map((job) => ({
+    id: job.id, accountId: job.accountId, mailbox: names.get(job.accountId)!, status: job.status, phase: job.phase,
     processed: job.processed, total: job.total, updatedAt: job.updatedAt
   }));
 }
@@ -336,7 +344,7 @@ export async function startSpamRescanMove(input: { accountId: string; jobId: str
   await reconcile();
   const job = await getSpamRescanJob(input.jobId);
   if (!job || job.accountId !== input.accountId) return null;
-  const selected = await beginSpamRescanMove(job.id, [...new Set(input.ids as string[])], input.userId);
+  const selected = await beginSpamRescanMove(job.id, [...new Set(input.ids as string[])], input.userId, runtime.instance);
   if (selected === null) throw new SpamRescanInputError("not_movable");
   if (selected > 0) {
     track(job.id, runMove(job, input.userId).catch((error) => {
