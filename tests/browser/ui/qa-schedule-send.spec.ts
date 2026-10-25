@@ -1,5 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
-import { evidencePath, signInQa } from "./qaRound2Session";
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { evidencePath, recordQa, signInQa } from "./qaRound2Session";
 import { catalogs } from "./qaSweep3";
 
 // Evidence for „Senden planen“: dialog, drafts list badge, opened scheduled draft (synthetic data only).
@@ -35,7 +37,7 @@ test("QA schedule send evidence at 1280/390 px, light and dark", async ({ page }
   await page.goto(draftsUrl);
   await expect(page.getByText("Entwurf: Angebot prüfen").first()).toBeVisible({ timeout: 60_000 });
   const draftId = await saveDraft(page, "Angebot Prophylaxe-Termine", "praxis-kunde@example.test");
-  await saveDraft(page, "Rückfrage Laborauftrag", "labor@example.test");
+  const laterId = await saveDraft(page, "Rückfrage Laborauftrag", "labor@example.test");
   const sendAt = Math.ceil((Date.now() + 26 * 3_600_000) / 900_000) * 900_000;
   const scheduled = await page.request.post(`${mailbox}/drafts/scheduled`, { headers: { origin: new URL(page.url()).origin }, data: { draftId, sendAt } });
   expect(scheduled.status()).toBe(201);
@@ -86,4 +88,27 @@ test("QA schedule send evidence at 1280/390 px, light and dark", async ({ page }
     await dialog.getByRole("button", { name: copy.Compose.schedule.cancel, exact: true }).click();
     await expect(dialog).toBeHidden();
   }
+
+  // End to end through the production server's job: due in ~20 s, sent by the next tick
+  // through the draft send path (SMTP sink outbox, draft removed, schedule settled).
+  const origin = new URL(page.url()).origin;
+  const dueAt = Date.now() + 20_000;
+  const planned = await page.request.post(`${mailbox}/drafts/scheduled`, { headers: { origin }, data: { draftId: laterId, sendAt: dueAt } });
+  expect(planned.status()).toBe(201);
+  const outbox = process.env.QA_SHELL_OUTBOX!;
+  const delivered = () => readdirSync(outbox).filter(name => name.endsWith(".eml"))
+    .map(name => readFileSync(path.join(outbox, name), "utf8")).filter(source => /^To: labor@example\.test/im.test(source));
+  await expect.poll(async () => {
+    const rows = (await (await page.request.get(`${mailbox}/drafts/scheduled`)).json()).scheduledSends as Array<{ draftId: string }>;
+    return rows.some(row => row.draftId === laterId);
+  }, { timeout: 90_000, intervals: [2_000] }).toBe(false);
+  const sentAt = Date.now();
+  const copies = delivered();
+  expect(copies).toHaveLength(1);
+  expect(copies[0]).not.toMatch(/^X-Noctua-Identity-Id:/im);
+  // The draft row is gone; its id now names the Sent copy at most.
+  const after = await page.request.get(`${mailbox}/messages/${encodeURIComponent(laterId)}`);
+  if (after.status() === 200) expect((await after.json()).message.draft).toBeFalsy();
+  else expect(after.status()).toBe(404);
+  recordQa("schedule-send-e2e", { dueAt, sentAt, delayMs: sentAt - dueAt, deliveredCopies: copies.length });
 });
