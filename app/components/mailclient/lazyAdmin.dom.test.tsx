@@ -170,7 +170,7 @@ if (!scenario) {
         });
         await waitFor(() => {
           const admin = view.getByRole("dialog", { name: "Admin" });
-          expect(admin.getAttribute("data-slot")).toBe(startsMobile ? null : "sheet-content");
+          expect(admin.getAttribute("data-slot")).toBe(startsMobile ? "settings-content" : "sheet-content");
           expect(view.getAllByRole("button", { name: "Close admin" })).toHaveLength(1);
           expect(view.getByRole("button", { name: "Invites" }).getAttribute("aria-pressed")).toBe("true");
           expect((view.getByLabelText("Name", { exact: true }) as HTMLInputElement).value).toBe("Synthetic unsent invite");

@@ -8,6 +8,8 @@ import type { AdminAuditEntry } from "@/lib/data";
 import { Button } from "@/app/components/ui/button";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, type AdminFetch } from "@/app/hooks/useAdminApi";
+import tableStyles from "@/app/components/account-settings/SettingsTable.module.css";
+import { adminHeaderRow, adminSectionTitle } from "./adminLayout";
 
 export default function AdminAuditLog({ apiFetch = fetch }: { apiFetch?: AdminFetch }) {
   const t = useTranslations("Admin");
@@ -27,10 +29,10 @@ export default function AdminAuditLog({ apiFetch = fetch }: { apiFetch?: AdminFe
     finally { setBusy(false); }
   }, [apiFetch]);
   useEffect(() => { void load(); }, [load]);
-  return <section className="space-y-4" aria-label={t("audit.title")}><div className="flex items-center justify-between"><h3 className="font-medium">{t("audit.title")}</h3><Button variant="outline" disabled={busy} onClick={() => void load()}>{t("audit.refresh")}</Button></div>
+  return <section className="space-y-4" aria-label={t("audit.title")}><div className={adminHeaderRow}><h3 className={adminSectionTitle}>{t("audit.title")}</h3><Button variant="outline" disabled={busy} onClick={() => void load()}>{t("audit.refresh")}</Button></div>
     {Boolean(error) && <p role="alert">{formatAdminError(error, t, locale)}</p>}
-    <table className="w-full text-left text-sm"><thead><tr><th>{t("audit.time")}</th><th>{t("audit.action")}</th><th>{t("audit.actor")}</th><th>{t("audit.target")}</th></tr></thead>
-      <tbody>{entries.map(entry => <tr key={entry.id} className="border-b"><td className="py-2">{dateTime(entry.createdAt)}</td><td>{entry.action}</td><td>{entry.actorUserId}</td><td>{entry.targetUserId ?? "—"} / {entry.targetAccountId ?? "—"}</td></tr>)}</tbody></table>
+    {entries.length > 0 && <div className={tableStyles.tableScroll}><table><thead><tr><th>{t("audit.time")}</th><th>{t("audit.action")}</th><th>{t("audit.actor")}</th><th>{t("audit.target")}</th></tr></thead>
+      <tbody>{entries.map(entry => <tr key={entry.id}><td className="whitespace-nowrap">{dateTime(entry.createdAt)}</td><td>{entry.action}</td><td className="break-all">{entry.actorUserId}</td><td className="break-all">{entry.targetUserId ?? "—"} / {entry.targetAccountId ?? "—"}</td></tr>)}</tbody></table></div>}
     {!busy && !entries.length && <p>{t("audit.empty")}</p>}
     <Button variant="outline" disabled={busy || !nextCursor || !entries.length} onClick={() => void load(nextCursor ?? undefined)}>{busy ? t("loading") : t("audit.older")}</Button>
   </section>;

@@ -24,9 +24,16 @@ function harness(override?: (url: string, init?: RequestInit) => Response | unde
   const page = render(<Theme><AdminPanel isAdminUser apiFetch={apiFetch} onClose={() => {}} /></Theme>);
   return { page, calls };
 }
+// Rare and sensitive user actions sit in the row's "More actions" menu.
+const menuActions = new Set(["Recovery", "Reset MFA", "Remove passkey", "Delete user"]);
+async function chooseUserAction(page: ReturnType<typeof render>, name: string, email = "user@example.test") {
+  await page.findByText(email);
+  if (!menuActions.has(name)) { fireEvent.click(page.getByRole("button", { name })); return; }
+  fireEvent.pointerDown(page.getByRole("button", { name: `More actions for ${email}` }), { button: 0, ctrlKey: false });
+  fireEvent.click(await page.findByRole("menuitem", { name }));
+}
 async function openUserAction(page: ReturnType<typeof render>, name: string, dialog: string) {
-  await page.findByText("user@example.test");
-  fireEvent.click(page.getByRole("button", { name }));
+  await chooseUserAction(page, name);
   return within(await page.findByRole("dialog", { name: dialog }));
 }
 describe("AdminPanel", () => {
@@ -36,11 +43,13 @@ describe("AdminPanel", () => {
     expect(page.getByText(/Password: Yes/)).toBeTruthy();
     expect(page.getByText(/TOTP: Yes/)).toBeTruthy();
     expect(page.getByText(/Passkeys: 2/)).toBeTruthy();
-    expect(page.getByText("Support · editor")).toBeTruthy();
+    const mailbox = page.getByText("support@example.test").closest("li")!;
+    expect(mailbox.textContent).toContain("Support"); expect(within(mailbox).getByText("editor")).toBeTruthy();
   });
   it("uses target ownership from the canonical users DTO", async () => {
     const { page } = harness(url => url === "/api/admin/users" ? response({ ok: true, users: [{ ...user, accounts: [{ id: "owned", name: "Owned", email: "owned@example.test", role: "manager", isOwner: true }] }] }) : undefined);
-    expect(await page.findByText("Owned · manager · Owner")).toBeTruthy();
+    const mailbox = (await page.findByText("owned@example.test")).closest("li")!;
+    expect(within(mailbox).getByText("manager")).toBeTruthy(); expect(within(mailbox).getByText("Owner")).toBeTruthy();
   });
   it("issues an email-bound invite, copies it and shows the code only until dismissed", async () => {
     const { page, calls } = harness((url, init) => url === "/api/admin/users" && init?.method === "POST" ? response({ ok: true, invite: { code: "synthetic-once-code" } }, 201) : undefined);
@@ -113,8 +122,7 @@ describe("AdminPanel", () => {
       { ...user, accounts: [{ id: "owned", name: "Owned", email: "owned@example.test", role: "manager", isOwner: true }] },
       { id: "synthetic-successor", email: "successor@example.test", role: "user", disabled: false, accounts: [] }
     ] }) : undefined);
-    await page.findByText("user@example.test");
-    fireEvent.click(within(page.getByText("user@example.test").closest("tr")!).getByRole("button", { name: "Delete user" }));
+    await chooseUserAction(page, "Delete user");
     const dialog = within(await page.findByRole("dialog", { name: "Delete user" }));
     expect((dialog.getByRole("button", { name: "Confirm" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(dialog.getByLabelText("Reassign owned mailboxes to"), { target: { value: "synthetic-successor" } });
@@ -165,10 +173,10 @@ describe("AdminPanel", () => {
     const { page } = harness();
     await page.findByText("user@example.test");
     expect(page.getByLabelText("Role for user@example.test").className).toBe(nativeControlBaseClass);
-    fireEvent.click(within(page.getByText("user@example.test").closest("tr")!).getByRole("button", { name: "Delete user" }));
+    await chooseUserAction(page, "Delete user");
     expect((await page.findByRole("dialog", { name: "Delete user" })).querySelector("select")!.className).toBe(nativeControlClass);
     fireEvent.click(page.getByRole("button", { name: "Cancel" }));
-    fireEvent.click(page.getByRole("button", { name: "Remove passkey" }));
+    await chooseUserAction(page, "Remove passkey");
     expect((await page.findByRole("dialog", { name: "Remove passkey" })).querySelector("select")!.className).toBe(nativeControlClass);
     fireEvent.click(page.getByRole("button", { name: "Cancel" }));
     fireEvent.click(page.getByRole("button", { name: "Invites" }));

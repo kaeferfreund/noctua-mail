@@ -6,7 +6,7 @@ import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
-import { adminActionRow } from "./adminLayout";
+import { adminActionRow, adminSectionTitle } from "./adminLayout";
 
 type SpamAdminResponse = {
   settings: { enabled?: boolean; model?: string; threshold?: number };
@@ -57,7 +57,7 @@ export default function AdminSpamSettings({ apiFetch = fetch }: { apiFetch?: Adm
   };
 
   return <section className="space-y-4" aria-label={t("tabs.spam")}>
-    <h3 className="font-medium">{t("spam.heading")}</h3>
+    <h3 className={adminSectionTitle}>{t("spam.heading")}</h3>
     <p className="max-w-2xl text-sm text-muted-foreground">{t("spam.help")}</p>
     {Boolean(error) && <p role="alert" className="text-destructive">{formatAdminError(error, t, locale)}</p>}
     {data && <form onSubmit={(event) => void save(event)} className="grid max-w-lg gap-3">
