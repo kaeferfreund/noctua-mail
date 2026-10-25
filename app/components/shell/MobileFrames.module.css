@@ -5,7 +5,7 @@
   width: 100dvw;
   height: var(--app-height);
   max-width: none;
-  padding: var(--sat) var(--sar) var(--sab) var(--sal);
+  padding: var(--safe-top) var(--sar) var(--sab) var(--sal);
   gap: 0;
   border: 0;
   border-radius: 0;
@@ -14,7 +14,7 @@
    for the 44px target its other controls use. */
 .fullscreenSheet > [data-slot="sheet-close"],
 .statusSheet > [data-slot="sheet-close"] { top: 4px; right: calc(4px + var(--sar)); width: 44px; height: 44px; }
-.fullscreenSheet > [data-slot="sheet-close"] { top: calc(4px + var(--sat)); }
+.fullscreenSheet > [data-slot="sheet-close"] { top: calc(4px + var(--safe-top)); }
 .statusSheet { max-height: 90dvh; overflow: hidden; gap: 0; }
 /* Title row of every phone status Sheet: title and count, then the 44px close. */
 .statusSheetTitle {
@@ -106,7 +106,7 @@
   width: 100dvw;
   max-width: none;
   margin: 0;
-  padding: var(--sat) var(--sar) var(--sab) var(--sal);
+  padding: var(--safe-top) var(--sar) var(--sab) var(--sal);
   border-radius: 0;
 }
 

@@ -4,6 +4,7 @@ import { Theme } from "@radix-ui/themes";
 import { ThemeProvider } from "next-themes";
 import Script from "next/script";
 import { APP_BAR_COLORS } from "@/lib/ui/theme";
+import { IOS_STANDALONE_SCRIPT } from "@/lib/ui/iosStandalone";
 import { DEFAULT_APP_TITLE, versionedIconUrl } from "@/lib/appBranding";
 import "./globals.css";
 import { getLocaleSettings } from "@/i18n/request";
@@ -54,6 +55,9 @@ export default async function RootLayout({
     <html lang={settings.locale} suppressHydrationWarning>
       <head>
         <Script src="/runtime-config.js" strategy="beforeInteractive" />
+        {/* Marks an iOS 26 home-screen app on <html> before the first paint, so
+            the top spacer does not shift the header after load. */}
+        <script id="ios-standalone" dangerouslySetInnerHTML={{ __html: IOS_STANDALONE_SCRIPT }} />
       </head>
       <body suppressHydrationWarning>
         <I18nProvider {...settings}>
