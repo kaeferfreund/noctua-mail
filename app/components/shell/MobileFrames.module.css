@@ -131,4 +131,4 @@
 }
 .calendarBody :global(.fc-toolbar-title) { min-width: 0; text-align: center; overflow-wrap: anywhere; }
 /* Week headers ("Mon 10/19") get about 33px per column at 320px. */
-.calendarBody :global(.fc .fc-col-header-cell-cushion) { padding: 2px 0; font-size: 11px; overflow-wrap: anywhere; }
+.calendarBody :global(.fc .fc-col-header-cell-cushion) { padding: 2px 0; font-size: 12px; overflow-wrap: anywhere; }

@@ -245,7 +245,11 @@ describe("app chrome typography", () => {
         if (decl.prop.startsWith("--") && enclosingLayer(decl) === "theme") themeVars.set(decl.prop, decl.value);
       });
       expect(themeVars.get("--font-mono")).toStartWith("ui-monospace,");
-      expect(themeVars.get("--text-2xs")).toBe("0.6875rem");
+      // One step above Tailwind's defaults: 12 / 13 / 15 (body) / 17px.
+      expect(themeVars.get("--text-2xs")).toBe("0.75rem");
+      expect(themeVars.get("--text-xs")).toBe("0.8125rem");
+      expect(themeVars.get("--text-sm")).toBe("0.9375rem");
+      expect(themeVars.get("--text-base")).toBe("1.0625rem");
       expect(themeVars.get("--tracking-caps")).toBe("0.06em");
 
       const radix = new Map<string, string>();
@@ -257,6 +261,10 @@ describe("app chrome typography", () => {
       expect(radix.get("--em-font-family")).toBe("var(--font-sans)");
       expect(radix.get("--quote-font-family")).toBe("var(--font-sans)");
       expect(radix.get("--code-font-family")).toBe("var(--font-mono)");
+      // Radix text sizes 1-3 follow the same step as --text-xs/sm/base.
+      expect(radix.get("--font-size-1")).toBe("calc(13px * var(--scaling))");
+      expect(radix.get("--font-size-2")).toBe("calc(15px * var(--scaling))");
+      expect(radix.get("--font-size-3")).toBe("calc(17px * var(--scaling))");
 
       // Tailwind runs without preflight: native controls must inherit the
       // family, and the body must not add tracking that only portalled menus

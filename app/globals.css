@@ -21,12 +21,22 @@
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
   /* The one monospace stack, for deliberate code/raw-source surfaces only. */
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-  /* Type scale for the app chrome, on top of Tailwind's text-xs (12px) and
-     text-sm (14px, body): 11px for dense captions such as the status bar.
-     Uppercase is reserved for small section eyebrows, which all share
-     --tracking-caps; everything else uses the font's own spacing. */
-  --text-2xs: 0.6875rem;
+  /* Type scale for the app chrome, one step above Tailwind's defaults (the
+     system font sets smaller than Inter did): text-sm (15px) is the body,
+     text-xs (13px) secondary text, text-2xs (12px) dense captions such as
+     the status bar, text-base (17px) titles. The root font size stays 16px,
+     so rem spacing is unchanged. Radix Themes' --font-size-1..3 follow in
+     the .radix-themes block below. Uppercase is reserved for small section
+     eyebrows, which all share --tracking-caps; everything else uses the
+     font's own spacing. */
+  --text-2xs: 0.75rem;
   --text-2xs--line-height: 1rem;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: calc(1.125 / 0.8125);
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: calc(1.375 / 0.9375);
+  --text-base: 1.0625rem;
+  --text-base--line-height: calc(1.5 / 1.0625);
   --tracking-caps: 0.06em;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -219,6 +229,12 @@
   --color-panel-solid: var(--card);
   --color-surface: var(--card);
   --default-font-family: var(--font-sans);
+  /* The same one-step type scale as --text-xs/--text-sm/--text-base. */
+  --font-size-1: calc(13px * var(--scaling));
+  --font-size-2: calc(15px * var(--scaling));
+  --font-size-3: calc(17px * var(--scaling));
+  --line-height-1: calc(18px * var(--scaling));
+  --line-height-2: calc(22px * var(--scaling));
   --code-font-family: var(--font-mono);
   --em-font-family: var(--font-sans);
   --em-font-size-adjust: 1;
@@ -391,7 +407,7 @@ a {
 
 .icon-button.small {
   padding: 4px 8px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .icon-button:hover {
@@ -480,7 +496,7 @@ a {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
-  font-size: 12px;
+  font-size: 13px;
   color: inherit;
 }
 
@@ -518,7 +534,7 @@ a {
   background: rgba(0, 0, 0, 0.08);
   color: inherit;
   border-radius: var(--radius-sm);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1;
   padding: 6px 8px;
   cursor: pointer;
@@ -646,7 +662,7 @@ a {
 
 .markdown-view {
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.6;
   color: var(--mail-view-fg);
   background: var(--mail-view-bg);
@@ -682,7 +698,7 @@ a {
 
 .markdown-view code {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   background: var(--surface-2);
   padding: 2px 4px;
   border-radius: var(--radius-sm);
@@ -714,7 +730,7 @@ a {
 
 .attachments h4 {
   margin: 8px 0;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .attachments-header {
@@ -733,7 +749,7 @@ a {
   color: var(--muted-foreground);
   border-radius: var(--radius-sm);
   padding: 4px 8px;
-  font-size: 11px;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -752,7 +768,7 @@ a {
   align-items: center;
   gap: 8px;
   padding: 6px 0;
-  font-size: 12px;
+  font-size: 13px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -791,7 +807,7 @@ a {
   max-width: 6ch;
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
 }
@@ -834,7 +850,7 @@ a {
 
 .attachment-meta {
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .attachment-preview {
@@ -849,7 +865,7 @@ a {
 
 .attachment-load-error {
   color: var(--red-11);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 
@@ -861,7 +877,7 @@ a {
 }
 
 .flag-pill {
-  font-size: 10px;
+  font-size: 11px;
   padding: 2px 6px;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
@@ -887,7 +903,7 @@ a {
 
 .quote-block p {
   margin: 6px 0;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--mail-view-fg);
 }
 
@@ -1014,7 +1030,7 @@ a {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow);
   padding: 10px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text);
   z-index: 6;
 }
@@ -1160,7 +1176,7 @@ a {
   padding: 0 6px;
   border: 1px solid var(--gray-6);
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.4;
 }
 
@@ -1211,7 +1227,7 @@ a {
 }
 
 .exception-meta {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--muted-foreground);
 }
 
@@ -1239,7 +1255,7 @@ a {
   border-radius: var(--radius-sm);
   padding: 4px 6px;
   cursor: default;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .exception-item.interactive {
@@ -1262,7 +1278,7 @@ a {
 
 .exception-item-time {
   color: var(--muted-foreground);
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .popover-body {
@@ -1451,7 +1467,7 @@ a {
 
 .settings-subtitle {
   margin: 6px 0 4px 0;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 400;
   color: var(--muted-foreground);
 }
@@ -1471,7 +1487,7 @@ a {
 
 .form-section h4 {
   margin: 0 0 6px 0;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .section-header {
@@ -1484,7 +1500,7 @@ a {
 
 .section-note {
   margin: 0 0 10px 0;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted-foreground);
 }
 
@@ -1498,7 +1514,7 @@ a {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted-foreground);
 }
 
@@ -1582,7 +1598,7 @@ a {
   border: 1px solid var(--border);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
   color: var(--text);
-  font-size: 13px;
+  font-size: 14px;
   pointer-events: none;
   z-index: var(--layer-drag-ghost);
 }

@@ -109,7 +109,7 @@ export default function MessageCardList({
   } = useThreadListAnimationState();
 
   const isMobile = useIsMobile();
-  const rowHeight = isCompactView ? (isMobile ? 72 : 60) : 100;
+  const rowHeight = isCompactView ? (isMobile ? 72 : 60) : 104;
   const groupHeight = isCompactView ? 28 : 32;
   const { ids: selectedMessageIds, activeId: activeMessageId } =
     useSelectionSnapshot(selectionStore);

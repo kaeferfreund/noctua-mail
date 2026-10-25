@@ -30,7 +30,7 @@ export default function CollabRowBadges({
   return (
     <span
       data-collab-thread={message.threadId}
-      className="inline-flex shrink-0 items-center gap-1 text-[10px] leading-4"
+      className="inline-flex shrink-0 items-center gap-1 text-[11px] leading-4"
     >
       {name && (
         <span

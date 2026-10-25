@@ -3,7 +3,7 @@
   align-items: baseline;
   gap: var(--space-2);
   flex-wrap: nowrap;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--gray-11);
   line-height: 1.6;
 }
@@ -21,7 +21,7 @@
   color: var(--gray-11);
   font-weight: 600;
   flex: 0 0 auto;
-  font-size: 12px;
+  font-size: 13px;
   overflow-wrap: normal;
   word-break: normal;
   hyphens: manual;
@@ -39,7 +39,7 @@
   color: var(--link);
   text-decoration: underline;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
   text-align: left;
   min-width: 0;
@@ -51,6 +51,6 @@
 
 .value {
   color: var(--gray-12);
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.6;
 }

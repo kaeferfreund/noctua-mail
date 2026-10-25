@@ -20,7 +20,7 @@
   max-width: 100%;
   overflow: visible;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13px;
   align-items: center;
   transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
   height: 44px;
