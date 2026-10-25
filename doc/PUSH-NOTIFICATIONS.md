@@ -181,7 +181,7 @@ context on the last body line (left out when `accountName` is empty).
 | `count` > 1 | `<count> neue Nachrichten` | `from — subject` ⏎ `accountName` |
 | `count` > 1, no subject | `<count> neue Nachrichten` | `from` ⏎ `accountName` |
 
-Example: title “Dr. Weber”, body “Terminbestätigung Montag” / “kontakt@monkeydent”.
+Example: title “Dr. Weber”, body “Terminbestätigung Montag” / “kontakt@example.test”.
 Notifications per mailbox share the tag `mail:<accountId>`, so a newer push
 replaces the older one and alerts again. The test push shows “Noctua:
 Benachrichtigungen aktiv”.

@@ -113,8 +113,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      BETTER_AUTH_URL: https://mail.example.org
-      PASSKEY_RP_ID: mail.example.org
+      BETTER_AUTH_URL: https://ci.example.test
+      PASSKEY_RP_ID: ci.example.test
       IMAP_CREDENTIALS_STORAGE: db
       NOCTUA_MAILBOX_WATCHER: "0"
       NOCTUA_DATA_DIR: ${{ github.workspace }}/.tmp/build-data

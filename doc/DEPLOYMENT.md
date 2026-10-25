@@ -41,8 +41,8 @@ is set. `PASSKEY_RP_ID` defaults to the canonical hostname. Additional trusted o
 Keep independent random secrets in a root-readable environment file, never in source or logs.
 Generate a new auth secret with `openssl rand -hex 32`; retain the existing IMAP key for old data.
 
-Canonical DNS A is `203.0.113.10` inside the tailnet. Obtain and renew TLS via mailprovider DNS-01;
-keep mailprovider API credentials in the proxy secret store. No public HTTP challenge is required.
+Canonical DNS A is `<tailnet-ip>` inside the tailnet. Obtain and renew TLS via your DNS provider (DNS-01);
+keep the DNS provider's API credentials in the proxy secret store. No public HTTP challenge is required.
 The separate preview `https://preview.example.org:3790` has isolated data/auth/encryption
 secrets, its own URL and RP ID `preview.example.org`, preview-only trust and new passkeys.
 Never add preview trust to production or claim canonical passkey reuse there.
@@ -391,10 +391,10 @@ These are auto-managed and should be included in backups if the app is running.
 ## Reverse Proxy
 
 Use [deploy-scripts/nginx-auth.conf](../deploy-scripts/nginx-auth.conf) at the TLS terminator.
-The example binds tailnet IP 203.0.113.10, uses the canonical hostname, overwrites the complete
+The example binds the tailnet IP (placeholder `203.0.113.10`), uses the canonical hostname, overwrites the complete
 forwarded-header chain, and disables access logs for all authentication/reset paths. Other access
 logs use `$uri` without query strings. Do not enable proxy/debug/body logging for auth traffic.
-Provision certificate paths through mailprovider DNS-01 before starting nginx; the actual mailprovider plugin
+Provision certificate paths through your DNS provider (DNS-01) before starting nginx; the actual DNS plugin
 and renewal service are deployment-owner responsibilities, not exercised by the local smoke.
 Only the proxy may connect to the loopback backend. With one sanitized proxy hop, Better Auth's
 pinned default IP reader takes `x-forwarded-for`; Noctua wrapper limits use `TRUSTED_PROXY_HOPS=1`.
@@ -530,7 +530,7 @@ Children bind their durable ticket before sync work, closing the parent-spawn cr
 Shutdown/timeout only signal owned child PIDs and wait for confirmed exit. These local-PID leases
 are not a distributed multi-host scheduler. Browser invalidation events remain process-local.
 
-**MailProvider sizing assumption:** the mailbox plan permits a handful of concurrent IMAP connections
+**Mail provider sizing assumption:** the mailbox plan permits a handful of concurrent IMAP connections
 per mailbox. This is an assumption to verify against the actual hosting plan before go-live, not
 a provider-guaranteed limit. A mailbox can need one watcher, one pooled connection and one worker,
 plus the sessions of any open browser tabs or other mail clients. Start with
@@ -602,5 +602,5 @@ shard/key snapshot; application-wide restore acceptance stays Stage 4 in TEAM-IN
 The auth/admin UI and policy-controlled public backend are integrated. Migration and recovery
 both hold the shared operator lifetime lock; follow the [offline runbook](AUTHENTICATION.md#offline-migration-and-bootstrap-runbook),
 including stopped service, consistent backup and personally verified handover. The build, local
-compiled smoke and virtual-authenticator suite do not establish live tailnet DNS/TLS, mailprovider renewal,
+compiled smoke and virtual-authenticator suite do not establish live tailnet DNS/TLS, DNS-01 renewal,
 physical phone/PWA acceptance or the final application-wide restore. Those remain release gates.

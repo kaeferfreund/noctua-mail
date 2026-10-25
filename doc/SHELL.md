@@ -215,7 +215,7 @@ unchanged. Notice positioning measures the list pane's actual right edge in spli
 the visible reader (`#reader`) in focus.
 
 Synthetic browser evidence and before/after measurements live in
-[briefs/status-bar-compact-evidence](/home/user/code/noctua-mail/briefs/status-bar-compact-evidence/). The density baseline was captured after the
+the workspace archive `briefs/status-bar-compact-evidence/` (not part of this repository). The density baseline was captured after the
 footer removal but before the density pass; the original footer separately
 occupied 28px. Verification results and merge notes follow below.
 
@@ -243,7 +243,7 @@ Frozen installation preserved `bun.lock`. Type checking reports zero errors in
 catalog parity is green with 57 new `Shell.status` keys. Lint stays at the
 supplied baseline of one existing error and 25 warnings. Production build and
 all four browser scenarios pass. Complete CI and merge results are recorded in
-[archived verification.json](/home/user/code/noctua-mail/briefs/status-bar-compact-evidence/verification.json).
+the archived `briefs/status-bar-compact-evidence/verification.json` (workspace archive, not part of this repository).
 
 Integration dry run of implementation commit `bbcec12` against
 `origin/integration/stage` (`11dc3c5`) is clean: merge-tree exit 0, tree
@@ -260,7 +260,7 @@ complete run. No timeout, retry budget or existing assertion was relaxed.
 The implementation and validation notes are committed locally; nothing is pushed.
 
 Round 2 evidence is stored outside the source checkout at
-[briefs/status-bar-compact-evidence/round2](/home/user/code/noctua-mail/briefs/status-bar-compact-evidence/round2/).
+the workspace archive `briefs/status-bar-compact-evidence/round2/` (not part of this repository).
 The status browser suite accepts `QA_STATUS_ARTIFACTS` for this destination;
 without it, captures stay in ignored `.tmp/qa-status-indicator`.
 
@@ -361,7 +361,7 @@ all five reviewer probes: calendar layout/event click, layers, retry wiring,
 exception clearing and all mobile routes/PWA flag handling.
 
 The original 12 PNGs and six JSON artifacts are preserved byte-for-byte in
-[round1-committed](/home/user/code/noctua-mail/briefs/status-bar-compact-evidence/round1-committed/);
+`briefs/status-bar-compact-evidence/round1-committed/` (workspace archive, not part of this repository);
 new captures are in the parent evidence directory and raw gates/probes in
 `round2/`. Browser fixtures use isolated `.tmp/qa-shell-*` storage, synthetic
 credentials and only ports 3875–3878. `.env.local` and the configured persistent

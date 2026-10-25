@@ -3,8 +3,9 @@ import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import { workerRuntimeTraceFiles } from "./build-scripts/workerRuntimeTraceFiles";
 
-// Next walks parent lockfiles and otherwise picks /home/user as the
-// workspace root, which nests standalone output under that absolute path.
+// Next walks parent lockfiles and otherwise picks a parent directory (for
+// example the home directory) as the workspace root, which nests standalone
+// output under that absolute path.
 // SWC compiles this file to CJS and rewrites import.meta.dirname to
 // __dirname (the directory of next.config.ts). Native TS loading keeps
 // import.meta.dirname, which is the same directory.

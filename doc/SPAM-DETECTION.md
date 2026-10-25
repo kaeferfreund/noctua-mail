@@ -166,7 +166,7 @@ is the exact list in `NOCTUA_SPAM_AUTHSERV_ID`, or else the host after "by" in
 the top-most `Received` line (written by our server, never by the sender): an
 authserv-id matches when it equals that host, its first label, or lies in its
 registrable domain (case-insensitive, trailing dot ignored). The label match
-covers MailProvider, which stamps `by mx1.mail.example.com` but writes
+covers providers that stamp `by mx1.mail.example.com` but write
 `Authentication-Results: mx1;`. A block the sender inserted under another id —
 for example when the receiving server adds none — is ignored. A forged block
 under our server's own id still counts when the server writes none; a
