@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import { nativeControlBaseClass, nativeControlClass } from "@/app/components/account-settings/Field";
-import SettingsFrame, { SettingsTitle } from "@/app/components/shell/SettingsFrame";
+import SettingsFrame, { SettingsHeader, settingsNavClass } from "@/app/components/shell/SettingsFrame";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 import { createAuthClient, type NoctuaAuthClient, type Proof } from "@/lib/authClient";
@@ -19,13 +19,13 @@ import AdminInviteHistory from "./AdminInviteHistory";
 import AdminMailboxes from "./AdminMailboxes";
 import AdminSpamSettings from "./AdminSpamSettings";
 import AdminDomainIcons from "./AdminDomainIcons";
+import AdminUsersTable from "./AdminUsersTable";
 import { ADMIN_SECTIONS } from "@/lib/navigation/deepLinks";
-import { adminActionRow, adminHeaderRow } from "./adminLayout";
+import { adminActionRow, adminHeaderRow, adminSectionTitle } from "./adminLayout";
 import type { AdminUser } from "./types";
 
 type Action = { user: AdminUser; type: "role" | "status" | "delete" | "recovery" | "mfa-reset" | "sessions" | "passkey"; role?: "admin" | "user" };
 function isOwner(user: AdminUser) { return user.accounts?.some(account => account.isOwner === true) ?? false; }
-function securityValue(value: boolean | undefined) { return value === undefined ? "users.unknown" : value ? "users.yes" : "users.no"; }
 
 export type AdminSection = (typeof ADMIN_SECTIONS)[number];
 type NavigationProps = { section?: AdminSection; onSectionChange?: (section: AdminSection) => void };
@@ -97,28 +97,17 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
     finally { setBusy(false); }
   };
   return <SettingsFrame open onClose={() => { if (!busy) onClose(); }}><div className="flex h-full min-h-0 flex-col gap-4">
-    <div className={adminHeaderRow}><SettingsTitle>{t("title")}</SettingsTitle><Button variant="outline" disabled={busy} onClick={onClose}>{t("close")}</Button></div>
-    <nav aria-label={t("sections")} className={adminActionRow}>{ADMIN_SECTIONS.map(value => <Button key={value} variant={tab === value ? "default" : "outline"} aria-pressed={tab === value} onClick={() => setTab(value)}>{t(`tabs.${value}`)}</Button>)}</nav>
+    <SettingsHeader title={t("title")} closeLabel={t("close")} closeDisabled={busy} onClose={onClose} />
+    <nav aria-label={t("sections")} className={`${adminActionRow} ${settingsNavClass.buttons}`}>{ADMIN_SECTIONS.map(value => <Button key={value} variant="ghost" aria-pressed={tab === value} onClick={() => setTab(value)}>{t(`tabs.${value}`)}</Button>)}</nav>
     <div className="min-h-0 flex-1 overflow-auto">
       {Boolean(error) && <p role="alert" className="mb-3 text-destructive">{formatAdminError(error, t, locale)}</p>}
-      {tab === "users" && <section className="space-y-4" aria-label={t("tabs.users")}><div className={adminHeaderRow}><h3 className="font-medium">{t("tabs.users")}</h3><Button variant="outline" disabled={loading || busy} onClick={() => void load()}>{t("users.refresh")}</Button></div>
+      {tab === "users" && <section className="space-y-4" aria-label={t("tabs.users")}><div className={adminHeaderRow}><h3 className={adminSectionTitle}>{t("tabs.users")}</h3><Button variant="outline" disabled={loading || busy} onClick={() => void load()}>{t("users.refresh")}</Button></div>
         {loading && <p role="status">{t("users.loading")}</p>}
-        <table className="w-full text-left text-sm"><thead><tr><th>{t("users.nameEmail")}</th><th>{t("role")}</th><th>{t("status")}</th><th>{t("users.security")}</th><th>{t("tabs.mailboxes")}</th><th>{t("actions")}</th></tr></thead>
-          <tbody>{users.map(user => <tr key={user.id} className="border-b align-top"><td className="p-2">{user.name || "—"}<div>{user.email}</div></td>
-            <td className="p-2"><select className={nativeControlBaseClass} aria-label={t("users.roleFor", {email: user.email})} value={user.role} disabled={busy} onChange={event => begin({ user, type: "role", role: event.target.value as "admin" | "user" })}><option value="user">{t("roles.user")}</option><option value="admin">{t("roles.admin")}</option></select></td>
-            <td className="p-2">{user.disabled ? t("users.disabled") : user.disabled === false ? t("users.enabled") : t("users.unknown")}</td>
-            <td className="p-2">{t("users.password", {value: t(securityValue(user.hasPassword))})}<br />{t("users.totp", {value: t(securityValue(user.twoFactorEnabled))})}<br />{t("users.passkeys", {value: user.passkeyCount ?? user.passkeys?.length ?? t("users.unknown")})}</td>
-            <td className="p-2">{user.accounts?.map(account => <div key={account.id}>{account.name || account.email} · {t(`roles.${account.role}`)}{(account.isOwner === true) ? <> · {t("owner")}</> : null}</div>)}</td>
-            <td className="flex flex-wrap gap-2 p-2"><Button size="sm" variant="outline" disabled={busy} onClick={() => begin({ user, type: "status" })}>{user.disabled ? t("users.enable") : t("users.disable")}</Button>
-              <Button size="sm" variant="outline" disabled={busy} onClick={() => begin({ user, type: "sessions" })}>{t("actionTitles.sessions")}</Button>
-              <Button size="sm" variant="outline" disabled={busy} onClick={() => begin({ user, type: "recovery" })}>{t("users.recovery")}</Button>
-              <Button size="sm" variant="outline" disabled={busy} onClick={() => begin({ user, type: "mfa-reset" })}>{t("actionTitles.mfa-reset")}</Button>
-              <Button size="sm" variant="outline" disabled={busy || !user.passkeys?.length} onClick={() => begin({ user, type: "passkey" })}>{t("actionTitles.passkey")}</Button>
-              <Button size="sm" variant="destructive" disabled={busy} onClick={() => begin({ user, type: "delete" })}>{t("actionTitles.delete")}</Button></td></tr>)}</tbody></table>
+        <AdminUsersTable users={users} busy={busy} onAction={(user, type, role) => begin({ user, type, role })} />
       </section>}
-      {tab === "invites" && <section className="space-y-4" aria-label={t("tabs.invites")}><h3 className="font-medium">{t("invites.heading")}</h3><p className="text-sm text-muted-foreground">{t("invites.help")}</p>
-        <form onSubmit={event => void invite(event)} className="grid max-w-lg gap-3"><label className="grid gap-1">{t("name")}<Input required value={name} onChange={event => setName(event.target.value)} /></label><label className="grid gap-1">{t("email")}<Input required type="email" value={email} onChange={event => setEmail(event.target.value)} /></label>
-          <label className="grid gap-1">{t("invites.role")}<select className={nativeControlClass} value={inviteRole} onChange={event => setInviteRole(event.target.value as "user" | "admin")}><option value="user">{t("roles.user")}</option><option value="admin">{t("roles.admin")}</option></select></label><Button disabled={busy}>{t("invites.issue")}</Button></form>
+      {tab === "invites" && <section className="space-y-4" aria-label={t("tabs.invites")}><div className="space-y-1"><h3 className={adminSectionTitle}>{t("invites.heading")}</h3><p className="text-sm text-muted-foreground">{t("invites.help")}</p></div>
+        <form onSubmit={event => void invite(event)} className="grid max-w-lg gap-3 text-sm"><label className="grid gap-1">{t("name")}<Input required value={name} onChange={event => setName(event.target.value)} /></label><label className="grid gap-1">{t("email")}<Input required type="email" value={email} onChange={event => setEmail(event.target.value)} /></label>
+          <label className="grid gap-1">{t("invites.role")}<select className={nativeControlClass} value={inviteRole} onChange={event => setInviteRole(event.target.value as "user" | "admin")}><option value="user">{t("roles.user")}</option><option value="admin">{t("roles.admin")}</option></select></label><Button className="justify-self-start" disabled={busy}>{t("invites.issue")}</Button></form>
         <AdminInviteHistory apiFetch={apiFetch} revision={inviteRevision} />
       </section>}
       {tab === "mailboxes" && <AdminMailboxes apiFetch={apiFetch} users={users} onAccessChanged={onAccessChanged} />}

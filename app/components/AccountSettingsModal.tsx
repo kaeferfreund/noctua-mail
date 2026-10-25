@@ -5,8 +5,7 @@ import { useTranslations } from "next-intl";
 import mobileStyles from "@/app/components/shell/MobileFrames.module.css";
 import { useMemo, useState } from "react";
 import { useIsMobile } from "@/app/hooks/use-mobile";
-import SettingsFrame, { SettingsTitle } from "@/app/components/shell/SettingsFrame";
-import { X } from "lucide-react";
+import SettingsFrame, { SettingsHeader, settingsNavClass } from "@/app/components/shell/SettingsFrame";
 import { Flex, Tabs } from "@radix-ui/themes";
 import type { Account, AccountSettings, RecipientAlias, Topic } from "@/lib/data";
 import { hasSavableAccountSettingsChanges } from "@/lib/accountSettings";
@@ -26,7 +25,6 @@ import TranslationTabContent from "@/app/components/account-settings/tabs/Transl
 import SpamTabContent from "@/app/components/account-settings/tabs/SpamTabContent";
 import NotificationsTabContent from "@/app/components/account-settings/tabs/NotificationsTabContent";
 import { type OverflowTabItem } from "@/app/components/account-settings/OverflowTabsList";
-import TooltipIconButton from "@/app/components/TooltipIconButton";
 export type ManageTab =
   | "account"
   | "identities"
@@ -223,22 +221,15 @@ export default function AccountSettingsModal({
   return (
     <SettingsFrame open={isOpen} onClose={onClose}>
         <Flex direction="column" gap="4" style={{ height: "100%", minHeight: 0 }}>
-          <Flex align="center" justify="between" style={{ paddingBottom: "var(--space-2)", flexShrink: 0 }}>
-            <SettingsTitle>
-              {t("accountTitle")}
-            </SettingsTitle>
-            <TooltipIconButton variant="ghost" tooltip={t("close")} onClick={onClose}>
-              <X size={18} />
-            </TooltipIconButton>
-          </Flex>
+          <SettingsHeader title={t("accountTitle")} closeLabel={t("close")} onClose={onClose} />
 
           <Tabs.Root
             orientation="vertical"
             value={activeTab}
             onValueChange={(value) => onTabChange(value as ManageTab)}
-            style={{ flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: "row", gap: 12 }}
+            style={{ flex: "1 1 auto", minHeight: 0, display: "flex", flexDirection: "row", gap: isMobile ? 12 : 24 }}
           >
-            <Tabs.List className={isMobile ? mobileStyles.settingsTabs : undefined} style={{ flexDirection: "column", alignItems: "stretch", flexShrink: 0, overflow: "auto" }}>{tabItems.map(tab => <Tabs.Trigger key={tab.value} aria-label={tab.label} value={tab.value} disabled={tab.disabled}>{tab.label}</Tabs.Trigger>)}</Tabs.List>
+            <Tabs.List className={`${settingsNavClass.tabs} ${isMobile ? mobileStyles.settingsTabs : settingsNavClass.tabsWide}`}>{tabItems.map(tab => <Tabs.Trigger key={tab.value} aria-label={tab.label} value={tab.value} disabled={tab.disabled}>{tab.label}</Tabs.Trigger>)}</Tabs.List>
 
             {settingsTabVisible("account", initialAccount.accessRole, isExistingAccount) && <Tabs.Content value="account" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
               <AccountTabContent

@@ -4,11 +4,20 @@ import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { formatDate } from "@/lib/i18n/format";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
+import { Badge } from "@/app/components/ui/badge";
 import { Button } from "@/app/components/ui/button";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 import AdminConfirmDialog from "./AdminConfirmDialog";
-import { adminHeaderRow } from "./adminLayout";
+import { adminHeaderRow, adminSectionTitle } from "./adminLayout";
 import type { AdminInvite } from "./types";
+
+/** Status badge colours: open invites stand out, finished ones recede. */
+const statusBadge: Record<AdminInvite["status"], string> = {
+  issued: "border-transparent bg-(--accent-a3) text-(--accent-11)",
+  redeemed: "border-transparent bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
+  revoked: "border-transparent bg-destructive/10 text-destructive",
+  expired: "text-muted-foreground"
+};
 
 type Pending = { type: "cleanup" } | { type: "revoke"; invite: AdminInvite };
 
@@ -43,15 +52,19 @@ export default function AdminInviteHistory({ apiFetch, revision }: { apiFetch: A
     finally { setBusy(false); }
   };
   return <div className="space-y-2">
-    <div className={adminHeaderRow}><h3 className="font-medium">{t("invites.history")}</h3>
+    <div className={adminHeaderRow}><h3 className={adminSectionTitle}>{t("invites.history")}</h3>
       <Button variant="outline" size="sm" disabled={busy} onClick={() => { setActionError(null); setPending({ type: "cleanup" }); }}>{t("invites.cleanup")}</Button></div>
     {Boolean(error) && <p role="alert">{formatAdminError(error, t, locale)}</p>}
     {cleaned !== null && <p role="status" className="text-sm text-muted-foreground">{t("invites.cleaned", {count: cleaned})}</p>}
-    {invites.map(invite => <div key={invite.id} className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-sm">{label(invite)} · {t(`invites.status.${invite.status}`)} · {t("invites.issuedBy", {name: issuer(invite)})} · {invite.expiresAt ? t("invites.expires", {time: dateTime(invite.expiresAt)}) : t("invites.noExpiry")}</p>
-      {invite.status === "issued" && <Button variant="outline" size="sm" disabled={busy} aria-label={t("invites.revokeFor", {name: label(invite)})}
+    {invites.length > 0 && <ul className="m-0 list-none divide-y rounded-md border bg-(--color-panel-solid) p-0">{invites.map(invite => <li key={invite.id} data-invite className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2">
+      <div className="min-w-0 space-y-0.5">
+        <div className="flex flex-wrap items-center gap-2"><span className="min-w-0 break-words font-medium" data-user-text>{label(invite)}</span>
+          <Badge variant="outline" className={`font-normal ${statusBadge[invite.status]}`}>{t(`invites.status.${invite.status}`)}</Badge></div>
+        <p className="m-0 text-xs text-muted-foreground">{t("invites.issuedBy", {name: issuer(invite)})} · {invite.expiresAt ? t("invites.expires", {time: dateTime(invite.expiresAt)}) : t("invites.noExpiry")}</p>
+      </div>
+      {invite.status === "issued" && <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive max-md:min-h-11" disabled={busy} aria-label={t("invites.revokeFor", {name: label(invite)})}
         onClick={() => { setActionError(null); setPending({ type: "revoke", invite }); }}>{t("invites.revoke")}</Button>}
-    </div>)}
+    </li>)}</ul>}
     {pending && <AdminConfirmDialog busy={busy} error={actionError ? formatAdminError(actionError, t, locale) : undefined} onCancel={close} onConfirm={() => void confirm()}
       title={pending.type === "cleanup" ? t("invites.cleanup") : t("invites.revokeTitle")}
       description={pending.type === "cleanup" ? t("invites.cleanupConfirm") : t("invites.revokeConfirm", {name: label(pending.invite)})} />}
