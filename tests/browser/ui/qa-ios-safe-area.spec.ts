@@ -218,9 +218,9 @@ test("iPhone with the opaque status bar: frames start at the top, reach the bott
 
 // iOS 26 home-screen app: the early script marks <html data-ios-standalone>
 // (lib/ui/iosStandalone.ts; Chromium is no iPhone, so the test sets it) and
-// every view's top bar gets the quarter-line --top-spacer in its own colour.
-const SPACER = 12;
-test("iOS 26 home-screen app: a quarter-line spacer above each top bar, the list still reaches the bottom", async ({ page, browser }) => {
+// every view's top bar gets the 6px --top-spacer in its own colour.
+const SPACER = 6;
+test("iOS 26 home-screen app: a 6px spacer above each top bar, the list still reaches the bottom", async ({ page, browser }) => {
   mkdirSync(evidence, { recursive: true });
   const markIosStandalone = () => document.addEventListener("DOMContentLoaded", () => document.documentElement.setAttribute("data-ios-standalone", ""));
   await page.setViewportSize(VIEWPORT);
