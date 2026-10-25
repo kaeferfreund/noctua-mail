@@ -27,7 +27,7 @@ export type SpamRescanStage = "server-flag" | "classifier";
 /** pending: selected for the running move; gone: no longer in the INBOX; changed: kept because the mail changed since the scan. */
 export type SpamRescanMoveStatus = "pending" | "moved" | "gone" | "changed" | "error";
 /** Why the model step did not run although it was requested. */
-export type SpamRescanModelBlock = "detection-off" | "missing-key" | "unsupported-provider";
+export type SpamRescanModelBlock = "detection-off" | "mailbox-off" | "missing-key" | "unsupported-provider";
 
 export type SpamRescanCounts = {
   /** INBOX rows in the range. */

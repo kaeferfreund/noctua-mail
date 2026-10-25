@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/app/components/ui/button";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
@@ -33,7 +33,7 @@ export default function AdminSpamRescan({ apiFetch, mailboxes }: { apiFetch: Adm
   return <section className="space-y-3" aria-labelledby="spam-rescan-heading">
     <h3 id="spam-rescan-heading" className="font-medium">{t("heading")}</h3>
     <p className="max-w-2xl text-sm text-muted-foreground">{t("help")}</p>
-    <ul className="space-y-3">
+    <ul className="m-0 list-none space-y-3 p-0">
       {mailboxes.map((mailbox) => <li key={mailbox.accountId} className="space-y-3 rounded-md border p-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <span className="min-w-0 break-words font-medium">{mailbox.email}</span>
@@ -59,6 +59,7 @@ function SpamRescanPanel({ apiFetch, accountId }: { apiFetch: AdminFetch; accoun
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const base = `/api/admin/accounts/${encodeURIComponent(accountId)}/spam-rescan`;
+  const root = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async (value: SpamRescanPeriod) => {
     const data = await adminRequest<RescanState>(apiFetch, `${base}?period=${value}`);
@@ -72,6 +73,10 @@ function SpamRescanPanel({ apiFetch, accountId }: { apiFetch: AdminFetch; accoun
       .catch((reason) => { if (active) setError(reason); });
     return () => { active = false; };
   }, [apiFetch, base]);
+
+  // The panel opens below its mailbox: bring it into view once its content has loaded.
+  const loaded = state !== null;
+  useEffect(() => { if (loaded) root.current?.scrollIntoView?.({ block: "nearest" }); }, [loaded]);
 
   const job = state?.job ?? null;
   const running = isActive(job);
@@ -116,10 +121,10 @@ function SpamRescanPanel({ apiFetch, accountId }: { apiFetch: AdminFetch; accoun
   });
 
   const errorText = Boolean(error) && <p role="alert" className="text-destructive">{formatAdminError(error, tAdmin, locale)}</p>;
-  if (!state) return <div>{errorText || <p role="status" className="text-sm">{tAdmin("loading")}</p>}</div>;
+  if (!state) return <div ref={root}>{errorText || <p role="status" className="text-sm">{tAdmin("loading")}</p>}</div>;
 
   if (running && job) {
-    return <div className="space-y-2" role="status" aria-live="polite">
+    return <div ref={root} className="space-y-2" role="status" aria-live="polite">
       <p>{job.phase ? t(`phase.${job.phase}`) : t("running")}</p>
       <progress className="w-full" max={Math.max(1, job.total)} value={Math.min(job.processed, Math.max(1, job.total))} aria-label={t("running")} />
       <p className="text-sm text-muted-foreground">{t("progress", { processed: job.processed, total: job.total })}</p>
@@ -129,9 +134,9 @@ function SpamRescanPanel({ apiFetch, accountId }: { apiFetch: AdminFetch; accoun
   }
 
   if (setup || !job || job.status === "failed") {
-    return <div className="space-y-3">
+    return <div ref={root} className="space-y-3">
       {job?.status === "failed" && !setup && <p className="text-sm">{t("state.failed")}</p>}
-      <fieldset className="space-y-1" disabled={busy}>
+      <fieldset className="m-0 min-w-0 space-y-1 border-0 p-0" disabled={busy}>
         <legend className="mb-1 text-sm font-medium">{t("period")}</legend>
         <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:gap-4">
           {SPAM_RESCAN_PERIODS.map((value) => <label key={value} className="flex min-h-11 items-center gap-2 sm:min-h-0">
@@ -165,7 +170,7 @@ function SpamRescanPanel({ apiFetch, accountId }: { apiFetch: AdminFetch; accoun
   const notice = job.status === "cancelled" ? t(job.error === "interrupted" ? "state.interrupted" : "state.cancelled")
     : job.error === "interrupted" ? t("state.moveInterrupted") : null;
   const selectable = items.filter(movable);
-  return <div className="space-y-3">
+  return <div ref={root} className="space-y-3">
     <p className="font-medium">{t("summary", { time, period: t(`periods.${job.period}`), items: counts.items ?? items.length })}</p>
     {notice && <p className="text-sm">{notice}</p>}
     {counts.serverFlagged !== undefined && <p className="text-sm text-muted-foreground">
@@ -181,7 +186,7 @@ function SpamRescanPanel({ apiFetch, accountId }: { apiFetch: AdminFetch; accoun
         <Button size="sm" variant="ghost" disabled={busy} onClick={() => setDeselected(new Set())}>{t("selectAll")}</Button>
         <Button size="sm" variant="ghost" disabled={busy} onClick={() => setDeselected(new Set(selectable.map((item) => item.id)))}>{t("selectNone")}</Button>
       </div>}
-      <ul aria-label={t("list")} className="max-h-[50vh] divide-y overflow-auto rounded-md border">
+      <ul aria-label={t("list")} className="m-0 max-h-[50vh] list-none divide-y overflow-auto rounded-md border p-0">
         {items.map((item) => <SpamRescanRow key={item.id} item={item} locale={locale} disabled={busy}
           checked={movable(item) && !deselected.has(item.id)} onToggle={(checked) => toggle(item.id, checked)} />)}
       </ul>

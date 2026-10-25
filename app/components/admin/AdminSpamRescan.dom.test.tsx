@@ -102,7 +102,7 @@ describe("admin INBOX rescan", () => {
 
   it("reports an interrupted scan and a blocked model check", async () => {
     const apiFetch: AdminFetch = async () => response({ ok: true,
-      preview: { ...preview("30d"), modelBlocked: "detection-off", hasJunkFolder: false },
+      preview: { ...preview("30d"), modelBlocked: "mailbox-off", hasJunkFolder: false },
       job: job({ status: "cancelled", error: "interrupted", counts: { inboxRows: 120 } }), items: [] });
     const view = mount(apiFetch);
     fireEvent.click(view.getByRole("button", { name: "Posteingang von team@example.test prüfen" }));

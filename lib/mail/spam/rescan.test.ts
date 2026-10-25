@@ -141,7 +141,7 @@ describe("admin INBOX rescan", () => {
     expect((await rescan.loadSpamRescanState(f.accountId)).job?.counts).toMatchObject({ modelChecked: 1, modelCalls: 1 });
 
     await saveMailboxSpamSettings(f.accountId, { enabled: false }, ADMIN);
-    expect((await rescan.previewSpamRescan(f.accountId, "all")).modelBlocked).toBe("detection-off");
+    expect((await rescan.previewSpamRescan(f.accountId, "all")).modelBlocked).toBe("mailbox-off");
     await expect(rescan.startSpamRescan({ accountId: f.accountId, period: "all", withModel: true, modelLimit: 2, userId: ADMIN }))
       .rejects.toMatchObject({ code: "model_unavailable" });
   });

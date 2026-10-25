@@ -1209,7 +1209,8 @@
         "modelCount": "Schickt höchstens {count, plural, one {# Mail} other {# Mails}} an das Modell. Bereits geprüfte Mails werden übersprungen; Absender aus der Allowlist und feste Regeln brauchen kein Modell.",
         "modelCapped": "{unchecked, number} Mails sind ungeprüft, pro Durchlauf gehen höchstens {max, number} an das Modell. Ein weiterer Durchlauf prüft den Rest.",
         "modelBlocked": {
-          "detection-off": "Die Filter-Prüfung ist nicht möglich: Die Spam-Erkennung ist für dieses Postfach ausgeschaltet.",
+          "detection-off": "Die Filter-Prüfung ist nicht möglich: Die Spam-Erkennung ist in der Verwaltung ausgeschaltet.",
+          "mailbox-off": "Die Filter-Prüfung ist nicht möglich: Die Spam-Erkennung ist für dieses Postfach ausgeschaltet.",
           "missing-key": "Die Filter-Prüfung ist nicht möglich: kein API-Schlüssel (ANTHROPIC_API_KEY).",
           "unsupported-provider": "Die Filter-Prüfung ist nicht möglich: Anbieter wird nicht unterstützt."
         },

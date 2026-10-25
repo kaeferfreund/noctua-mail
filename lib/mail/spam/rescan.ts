@@ -121,9 +121,11 @@ async function reconcile() {
   if (active.some((job) => !runtime.running.has(job.id))) await reconcileInterruptedSpamRescans(runtime.instance);
 }
 
+/** Why Stage B cannot run: the switches the sweep obeys (global, then the mailbox's), then the model itself. */
 async function modelBlock(accountId: string): Promise<SpamRescanModelBlock | null> {
   const config = await loadSpamConfig();
-  if (!isSpamDetectionOn(config, await loadMailboxSpamSettings(accountId))) return "detection-off";
+  if (!config.enabled) return "detection-off";
+  if (!isSpamDetectionOn(config, await loadMailboxSpamSettings(accountId))) return "mailbox-off";
   return spamModelUnavailableReason(config);
 }
 

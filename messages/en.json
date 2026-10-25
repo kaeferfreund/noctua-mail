@@ -1209,7 +1209,8 @@
         "modelCount": "Sends at most {count, plural, one {# message} other {# messages}} to the model. Messages checked before are skipped; allowlisted senders and fixed rules need no model.",
         "modelCapped": "{unchecked, number} messages are unchecked; at most {max, number} go to the model per run. Another run checks the rest.",
         "modelBlocked": {
-          "detection-off": "The filter check is not available: spam detection is switched off for this mailbox.",
+          "detection-off": "The filter check is not available: spam detection is switched off in the administration.",
+          "mailbox-off": "The filter check is not available: spam detection is switched off for this mailbox.",
           "missing-key": "The filter check is not available: no API key (ANTHROPIC_API_KEY).",
           "unsupported-provider": "The filter check is not available: unsupported provider."
         },

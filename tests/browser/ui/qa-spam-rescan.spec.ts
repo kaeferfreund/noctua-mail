@@ -88,6 +88,9 @@ test("admin INBOX rescan at desktop and phone width", async ({ page }) => {
   const measurements: Record<string, unknown> = {};
   await page.setViewportSize({ width: 1280, height: 900 });
   await signInQa(page);
+  // On like in production; without an API key the sweep and the model step leave mail unchecked.
+  const enabled = await page.request.put("/api/admin/spam-settings", { data: { enabled: true }, headers: { origin: new URL(page.url()).origin } });
+  expect(enabled.status()).toBe(200);
   await waitForSyncedInbox(page);
 
   // 1. Setup: counts per period, model step unavailable without an API key.
@@ -110,6 +113,7 @@ test("admin INBOX rescan at desktop and phone width", async ({ page }) => {
   for (const subject of ["Sie haben einen Gutschein über 500 € gewonnen", "Ihr Paket wartet: Zollgebühr offen", "Verdoppeln Sie Ihr Erspartes in 7 Tagen"]) {
     await expect(list.getByText(subject)).toBeVisible();
   }
+  await list.scrollIntoViewIfNeeded();
   await shot(page, "result-1280");
   await page.setViewportSize({ width: 390, height: 844 });
   await list.scrollIntoViewIfNeeded();
@@ -126,6 +130,7 @@ test("admin INBOX rescan at desktop and phone width", async ({ page }) => {
   await expect(list.getByText("Verschoben")).toHaveCount(2);
   await shot(page, "moved-390");
   await page.setViewportSize({ width: 1280, height: 900 });
+  await list.scrollIntoViewIfNeeded();
   await shot(page, "moved-1280");
   const status = await (await fetch(`${process.env.QA_SHELL_CONTROL_URL}/status`)).json() as Array<{ path: string; messages: number }>;
   measurements.imapAfterMove = status.filter((box) => box.path === "INBOX" || box.path === "Junk");
@@ -134,6 +139,7 @@ test("admin INBOX rescan at desktop and phone width", async ({ page }) => {
   await page.route(isRescanState, (route) => route.fulfill({ json: { ok: true, preview: preview30, job: mixedJob, items: mixedItems } }));
   panel = await openPanel(page);
   await expect(panel.getByText("Ihr Konto wird heute gesperrt – jetzt bestätigen")).toBeVisible();
+  await panel.getByRole("list", { name: "Treffer" }).scrollIntoViewIfNeeded();
   await shot(page, "mixed-1280");
   await page.setViewportSize({ width: 390, height: 844 });
   await panel.getByRole("list", { name: "Treffer" }).scrollIntoViewIfNeeded();
