@@ -11,6 +11,8 @@ export type SenderSettings = {
 };
 export const SENDER_SETTINGS_CHANGED = "noctua:sender-settings-changed";
 export const SENDER_SETTINGS_STORAGE_KEY = "noctua:sender-settings-refresh";
+/** Same-window notice after personal preferences were saved; `detail` is `{ accountId, prefs }`. */
+export const ACCOUNT_PREFS_CHANGED = "noctua:account-prefs-changed";
 
 /** Per-open snapshot; never retain private preferences in a process-wide cache. */
 export async function loadSenderSettings(apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>, accountId: string): Promise<SenderSettings> {
@@ -41,6 +43,6 @@ export function notifySenderSettingsChanged(accountId: string) {
   broadcastSenderRefresh(accountId);
 }
 export function notifySenderPreferencesChanged(accountId: string, prefs: UserAccountPrefs) {
-  window.dispatchEvent(new CustomEvent("noctua:account-prefs-changed", { detail: { accountId, prefs } }));
+  window.dispatchEvent(new CustomEvent(ACCOUNT_PREFS_CHANGED, { detail: { accountId, prefs } }));
   broadcastSenderRefresh(accountId);
 }

@@ -62,6 +62,8 @@ export type Account = {
 
 export type AccountDateFormat = "locale" | "mdy" | "dmy" | "ymd";
 
+export type AutoMarkReadMode = "immediate" | "after1s" | "after3s" | "never";
+
 export type AccountSettings = {
   sync?: {
     maxIdleSessions?: number;
@@ -81,6 +83,10 @@ export type AccountSettings = {
   };
   calendar?: {
     weekStartsOn?: "monday" | "sunday";
+  };
+  reading?: {
+    /** When an opened unread message is marked read; see lib/autoMarkRead.ts. */
+    autoMarkRead?: AutoMarkReadMode;
   };
   signatures?: {
     id: string;
@@ -490,7 +496,7 @@ export type UserAccountLink = {
  */
 export type UserAccountPrefs = Pick<
   AccountSettings,
-  "layout" | "appearance" | "calendar" | "threading" | "defaultSignatureId" | "notifications"
+  "layout" | "appearance" | "calendar" | "threading" | "reading" | "defaultSignatureId" | "notifications"
 > & { remoteContent?: { allowedSenders?: Record<string, boolean> }; defaultIdentityId?: string; signatureOverride?: string };
 
 /**

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { AccountSettings } from "./data";
 import { canonicalizeMailboxAddress } from "./senderIdentity";
+import { AUTO_MARK_READ_MODES } from "./autoMarkRead";
 const nullable = <T extends z.ZodType>(schema: T) => schema.nullable().optional();
 const senderKeySchema = z.string().transform((value, context) => {
   const key = canonicalizeMailboxAddress(value);
@@ -13,6 +14,7 @@ export const accountPrefsPatchSchema = z.object({
   appearance: nullable(z.object({ dateFormat: nullable(z.enum(["locale", "mdy", "dmy", "ymd"])), topicColorRows: nullable(z.boolean()), senderIcons: nullable(z.boolean()) }).strict()),
   calendar: nullable(z.object({ weekStartsOn: nullable(z.enum(["monday", "sunday"])) }).strict()),
   threading: nullable(z.object({ includeAcrossFolders: nullable(z.boolean()) }).strict()),
+  reading: nullable(z.object({ autoMarkRead: nullable(z.enum(AUTO_MARK_READ_MODES)) }).strict()),
   defaultSignatureId: nullable(z.string().max(256)),
   remoteContent: nullable(z.object({ allowedSenders: nullable(z.record(senderKeySchema, z.boolean())) }).strict()),
   defaultIdentityId: nullable(z.string().min(1).max(256)),
@@ -25,7 +27,7 @@ export function stripPersonalSettings(settings: AccountSettings | undefined, tea
   const { defaultIdentityId: _identity, signatureOverride: _override, ...sharedSettings } = settings as AccountSettings & { defaultIdentityId?: unknown; signatureOverride?: unknown };
   void _identity; void _override;
   if (teamDefaults) return sharedSettings;
-  const { layout: _l, appearance: _a, calendar: _c, threading: _t, defaultSignatureId: _s, notifications: _n, ...team } = sharedSettings;
-  void _l; void _a; void _c; void _t; void _s; void _n;
+  const { layout: _l, appearance: _a, calendar: _c, threading: _t, reading: _r, defaultSignatureId: _s, notifications: _n, ...team } = sharedSettings;
+  void _l; void _a; void _c; void _t; void _r; void _s; void _n;
   return team;
 }

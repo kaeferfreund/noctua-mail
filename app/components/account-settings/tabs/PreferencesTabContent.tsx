@@ -14,14 +14,15 @@ import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 import { senderSettingsError } from "@/lib/senderMessages";
-import { notifySenderPreferencesChanged } from "@/lib/ui/senderSettings";
+import { ACCOUNT_PREFS_CHANGED, notifySenderPreferencesChanged } from "@/lib/ui/senderSettings";
 import { validSignatureTemplate } from "@/lib/signatureTemplates";
+import { AUTO_MARK_READ_MODES } from "@/lib/autoMarkRead";
 
 type PreferenceOption = { value: string; label: string; literal?: boolean };
 type PreferenceField = {
-  group: "layout" | "appearance" | "calendar" | "threading" | "notifications";
-  key: "defaultView" | "dateFormat" | "topicColorRows" | "senderIcons" | "weekStartsOn" | "includeAcrossFolders" | "newMail";
-  options: PreferenceOption[]; boolean?: boolean;
+  group: "layout" | "appearance" | "calendar" | "threading" | "reading" | "notifications";
+  key: "defaultView" | "dateFormat" | "topicColorRows" | "senderIcons" | "weekStartsOn" | "includeAcrossFolders" | "autoMarkRead" | "newMail";
+  options: PreferenceOption[]; boolean?: boolean; help?: boolean;
 };
 const yesNo = [{ value: "true", label: "yes" }, { value: "false", label: "no" }];
 const fields: PreferenceField[] = [
@@ -31,6 +32,7 @@ const fields: PreferenceField[] = [
   { group: "appearance", key: "senderIcons", options: yesNo, boolean: true },
   { group: "calendar", key: "weekStartsOn", options: [{ value: "monday", label: "monday" }, { value: "sunday", label: "sunday" }] },
   { group: "threading", key: "includeAcrossFolders", options: yesNo, boolean: true },
+  { group: "reading", key: "autoMarkRead", options: AUTO_MARK_READ_MODES.map(value => ({ value, label: value })), help: true },
   { group: "notifications", key: "newMail", options: yesNo, boolean: true }
 ];
 // Error codes of the prefs route that only the sender section can cause.
@@ -69,7 +71,7 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
       // personal values back into the team-level /settings route. Sender changes
       // also tell other windows (compose) to reload their sender settings.
       if (touchesSenderPrefs(patch)) notifySenderPreferencesChanged(editingAccount.id, data.prefs);
-      else window.dispatchEvent(new CustomEvent("noctua:account-prefs-changed", { detail: { accountId: editingAccount.id, prefs: data.prefs } }));
+      else window.dispatchEvent(new CustomEvent(ACCOUNT_PREFS_CHANGED, { detail: { accountId: editingAccount.id, prefs: data.prefs } }));
     } catch (error) { setError(error); }
     finally { setBusy(false); }
   };
@@ -85,18 +87,23 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
       {loading && <p role="status">{t("preferences.loading")}</p>}
       {Boolean(error) && <p role="alert" className="text-destructive">{errorText}</p>}
       {saved && <p role="status">{t("preferences.saved")}</p>}
-      <fieldset disabled={loading || busy} className="m-0 grid min-w-0 gap-4 border-0 p-0 sm:grid-cols-2">
+      <fieldset disabled={loading || busy} className="m-0 grid min-w-0 items-start gap-4 border-0 p-0 sm:grid-cols-2">
         {fields.map(field => {
           const changes = patch[field.group] as Record<string, unknown> | null | undefined;
           const stored = prefs[field.group] as Record<string, unknown> | undefined;
           const value = changes && field.key in changes ? changes[field.key] : stored?.[field.key];
-          return <label key={`${field.group}.${field.key}`} className="grid min-w-0 gap-1 text-sm">{t(`preferences.fields.${field.key}`)}
-            <select className={nativeControlClass} value={value == null ? "inherit" : String(value)} onChange={event => {
+          const helpId = field.help ? `preference-help-${field.group}-${field.key}` : undefined;
+          const control = <label key={`${field.group}.${field.key}`} className="grid min-w-0 gap-1 text-sm">{t(`preferences.fields.${field.key}`)}
+            <select className={nativeControlClass} aria-describedby={helpId} value={value == null ? "inherit" : String(value)} onChange={event => {
               const value = event.target.value;
               setSaved(false);
               setPatch(previous => ({ ...previous, [field.group]: { ...previous[field.group], [field.key]: value === "inherit" ? null : field.boolean ? value === "true" : value } }));
-            }}><option value="inherit">{t("preferences.inherit")}</option>{field.options.map(option => <option key={option.value} value={option.value}>{option.literal ? option.label : t(`preferences.options.${option.label as "yes" | "no" | "threads" | "card" | "table" | "compact" | "locale" | "monday" | "sunday"}`)}</option>)}</select>
+            }}><option value="inherit">{t("preferences.inherit")}</option>{field.options.map(option => <option key={option.value} value={option.value}>{option.literal ? option.label : t(`preferences.options.${option.label as "yes" | "no" | "threads" | "card" | "table" | "compact" | "locale" | "monday" | "sunday" | "immediate" | "after1s" | "after3s" | "never"}`)}</option>)}</select>
           </label>;
+          // The help sits next to, not inside, the label so the field's accessible name stays the label text.
+          return helpId ? <div key={`${field.group}.${field.key}`} className="grid min-w-0 gap-1">{control}
+            <span id={helpId} className="text-xs text-muted-foreground">{t(`preferences.fieldHelp.${field.key as "autoMarkRead"}`)}</span>
+          </div> : control;
         })}
         {!senderPreferences && <label className="grid min-w-0 gap-1 text-sm">{t("preferences.signature")}<select className={nativeControlClass} value={signatureValue ?? "inherit"} onChange={event => {
           setSaved(false); setPatch(previous => ({ ...previous, defaultSignatureId: event.target.value === "inherit" ? null : event.target.value }));

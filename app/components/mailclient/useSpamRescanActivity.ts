@@ -1,18 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { adminRequest, type AdminFetch } from "@/app/hooks/useAdminApi";
 import { SPAM_RESCAN_EVENT, type SpamRescanActivity } from "@/lib/mail/spam/rescanTypes";
 
 const POLL_MS = 2_000;
 
 /**
- * Admin INBOX rescans (doc/SPAM-DETECTION.md) for the activity panel. Read
- * once on load and whenever the admin UI announces a start, cancel or move;
- * polled only while a job runs. Non-admins never ask.
+ * Admin INBOX rescans (doc/SPAM-DETECTION.md) for the activity panel. Nothing
+ * is read at start-up (the admin idle warm-up stays free of admin API calls):
+ * the list is read when a status panel opens and whenever the admin UI
+ * announces a start, cancel or move, and polled only while a job runs.
+ * Non-admins never ask.
  */
-export function useSpamRescanActivity(apiFetch: AdminFetch, enabled: boolean) {
+export function useSpamRescanActivity(apiFetch: AdminFetch, enabled: boolean, panelOpen: boolean) {
   const [jobs, setJobs] = useState<SpamRescanActivity[]>([]);
+  // Whether the last read found running jobs: polling then outlives a closed panel.
+  const running = useRef(false);
   useEffect(() => {
     if (!enabled) return;
     let active = true;
@@ -22,14 +26,15 @@ export function useSpamRescanActivity(apiFetch: AdminFetch, enabled: boolean) {
       let next: SpamRescanActivity[] | null;
       try { next = (await adminRequest<{ jobs: SpamRescanActivity[] }>(apiFetch, "/api/admin/spam-rescan")).jobs; } catch { next = null; }
       if (!active || !next) return;
+      running.current = next.length > 0;
       setJobs(next);
       if (next.length) timer = window.setTimeout(() => void refresh(), POLL_MS);
     };
     const onEvent = () => { void refresh(); };
-    void refresh();
+    if (panelOpen || running.current) void refresh();
     window.addEventListener(SPAM_RESCAN_EVENT, onEvent);
     return () => { active = false; window.clearTimeout(timer); window.removeEventListener(SPAM_RESCAN_EVENT, onEvent); };
-  }, [apiFetch, enabled]);
+  }, [apiFetch, enabled, panelOpen]);
   const cancel = useCallback((job: SpamRescanActivity) => {
     void adminRequest(apiFetch, `/api/admin/accounts/${encodeURIComponent(job.accountId)}/spam-rescan/cancel`, { method: "POST" })
       .catch(() => {})

@@ -20,6 +20,7 @@ function renderReader(thread: Message[], header: Partial<MessageViewOrchestrator
       showComposeInline: false, supportsThreads: true, threadContentById: {}, threadContentLoading: null,
       threadContentErrorById: {}, composeDraftId: null, composeMode: "new", composeThreadFocusMessageId: null,
       pendingSelectionCollapseMessageId: null, onPendingSelectionCollapseConsumed: () => {},
+      autoMarkReadDelayMs: null, onAutoMarkRead: () => {},
       activeAccountId: syntheticReviewMessage.accountId, messageByMessageId: new Map(),
       apiFetch: async () => Response.json({ok: true}),
       messageCardProps: {...shared, pendingMessageActions: new Set(), messageContentLoading: {},
