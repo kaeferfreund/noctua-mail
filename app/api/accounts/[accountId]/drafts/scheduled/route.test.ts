@@ -3,6 +3,7 @@ import { dbModulePromise } from "@/lib/testDbHarness";
 import { createAuthenticatedTestSession } from "@/lib/testAuthHarness";
 import { identityTestAccount } from "@/lib/testFixtures/senderIdentities";
 import { buildImapMessageRowId } from "@/lib/messageIds";
+import { COMPOSE_INVITE_HEADER, encodeComposeInviteHeader } from "@/lib/composeInviteMetadata";
 import { saveMessageSource } from "@/lib/storage";
 import { claimDueScheduledSends, getScheduledSend } from "@/lib/db";
 import { SCHEDULED_SEND_MAX_AHEAD_MS } from "@/lib/scheduledSend";
@@ -21,12 +22,12 @@ async function fixture() {
     specialUse: name === "INBOX" ? "\\Inbox" : "\\Drafts" })));
   const auth = await createAuthenticatedTestSession(accountId);
   const [identity] = await db.listSenderIdentities(accountId);
-  const seedDraft = async (overrides: Record<string, unknown> = {}) => {
+  const seedDraft = async (overrides: Record<string, unknown> = {}, extraHeaders: string[] = []) => {
     const messageId = `<synthetic-${crypto.randomUUID()}@example.test>`;
     const id = buildImapMessageRowId(messageId);
     const from = `${identity.displayName} <${identity.email}>`;
     const raw = [`From: ${from}`, "To: recipient@example.test", `Message-ID: ${messageId}`, `X-Noctua-Identity-Id: ${identity.id}`,
-      "Subject: Synthetic planned", "", "Synthetic body"].join("\r\n");
+      ...extraHeaders, "Subject: Synthetic planned", "", "Synthetic body"].join("\r\n");
     // No mailboxPath/imapUid: the discard route then never contacts an IMAP server.
     await db.upsertMessages(accountId, null, [{ id, messageId, threadId: messageId, accountId, folderId: `${accountId}:Drafts`, from,
       to: "recipient@example.test", subject: "Synthetic planned", body: "Synthetic body", preview: "", date: new Date().toISOString(),
@@ -90,6 +91,11 @@ describe("scheduled send routes", () => {
     expect((await POST(f.request("POST", { draftId: received, sendAt: future }), f.params())).status).toBe(403);
     const elsewhere = await f.seedDraft({ folderId: `${f.accountId}:INBOX` });
     expect((await POST(f.request("POST", { draftId: elsewhere, sendAt: future }), f.params())).status).toBe(409);
+    // The draft send path relays no calendar invitation, so invitation drafts are refused.
+    const invite = encodeComposeInviteHeader({ start: "2026-11-02T09:00", end: "2026-11-02T10:00", allDay: false, location: "Synthetic room" });
+    const invitation = await f.seedDraft({}, [`${COMPOSE_INVITE_HEADER}: ${invite}`]);
+    const refused = await POST(f.request("POST", { draftId: invitation, sendAt: future }), f.params());
+    expect([refused.status, (await refused.json()).message]).toEqual([409, "Drafts with an event invitation cannot be scheduled."]);
     const noRecipient = await f.seedDraft({ to: "" });
     expect((await POST(f.request("POST", { draftId: noRecipient, sendAt: future }), f.params())).status).toBe(400);
     const [identity] = await f.db.listSenderIdentities(f.accountId);

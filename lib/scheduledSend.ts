@@ -4,6 +4,7 @@ import { OutboundAuthorizationError } from "@/lib/outboundAuthorization";
 import { SenderIdentityError } from "@/lib/senderIdentityError";
 import { getSmtpHttpError, isSmtpUpstreamFailure } from "@/lib/mail/smtpError";
 import { findDraftsFolder } from "@/lib/specialFolders";
+import { extractComposeInviteDraftFromSource } from "@/lib/composeInviteMetadata";
 import { getAccountById, getFolders } from "@/lib/serverDb";
 import { resolveAccountRole, roleAtLeast } from "@/lib/accountAccess";
 import type { ScheduledSend, ScheduledSendReason } from "./db/scheduledSends";
@@ -31,12 +32,15 @@ export function validateScheduledSendAt(sendAt: unknown, now = Date.now()): { ok
 
 /**
  * Send preconditions plus the folder placement: only a draft that still sits in the
- * Drafts folder is sent by its schedule (a draft moved to Trash must not go out).
+ * Drafts folder is sent by its schedule (a draft moved to Trash must not go out), and
+ * no event-invitation draft (the draft send path relays no invitation).
  */
 export async function assertSchedulableDraft(accountId: string, draftId: string) {
-  const { draft, identity } = await loadSendableDraft(accountId, draftId);
+  const { draft, rawSource, identity } = await loadSendableDraft(accountId, draftId);
   const draftsFolder = findDraftsFolder(await getFolders(accountId), accountId);
   if (!draftsFolder || draft.folderId !== draftsFolder.id) throw new DraftSendError(409, "Only drafts in the Drafts folder can be scheduled.");
+  // A stored draft carries invitation metadata only; sending it would drop the calendar invitation.
+  if (extractComposeInviteDraftFromSource(rawSource)) throw new DraftSendError(409, "Drafts with an event invitation cannot be scheduled.");
   return { draft, identity };
 }
 
