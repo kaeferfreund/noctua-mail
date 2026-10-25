@@ -14,6 +14,8 @@ export async function register() {
   // getAuth locks the datastore before initializing the master DB and auth.
   await getAuth();
   (await import("@/lib/threadRecomputeJobs")).resumeIdentityRecomputeJobs();
+  // Resumes planned sends from scheduled_sends; overdue rows go out on the first pass.
+  (await import("@/lib/scheduledSendJob")).startScheduledSendScheduler();
   if (process.env.NOCTUA_MAILBOX_WATCHER === "1") (await import("@/lib/mailboxWatcher")).startMailboxWatcher();
   startupInitialized = true;
 }

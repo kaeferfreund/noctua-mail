@@ -16,6 +16,7 @@ import { getMessageListDateDisplay, useMessageListRelativeDayLabels } from "./me
 import styles from "./MessageRow.module.css";
 import CategoryBadge from "../CategoryBadge";
 import SpamBadge from "../SpamBadge";
+import { ScheduledSendBadge, useDraftSchedule } from "../scheduledSend/ScheduledSend";
 import TopicBadge from "../TopicBadge";
 import FlagBadge from "../message/FlagBadge";
 import MessageBadge from "../message/MessageBadge";
@@ -179,6 +180,7 @@ function MessageRow({
   const locale = useLocale();
   const t = useTranslations("List");
   const relativeDayLabels = useMessageListRelativeDayLabels();
+  const draftSchedule = useDraftSchedule(message);
   const [optimisticSelected, setOptimisticSelected] = useState<boolean | null>(null);
   const [optimisticActive, setOptimisticActive] = useState(false);
   const clearTimerRef = useRef<number | null>(null);
@@ -480,7 +482,7 @@ function MessageRow({
           showThreadIndicator ||
           showAttachmentIcon ||
           showCalendarInviteIcon ||
-          categoryIcon || message.collab
+          categoryIcon || message.collab || draftSchedule
         ) && (
           <div className={styles.subjectMeta}>
             {showFolderBadgesInSubjectMeta && folderBadges}
@@ -531,6 +533,7 @@ function MessageRow({
                   <CategoryBadge category={message.category as any} showText={false} />
                 )}
             <SpamBadge message={message} />
+            <ScheduledSendBadge message={message} />
             {messageTopics && messageTopics.map((topic) => (
               <TopicBadge key={topic.id} topic={topic} showText size="1" preferShortName />
             ))}

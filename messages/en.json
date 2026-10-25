@@ -1830,6 +1830,56 @@
     "translation": {
       "noContent": "There is no content to translate.",
       "failed": "Translation failed."
+    },
+    "schedule": {
+      "moreOptions": "More send options",
+      "open": "Schedule send …",
+      "title": "Schedule send",
+      "presets": {
+        "thisMorning": "This morning",
+        "tomorrowMorning": "Tomorrow morning",
+        "thisAfternoon": "This afternoon",
+        "tomorrowAfternoon": "Tomorrow afternoon",
+        "mondayMorning": "Monday morning"
+      },
+      "custom": "Custom time",
+      "dateLabel": "Date",
+      "timeLabel": "Time",
+      "timePlaceholder": "Time",
+      "errors": {
+        "invalid": "Choose a date and a time.",
+        "past": "This time is in the past.",
+        "nonexistent": "This time does not exist on that day because of the clock change.",
+        "noTimes": "No later time is left on this day."
+      },
+      "cancel": "Cancel",
+      "submit": "Schedule",
+      "submitting": "Scheduling …",
+      "scheduled": "Send scheduled for {time}",
+      "undo": "Undo",
+      "failed": "The send could not be scheduled.",
+      "unscheduleFailed": "The schedule could not be removed.",
+      "unscheduled": "Schedule removed.",
+      "busy": "This draft is being sent right now.",
+      "sendConflictBusy": "This draft is being sent by its schedule right now. No second copy was sent.",
+      "sendConflictSent": "This draft was already sent by its schedule. No second copy was sent.",
+      "inviteUnsupported": "Event invitations cannot be scheduled. Send the invitation directly.",
+      "badge": "Scheduled · {time}",
+      "badgeFailed": "Failed",
+      "badgeFailedTitle": "Scheduled send for {time} failed: {reason}",
+      "barScheduled": "Scheduled for {time} — editing removes the schedule",
+      "barSending": "Sending right now …",
+      "barFailed": "Scheduled send for {time} failed: {reason}",
+      "sendNow": "Send now",
+      "unschedule": "Remove schedule",
+      "reasons": {
+        "send_failed": "The mail server could not be reached after several attempts.",
+        "smtp_rejected": "The mail server rejected the message.",
+        "send_uncertain": "It is unclear whether the mail was delivered. Check the Sent folder before sending again.",
+        "interrupted": "Sending was interrupted. Check the Sent folder before sending again.",
+        "draft_invalid": "The draft is incomplete. Open it and save it again.",
+        "unknown": "Unknown error."
+      }
     }
   },
   "Errors": {

@@ -247,6 +247,8 @@ old one. The tool descriptions say so, so AI clients stop proposing that workaro
 `POST /api/accounts/{accountId}/calendar/events/{eventId}/respond` report SMTP acceptance
 separately from Sent-copy persistence. These routes (and draft save) require editor and
 same-origin JSON. Calendar `sendReply:false` updates participation without returning send fields.
+Scheduled sends of saved drafts (`…/drafts/scheduled`) are described in
+[SCHEDULED-SEND.md](SCHEDULED-SEND.md).
 
 Successful SMTP acceptance always returns HTTP 200 with `ok:true` and these fields:
 

@@ -473,3 +473,13 @@ export {
   listDomainIconRows,
   saveDomainIconRow
 } from "./db/domainIcons";
+export {
+  cancelScheduledSend,
+  claimDueScheduledSends,
+  createScheduledSend,
+  getScheduledSend,
+  listScheduledSends,
+  ScheduledSendAlreadySentError,
+  ScheduledSendBusyError
+} from "./db/scheduledSends";
+export type { ScheduledSend, ScheduledSendReason, ScheduledSendStatus } from "./db/scheduledSends";

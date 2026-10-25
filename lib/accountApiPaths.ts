@@ -157,6 +157,15 @@ export function buildAccountDraftSendPath(accountId: string, draftId: string) {
   return buildAccountApiPath(accountId, `/drafts/${encodeURIComponent(draftId)}/send`);
 }
 
+export function buildAccountScheduledSendsPath(accountId: string, draftId?: string) {
+  const path = buildAccountApiPath(accountId, "/drafts/scheduled");
+  return draftId ? `${path}?draftId=${encodeURIComponent(draftId)}` : path;
+}
+
+export function buildAccountScheduledSendCancelPath(accountId: string, scheduleId: string) {
+  return buildAccountApiPath(accountId, `/drafts/scheduled/${encodeURIComponent(scheduleId)}/cancel`);
+}
+
 export function buildAccountSmtpSendPath(accountId: string) {
   return buildAccountApiPath(accountId, "/smtp/send");
 }

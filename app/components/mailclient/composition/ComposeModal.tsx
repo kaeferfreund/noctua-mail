@@ -76,6 +76,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
     setComposeView,
     setComposeResizing,
     handleSendMail,
+    handleScheduleSend,
     handleDiscardDraft,
     handleSaveDraft,
     applyRecipientSelection,
@@ -231,6 +232,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
               setComposeView("inline");
             }}
             handleSendMail={handleSendMail}
+            handleScheduleSend={handleScheduleSend}
             sendDisabled={sendDisabled}
             formatRelativeTime={formatRelativeTime}
           />

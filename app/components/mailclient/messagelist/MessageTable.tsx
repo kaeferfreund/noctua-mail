@@ -1,5 +1,6 @@
 import { isReaderRowActivation } from "@/lib/ui/readerFocus";
 import SpamBadge from "../SpamBadge";
+import { ScheduledSendBadge } from "../scheduledSend/ScheduledSend";
 import { useReaderNavigationRows } from "./useReaderNavigationRows";
 import { useLocale, useTranslations } from "next-intl";
 import CollabRowBadges from "@/app/components/collab/CollabRowBadges";
@@ -527,7 +528,7 @@ export default function MessageTable({
                   }}
                 >
                   {renderFolderBadges(item.folderIds)}
-                  <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><SpamBadge message={message} /><span data-mobile-collab=""><CollabRowBadges message={message} /></span></span>
+                  <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><SpamBadge message={message} /><ScheduledSendBadge message={message} /><span data-mobile-collab=""><CollabRowBadges message={message} /></span></span>
                   {messageTopicsById?.get(message.threadId)?.map((topic) => (
                     <TopicBadge key={topic.id} topic={topic} size="1" preferShortName />
                   ))}

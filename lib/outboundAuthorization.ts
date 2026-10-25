@@ -13,8 +13,12 @@ import type { AccountRole } from "./data";
 import type { ResolvedSender } from "./sendIdentity";
 import { collabActorFromSession, type CollabActor } from "./threadCollab";
 
-/** Request credentials, never the role/identity snapshot taken at entry. */
-export type OutboundAuthorization = { request: Request } | { tokenId: string };
+/**
+ * Request credentials, never the role/identity snapshot taken at entry. `scheduledByUserId`
+ * is the server-side scheduled-send job acting for the user who planned the send: no session
+ * exists then, so the user's live mailbox role (lib/db/accountAccess.ts) is the whole check.
+ */
+export type OutboundAuthorization = { request: Request } | { tokenId: string } | { scheduledByUserId: string };
 export type AuthorizedOutboundActor = CollabActor & { assertCurrent: (db: Database) => void };
 export type OutboundWriteAuthorization = () => Promise<AuthorizedOutboundActor>;
 export class OutboundAuthorizationError extends Error {
@@ -50,6 +54,21 @@ export async function authorizeOutbound(
     const context = await resolveMcpToolContext(source.tokenId, input.accountId, input.minRole, checkIdentity, scope);
     return { userId: context.tokenRecord.createdByUserId, clientId: `mcp:${source.tokenId}`,
       assertCurrent: db => { resolveMcpToolContextRow(db, source.tokenId, input.accountId, input.minRole, checkIdentity, scope); } };
+  }
+  if ("scheduledByUserId" in source) {
+    const userId = source.scheduledByUserId;
+    const assertCurrent = (db: Database) => {
+      db.transaction(() => {
+        const role = resolveAccountRoleRow(db, userId, input.accountId);
+        if (!role) throw new OutboundAuthorizationError(NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 }));
+        if (!roleAtLeast(role, input.minRole)) {
+          throw new OutboundAuthorizationError(NextResponse.json({ ok: false, message: "Insufficient mailbox role", requiredRole: input.minRole }, { status: 403 }));
+        }
+        checkIdentity(db);
+      }).deferred();
+    };
+    assertCurrent(await getDb());
+    return { userId, clientId: "scheduled-send", assertCurrent };
   }
   const context = await requireAccountContext(source.request, input.accountId, { minRole: input.minRole });
   if (context instanceof NextResponse) throw new OutboundAuthorizationError(context);

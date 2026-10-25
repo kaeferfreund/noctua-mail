@@ -133,3 +133,33 @@ export function getSmtpHttpError(error: unknown, senderEmail?: string): SmtpHttp
     message: "The outgoing mail server could not complete the request. Try again later or ask a mailbox manager to review its SMTP configuration." };
   return null;
 }
+
+/** System errors of the TCP/DNS connect itself (nodemailer keeps them as `originalCode`). */
+const CONNECT_SYSTEM_CODES = new Set(["ECONNREFUSED", "EHOSTUNREACH", "ENETUNREACH", "ENOTFOUND", "EAI_AGAIN"]);
+/** Timeouts nodemailer reports before any SMTP command was accepted (`timeoutType`). */
+const SETUP_TIMEOUTS = new Set(["CONNECTION_TIMEOUT", "GREETING_TIMEOUT", "DNS_TIMEOUT"]);
+/** Commands answered before the message content is transmitted. */
+const PRE_DATA_COMMAND = /^(?:EHLO|HELO|LHLO|STARTTLS|AUTH\b|MAIL FROM|RCPT TO)/i;
+
+/**
+ * True only when an SMTP failure provably happened before the message content was sent
+ * (connect/DNS/TLS setup, greeting, authentication, envelope, a refused DATA command), so a
+ * retry cannot deliver a second copy. A dropped connection or a socket timeout during or after
+ * DATA, and every failure whose phase is unknown, return false.
+ */
+export function smtpFailedBeforeData(error: unknown): boolean {
+  if (!isSmtpUpstreamFailure(error)) return false;
+  const candidate = error as { code?: unknown; originalCode?: unknown; command?: unknown; timeoutType?: unknown };
+  const code = typeof candidate.code === "string" ? candidate.code.toUpperCase() : "";
+  const command = typeof candidate.command === "string" ? candidate.command : "";
+  if (code === "ETIMEDOUT") return typeof candidate.timeoutType === "string" && SETUP_TIMEOUTS.has(candidate.timeoutType);
+  if (code === "EDNS" || code === "ETLS" || code === "EAUTH" || code === "EENVELOPE") return true;
+  if (typeof candidate.originalCode === "string" && CONNECT_SYSTEM_CODES.has(candidate.originalCode.toUpperCase())) return true;
+  return PRE_DATA_COMMAND.test(command);
+}
+
+/** The server may have accepted the message: neither a pre-DATA failure nor an explicit 5xx rejection. */
+export function smtpOutcomeUncertain(error: unknown): boolean {
+  if (!isSmtpUpstreamFailure(error) || smtpFailedBeforeData(error)) return false;
+  return getSmtpHttpError(error)?.status !== 422;
+}
