@@ -16,6 +16,7 @@ import { buildThreadTree, flattenThread, getThreadLatestDate } from "@/app/compo
 import type { MessageCardListProps, MessageThreadListProps } from "@/app/components/mailclient/messagelist/messageListViewTypes";
 import StatusPanelFrame from "./StatusPanelFrame";
 import { MobileStatusFocusContext } from "./MobileStatusFocus";
+import { expectFocused } from "@/lib/testDomAssertions";
 
 const originalWidth = window.innerWidth;
 beforeEach(() => { window.innerWidth = 390; });
@@ -247,6 +248,6 @@ describe("status Sheet focus", () => {
     const sheet = await page.findByRole("dialog", { name: "Processes" });
     fireEvent.keyDown(sheet, { key: "Escape" });
     await waitFor(() => expect(page.queryByRole("dialog")).toBeNull());
-    await waitFor(() => expect(document.activeElement).toBe(indicator));
+    await waitFor(() => expectFocused(indicator));
   });
 });

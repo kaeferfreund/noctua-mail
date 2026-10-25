@@ -70,6 +70,9 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+  // Storage is shared by every DOM test file in the run; leave none behind for the next one.
+  localStorage.clear();
+  sessionStorage.clear();
   globalThis.fetch = originals.fetch;
   globalThis.EventSource = originals.eventSource;
   window.history.replaceState(null, "", "/");

@@ -7,6 +7,7 @@ import SettingsFrame, { SettingsTitle } from "./SettingsFrame";
 import { Dialog, DialogContent, DialogTitle } from "@/app/components/ui/dialog";
 import { DIALOG_LAYERS } from "@/app/components/ui/dialogLayers";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/app/components/ui/dropdown-menu";
+import { expectFocused } from "@/lib/testDomAssertions";
 let viewportWidth: number;
 beforeEach(() => { viewportWidth = window.innerWidth; });
 afterEach(() => { cleanup(); window.innerWidth = viewportWidth; });
@@ -34,14 +35,14 @@ it("QA-004/009 layers nested dialogs and closes only the top dialog, restoring e
   expect(Number(confirm.style.zIndex)).toBe(Number(members.style.zIndex) + DIALOG_LAYERS.step);
   fireEvent.keyDown(confirm, { key: "Escape" });
   await waitFor(() => expect(page.queryByRole("dialog", { name: "Confirm role" })).toBeNull());
-  await waitFor(() => expect(document.activeElement).toBe(change));
+  await waitFor(() => expectFocused(change));
   expect(members.isConnected && frame.isConnected).toBe(true);
   fireEvent.keyDown(members, { key: "Escape" });
   await waitFor(() => expect(members.isConnected).toBe(false));
-  await waitFor(() => expect(document.activeElement).toBe(manage));
+  await waitFor(() => expectFocused(manage));
   fireEvent.keyDown(frame, { key: "Escape" });
   await waitFor(() => expect(frame.isConnected).toBe(false));
-  await waitFor(() => expect(document.activeElement).toBe(opener));
+  await waitFor(() => expectFocused(opener));
 });
 it("QA-009 preserves the Close button dismissal path and focus", async () => {
   window.innerWidth = 1440;
@@ -49,7 +50,7 @@ it("QA-009 preserves the Close button dismissal path and focus", async () => {
   const opener = page.getByRole("button", { name: "Open settings" }); opener.focus(); fireEvent.click(opener);
   await page.findByRole("dialog", { name: "Settings" }); fireEvent.click(page.getByRole("button", { name: "Close settings" }));
   await waitFor(() => expect(page.queryByRole("dialog")).toBeNull());
-  await waitFor(() => expect(document.activeElement).toBe(opener));
+  await waitFor(() => expectFocused(opener));
 });
 it("QA-009 restores the persistent menu trigger after its Settings item unmounts", async () => {
   window.innerWidth = 1440;
@@ -66,5 +67,5 @@ it("QA-009 restores the persistent menu trigger after its Settings item unmounts
   const frame = await page.findByRole("dialog", { name: "Preferences" });
   fireEvent.keyDown(frame, { key: "Escape" });
   await waitFor(() => expect(page.queryByRole("dialog")).toBeNull());
-  await waitFor(() => expect(document.activeElement).toBe(opener));
+  await waitFor(() => expectFocused(opener));
 });

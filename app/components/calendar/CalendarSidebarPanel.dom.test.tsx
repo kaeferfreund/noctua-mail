@@ -5,7 +5,8 @@ import { I18nTestProvider } from "@/lib/i18n/testRender";
 import type { UiLocale } from "@/lib/i18n/config";
 import CalendarSidebarPanel from "./CalendarSidebarPanel";
 
-afterEach(cleanup);
+// Storage is shared by every DOM test file in the run; leave none behind for the next one.
+afterEach(() => { cleanup(); localStorage.clear(); sessionStorage.clear(); });
 
 describe("calendar sidebar panel", () => {
   for (const [locale, title, openWindow, close] of [
