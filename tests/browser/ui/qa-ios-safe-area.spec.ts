@@ -42,6 +42,21 @@ const band = (page: Page) => page.evaluate(() => {
   return { height: parseFloat(style.height), background: style.backgroundColor, zIndex: Number(style.zIndex) };
 });
 
+/** The rendered colour behind the phone's top bar and the theme-color metas, as hex. */
+const topBarAndThemeColor = (page: Page) => page.evaluate(() => {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = 1;
+  const context = canvas.getContext("2d")!;
+  const header = document.querySelector('[data-slot="shell-header"]')!;
+  // The header is transparent; the first painted ancestor gives the bar its colour.
+  let element: Element | null = header;
+  while (element && getComputedStyle(element).backgroundColor === "rgba(0, 0, 0, 0)") element = element.parentElement;
+  context.fillStyle = getComputedStyle(element!).backgroundColor;
+  context.fillRect(0, 0, 1, 1);
+  const bar = "#" + [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)].map(value => value.toString(16).padStart(2, "0")).join("");
+  return { bar, meta: [...new Set([...document.querySelectorAll('meta[name="theme-color"]')].map(meta => meta.getAttribute("content")))] };
+});
+
 async function openSidebar(page: Page) {
   await page.getByRole("button", { name: "Seitenleiste umschalten", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "Seitenleiste", exact: true })).toBeVisible();
@@ -110,6 +125,12 @@ test("iPhone with the opaque status bar: frames start at the top, reach the bott
     expect(statusBand.height).toBe(0);
     await expect.poll(() => page.locator('meta[name="theme-color"]').evaluateAll(metas => metas.map(meta => meta.getAttribute("content"))))
       .toEqual(scheme === "light" ? ["#ffffff", "#ffffff"] : ["#0a0a0a", "#0a0a0a"]);
+    // The opaque status bar (theme-color) is exactly the top bar's colour, also
+    // with the list scrolled, so iOS shows no seam above the header.
+    expect(await topBarAndThemeColor(page)).toEqual({ bar: scheme === "light" ? "#ffffff" : "#0a0a0a", meta: [scheme === "light" ? "#ffffff" : "#0a0a0a"] });
+    await page.locator('[id="list"] aside').evaluate(el => { el.scrollTop = 400; });
+    expect(await topBarAndThemeColor(page)).toEqual({ bar: scheme === "light" ? "#ffffff" : "#0a0a0a", meta: [scheme === "light" ? "#ffffff" : "#0a0a0a"] });
+    await page.locator('[id="list"] aside').evaluate(el => { el.scrollTop = 0; });
     const list = await topOf(page, '[id="list"] aside');
     const shell = await topOf(page, '[data-slot="sidebar-wrapper"]');
     const result: Record<string, unknown> = { scheme, band: statusBand, header: await topOf(page, '[data-slot="shell-header"]'), list, shell };
@@ -130,6 +151,8 @@ test("iPhone with the opaque status bar: frames start at the top, reach the bott
     await expect(back).toBeVisible();
     result.readerBack = await back.evaluate(el => Math.round(el.getBoundingClientRect().top));
     expect(result.readerBack as number).toBeGreaterThanOrEqual(TOP);
+    // Opening a mail keeps the same top bar, so the status bar colour does not change.
+    expect(await topBarAndThemeColor(page)).toEqual({ bar: scheme === "light" ? "#ffffff" : "#0a0a0a", meta: [scheme === "light" ? "#ffffff" : "#0a0a0a"] });
     const reader = page.locator("[data-reader-scroll]").filter({ visible: true }).first();
     expect(await reader.evaluate(el => ({ bottom: Math.round(el.getBoundingClientRect().bottom), paddingBottom: getComputedStyle(el).paddingBottom })))
       .toEqual({ bottom: VIEWPORT.height, paddingBottom: `${8 + BOTTOM}px` });
