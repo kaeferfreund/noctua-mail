@@ -1,5 +1,6 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useContext, useMemo, useState, type CSSProperties } from "react";
 import { buildAccountSenderIconPath } from "@/lib/accountApiPaths";
+import { DomainIconVersionsContext, domainIconVersionFor } from "@/app/hooks/useDomainIconVersions";
 import { getSenderIconColors, getSenderIdentity } from "@/lib/senderIdentity";
 import styles from "./SenderIcon.module.css";
 
@@ -17,16 +18,18 @@ type SenderIconProps = {
 
 /** URL of the account's sender-icon route. With `fallback: "none"` the route
  * answers 404 instead of its initials SVG when no logo is found, so callers
- * can keep their own initials. */
+ * can keep their own initials. `version` (of an uploaded domain icon) makes
+ * the browser load a new upload instead of a cached favicon. */
 export function buildSenderIconSrc(
   accountId: string,
-  sender: { from?: string | null; fromEmail?: string | null; fallback?: "none" }
+  sender: { from?: string | null; fromEmail?: string | null; fallback?: "none"; version?: string | null }
 ) {
   const search = new URLSearchParams({
     from: sender.from ?? ""
   });
   if (sender.fromEmail) search.set("fromEmail", sender.fromEmail);
   if (sender.fallback) search.set("fallback", sender.fallback);
+  if (sender.version) search.set("v", sender.version);
   return buildAccountSenderIconPath(accountId, search);
 }
 
@@ -45,9 +48,12 @@ export default function SenderIcon({
     () => getSenderIdentity({ from, fromEmail }),
     [from, fromEmail]
   );
+  // An uploaded domain icon changes the URL, so a favicon cached for six
+  // hours under the old one is not shown after an upload.
+  const version = domainIconVersionFor(useContext(DomainIconVersionsContext), identity.domain);
   const src = useMemo(
-    () => buildSenderIconSrc(accountId, { from, fromEmail }),
-    [accountId, from, fromEmail]
+    () => buildSenderIconSrc(accountId, { from, fromEmail, version }),
+    [accountId, from, fromEmail, version]
   );
 
   if (!enabled || !accountId) return null;

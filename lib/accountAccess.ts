@@ -46,6 +46,10 @@ export async function listAccountMembersForRole(accountId: string, role: Account
   const members = await listAccountMembers(accountId);
   return role === "manager" ? members : members.filter(member => !member.disabled).map(({ disabled, ...member }) => { void disabled; return member; });
 }
+/** Addresses of the mailboxes the user can open (no identity join). */
+export async function listAccessibleAccountEmails(userId: string): Promise<string[]> {
+  return readAccountAccess(await getDb(), userId, { identities: false }).entries.map(entry => entry.account.email);
+}
 export async function listAccessibleAccountsForUser(userId: string): Promise<AccountAccessEntry[]> {
   return readAccountAccess(await getDb(), userId, { identities: true }).entries;
 }

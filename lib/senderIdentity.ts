@@ -269,6 +269,11 @@ export function getRootDomain(domain?: string | null) {
   return normalized;
 }
 
+/** Domain a mailbox address is grouped under in the sidebar (lower case, raw, not IDNA-encoded). */
+export function mailboxGroupDomain(email: string): string | null {
+  return email.trim().split("@")[1]?.toLowerCase() || null;
+}
+
 export function isFreeMailDomain(domain?: string | null) {
   const normalized = normalizeEmailAddress(domain);
   return normalized ? FREE_MAIL_DOMAINS.has(normalized) : false;

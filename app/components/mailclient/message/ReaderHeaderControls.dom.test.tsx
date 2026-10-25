@@ -7,6 +7,7 @@ import type { ComponentProps } from "react";
 import MessageViewOrchestrator, { type MessageViewOrchestratorProps } from "./MessageViewOrchestrator";
 import ReaderToolbar from "./ReaderToolbar";
 import type { Message } from "@/lib/data";
+import type { ThreadCollabController } from "@/app/hooks/useThreadCollab";
 
 afterEach(cleanup);
 
@@ -99,4 +100,31 @@ test("split toolbar holds only the expand control", () => {
   expect(group.getAttribute("data-focus")).toBe("false");
   expect(Array.from(group.querySelectorAll("button")).map(b => b.getAttribute("aria-label"))).toEqual(["Expand reading view"]);
   expect(view.queryByText(/^Tip:/)).toBeNull();
+});
+
+const collab: ThreadCollabController = {state: undefined, readDenied: false, members: [], me: null, comments: [], activity: [],
+  pending: false, loading: false, error: null, reload: async () => {}, update: async () => true,
+  addNote: async () => true, deleteNote: async () => true};
+
+test("split layout with a collaboration bar: toggle and Expand end the collaboration row, the subject keeps its row", () => {
+  const toolbar = <div data-testid="split-toolbar"><button type="button">Expand</button></div>;
+  const view = renderReader(threadMessages(3), {toolbar, toolbarInSubjectRow: true, collab: {controller: collab, role: "editor"}});
+  const inline = view.getByTestId("split-toolbar");
+  const compact = view.getByRole("radio", {name: "Compact"});
+  const actions = inline.parentElement!;
+  expect(actions.contains(compact)).toBe(true);
+  expect(actions.lastElementChild).toBe(inline);
+  const bar = view.getByLabelText("Thread collaboration");
+  expect(bar.contains(actions)).toBe(true);
+  // Same line as the assignee/status controls, not below them.
+  expect(actions.parentElement!.contains(view.getByRole("button", {name: "Internal note"}))).toBe(true);
+  // ThreadSubject renders the text inside its group; the group's parent is the subject row.
+  const subjectRow = (v: typeof view) => v.getByText(syntheticReviewMessage.subject!).parentElement!.parentElement!;
+  expect(subjectRow(view).querySelector('[role="radio"]')).toBeNull();
+  expect(subjectRow(view).children).toHaveLength(1);
+  cleanup();
+  // Focus layout keeps the toggle in the subject row.
+  const focus = renderReader(threadMessages(3), {toolbar, collab: {controller: collab, role: "editor"}});
+  expect(focus.getByLabelText("Thread collaboration").querySelector('[role="radio"]')).toBeNull();
+  expect(subjectRow(focus).contains(focus.getByRole("radio", {name: "Compact"}))).toBe(true);
 });

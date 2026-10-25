@@ -13,6 +13,7 @@ This document explains runtime storage from an operator/deployment perspective:
   - `db/accounts/<accountId>.db` (per-account SQLite shards)
   - `sources/<accountId>/<messageId>.eml` (raw message source cache)
   - `attachments/<accountId>/<messageId>/<attachmentId>.bin` (attachment binary cache)
+  - `domain-icons/<sha256(domain)>.png` (admin-uploaded sidebar domain icons, re-encoded 64×64 PNG)
 
 Path segments are `encodeURIComponent(...)` encoded.
 
@@ -25,6 +26,10 @@ Contains control-plane and identity data:
 - `users`
 - `user_accounts`
 - `invite_codes`
+- `domain_icons` (one row per domain with an uploaded icon: byte hash, size, updatedAt, updatedByUserId;
+  the PNG itself lives in `domain-icons/`. Back both up together. A row without its file falls
+  back to the favicon; a file without its row is never served. The sender-icon route serves an
+  upload only for domains of mailboxes the caller can open.)
 
 Depending on `IMAP_CREDENTIALS_STORAGE`, encrypted IMAP/SMTP passwords may also be stored here:
 - `db`: credentials in DB
