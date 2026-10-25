@@ -109,7 +109,7 @@ test("admin INBOX rescan at desktop and phone width", async ({ page }) => {
   const list = panel.getByRole("list", { name: "Treffer" });
   await expect(list).toBeVisible({ timeout: 60000 });
   await expect(list.getByRole("checkbox")).toHaveCount(3);
-  await expect(panel.getByText(/^Vom Server markiert: 6, davon 3 im Posteingang behalten/)).toBeVisible();
+  await expect(panel.getByText(/^Vom Server markiert: 6, davon 3 aus Schutzgründen im Posteingang behalten/)).toBeVisible();
   for (const subject of ["Sie haben einen Gutschein über 500 € gewonnen", "Ihr Paket wartet: Zollgebühr offen", "Verdoppeln Sie Ihr Erspartes in 7 Tagen"]) {
     await expect(list.getByText(subject)).toBeVisible();
   }

@@ -180,6 +180,46 @@ describe("admin INBOX rescan", () => {
     expect(await rescan.listSpamRescanActivity(ADMIN)).not.toContainEqual(expect.objectContaining({ accountId: f.accountId }));
   });
 
+  test("the server-flag phase counts the whole INBOX it reads, the model limit follows the live count", async () => {
+    const f = await fixture();
+    await f.seed(f.mail({ subject: "Im Zeitraum" }), f.mail({ subject: "Älter", dateValue: Date.now() - 90 * DAY }));
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    await f.run(async () => {
+      // The admin saw 50 (stale count); one unchecked row is in the range now.
+      const job = await rescan.startSpamRescan({ accountId: f.accountId, period: "30d", withModel: true, modelLimit: 50, userId: ADMIN });
+      expect(job).toMatchObject({ modelLimit: 1, counts: { inboxRows: 1 } });
+      // The first progress write is asynchronous; it lands before the gated scan reads anything.
+      for (let tries = 0; tries < 200 && (await rescan.loadSpamRescanState(f.accountId)).job?.total !== 2; tries += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+      expect((await rescan.loadSpamRescanState(f.accountId)).job).toMatchObject({ status: "running", phase: "server-flag", total: 2 });
+      release();
+    }, { loadStaticRules: async () => { await gate; return EMPTY_STATIC_RULES; } });
+    expect(f.model.doGenerateCalls).toHaveLength(1);
+  });
+
+  test("the move result counts errors from the items: a later run keeps earlier errors, a retry clears them", async () => {
+    const f = await fixture();
+    const [broken, fine, later] = await f.seed(f.mail({ subject: "Kaputt" }), f.mail({ subject: "Gut" }), f.mail({ subject: "Später" }));
+    const job = await f.run(() => rescan.startSpamRescan({ accountId: f.accountId, period: "30d", withModel: true, modelLimit: 3, userId: ADMIN }));
+    let failing = true;
+    const imapMove: SpamRescanDeps["moveToJunk"] = async ({ message }) => {
+      if (failing && message.id === broken.id) throw new Error("IMAP down");
+      await f.db.prepare("UPDATE messages SET folderId = ?, mailboxPath = 'Junk' WHERE accountId = ? AND id = ?").run(f.junkId, f.accountId, message.id);
+      return { junkFolderId: f.junkId, junkMailbox: "Junk", flags: [], previousMessageId: message.id, messageId: message.id };
+    };
+    const moveIds = (ids: string[]) => f.run(() => rescan.startSpamRescanMove({ accountId: f.accountId, jobId: job.id, ids, userId: ADMIN }), { moveToJunk: imapMove });
+    const counts = async () => (await rescan.loadSpamRescanState(f.accountId)).job?.counts;
+    await moveIds([broken.id, fine.id]);
+    expect(await counts()).toMatchObject({ moved: 1, errors: 1 });
+    await moveIds([later.id]);
+    expect(await counts()).toMatchObject({ moved: 2, errors: 1 });
+    failing = false;
+    await moveIds([broken.id]);
+    expect(await counts()).toMatchObject({ moved: 3, gone: 0, changed: 0, errors: 0 });
+  });
+
   test("moving a job scanned by an earlier process is not reset by reconcile", async () => {
     const f = await fixture();
     const [first, second] = await f.seed(f.mail({ subject: "Eins" }), f.mail({ subject: "Zwei" }));

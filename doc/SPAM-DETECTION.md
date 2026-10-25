@@ -495,7 +495,8 @@ decision 2026-10-25). Code: `lib/mail/spam/rescan.ts`, UI
    exactly the selection of `scripts/spam-apply.ts --server-flagged`
    (`scanServerFlaggedInbox`, all exclusions of the section above; the sender
    history still counts the whole INBOX). Only the first 64 KB of each INBOX
-   source are read.
+   source are read; the progress of this phase therefore counts the whole
+   INBOX, and its label says so.
 3. **Stage B** (optional, checkbox „Auch Filter-Prüfung mit Modell“, on by
    default for 30 Tage, off for 12 Monate and alles): the regular pipeline
    (allowlist → static rules → trusted senders → model) on the unchecked INBOX
@@ -520,11 +521,14 @@ decision 2026-10-25). Code: `lib/mail/spam/rescan.ts`, UI
    row id is skipped as „nicht mehr im Posteingang“; mail that was flagged,
    answered, marked `$NotJunk` or judged other than spam since the scan (for
    example „Kein Spam“ on its mark) stays as „geändert“. Moved hits are not
-   selected again, so a second move resumes. „Kein Spam“ undoes a move.
+   selected again, so a second move resumes. The result line counts the
+   items of the job by their status (moved, gone, changed, errors), so it
+   covers every move so far and a retried error no longer counts. „Kein Spam“
+   undoes a move.
 
 **Model-call safeguards**: the count is shown before the start; the start
-sends the shown count as `modelLimit` and the job never sends more, and never
-more than 2,000 per run (`SPAM_RESCAN_MODEL_MAX`; another run continues, checked
+sends the shown count as `modelLimit` and the job never sends more, never more
+than the unchecked rows counted at the start, and never more than 2,000 per run (`SPAM_RESCAN_MODEL_MAX`; another run continues, checked
 rows are skipped); already checked rows and rows at the attempt limit are never
 sent; the allowlist, static rules and trusted senders decide without the model
 as in the sweep; „Abbrechen“ stops after the running pair. The log line

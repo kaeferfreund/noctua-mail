@@ -55,7 +55,7 @@ describe("admin INBOX rescan", () => {
     expect(view.getByText(/5\.200 Mails sind ungeprüft, pro Durchlauf gehen höchstens 2\.000 an das Modell/)).toBeTruthy();
 
     fireEvent.click(view.getByRole("button", { name: "Prüfung starten" }));
-    expect(await view.findByText("Vom Server markierte Mails werden gesucht")).toBeTruthy();
+    expect(await view.findByText("Posteingang wird gelesen (alle Mails, auch außerhalb des Zeitraums, für bekannte Absender)")).toBeTruthy();
     expect(view.getByText("300 von 1.200")).toBeTruthy();
     const post = calls.find((call) => call.init?.method === "POST")!;
     expect(post.url).toBe("/api/admin/accounts/acc-a/spam-rescan");
@@ -83,7 +83,7 @@ describe("admin INBOX rescan", () => {
     fireEvent.click(view.getByRole("button", { name: "Posteingang von team@example.test prüfen" }));
     const list = await view.findByRole("list", { name: "Treffer" });
     expect(view.getByText(/^Prüfung vom 25\.10\.2026 .*\(Letzte 30 Tage\): 3 Treffer$/)).toBeTruthy();
-    expect(view.getByText(/^Vom Server markiert: 5, davon 3 im Posteingang behalten/)).toBeTruthy();
+    expect(view.getByText(/^Vom Server markiert: 5, davon 3 aus Schutzgründen im Posteingang behalten \(z\. B\. bekannter Absender, beantwortet, markiert, jünger als 3 Tage/)).toBeTruthy();
     expect(view.getByText("Filter: 40 geprüft, 31 Modellaufrufe, 1 verdächtig.")).toBeTruthy();
     expect(within(list).getByText("Filter: verdächtig · Sicherheit 93 % · Gewinnversprechen")).toBeTruthy();
     const boxes = within(list).getAllByRole("checkbox") as HTMLInputElement[];

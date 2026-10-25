@@ -199,8 +199,9 @@ function progressWriter(jobId: string) {
 
 /**
  * Starts a scan in the background. `modelLimit` is the count the admin saw
- * (preview.modelLimit): Stage B never sends more mails to the model, and
- * never more than SPAM_RESCAN_MODEL_MAX. Throws SpamRescanBusyError while the
+ * (preview.modelLimit): Stage B never sends more mails to the model, never
+ * more than SPAM_RESCAN_MODEL_MAX and never more than the unchecked rows of
+ * the range counted at the start. Throws SpamRescanBusyError while the
  * mailbox has a running job.
  */
 export async function startSpamRescan(input: { accountId: string; period: SpamRescanPeriod; withModel: boolean; modelLimit: number; userId: string }) {
@@ -210,7 +211,8 @@ export async function startSpamRescan(input: { accountId: string; period: SpamRe
   const inbox = findInboxFolder(await getFolders(input.accountId), input.accountId);
   if (!inbox) throw new SpamRescanInputError("no_inbox");
   if (input.withModel && preview.modelBlocked) throw new SpamRescanInputError("model_unavailable");
-  const modelLimit = input.withModel ? Math.min(input.modelLimit, SPAM_RESCAN_MODEL_MAX) : 0;
+  // Never more than the admin saw, than the cap, or than the unchecked rows counted now.
+  const modelLimit = input.withModel ? Math.min(input.modelLimit, preview.modelLimit) : 0;
   const id = randomUUID();
   const sinceDateValue = spamRescanSince(input.period);
   await createSpamRescanJob({ id, accountId: input.accountId, period: input.period, sinceDateValue, withModel: input.withModel, modelLimit,
@@ -270,8 +272,9 @@ async function runScan(job: StoredSpamRescanJob, inboxId: string) {
     console.info("[spam] rescan done", { accountId, jobId: job.id, cancelled: reason ?? null, ...logged });
   };
 
-  // Stage A: server-flagged mail, the conservative rules of the server-flag backfill.
-  progress("server-flag", 0, counts.inboxRows ?? 0, true);
+  // Stage A: server-flagged mail, the conservative rules of the server-flag backfill. Its progress counts
+  // the whole INBOX, whose heads it reads for the sender history (the phase label says so), not the range.
+  progress("server-flag", 0, (await countSpamRescanRows(accountId, inboxId, OLDEST, SPAM_MAX_ATTEMPTS)).rows, true);
   const { shards, household } = await loadAppServerFlagContext(await deps().loadStaticRules());
   const shard = shards.get(accountId);
   if (!shard) throw new Error("mailbox shard not found");
@@ -387,13 +390,10 @@ async function runMove(job: StoredSpamRescanJob, userId: string) {
         progress("moving", processed += 1, records.length);
       }
     });
-    counts = {
-      ...counts,
-      moved: (counts.moved ?? 0) + results.moved,
-      gone: (counts.gone ?? 0) + results.missing + results["not-in-inbox"],
-      changed: (counts.changed ?? 0) + results.changed,
-      errors: results.error
-    };
+    // The result counts every move of this job so far: read from the items, so a retried error is no longer one.
+    const statuses = (await listSpamRescanItems(job.id)).map((item) => item.moveStatus);
+    const count = (status: SpamRescanMoveStatus) => statuses.filter((value) => value === status).length;
+    counts = { ...counts, moved: count("moved"), gone: count("gone"), changed: count("changed"), errors: count("error") };
     console.info("[spam] rescan move done", { accountId, jobId: job.id, selected: records.length, moved: results.moved,
       gone: results.missing + results["not-in-inbox"], changed: results.changed, errors: results.error });
   } finally {

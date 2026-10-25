@@ -638,7 +638,7 @@
         "title": "Spam check: {mailbox}",
         "cancel": "Cancel check",
         "phase": {
-          "server-flag": "Looking for messages flagged by the server",
+          "server-flag": "Reading the inbox (all messages, also outside the period, for known senders)",
           "classifier": "Filter check with the model",
           "moving": "Moving the selected messages"
         },
@@ -1218,7 +1218,7 @@
         "start": "Start check",
         "cancel": "Cancel",
         "phase": {
-          "server-flag": "Looking for messages flagged by the server",
+          "server-flag": "Reading the inbox (all messages, also outside the period, for known senders)",
           "classifier": "Filter check with the model",
           "moving": "Moving the selected messages"
         },
@@ -1230,7 +1230,7 @@
           "failed": "The check failed. Start a new check."
         },
         "summary": "Check of {time} ({period}): {items, plural, =0 {no hits} one {# hit} other {# hits}}",
-        "serverLine": "Flagged by the server: {flagged, number}, {kept, number} of them kept in the inbox (known sender, answered, flagged or “Not spam”).",
+        "serverLine": "Flagged by the server: {flagged, number}, {kept, number} of them kept in the inbox as a precaution (e.g. known sender, answered, flagged, younger than 3 days, “Not spam”, already checked).",
         "modelLine": "Filter: {checked, number} checked, {calls, number} model calls, {marked, number} suspicious.",
         "modelSkipped": "Filter check not run.",
         "truncated": "There are more hits than the list shows. Move these and start a new check.",
