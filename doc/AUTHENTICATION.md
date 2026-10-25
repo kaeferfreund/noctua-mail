@@ -30,9 +30,38 @@ members are granted separately.
 
 `requireActiveUserSession(request)` uses Better Auth's real session plus the Noctua generation/
 assurance sidecar, live enabled profile and both mandatory TOTP records. Restricted setup sessions
-cannot access mail. Cookie refresh/deletion headers are forwarded. Absolute authentication age is
-24 hours, independent of refresh. `/api/auth/me` retains enrollment/none/unselected/selected states.
+cannot access mail. Cookie refresh/deletion headers are forwarded. `/api/auth/me` retains
+enrollment/none/unselected/selected states.
 Active mailbox selection is a UI preference and never authorizes the route's requested mailbox.
+
+### Session lifetime: three days of inactivity
+
+User decision of 2026-10-25: a session stays valid as long as it is used and ends after three days
+without use. There is no absolute lifetime. Better Auth runs with `expiresIn` 259200 s
+(`SESSION_IDLE_TIMEOUT_SECONDS`), `updateAge` 3600 s and the cookie cache disabled. Every guarded
+request reads the session through `getSession`; when the last refresh is at least one hour old it
+moves `auth_session.expiresAt` to now + 3 days and sends a new session cookie with `Max-Age=259200`,
+which `withAuthResponse`/`forwardAuthHeaders` pass through. The effective idle limit is therefore
+between 71 and 72 hours after the last request. After that the row has expired, the guard answers
+401 and the deletion cookie is forwarded.
+
+The session's `expiresAt` is the only lifetime. `auth_session_security.authenticatedAt` still records
+when the factors were last proven and binds stream and MCP checks to that proof, but its age no
+longer ends a session, a stream or a reauth proof. `/api/auth/me` returns the sliding expiry as
+`exp` and the idle timeout as `ttlSeconds` (259200). Open streams check the live session row every
+5 seconds, so they follow the sliding expiry instead of a snapshot from the request that opened them
+and close at most 5 seconds after it passes. An open stream does not extend the session; only
+requests through the guard do, so a tab that keeps polling keeps its session alive indefinitely.
+Restricted setup sessions slide the same way.
+
+Security consequences: a stolen session cookie stays usable as long as it is used, and up to three
+days after its last use. The controls against that: sensitive actions (factor and password changes,
+passkeys, backup codes, session revocation, admin recovery and MCP token creation) need a fresh
+`x-noctua-reauth` grant that lives five minutes and requires the factors again; Better Auth's
+`freshAge` (300 s since session creation) still applies to its own sensitive endpoints; a user can
+revoke single or all other sessions in Security settings; password, factor and login-mailbox changes
+advance the security generation, which ends all other sessions, open streams and MCP tokens; banning
+or disabling a user ends access on the next request.
 
 ## Roles and account DTOs
 
@@ -160,9 +189,14 @@ new-mailbox flow; the reviewed optional personal mailbox supplied at identity si
 
 Tokens are `mcp_` plus 32 random base64url bytes. Only their SHA-256 hash and six-character suffix
 are stored; the secret is shown once. Mint requires a live MFA-assured session, current generation,
-complete TOTP enrollment and editor/manager access, atomically rechecked. POST accepts label and
-optional ttlSeconds (default 30 days; range 60 seconds through 365 days).
-Editor token GET/DELETE covers own tokens; managers can list/delete all mailbox tokens.
+complete TOTP enrollment and editor/manager access, atomically rechecked. Because a token outlives
+session expiry and revocation, POST also spends a fresh `mcp.create` grant from `x-noctua-reauth`
+(password + TOTP/UV); without one it answers 403 `reauth_required`, a wrong-purpose or reused grant
+403 `invalid_proof`. The grant is consumed in its own transaction without taking the security slot, so
+other requests and streams continue; the settings tab collects it through ReauthDialog. POST accepts
+label and optional ttlSeconds (default 30 days; range 60 seconds through 365 days).
+Editor token GET/DELETE covers own tokens; managers can list/delete all mailbox tokens. Deletion
+needs no grant, since it only removes access.
 Every bearer request and tool use checks the live creator/profile/ban, both MFA records, non-NULL
 current generation, expiry and current role. No cookie fallback. Each requested tool accountId must
 repeat the bound mailbox; cross-mailbox calls require another token. Mutation tools require editor;
@@ -173,12 +207,14 @@ changes are limited to the binding/role checks, leaving thread-collaboration's t
 
 `lib/authStreams.ts` exports:
 
-- `AuthStreamIdentity = {userId,sessionId,accountId?,generation,authenticatedAt,expiresAt,minRole?}`.
+- `AuthStreamIdentity = {userId,sessionId,accountId?,generation,authenticatedAt,minRole?}`. Expiry is
+  read from the live session row, never carried in the identity.
 - `assertStreamAuthorized(identity): Promise<void>`: one coherent live DB snapshot of session,
   generation/assurance, verified factor and current role. Await immediately before sensitive enqueue;
   no intervening await. Queued/fetched events are checked anew.
 - `registerAuthStream(identity, cleanup): {close():void, readonly closed:boolean}`: idempotent disposal,
-  5-second idle liveness and absolute-expiry timers. It clears timers before invoking cleanup.
+  5-second idle liveness, which also ends the stream once the sliding session expiry has passed. It
+  clears the timer before invoking cleanup.
 - `revokeAuthStreams({userId?,sessionId?,accountId?}): void`: publish after commit. Logout, membership
   revoke/downgrade, mailbox deletion and login-mailbox repair are wired here. Factor,
   password and lifecycle finalizers call it after their authoritative commits. DB checks already
@@ -235,7 +271,7 @@ Missing, expired, mismatched or removed registry entries fail before verificatio
 at finalization. The registry uses `two_factor_imap` as a distinct two-factor kind to preserve the
 first factor's `imap_totp` method without storing a mailbox password. IMAP write-back captures its
 new generation/time after the credential service's revocation. Refresh, password changes, factor
-rotations and UV reauth preserve `authenticatedAt`; only a complete new login restarts the 24h clock.
+rotations and UV reauth preserve `authenticatedAt`; only a complete new login sets a new one.
 
 ### Fresh-proof matrix and requests
 
@@ -258,6 +294,7 @@ session's original factor. A backup code is accepted only for `totp.replace`.
 | `passkey.rename` | Password + TOTP, or same-user UV passkey (same policy as enrollment) |
 | `sessions.revoke` | Current credential + TOTP/UV |
 | `admin.recovery` | Admin app password + TOTP/UV; administration additionally verifies the target out of band |
+| `mcp.create` | Current credential + TOTP/UV |
 
 Password+UV uses `proofMode:"passkey"` with `currentPassword` for purposes that require password.
 Only passkey enrollment/removal/rename permit UV without a password. The initial response is
@@ -265,7 +302,8 @@ Only passkey enrollment/removal/rename permit UV without a password. The initial
 operation grant. Send it as `x-noctua-reauth` on both installed passkey authentication options and
 verification requests. Verification returns a replacement cookie and
 `{...,ok:true,grant,purpose,expiresAt}` together. That final grant belongs to the resulting rotated
-session; the old session is retired. Its absolute age/assurance ceiling is preserved. A UV removal
+session; the old session is retired. Its `authenticatedAt` and assurance carry over; its lifetime is the
+new session's sliding expiry. A UV removal
 grant records the proving credential and cannot remove that same key.
 
 For password/TOTP/backup proof, success is
@@ -283,7 +321,7 @@ reset URLs or full bearer tokens appear in journal/audit metadata.
 | `POST /api/auth/security/password` | `{currentPassword?,newPassword}` → `{ok:true}` + replacement cookie when changed; consumes `password.change` or `password.set`; 10..256 characters; server forces other-session revocation |
 | `POST /api/auth/security/backup-codes` | `{currentPassword?}` → `{ok:true,backupCodes:string[]}` shown once; consumes `backup.regenerate`; advances generation, retains only proved current session and its age |
 | `POST /api/auth/totp/replace` | `{currentPassword?}` → `{ok:true,grant,purpose:"totp.enroll",expiresAt,enrollmentRequired:true}` + rotated restricted cookie; consumes `totp.replace` |
-| `POST /api/auth/security/sessions/revoke` | `{sessionId}` revokes exactly that owned session (including current only when explicitly named); `{all:true}` revokes all **other** sessions, retains the current session/absolute age and advances generation (also revoking MCP); consumes `sessions.revoke` → `{ok:true}`; explicit current-session revocation forwards deletion cookies |
+| `POST /api/auth/security/sessions/revoke` | `{sessionId}` revokes exactly that owned session (including current only when explicitly named); `{all:true}` revokes all **other** sessions, retains the current session and its authentication time and advances generation (also revoking MCP); consumes `sessions.revoke` → `{ok:true}`; explicit current-session revocation forwards deletion cookies |
 | `POST /api/auth/security/passkeys/rename` | `{passkeyId,name}` → `{ok:true}`; consumes `passkey.rename`, checks ownership; trimmed name 1..100 characters, no control characters; no generation/assurance change |
 | `POST /api/auth/security/passkeys/remove` | `{passkeyId}` → `{ok:true}`; consumes `passkey.remove`, checks ownership, revokes other sessions/tokens/challenges |
 | `POST /api/ba/two-factor/enable` | `{password?,method?:"totp"}` + `totp.enroll` header → stock `{method:"totp",totpURI,backupCodes}` once; proof reserved for this seed |
@@ -330,7 +368,7 @@ is eligible; failures remain generic. The production allowlist stays unset.
 `security:{enrollmentRequired,reauthRequired,hasPassword,imapLoginAvailable,code?}`. Restricted
 responses have minimal `{id,email,name}` identity, `accounts:[]`, `accountId:null` and
 `mailboxState:"enrollment"`. Fully assured users retain selected/none/unselected states. `exp` is
-Unix seconds of the smaller library/absolute expiry; no session token is returned.
+Unix seconds of the session's sliding expiry (`auth_session.expiresAt`); no session token is returned.
 
 `GET /api/auth/security` works without a mailbox and returns
 `{ok:true,hasPassword,totpEnrolled,mfaStateInconsistent,enrollmentRequired,reauthRequired,

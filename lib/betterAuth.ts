@@ -23,6 +23,8 @@ export const AUTH_BASE_PATH = "/api/ba";
 export const AUTH_COOKIE_PREFIX = "noctua";
 export const PASSWORD_MIN = 10;
 export const PASSWORD_MAX = 256;
+/** A session ends after this much inactivity; there is no absolute lifetime (user decision 2026-10-25). */
+export const SESSION_IDLE_TIMEOUT_SECONDS = 3 * 86400;
 
 type SqliteHandle = {
   prepare(sql: string): {
@@ -120,7 +122,9 @@ export function noctuaAuthOptions(config: NoctuaAuthConfig) {
     user: { modelName: "auth_user" },
     session: {
       modelName: "auth_session",
-      expiresIn: 86400,
+      // Sliding expiry: a request through getSession more than updateAge after the last
+      // refresh pushes expiresAt (DB row and cookie Max-Age) to now + expiresIn.
+      expiresIn: SESSION_IDLE_TIMEOUT_SECONDS,
       updateAge: 3600,
       freshAge: 300,
       cookieCache: { enabled: false },

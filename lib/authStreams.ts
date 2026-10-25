@@ -7,7 +7,7 @@ import type { AccountRole } from "./data";
 
 export type AuthStreamIdentity = {
   userId: string; sessionId: string; accountId?: string;
-  generation: number; authenticatedAt: number; expiresAt: number; minRole?: AccountRole;
+  generation: number; authenticatedAt: number; minRole?: AccountRole;
 };
 export type StreamRevocation = { userId?: string; sessionId?: string; accountId?: string };
 type Entry = { identity: AuthStreamIdentity; close: () => void; accountChanged?: (accountId: string) => void };
@@ -46,8 +46,9 @@ export function assertStreamAuthorizedRow(db: Database, identity: AuthStreamIden
         AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login'))
       AND NOT EXISTS (SELECT 1 FROM user_provisioning WHERE userId=u.id AND state NOT IN ('complete','cancelled'))`)
     .get(identity.sessionId, identity.userId, identity.generation, identity.authenticatedAt) as { expiresAt: string | number; authenticatedAt: number } | undefined;
-  if (!row || !Number.isSafeInteger(identity.generation) || !Number.isSafeInteger(identity.authenticatedAt) || !Number.isFinite(identity.expiresAt) || !Number.isFinite(new Date(row.expiresAt).getTime()) || identity.expiresAt <= now || new Date(row.expiresAt).getTime() <= now ||
-      row.authenticatedAt > now || row.authenticatedAt + 86_400_000 <= now ||
+  // The live row's expiresAt slides with session use; an expiry snapshot from the opening request would end active streams early.
+  if (!row || !Number.isSafeInteger(identity.generation) || !Number.isSafeInteger(identity.authenticatedAt) || !Number.isFinite(new Date(row.expiresAt).getTime()) || new Date(row.expiresAt).getTime() <= now ||
+      row.authenticatedAt > now ||
       (identity.accountId && !roleAtLeast(resolveAccountRoleRow(db, identity.userId, identity.accountId), identity.minRole ?? "viewer"))) {
     throw new Error("Stream authorization revoked");
   }
@@ -70,12 +71,10 @@ export function registerAuthStream(identity: AuthStreamIdentity, cleanup: () => 
   let checking = false;
   let checkingTask: Promise<void> | undefined;
   let liveness: ReturnType<typeof setInterval> | undefined;
-  let expiry: ReturnType<typeof setTimeout> | undefined;
   const close = () => {
     if (closed) return;
     closed = true;
     clearInterval(liveness);
-    clearTimeout(expiry);
     streams.delete(entry);
     // Stop delivery/timers synchronously even if resource disposal fails.
     let disposed: void | Promise<void> = undefined;
@@ -94,8 +93,8 @@ export function registerAuthStream(identity: AuthStreamIdentity, cleanup: () => 
     checking = true;
     checkingTask = assertStreamAuthorized(identity).catch(close).finally(() => { checking = false; });
   }, 5_000);
-  expiry = setTimeout(close, Math.max(0, Math.min(identity.expiresAt, identity.authenticatedAt + 86_400_000) - Date.now()));
-  liveness.unref?.(); expiry.unref?.();
+  // Session expiry slides with use, so the liveness check against the live row also ends expired streams.
+  liveness.unref?.();
   streams.add(entry);
   return registration;
 }

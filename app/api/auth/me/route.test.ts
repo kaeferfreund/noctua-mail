@@ -26,7 +26,7 @@ describe("me state and persisted selection contract",()=>{
   await h.addMembership(user.id,await account("Hidden"));
   const response=await GET(req(f.jar.header())); const body=await response.json();
   expect(response.status).toBe(200);
-  expect(body).toEqual({ok:true,user:{id:user.id,email:user.email,name:"Synthetic User",uiLocale:null},accountId:null,accounts:[],exp:expect.any(Number),ttlSeconds:86400,mailboxState:"enrollment",security:{enrollmentRequired:true,reauthRequired:true,code:"mfa_enrollment_required",hasPassword:true,imapLoginAvailable:false}});
+  expect(body).toEqual({ok:true,user:{id:user.id,email:user.email,name:"Synthetic User",uiLocale:null},accountId:null,accounts:[],exp:expect.any(Number),ttlSeconds:259200,mailboxState:"enrollment",security:{enrollmentRequired:true,reauthRequired:true,code:"mfa_enrollment_required",hasPassword:true,imapLoginAvailable:false}});
   expect(JSON.stringify(body)).not.toContain("sessionToken");
  });
  test("zero memberships returns none",async()=>{
@@ -68,14 +68,17 @@ describe("me state and persisted selection contract",()=>{
   try {expect((await (await GET(req(f.jar.header()))).json()).accountId).toBe(b);}
   finally {await withDbWriteRetry("test.raceCleanup",()=>f.master.exec(`DROP TRIGGER ${trigger}`));}
  });
- test("refresh cookies are forwarded and absolute expiry is bounded",async()=>{
+ test("refresh cookies are forwarded and exp follows the sliding expiry, not the authentication time",async()=>{
   const f=await createAuthenticatedTestSession();
-  const authenticatedAt=Date.now()-7200_000;
-  await f.seedSessionSecurity(f.session.id,f.user.id,"mfa","password_totp",authenticatedAt);
-  await withDbWriteRetry("test.refresh",()=>f.master.prepare("UPDATE auth_session SET updatedAt=?,expiresAt=? WHERE id=?").run(new Date(Date.now()-7200_000).toISOString(),new Date(Date.now()+79200_000).toISOString(),f.session.id));
+  // Authenticated 25 h ago, last refreshed 2 h ago: the request slides expiry to now + 3 days.
+  await f.seedSessionSecurity(f.session.id,f.user.id,"mfa","password_totp",Date.now()-90000_000);
+  await withDbWriteRetry("test.refresh",()=>f.master.prepare("UPDATE auth_session SET updatedAt=?,expiresAt=? WHERE id=?").run(new Date(Date.now()-7200_000).toISOString(),new Date(Date.now()+259200_000-7200_000).toISOString(),f.session.id));
+  const before=Date.now();
   const response=await GET(req(f.jar.header()));
-  expect(response.headers.getSetCookie().length).toBeGreaterThan(0);f.jar.absorb(response.headers);
-  expect((await response.json()).exp).toBe(Math.floor((authenticatedAt+86400_000)/1000));
+  expect(response.headers.getSetCookie().join(";")).toContain("Max-Age=259200");f.jar.absorb(response.headers);
+  const exp=(await response.json()).exp;
+  expect(exp).toBeGreaterThanOrEqual(Math.floor((before+259200_000)/1000));
+  expect(exp).toBe(Math.floor(new Date(f.master.prepare("SELECT expiresAt FROM auth_session WHERE id=?").get(f.session.id).expiresAt).getTime()/1000));
   expect((await GET(req(f.jar.header()))).status).toBe(200);
  });
  test("expired library session forwards deletion cookies",async()=>{

@@ -79,6 +79,9 @@ test("server resolution uses the guarded identity and restricted /me retains its
   expect(await response.json()).toMatchObject({ mailboxState: "enrollment", accountId: null, accounts: [], user: { id: f.user.id, uiLocale: null } });
   await setUserUiLocale(f.user.id, "en");
   expect((await resolveRequestLocale(headers, "de")).locale).toBe("en");
+  // Authentication age alone no longer ends a session; an expired session does.
   await f.seedSessionSecurity(f.session.id, f.user.id, "setup", "password", Date.now() - 86400_001);
+  expect((await resolveRequestLocale(headers, "de")).locale).toBe("en");
+  f.master.prepare("UPDATE auth_session SET expiresAt=? WHERE id=?").run(new Date(Date.now() - 1000).toISOString(), f.session.id);
   expect((await resolveRequestLocale(headers, "de")).locale).toBe("de");
 });

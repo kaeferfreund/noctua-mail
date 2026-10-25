@@ -11,6 +11,7 @@ import { listSenderIdentityRows } from "./db/senderIdentities";
 import { getOwnAddresses } from "./ownAddresses";
 import { roleAtLeast } from "./accountRole";
 import { withDbWriteRetry } from "./dbWriteRetry";
+import { consumeActionGrant } from "./authPolicy";
 
 export type McpAccountContext = { accountId: string; account: Account; role: AccountRole; tokenRecord: McpTokenMetadata };
 export const hashMcpToken = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -94,6 +95,10 @@ export async function listMcpTokenAccounts(tokenId: string): Promise<AccountAcce
     return readAccountAccess(db, context.tokenRecord.createdByUserId, { scope: context.tokenRecord.accountIds, identities: true }).entries;
   }).deferred();
 }
+/** A token outlives session expiry and revocation, so creating one spends a fresh `mcp.create` grant. */
+export async function consumeMcpCreateGrant(session: ActiveUserSession, grant: string | null) {
+  await consumeActionGrant(await getDb(), grant, session, "mcp.create");
+}
 export async function mintMcpToken(session: ActiveUserSession, accountId: string, label: string, ttlSeconds: number,
   options: { accountIds?: string[]; mode?: McpPermissionMode } = {}) {
   if (!Number.isSafeInteger(ttlSeconds) || ttlSeconds < 60 || ttlSeconds > 31_536_000) throw new Error("Invalid token TTL");
@@ -103,8 +108,8 @@ export async function mintMcpToken(session: ActiveUserSession, accountId: string
     const proof = db.prepare(`SELECT 1 FROM auth_session s JOIN auth_session_security ss ON ss.sessionId=s.id AND ss.userId=s.userId
       JOIN auth_security_state st ON st.userId=s.userId WHERE s.id=? AND s.userId=? AND ss.assurance='mfa'
       AND ss.generation=st.generation AND st.generation=? AND ss.authenticatedAt=?
-      AND julianday(s.expiresAt)>julianday('now') AND ss.authenticatedAt<=? AND ss.authenticatedAt>?`)
-      .get(session.sessionId, session.userId, session.generation, session.authenticatedAt, Date.now(), Date.now() - 86_400_000);
+      AND julianday(s.expiresAt)>julianday('now') AND ss.authenticatedAt<=?`)
+      .get(session.sessionId, session.userId, session.generation, session.authenticatedAt, Date.now());
     if (!proof || session.assurance !== "mfa" || session.expiresAt <= Date.now() || !roleAtLeast(resolveAccountRoleRow(db, session.userId, accountId), "editor")) throw new Error("MFA session and editor membership required");
     const accountIds = [...new Set(options.accountIds ?? [accountId])];
     if (!accountIds.length || !accountIds.includes(accountId) || accountIds.some(id => !resolveAccountRoleRow(db, session.userId, id))) {

@@ -1,5 +1,4 @@
 import { handleMailboxCredentialMutation } from "@/app/api/_helpers/mailboxPatch";
-import { setTimeout as sleep } from "node:timers/promises";
 import { describe, test, expect, jest } from "bun:test";
 import { CookieJar, totpFromUri, createAuthenticatedTestSession } from "./testAuthHarness";
 import { dbModulePromise } from "./testDbHarness";
@@ -191,22 +190,23 @@ describe("Slice 3 live MCP/streams and shard cleanup", () => {
     revokeAuthStreams({ sessionId: identity.sessionId }); registration.close();
     expect(registration.closed).toBe(true); expect(disposed).toBe(1);
   });
-  test("absolute expiry and idle liveness close without emitter, even if cleanup throws", async () => {
-    const f = await fixture(); let closed = 0;
-    const expiry = registerAuthStream({ ...f.context, expiresAt: Date.now()+20 }, () => { closed++; throw new Error("Synthetic cleanup failure"); });
-    await sleep(40); expect(expiry.closed).toBe(true); expect(closed).toBe(1);
+  test("session expiry and lost membership close idle streams without emitter, even if cleanup throws", async () => {
+    const f = await fixture(); const g = await fixture(); let closed = 0;
+    g.master.prepare("UPDATE auth_session SET expiresAt=? WHERE id=?").run(new Date(Date.now()-1000).toISOString(), g.context.sessionId);
     await f.db.removeUserAccountLink(f.user.id, f.id);
     // Drive the 5 s liveness interval with fake timers instead of sleeping past it (that
     // alone exceeded bun's 5 s default test timeout); the authorization check itself
     // runs on real timers and closes the stream through its rejection.
-    const idleClosed = Promise.withResolvers<void>();
+    const expiredClosed = Promise.withResolvers<void>(), idleClosed = Promise.withResolvers<void>();
     jest.useFakeTimers();
-    let idle: ReturnType<typeof registerAuthStream>;
+    let expired: ReturnType<typeof registerAuthStream>, idle: ReturnType<typeof registerAuthStream>;
     try {
+      expired = registerAuthStream(g.context, () => { closed++; expiredClosed.resolve(); throw new Error("Synthetic cleanup failure"); });
       idle = registerAuthStream({ ...f.context, accountId: f.id }, () => { closed++; idleClosed.resolve(); });
       jest.advanceTimersByTime(5_000);
     } finally { jest.useRealTimers(); }
-    await idleClosed.promise; expect(idle.closed).toBe(true); expect(closed).toBe(2);
+    await expiredClosed.promise; await idleClosed.promise;
+    expect(expired.closed).toBe(true); expect(idle.closed).toBe(true); expect(closed).toBe(2);
   });
   test("absent both, installed idempotent unassign/audit, partial schema durable failure after revoke", async () => {
     const f = await fixture();

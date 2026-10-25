@@ -14,8 +14,8 @@ import { mapAccountRow, mapUserRow, USER_ROW_SELECT, type StoredUserRow } from "
 import { listSenderIdentityRows } from "../../lib/db/senderIdentities";
 import { getOwnAddresses } from "@/lib/ownAddresses";
 import { teamFeaturesSupported } from "@/lib/teamFeatures";
-import { getAuth, setActiveAccountId } from "@/lib/betterAuth";
-import { requireActiveUserSession, withAuthResponse, SESSION_TTL_SECONDS, type ActiveUserSession } from "@/lib/auth";
+import { getAuth, setActiveAccountId, SESSION_IDLE_TIMEOUT_SECONDS } from "@/lib/betterAuth";
+import { requireActiveUserSession, withAuthResponse, type ActiveUserSession } from "@/lib/auth";
 import { imapLoginAvailable } from "@/lib/imapLoginPolicy";
 import type { UserMailboxSummary, MailboxSummaryResult } from "@/lib/mailboxSummary";
 import type { WatcherState } from "../../lib/db/mailboxSummary";
@@ -154,7 +154,7 @@ export async function legacyMeGET(request: Request) {
     return NextResponse.json({ ok: true,
       user: restricted ? { id: user.id, email: user.email, name: user.name, uiLocale: user.uiLocale } : user,
       accountId: selection.accountId, accounts: restricted ? [] : await legacySanitizeAccountsForClient(session.userId),
-      exp: Math.floor(session.expiresAt / 1000), ttlSeconds: SESSION_TTL_SECONDS,
+      exp: Math.floor(session.expiresAt / 1000), ttlSeconds: SESSION_IDLE_TIMEOUT_SECONDS,
       mailboxState: selection.mailboxState,
       security: { imapLoginAvailable: imapLoginAvailable(), hasPassword: user.hasPassword,
         enrollmentRequired: session.enrollmentRequired, reauthRequired: session.reauthRequired,

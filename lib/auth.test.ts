@@ -61,13 +61,42 @@ describe("live session assurance gate", () => {
     expect((await denied.json()).code).toBe("mfa_state_inconsistent");
   });
 
-  test("absolute authenticatedAt survives a refreshed library session", async () => {
+  test("authentication age does not end a used session; a future authentication time still fails", async () => {
     const f = await createAuthenticatedTestSession();
-    await f.seedSessionSecurity(f.session.id,f.user.id,"mfa","password_totp", Date.now()-86400_001);
-    const response = await requireActiveUserSession(request(f.jar.header()));
-    expect((response as NextResponse).status).toBe(401);
+    const authenticatedAt = Date.now()-90000_000;
+    await f.seedSessionSecurity(f.session.id,f.user.id,"mfa","password_totp", authenticatedAt);
+    const session = await requireActiveUserSession(request(f.jar.header()));
+    if (session instanceof NextResponse) throw new Error(`Session used after 25 h was denied: ${session.status}`);
+    expect(session.authenticatedAt).toBe(authenticatedAt);
+    expect(session.expiresAt).toBe(new Date(f.master.prepare("SELECT expiresAt FROM auth_session WHERE id=?").get(f.session.id).expiresAt).getTime());
     await f.seedSessionSecurity(f.session.id,f.user.id,"mfa","password_totp", Date.now()+60_000);
     expect((await requireActiveUserSession(request(f.jar.header())) as NextResponse).status).toBe(401);
+  });
+
+  test("activity slides expiry to three days from now; three days without activity end the session", async () => {
+    const f = await createAuthenticatedTestSession();
+    const setSession = (updatedAt: number, expiresAt: number) => withDbWriteRetry("test.sliding", () =>
+      f.master.prepare("UPDATE auth_session SET updatedAt=?,expiresAt=? WHERE id=?").run(new Date(updatedAt).toISOString(), new Date(expiresAt).toISOString(), f.session.id));
+    // Within updateAge (1 h) of the last refresh, a request neither writes nor sets a cookie.
+    const recent = Date.now()+259200_000-600_000;
+    await setSession(Date.now()-600_000, recent);
+    const unchanged = await requireActiveUserSession(request(f.jar.header()));
+    if (unchanged instanceof NextResponse) throw new Error(`Recently refreshed session was denied: ${unchanged.status}`);
+    expect(unchanged.expiresAt).toBe(recent);
+    expect(unchanged.responseHeaders.getSetCookie()).toEqual([]);
+    // Two days idle: the next request extends to now + 3 days and refreshes the cookie.
+    await setSession(Date.now()-2*86400_000, Date.now()+86400_000);
+    const before = Date.now();
+    const used = await requireActiveUserSession(request(f.jar.header()));
+    if (used instanceof NextResponse) throw new Error(`Session used after two idle days was denied: ${used.status}`);
+    expect(used.expiresAt).toBeGreaterThanOrEqual(before+259200_000);
+    expect(used.responseHeaders.getSetCookie().join(";")).toContain("Max-Age=259200");
+    expect(new Date(f.master.prepare("SELECT expiresAt FROM auth_session WHERE id=?").get(f.session.id).expiresAt).getTime()).toBe(used.expiresAt);
+    // Unused for more than three days: the row has expired and the session is gone.
+    await setSession(Date.now()-259200_001, Date.now()-1);
+    const expired = await requireActiveUserSession(request(f.jar.header())) as NextResponse;
+    expect(expired.status).toBe(401);
+    expect(expired.headers.getSetCookie().join(";")).toContain("Max-Age=0");
   });
 
   test("ban, missing profile, incomplete provisioning and session deletion fail closed", async () => {

@@ -97,8 +97,8 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
         let lifetimeTimer: ReturnType<typeof setTimeout> | undefined;
         let polling = false;
         let pollClient: import("imapflow").ImapFlow | null = null;
-        const { userId, sessionId, generation, authenticatedAt, expiresAt } = accountContext.session;
-        const identity = { userId, sessionId, generation, authenticatedAt, expiresAt, accountId, minRole: "viewer" as const };
+        const { userId, sessionId, generation, authenticatedAt } = accountContext.session;
+        const identity = { userId, sessionId, generation, authenticatedAt, accountId, minRole: "viewer" as const };
         const send = createStreamEventSender({ identity, accountId, role: accountContext.role, controller,
           isStopped: () => stopped, close: () => authStream.close() });
 

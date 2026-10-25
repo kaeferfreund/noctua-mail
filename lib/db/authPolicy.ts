@@ -384,8 +384,7 @@ export function enrollmentState(db: Database, userId: string) {
 export function readSessionSecurity(db: Database, sessionId: string): SessionSecurity {
   const row = db.prepare(`SELECT p.* FROM auth_session_security p JOIN auth_session s ON s.id=p.sessionId
     WHERE p.sessionId=? AND p.userId=s.userId AND julianday(s.expiresAt)>julianday('now')`).get(sessionId) as SessionSecurity | null;
-  if (!row || !Number.isSafeInteger(row.authenticatedAt) || !["setup","mfa"].includes(row.assurance) || row.generation !== readGeneration(db, row.userId) || row.authenticatedAt > Date.now() ||
-    row.authenticatedAt + 86400000 <= Date.now()) throw new AuthPolicyError("Unauthorized", 401);
+  if (!row || !Number.isSafeInteger(row.authenticatedAt) || !["setup","mfa"].includes(row.assurance) || row.generation !== readGeneration(db, row.userId) || row.authenticatedAt > Date.now()) throw new AuthPolicyError("Unauthorized", 401);
   return row;
 }
 
@@ -443,7 +442,7 @@ export async function finalizeAuthentication(db: Database, op: SecurityOperation
       if (challenge.loginEpoch !== null && db.prepare(`SELECT generation FROM auth_login_epoch WHERE id=1`).get()?.generation !== challenge.loginEpoch) throw new AuthPolicyError("invalid_challenge");
     }
     const live = db.prepare(`SELECT userId FROM auth_session WHERE id=? AND julianday(expiresAt)>julianday('now')`).get(security.sessionId);
-    if (live?.userId !== op.userId || security.userId !== op.userId || !Number.isSafeInteger(security.authenticatedAt) || security.authenticatedAt > Date.now() || security.authenticatedAt + 86400000 <= Date.now()) {
+    if (live?.userId !== op.userId || security.userId !== op.userId || !Number.isSafeInteger(security.authenticatedAt) || security.authenticatedAt > Date.now()) {
       throw new AuthPolicyError("Unauthorized", 401);
     }
     if (security.assurance === "mfa" && !enrollmentState(db, op.userId).complete) throw new AuthPolicyError("mfa_state_inconsistent");

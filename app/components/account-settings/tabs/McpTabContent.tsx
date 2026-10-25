@@ -15,6 +15,8 @@ import { timeZone, type UiLocale } from "@/lib/i18n/config";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 import { MCP_PERMISSION_MODES, mcpPermissionMode, mcpTokenListItem, type McpPermissionMode, type McpTokenListItem } from "@/lib/mcpPermissions";
 import type { mintMcpToken } from "@/lib/mcpAuth";
+import { authClient as defaultAuthClient, type NoctuaAuthClient } from "@/lib/authClient";
+import ReauthDialog from "@/app/components/auth/ReauthDialog";
 
 type Props = {
   accountId?: string;
@@ -22,6 +24,8 @@ type Props = {
   isExistingAccount: boolean;
   accountDateFormat?: AccountDateFormat;
   apiFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
+  /** Collects the fresh factor proof that token creation requires. */
+  authClient?: NoctuaAuthClient;
   onClose: () => void;
 };
 
@@ -105,6 +109,7 @@ function McpTokenSettings({
   isExistingAccount,
   accountDateFormat,
   apiFetch,
+  authClient = defaultAuthClient,
   onClose
 }: Props) {
   const t = useTranslations("Settings");
@@ -122,6 +127,7 @@ function McpTokenSettings({
   const [createdSecret, setCreatedSecret] = useState("");
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [deletingId, setDeletingId] = useState("");
   const [copiedValue, setCopiedValue] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -194,20 +200,32 @@ function McpTokenSettings({
     }
   }, []);
 
-  const handleCreate = useCallback(async () => {
+  const validTtl = useCallback(() => {
+    const ttlSeconds = ttlFromPreset(expiryPreset, customExpiresAt);
+    return Number.isSafeInteger(ttlSeconds) && ttlSeconds >= 60 && ttlSeconds <= 31_536_000 ? ttlSeconds : null;
+  }, [customExpiresAt, expiryPreset]);
+
+  /** Check the input before asking for the password and authenticator code. */
+  const requestCreate = useCallback(() => {
+    setError("");
+    if (validTtl() === null) { setError(t("mcp.invalidExpiry")); return; }
+    setVerifying(true);
+  }, [validTtl, t]);
+
+  const handleCreate = useCallback(async (grant: string) => {
     if (!accountId) return;
     setCreating(true);
     setError("");
     setCreatedSecret("");
     try {
-      const ttlSeconds = ttlFromPreset(expiryPreset, customExpiresAt);
-      if (!Number.isSafeInteger(ttlSeconds) || ttlSeconds < 60 || ttlSeconds > 31_536_000) {
+      const ttlSeconds = validTtl();
+      if (ttlSeconds === null) {
         setError(t("mcp.invalidExpiry"));
         return;
       }
       const response = await request(buildAccountMcpTokensPath(accountId), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-noctua-reauth": grant },
         body: JSON.stringify({
           label,
           ttlSeconds,
@@ -232,7 +250,7 @@ function McpTokenSettings({
     } finally {
       setCreating(false);
     }
-  }, [accountId, customExpiresAt, expiryPreset, label, selectedAccountIds, mode, request, loadTokens, t]);
+  }, [accountId, validTtl, label, selectedAccountIds, mode, request, loadTokens, t]);
 
   /** Names of accessible covered mailboxes plus a count for the rest; `exclude` drops the current tab's mailbox. */
   const describeMailboxes = useCallback((token: McpTokenListItem, exclude?: string) => [
@@ -360,8 +378,8 @@ function McpTokenSettings({
             )}
             <Flex align="center" gap="2" wrap="wrap">
               <Button
-                onClick={() => void handleCreate()}
-                disabled={!accountId || !label.trim() || creating}
+                onClick={requestCreate}
+                disabled={!accountId || !label.trim() || creating || verifying}
               >
                 {creating ? t("mcp.creating") : t("mcp.create")}
               </Button>
@@ -462,6 +480,10 @@ function McpTokenSettings({
           {t("close")}
         </Button>
       </Flex>
+      {verifying && <ReauthDialog purpose="mcp.create" client={authClient} onCancel={() => setVerifying(false)} onVerified={async proof => {
+        setVerifying(false);
+        await handleCreate(proof.grant);
+      }} />}
     </Flex>
   );
 }

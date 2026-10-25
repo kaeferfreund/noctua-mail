@@ -22,3 +22,18 @@ test("generation commit between stream check and enqueue prevents sensitive deli
   expect(closed).toBe(1);
   await expect(assertStreamAuthorized(identity)).rejects.toThrow("revoked");
 });
+
+test("a used session authenticated days ago keeps stream access until its sliding expiry passes",async()=>{
+  const f=await createAuthenticatedTestSession();
+  const authenticatedAt=Date.now()-4*86400_000;
+  await f.seedSessionSecurity(f.session.id,f.user.id,"mfa","password_totp",authenticatedAt);
+  const identity=await requireActiveUserSession(new Request("http://localhost:3000",{headers:f.jar.headers()}));
+  if(identity instanceof Response)throw new Error(`Session authenticated four days ago was denied: ${identity.status}`);
+  expect(identity.authenticatedAt).toBe(authenticatedAt);
+  let delivered=0;
+  await assertStreamAuthorized(identity,()=>{delivered++;});
+  expect(delivered).toBe(1);
+  f.master.prepare("UPDATE auth_session SET expiresAt=? WHERE id=?").run(new Date(Date.now()-1000).toISOString(),f.session.id);
+  await expect(assertStreamAuthorized(identity,()=>{delivered++;})).rejects.toThrow("revoked");
+  expect(delivered).toBe(1);
+});

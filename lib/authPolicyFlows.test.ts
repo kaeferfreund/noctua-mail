@@ -140,12 +140,12 @@ describe("HTTP assurance and purpose-bound factors",()=>{
     await expect(mutateSecurity(f.auth,f.master,await source(f,f.jar),request(f.jar,{}, {"x-noctua-reauth":grant.grant}),{currentPassword:password,newPassword:"changed-synthetic-password"},"password")).rejects.toThrow();
     expect(f.master.prepare(`SELECT 1 FROM auth_reauth_grants WHERE tokenHash=?`).get(hashProof(grant.grant))).not.toBeNull();
   });
-  test("password rotation preserves absolute authentication age and revokes other sessions",async()=>{
+  test("password rotation on a session authenticated days ago preserves its authentication time and revokes other sessions",async()=>{
     const f=await enrolled();
     const b=await login(f,f.user.email);
     expect((await http(f,b,"/two-factor/verify-totp",{code:totpFromUri(f.factors.totpURI)})).status).toBe(200);
     const original=await source(f,f.jar);
-    const oldTime=Date.now()-23*3600000;
+    const oldTime=Date.now()-4*86400_000;
     f.master.prepare(`UPDATE auth_session_security SET authenticatedAt=? WHERE sessionId=?`).run(oldTime,original.sessionId);
     f.master.prepare(`UPDATE auth_session SET createdAt=? WHERE id=?`).run(new Date(oldTime).toISOString(),original.sessionId);
     const grant=await proof(f,f.jar,{purpose:"password.change",currentPassword:password,totpCode:totpFromUri(f.factors.totpURI)});

@@ -5,7 +5,8 @@ import { requireAccountContextFromParams, type AccountRouteParams } from "@/app/
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { listMcpTokens } from "@/lib/serverDb";
-import { mintMcpToken } from "@/lib/mcpAuth";
+import { consumeMcpCreateGrant, mintMcpToken } from "@/lib/mcpAuth";
+import { AuthPolicyError } from "@/lib/authPolicy";
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const context = await requireAccountContextFromParams(request, params, { minRole: "editor" });
   if (context instanceof NextResponse) return context;
@@ -29,6 +30,12 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
         !body.accountIds.every((id: unknown) => typeof id === "string" && id.trim() === id && id.length > 0) ||
         !body.accountIds.includes(context.accountId)))) {
       return NextResponse.json({ ok: false, message: "Invalid token mailboxes or permission mode" }, { status: 400 });
+    }
+    // A token outlives session expiry and revocation, so creating one needs a fresh factor proof.
+    try { await consumeMcpCreateGrant(context.session, request.headers.get("x-noctua-reauth")); }
+    catch (error) {
+      if (!(error instanceof AuthPolicyError)) throw error;
+      return NextResponse.json({ ok: false, code: error.code, message: "Fresh verification required" }, { status: error.status, headers: { "cache-control": "no-store" } });
     }
     try { return NextResponse.json({ ok: true, ...await mintMcpToken(context.session, context.accountId, body.label, body.ttlSeconds ?? 2_592_000, { accountIds: body.accountIds, mode: body.mode }) }, { status: 201 }); }
     catch { return NextResponse.json({ ok: false, message: "MFA session and editor membership required" }, { status: 403 }); }
