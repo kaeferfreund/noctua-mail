@@ -321,7 +321,7 @@ alongside these, preserving its senderKey/sourceSha256 additions. Do not replace
 new ingestion implementation with this branch's base implementation.
 
 Household choices remain design §10: address/mailbox/alias mapping (including five
-MonkeyDent areas versus four addresses), manager-owned brand/person display names,
+practice areas versus four addresses), manager-owned brand/person display names,
 Reply-To and mailbox/personal defaults, personal signature text/overrides, and the
 controlled probe sink/forwarder-conversion plan. These choices affect initial defaults
 and Stage 4 enablement; no live addresses or provider credentials were used here.

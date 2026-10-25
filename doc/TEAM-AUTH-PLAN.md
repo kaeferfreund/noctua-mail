@@ -14,7 +14,7 @@ Decided: encrypted DB-only credentials; cookie-only mode and Tauri/desktop mode 
 
 Decided: admin personally hands over a 15-minute single-use reset link; SMTP recovery delivery is a non-goal (user, 2026-10-22).
 
-Decided: canonical origin `https://mail.example.org`, RP ID `mail.example.org`, DNS A `203.0.113.10` inside the tailnet, TLS via mailprovider API DNS-01; preview-host preview remains separate (user, 2026-10-22).
+Decided: canonical origin `https://mail.example.org`, RP ID `mail.example.org`, DNS A `<tailnet-ip>` inside the tailnet, TLS via the DNS provider's API (DNS-01); the preview remains separate (user, 2026-10-22).
 
 v2→v3: resolve the five user decisions and canonical deployment, promote repo paths, and preserve
 Slice 1 verbatim. Rejected alternatives and rationale are in design Appendix A; this plan implements
@@ -295,7 +295,7 @@ shared temporary password, old cookie/MCP invalidation and idempotent second run
 bootstrap logs/secret redaction. Remove transitional old login/crypto dead code; rg all callers.
 Document final env/systemd/TLS/RP ID/recovery in doc/AUTHENTICATION.md, README and deployment examples:
 BETTER_AUTH_URL=https://mail.example.org, PASSKEY_RP_ID=mail.example.org, canonical trusted origin
-only, DNS A 203.0.113.10 inside the tailnet, TLS certificate/renewal via mailprovider API DNS-01. Leave
+only, DNS A <tailnet-ip> inside the tailnet, TLS certificate/renewal via the DNS provider's API (DNS-01). Leave
 NOCTUA_IMAP_LOGIN_HOSTS unset by default, DB-only storage and no desktop mode; recovery links are
 handed over personally, never sent by SMTP. The preview https://preview.example.org:3790
 is separate, with isolated auth data/secrets and preview-only origin/RP ID; never add it to canonical
@@ -350,7 +350,7 @@ slots. Extend browser harness fixtures to actual client flows against enabled Sl
 
 **Checks:** auth/reset/selection/logout/role-error/ComposeFields DOM tests; common checks;
 `bun run test:auth-browser` against actual shell. Install PWA on both household phones at canonical
-HTTPS https://mail.example.org (never the preview-host preview): password+TOTP, UV passkey,
+HTTPS https://mail.example.org (never the preview): password+TOTP, UV passkey,
 backup-code/replacement recovery, mailbox switch, read, reply and
 camera-photo attachment. Record manual gaps explicitly; simulator/virtual-authenticator checks alone
 do not mark phone acceptance passed. No real personal data in fixtures/screenshots.

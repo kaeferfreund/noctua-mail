@@ -631,7 +631,7 @@ NOCTUA_DATA_DIR=/srv/noctua/data
 `PASSKEY_RP_ID` defaults to the configured hostname; it must match. DB storage is the default,
 `both` is a deprecated DB-only alias, `cookie` and `NOCTUA_DESKTOP_MODE=true` fail startup.
 Additional `NOCTUA_TRUSTED_ORIGINS` values now fail startup; canonical trust cannot include preview.
-DNS A `203.0.113.10` is tailnet-only; TLS is issued/renewed via mailprovider DNS-01. Bind the Bun backend
+DNS A `<tailnet-ip>` is tailnet-only; TLS is issued/renewed via your DNS provider (DNS-01). Bind the Bun backend
 to loopback and overwrite Host/X-Forwarded-* at the sole reverse proxy. The pinned Better Auth
 IP reader uses the proxy-sanitized `x-forwarded-for`; Noctua limits default to one trusted hop
 (`TRUSTED_PROXY_HOPS=1`). See `deploy-scripts/nginx-auth.conf`: auth/reset access logs are disabled,
@@ -641,7 +641,7 @@ handed over personally, never SMTP. Do not record the private operator terminal.
 The preview `https://preview.example.org:3790` is a separate instance with isolated auth
 data, auth/encryption secrets, preview-only URL/trust and RP ID `preview.example.org`.
 Enroll separate preview passkeys. Canonical passkeys are not reusable there. Actual tailnet DNS,
-mailprovider renewal and physical phone/PWA acceptance belong to deployment/Stage 4 and Slice 7.
+DNS-01 renewal and physical phone/PWA acceptance belong to deployment/Stage 4 and Slice 7.
 
 ## Offline migration and bootstrap runbook
 
@@ -856,7 +856,7 @@ Collab-ui slice 2b owns canonical `/api/me/mailboxes/summary` and `/api/me/event
 counts and UI integration. When merging monotonic collaboration revisions, update membershipCleanup's
 raw unassignment writer and corruption fixtures to increment revisions. Preserve watcher stream
 liveness/resource ownership and canonical role guards. Live IMAP browser acceptance, canonical
-physical phone/PWA flows, deployed DNS/TLS/proxy logging/mailprovider renewal and final application-wide
+physical phone/PWA flows, deployed DNS/TLS/proxy logging/DNS-01 renewal and final application-wide
 restore remain later-owner evidence. This work makes no deployment or go-live claim.
 
 ## Historical verification
@@ -1152,6 +1152,6 @@ Collab-ui slice 2b still owns canonical per-user mailbox summaries/events and cr
 those routes are absent in the previewed stage tree. Stage commit `40cf8b6` already increments
 membership-cleanup revisions and updates the corruption fixtures; preserve that fix during this
 merge. The earlier `5dce0ac` preview lacked it. Canonical physical
-phone/PWA, live IMAP browser flows, deployed DNS/TLS/proxy/mailprovider renewal and application-wide restore
+phone/PWA, live IMAP browser flows, deployed DNS/TLS/proxy/certificate renewal and application-wide restore
 remain later-owner evidence. The updated optional MFA-session fixture verifier was not exercised
 against a live mailbox by this integration.

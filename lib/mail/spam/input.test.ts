@@ -117,9 +117,9 @@ describe("buildSpamInput", () => {
     expect(buildSpamInputFromMessage({ from: "ceo@victim.example.test", to: "anna@example.test", subject: "S", headers }).authenticationResults).toEqual([ours]);
   });
 
-  test("authserv-id pinning: MailProvider's bare host label (by mx1.mail.example.com, Authentication-Results: mx1;) is the receiving server", async () => {
+  test("authserv-id pinning: a provider's bare host label (by mx1.mail.example.com, Authentication-Results: mx1;) is the receiving server", async () => {
     const ours = "mx1; dkim=pass header.d=shop.example.test; spf=pass smtp.mailfrom=shop.example.test";
-    const mailprovider = [
+    const provider = [
       "Received: from mail.shop.example.test (mail.shop.example.test [192.0.2.20]) by mx1.mail.example.com (Postfix) with ESMTPS id 4X1; Sat, 24 Oct 2026 10:00:00 +0000",
       `Authentication-Results: ${ours}`,
       "Authentication-Results: mx.forwarder.example.net; dkim=pass header.d=victim.example.test",
@@ -130,14 +130,14 @@ describe("buildSpamInput", () => {
       "",
       "Ihre Bestellung ist unterwegs."
     ].join("\r\n");
-    expect(buildSpamInput(await simpleParser(mailprovider)).authenticationResults).toEqual([ours]);
-    const lines = parseHeaderBlock(mailprovider.split("\r\n\r\n")[0]);
+    expect(buildSpamInput(await simpleParser(provider)).authenticationResults).toEqual([ours]);
+    const lines = parseHeaderBlock(provider.split("\r\n\r\n")[0]);
     for (const id of ["MX1.", "mx1.mail.example.com", "mx2.mail.example.com"]) {
       const block = `Authentication-Results: ${id}; spf=pass smtp.mailfrom=shop.example.test`;
-      expect(receivingAuthenticationResults(parseHeaderBlock(`${mailprovider.split("\r\n")[0]}\r\n${block}`), [])).toHaveLength(1);
+      expect(receivingAuthenticationResults(parseHeaderBlock(`${provider.split("\r\n")[0]}\r\n${block}`), [])).toHaveLength(1);
     }
     // Another bare label or a foreign host never counts.
-    expect(receivingAuthenticationResults(parseHeaderBlock(`${mailprovider.split("\r\n")[0]}\r\nAuthentication-Results: mx2; spf=pass`), [])).toEqual([]);
+    expect(receivingAuthenticationResults(parseHeaderBlock(`${provider.split("\r\n")[0]}\r\nAuthentication-Results: mx2; spf=pass`), [])).toEqual([]);
     expect(receivingAuthenticationResults(lines.filter((line) => !line.value.startsWith("mx1;")), [])).toEqual([]);
   });
 

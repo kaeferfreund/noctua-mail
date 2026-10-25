@@ -140,7 +140,7 @@ function receivedByHost(value: string) {
  * those, the top-most id's block. The receiving server is the configured
  * `NOCTUA_SPAM_AUTHSERV_ID` list (exact ids) or else the host that stamped
  * the top-most Received line, which no sender can write: an id matches when it
- * is that host, its first label (MailProvider writes `by mx1.mail.example.com` and
+ * is that host, its first label (some providers write `by mx1.mail.example.com` and
  * `Authentication-Results: mx1;`) or in its registrable domain. A block the sender inserted under another id (no A-R of our server)
  * is ignored. A mail without any Received line never passed an MX (local
  * append); there the top-most block counts as before.
