@@ -104,8 +104,60 @@
 .pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-select])) { grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 28px; }
 .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"]:has([data-message-select])) { width: 24px; }
 
+/* Pull-to-refresh (phone, see usePullToRefresh.ts): a zero-height row above the
+   list whose icon slides in from above the pane's top edge; while pulling, the
+   list follows by the same offset. Transforms leave the virtualized layout alone. */
+.pullIndicator {
+  position: relative;
+  height: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+.pullIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-top: -44px;
+  border-radius: 999px;
+  background: var(--color-panel-solid, var(--card));
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  color: var(--accent-11);
+  opacity: 0;
+  transform: translateY(var(--pull-offset, 0px));
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.pullIcon > svg { transition: transform 0.15s ease; }
+.pullLabel {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.pane[data-pull-state]:not([data-pull-state="idle"]) .pullIcon { opacity: 1; }
+.pane[data-pull-state="armed"] .pullIcon > svg { transform: rotate(180deg); }
+.pane[data-pull-state="refreshing"] .pullIcon > svg { animation: pullSpin 0.9s linear infinite; }
+.pane[data-pull-state] > .list {
+  transform: translateY(var(--pull-offset, 0px));
+  transition: transform 0.2s ease;
+}
+.pane[data-pull-state="idle"] > .list { transform: none; }
+/* The finger drives the offset directly. */
+.pane:is([data-pull-state="pulling"], [data-pull-state="armed"]) .pullIcon,
+.pane:is([data-pull-state="pulling"], [data-pull-state="armed"]) > .list { transition: none; }
+@keyframes pullSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .pullIcon, .pullIcon > svg, .pane[data-pull-state] > .list { transition: none; }
+  .pane[data-pull-state="refreshing"] .pullIcon > svg { animation: none; }
+}
+
 @media (width < 768px) {
-  .pane { padding: 8px; min-width: 0; overflow-x: hidden; }
+  /* The list's own pull-to-refresh replaces the browser's overscroll. */
+  .pane { padding: 8px; min-width: 0; overflow-x: hidden; overscroll-behavior-y: contain; }
   .pane :global([data-message-layout="stacked"][data-message-narrow="true"]) {
     grid-template-columns: 0 minmax(0, 1fr) auto 44px;
   }

@@ -201,6 +201,24 @@
   --quote-2: var(--iris-4);
 }
 
+/* Safe-area insets of the iOS home-screen app (black-translucent status bar,
+   viewport-fit=cover, see app/layout.tsx). Layout reads only these tokens, so
+   tests can set them to a notch-sized value. The opaque band under the status
+   bar is --status-bar-bg: iOS always draws the clock and icons white there, so
+   the light theme uses the iris primary (white contrast 5.37:1) and the dark
+   theme its dark header background. */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --status-bar-bg: var(--iris-9);
+}
+
+.dark {
+  --status-bar-bg: var(--background);
+}
+
 /* z-index ladder for fixed and portalled layers, lowest first. Modules and
    the shadcn primitives read these tokens (z-(--layer-*) in Tailwind)
    instead of repeating the numbers:
@@ -212,6 +230,7 @@
                              in app/components/ui/dialogLayers.ts
      --layer-popper          shadcn and Radix Themes popper content
      --layer-drag-ghost      off-screen .drag-ghost
+     --layer-status-bar      the band under the iOS status bar (body::before)
    app/globals.test.ts keeps the order and the JS mirror in sync. */
 :root {
   --layer-floating: 9990;
@@ -219,6 +238,7 @@
   --layer-dialog-overlay: 9995;
   --layer-popper: 9998;
   --layer-drag-ghost: 9999;
+  --layer-status-bar: 10000;
 }
 
 /* Radix Themes reads its own surface tokens; point them at the shadcn ones so
@@ -307,6 +327,26 @@ body {
   color: var(--text);
   font-family: var(--font-sans);
   overflow: hidden;
+}
+
+/* Opaque band under the iOS status bar, above every layer: no list, dialog,
+   sheet or toast shows through behind the clock. Zero height elsewhere. */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--sat);
+  background: var(--status-bar-bg);
+  z-index: var(--layer-status-bar);
+  pointer-events: none;
+}
+
+/* Radix Themes dialogs centre inside the safe area. */
+.rt-BaseDialogScroll {
+  box-sizing: border-box;
+  padding: var(--sat) var(--sar) var(--sab) var(--sal);
 }
 
 .radix-themes {
@@ -430,7 +470,7 @@ a {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 44px;
+  bottom: calc(44px + var(--sab));
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -442,9 +482,9 @@ a {
 .inapp-notice-stack.inapp-notice-stack-pane {
   position: fixed;
   left: auto;
-  right: 16px;
+  right: calc(16px + var(--sar));
   transform: none;
-  bottom: 44px;
+  bottom: calc(44px + var(--sab));
   align-items: flex-end;
   width: min(470px, calc(100vw - 24px));
 }
@@ -604,13 +644,13 @@ a {
   .inapp-notice-stack {
     left: 50%;
     transform: translateX(-50%);
-    bottom: 40px;
+    bottom: calc(40px + var(--sab));
   }
 
   .inapp-notice-stack.inapp-notice-stack-pane {
     left: auto;
     transform: none;
-    bottom: 40px;
+    bottom: calc(40px + var(--sab));
   }
 }
 

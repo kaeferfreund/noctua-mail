@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Theme } from "@radix-ui/themes";
 import { ThemeProvider } from "next-themes";
 import Script from "next/script";
-import { APP_THEME_COLOR } from "@/lib/ui/theme";
+import { APP_BAR_COLORS } from "@/lib/ui/theme";
 import { DEFAULT_APP_TITLE, versionedIconUrl } from "@/lib/appBranding";
 import "./globals.css";
 import { getLocaleSettings } from "@/i18n/request";
@@ -23,15 +23,21 @@ export async function generateMetadata(): Promise<Metadata> {
       icon: { url: versionedIconUrl("/icons/badged/256"), sizes: "256x256", type: "image/png" },
       apple: { url: versionedIconUrl("/icons/apple-touch"), sizes: "180x180", type: "image/png" }
     },
-    // Home-screen web app on iOS (needed there for Web Push). The opaque
-    // "default" status bar keeps the clock readable in the light theme; the
-    // shell has no safe-area insets for a translucent bar or viewport-fit=cover.
-    appleWebApp: { capable: true, statusBarStyle: "default", title: DEFAULT_APP_TITLE }
+    // Home-screen web app on iOS (needed there for Web Push). The page runs
+    // under the translucent status bar (viewport-fit=cover); the shell pads by
+    // the safe-area tokens and paints the opaque --status-bar-bg band behind
+    // the white clock (app/globals.css). iOS reads this only when the app is
+    // added to the home screen.
+    appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: DEFAULT_APP_TITLE }
   };
 }
 
 export const viewport: Viewport = {
-  themeColor: APP_THEME_COLOR
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: APP_BAR_COLORS.light },
+    { media: "(prefers-color-scheme: dark)", color: APP_BAR_COLORS.dark }
+  ]
 };
 
 export default async function RootLayout({

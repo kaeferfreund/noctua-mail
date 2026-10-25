@@ -16,7 +16,7 @@ import { AuthClientError } from "@/lib/authClient";
 export function AuthFrame({ title, description, children, authenticated = false }: { title: string; description?: string; children: ReactNode; authenticated?: boolean }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus(); }, [title]);
-  return <div data-shell="" className="flex min-h-dvh items-center justify-center bg-muted/40 p-4 text-foreground">
+  return <div data-shell="" className="flex min-h-dvh items-center justify-center bg-muted/40 pt-[calc(1rem+var(--sat))] pr-[calc(1rem+var(--sar))] pb-[calc(1rem+var(--sab))] pl-[calc(1rem+var(--sal))] text-foreground">
     <Card className="w-full max-w-sm">
       <CardHeader>
         <h1 ref={heading} tabIndex={-1} className="text-xl font-semibold outline-none">{title}</h1>

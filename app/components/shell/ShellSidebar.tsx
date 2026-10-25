@@ -393,7 +393,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
   ];
 
   return (
-    <Sidebar variant="inset" collapsible="offcanvas" className="h-dvh">
+    <Sidebar variant="inset" collapsible="offcanvas">
       {/* The mobile variant renders this subtree in a shadcn Sheet portalled to
           <body>, outside the root `.radix-themes` element. The nested Theme
           re-establishes the Radix tokens (--space-N, --gray-N, --accent-N) for
