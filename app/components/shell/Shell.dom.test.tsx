@@ -85,9 +85,22 @@ function OpenMobileSheet() {
 }
 
 describe("shell sidebar", () => {
-  for (const admin of [false, true]) it(`shows mailbox creation only when admin=${admin}`, () => {
-    const view = renderSidebar([account("synthetic", "Synthetic mailbox")], () => {}, () => {}, { isAdminUser: admin });
-    expect(Boolean(view.queryByRole("button", { name: "Add mailbox" }))).toBe(admin);
+  for (const admin of [false, true]) it(`offers mailbox creation only in the empty state, only when admin=${admin}`, () => {
+    // With a mailbox there is no add action in the sidebar (Administration has it).
+    const listed = renderSidebar([account("synthetic", "Synthetic mailbox")], () => {}, () => {}, { isAdminUser: admin });
+    expect(listed.queryByRole("button", { name: "Add mailbox" })).toBeNull();
+    expect(listed.queryByText("No mailbox yet")).toBeNull();
+    cleanup();
+    const empty = renderSidebar([], () => {}, () => {}, { isAdminUser: admin });
+    expect(empty.getByText("No mailbox yet")).toBeTruthy();
+    const add = empty.queryByRole("button", { name: "Add mailbox" });
+    expect(Boolean(add)).toBe(admin);
+    if (add) {
+      // A labelled row with the plus icon, 44 px on phones.
+      expect(add.textContent).toBe("Add mailbox");
+      expect(add.querySelector("svg")).toBeTruthy();
+      expect(add.className).toContain("max-md:h-11");
+    }
   });
 
   it("labels the brand with the same short commit and Berlin build time as the status popover", () => {
