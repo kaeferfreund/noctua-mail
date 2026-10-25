@@ -20,7 +20,6 @@ import {
   useSidebar,
   SidebarContent,
   SidebarGroup,
-  SidebarGroupAction,
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
@@ -421,13 +420,6 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               ) : null}
             </SidebarGroup>
             <SidebarGroup className={FLUSH_SECTION_CLASS}>
-              {/* No section heading: the add action keeps its place at the
-                  right, on a line of its own above the list. */}
-              {mailboxes.onAdd && <div className="flex h-8 items-center justify-end pr-1">
-                <SidebarGroupAction className="relative top-auto right-auto" title={t("mailboxes.add")} aria-label={t("mailboxes.add")} onClick={closeAfter(mailboxes.onAdd)}>
-                  <Plus />
-                </SidebarGroupAction>
-              </div>}
               <SidebarGroupContent>
                 {accounts.length > 0 ? (
                   <MailboxRows
@@ -440,7 +432,18 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                     onSwitch={switchMailbox}
                   />
                 ) : (
-                  <p className="px-2 py-1 text-xs text-muted-foreground">{t("mailboxes.none")}</p>
+                  <>
+                    <p className="px-2 py-1 text-xs text-muted-foreground">{t("mailboxes.none")}</p>
+                    {/* Only without any mailbox; otherwise admins add mailboxes
+                        in Administration > Mailboxes. */}
+                    {mailboxes.onAdd ? (
+                      <SidebarMenu><SidebarMenuItem>
+                        <SidebarMenuButton className={cn(FLUSH_ROW_RING_CLASS, "max-md:h-11")} onClick={closeAfter(mailboxes.onAdd)} data-shell-action="add-mailbox">
+                          <Plus /><span>{t("mailboxes.add")}</span>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem></SidebarMenu>
+                    ) : null}
+                  </>
                 )}
               </SidebarGroupContent>
             </SidebarGroup>
