@@ -42,12 +42,16 @@ describe("spam settings admin log", () => {
     await saveMailboxSpamSettings(accountId, { enabled: false }, admin);
     const previousGlobal = await loadSpamAdminSettings();
     await saveSpamAdminSettings({ model: "claude-haiku-5-5", threshold: 0.95 }, admin);
-    const entries = (await auditFor(admin)).reverse();
-    expect(entries.map((entry) => [entry.action, entry.targetAccountId, entry.payload])).toEqual([
-      ["spam_settings.update", accountId, { before: { autoMove: true }, after: { enabled: true, threshold: 0.8 } }],
-      ["spam_settings.update", accountId, { before: { enabled: true, threshold: 0.8 }, after: { enabled: false } }],
-      ["spam_settings.update", null, { before: previousGlobal, after: { model: "claude-haiku-5-5", threshold: 0.95 } }]
-    ]);
+    // Saves within one millisecond share createdAt and come back in id (random) order: compare as a set.
+    // Each entry's "before" names the save it follows, so the sequence is still checked.
+    const entries = (await auditFor(admin)).map((entry) => [entry.action, entry.actorUserId, entry.targetAccountId, entry.payload]);
+    const expected = [
+      ["spam_settings.update", admin, accountId, { before: { autoMove: true }, after: { enabled: true, threshold: 0.8 } }],
+      ["spam_settings.update", admin, accountId, { before: { enabled: true, threshold: 0.8 }, after: { enabled: false } }],
+      ["spam_settings.update", admin, null, { before: previousGlobal, after: { model: "claude-haiku-5-5", threshold: 0.95 } }]
+    ];
+    expect(entries).toHaveLength(expected.length);
+    expect(entries).toEqual(expect.arrayContaining(expected));
   });
 
   test("an invalid save writes nothing", async () => {
