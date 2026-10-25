@@ -83,7 +83,8 @@ installed apps on iOS 16.4+, Chromium desktop and some Android launchers.
   the sidebar, the TOTP issuer and the passkey RP name. The Docker image sets
   the same name in `deploy-scripts/container-entrypoint.sh`. Manifest and
   layout are built statically: a rename needs a rebuild.
-- `public/icons/base.svg` is the only icon source. Keep its viewBox
+- `public/icons/base.svg` is the only icon source (white envelope on the iris
+  gradient around the primary colour `#5b5bd6`). Keep its viewBox
   (`-100 -100 1800 1800`) and the 1600 px rounded background: the sidebar
   logo route (`app/icons/logo.svg`) draws the environment ribbon in that
   coordinate system. The ids `iconBackground`, `envelope`,
