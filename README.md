@@ -35,7 +35,9 @@ migration or production acceptance. The package version is `0.2.0-alpha.1`.
   cross-folder threads, drafts and rich-text, plain-text or Markdown composing.
   Reader modes include HTML, text, Markdown and source. Remote images start
   blocked; users can load once or allow a recognized sender. Remote CSS resources
-  stay blocked after image opt-in.
+  stay blocked after image opt-in. An opened unread message is marked read after a
+  personal delay (default 1 second; immediately, 3 seconds or never). `\Seen` is
+  shared IMAP state, so the read status applies to every member of the mailbox.
 - **Sender identities:** mailbox aliases with display name and Reply-To, manager
   configuration, personal defaults and signatures, and a From selector in the
   composer. Outbound validation covers drafts, SMTP and calendar replies;

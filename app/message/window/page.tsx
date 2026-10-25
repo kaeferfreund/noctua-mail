@@ -16,10 +16,11 @@ import {
   buildAccountMessageSourcePath
 } from "@/lib/accountApiPaths";
 import { normalizeAccountDateFormat } from "@/lib/dateFormatting";
-import type { Account, AccountDateFormat, Folder, Message } from "@/lib/data";
+import type { Account, AccountDateFormat, AccountSettings, Folder, Message } from "@/lib/data";
 import { formatMessageHtmlPageTitle, formatMessagePageTitle } from "@/lib/appBranding";
 import { useWindowTitle } from "@/lib/ui/windowTitle";
 import { useDarkMode } from "@/app/hooks/useDarkMode";
+import { useAutoMarkRead, useAutoMarkReadDelay } from "@/app/hooks/useAutoMarkRead";
 import { notifyDetachedMessageDeleted } from "@/lib/ui/detachedMessageEvents";
 import { getImapFlagBadges, hasHtmlContent } from "@/lib/ui/messageView";
 import { openDetachedWindow } from "@/lib/ui/openDetachedWindow";
@@ -58,6 +59,7 @@ export default function MessageWindowPage() {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
   const [dateFormat, setDateFormat] = useState<AccountDateFormat>("locale");
+  const [accountSettings, setAccountSettings] = useState<AccountSettings | undefined>(undefined);
   const [actionError, setActionError] = useState("");
   const [copyStatus, setCopyStatus] = useState<Record<string, boolean>>({});
   const [pendingMessageActions, setPendingMessageActions] = useState<Set<string>>(new Set());
@@ -111,6 +113,7 @@ export default function MessageWindowPage() {
         const currentAccount =
           accountsData.find((account) => account.id === nextMessage.accountId) ?? null;
         setDateFormat(normalizeAccountDateFormat(currentAccount?.settings?.appearance?.dateFormat));
+        setAccountSettings(currentAccount?.settings);
         setCollapsedMessages({ [nextMessage.id]: false });
         setStatus("ready");
       } catch {
@@ -214,6 +217,15 @@ export default function MessageWindowPage() {
     },
     [runMessageFlagRequest]
   );
+
+  // The window shows exactly one opened message; it follows the same
+  // personal auto-read preference as the main reader.
+  const autoMarkReadDelayMs = useAutoMarkReadDelay(message?.accountId, accountSettings);
+  useAutoMarkRead({
+    messages: status === "ready" && message ? [message] : [],
+    delayMs: autoMarkReadDelayMs,
+    onMarkRead: (target) => { void updateFlagState(target, "seen", true); }
+  });
 
   const handleDeleteMessage = useCallback(
     async (target: Message) => {

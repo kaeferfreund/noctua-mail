@@ -64,6 +64,7 @@ test("orchestrator keeps sibling cards idle through real collapse, tab, font, zo
       showComposeInline: false, supportsThreads: true, threadContentById: {}, threadContentLoading: null,
       threadContentErrorById: {}, composeDraftId: null, composeMode: "new", composeThreadFocusMessageId: null,
       pendingSelectionCollapseMessageId: null, onPendingSelectionCollapseConsumed: () => {},
+      autoMarkReadDelayMs: null, onAutoMarkRead: () => {},
       activeAccountId: syntheticReviewMessage.accountId, messageByMessageId: new Map(),
       apiFetch: async () => Response.json({ok: true, translatedText: "<p>Synthetische Übersetzung</p>", detectedSourceLang: "EN"}),
       messageCardProps: {...shared, pendingMessageActions: new Set(), messageContentLoading: {},

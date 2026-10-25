@@ -54,7 +54,11 @@
         "senderIcons": "Show sender icons",
         "weekStartsOn": "Week starts on",
         "includeAcrossFolders": "Include threads across folders",
+        "autoMarkRead": "Mark opened messages as read",
         "newMail": "New mail notifications"
+      },
+      "fieldHelp": {
+        "autoMarkRead": "When an opened unread message is marked as read. Default: after 1 second. The read status applies to all members of the mailbox."
       },
       "options": {
         "yes": "Yes",
@@ -65,7 +69,11 @@
         "card": "card",
         "table": "table",
         "compact": "compact",
-        "locale": "System locale"
+        "locale": "System locale",
+        "immediate": "Immediately",
+        "after1s": "After 1 second",
+        "after3s": "After 3 seconds",
+        "never": "Never (manually)"
       }
     },
     "roles": {

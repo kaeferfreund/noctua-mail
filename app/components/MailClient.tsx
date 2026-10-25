@@ -19,6 +19,7 @@ import { useMailboxSummaries } from "@/app/hooks/useMailboxSummaries";
 import { DomainIconVersionsContext, useDomainIconVersions } from "@/app/hooks/useDomainIconVersions";
 import { collaborationViewCount } from "@/app/hooks/mailboxSummaryEvents";
 import { useThreadCollab } from "@/app/hooks/useThreadCollab";
+import { useAutoMarkReadDelay } from "@/app/hooks/useAutoMarkRead";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
 import { SpamCorrectionProvider } from "./mailclient/SpamBadge";
 import { ScheduledSendProvider } from "./mailclient/scheduledSend/ScheduledSend";
@@ -3509,6 +3510,11 @@ export default function MailClient({
       listHandleRef.current?.updateFlagStateBulk(messages, flag, value) ?? Promise.resolve(),
     []
   );
+  const autoMarkReadDelayMs = useAutoMarkReadDelay(activeAccountId, currentAccount?.settings, apiFetch);
+  const handleAutoMarkRead = useCallback(
+    (message: Message) => { void updateFlagState(message, "seen", true); },
+    [updateFlagState]
+  );
   const updateKeywordFlag = useCallback(
     (message: Message, keyword: string, value: boolean) =>
       listHandleRef.current?.updateKeywordFlag(message, keyword, value) ??
@@ -5651,6 +5657,8 @@ export default function MailClient({
                 composeThreadFocusMessageId,
                 pendingSelectionCollapseMessageId,
                 onPendingSelectionCollapseConsumed: handlePendingSelectionCollapseConsumed,
+                autoMarkReadDelayMs,
+                onAutoMarkRead: handleAutoMarkRead,
                 activeAccountId,
                 apiFetch,
                 messageByMessageId,

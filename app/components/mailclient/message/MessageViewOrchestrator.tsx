@@ -25,7 +25,8 @@ import MessageViewPane from "./MessageViewPane";
 import ThreadSubject from "./ThreadSubject";
 import paneStyles from "./MessageViewPane.module.css";
 import ThreadView from "./ThreadView";
-import { getRenderedThreadMessages } from "./threadViewState";
+import { getExpandedThreadMessages, getRenderedThreadMessages, pinThreadCollapseState } from "./threadViewState";
+import { useAutoMarkRead } from "@/app/hooks/useAutoMarkRead";
 import type { ThreadWindowState } from "../useThreadContent";
 import type { ThreadViewCardProps } from "./ThreadView";
 import ThreadTopicSuggestionsRow from "./ThreadTopicSuggestionsRow";
@@ -208,6 +209,11 @@ export type MessageViewOrchestratorBodyInputs = {
   // `onPendingSelectionCollapseConsumed` so the shell can clear it.
   pendingSelectionCollapseMessageId: string | null;
   onPendingSelectionCollapseConsumed: (messageId: string) => void;
+  // Personal auto-read dwell (`null`: never) and the shell's mark-read
+  // action. Unread expanded cards of the shown thread are marked read
+  // through it after the dwell; see `useAutoMarkRead`.
+  autoMarkReadDelayMs: number | null;
+  onAutoMarkRead: (message: Message) => void;
   activeAccountId: string;
   // Client-id-injecting fetch wrapper owned by MailClient; used here by
   // the topic-suggestion-explanation loader to hit the per-account
@@ -403,6 +409,8 @@ function MessageViewOrchestratorImpl(
     composeThreadFocusMessageId,
     pendingSelectionCollapseMessageId,
     onPendingSelectionCollapseConsumed,
+    autoMarkReadDelayMs,
+    onAutoMarkRead,
     activeAccountId,
     apiFetch,
     messageByMessageId,
@@ -712,12 +720,28 @@ function MessageViewOrchestratorImpl(
     messageTabs, collapsedMessages, messageTranslations,
     showTranslation, hideTranslation, changeTranslationLang]);
 
-  // Compact and Full differ only in how collapsed cards render. A single
-  // rendered message opens expanded, so the toggle shows for threads only.
-  const showThreadViewModeToggle = getRenderedThreadMessages({
+  const renderedThread = getRenderedThreadMessages({
     activeMessage, activeThread, supportsThreads, threadContentById,
     threadContentLoading, showComposeInline, composeDraftId
-  }).length > 1;
+  });
+  // Expanded cards are the opened messages. A selection whose sibling
+  // collapse is still pending shows no settled layout yet, so nothing starts.
+  const autoReadMessages = activeMessage && pendingSelectionCollapseMessageId !== activeMessage.id
+    ? getExpandedThreadMessages(renderedThread, collapsedMessages, activeMessage.id)
+    : [];
+  useAutoMarkRead({
+    messages: autoReadMessages,
+    delayMs: autoMarkReadDelayMs,
+    onMarkRead: (message) => {
+      // Marking read changes the default expansion; keep the cards as shown.
+      setCollapsedMessages((prev) => pinThreadCollapseState(renderedThread, prev, activeMessage?.id));
+      onAutoMarkRead(message);
+    }
+  });
+
+  // Compact and Full differ only in how collapsed cards render. A single
+  // rendered message opens expanded, so the toggle shows for threads only.
+  const showThreadViewModeToggle = renderedThread.length > 1;
   const threadViewModeItem = (value: "compact" | "full", icon: React.ReactNode) => (
     <Tooltip content={t(value)}>
       <SegmentedControl.Item value={value} aria-label={t(value)}>{icon}</SegmentedControl.Item>

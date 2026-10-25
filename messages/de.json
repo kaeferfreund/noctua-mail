@@ -54,7 +54,11 @@
         "senderIcons": "Absendersymbole anzeigen",
         "weekStartsOn": "Wochenbeginn",
         "includeAcrossFolders": "Threads ordnerübergreifend anzeigen",
+        "autoMarkRead": "Geöffnete E-Mails als gelesen markieren",
         "newMail": "Benachrichtigungen bei neuen E-Mails"
+      },
+      "fieldHelp": {
+        "autoMarkRead": "Wann eine geöffnete ungelesene E-Mail als gelesen markiert wird. Standard: nach 1 Sekunde. Der Gelesen-Status gilt für alle Mitglieder des Postfachs."
       },
       "options": {
         "yes": "Ja",
@@ -65,7 +69,11 @@
         "card": "Karten",
         "table": "Tabelle",
         "compact": "Kompakt",
-        "locale": "Regionales Systemformat"
+        "locale": "Regionales Systemformat",
+        "immediate": "Sofort",
+        "after1s": "Nach 1 Sekunde",
+        "after3s": "Nach 3 Sekunden",
+        "never": "Nie (manuell)"
       }
     },
     "roles": {
