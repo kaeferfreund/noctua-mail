@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { inviteCodeFromFragment, inviteSignupUrl, isWebUrl } from "./inviteLink";
+import { inviteCodeFromFragment, inviteSignupUrl, isWebUrl, withoutInviteFragment } from "./inviteLink";
 
 describe("invite sign-up link", () => {
   it("builds the link from the given origin with the code in the fragment only", () => {
@@ -16,6 +16,12 @@ describe("invite sign-up link", () => {
   });
   it("reads no code from unrelated or empty fragments", () => {
     for (const hash of ["", "#", "#other=1", "#invite=", "#invite=%20%20"]) expect(inviteCodeFromFragment(hash)).toBeNull();
+  });
+  it("removes only the invite code from a fragment", () => {
+    expect(withoutInviteFragment("#invite=abc")).toBe("");
+    expect(withoutInviteFragment("#invite=abc&section=2")).toBe("#section=2");
+    expect(withoutInviteFragment("#section-2")).toBe("#section-2");
+    expect(withoutInviteFragment("")).toBe("");
   });
   it("accepts only absolute http(s) URLs for a QR code", () => {
     expect(isWebUrl("https://mail.example.test/reset-password?token=x")).toBe(true);

@@ -420,6 +420,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useApiErrorMessage } from "./mailclient/useApiErrorMessage";
 import { useFolderRefresh } from "./mailclient/useFolderRefresh";
 import { getFolderDisplayName } from "@/lib/i18n/folderNames";
+import { takeInviteCodeFromLocation } from "@/lib/inviteLink";
 
 const skipReaderRowsSubscription = () => () => {};
 const NO_READER_ROWS: Message[] = [];
@@ -437,6 +438,14 @@ export default function MailClient({
   const locale = useLocale();
   const tcompose = useTranslations("Compose");
   const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
+  // A scanned invite link: taken from the URL once at start (before any deep-link
+  // history write), prefilled for sign-up, discarded once someone is signed in.
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  useEffect(() => {
+    const code = takeInviteCodeFromLocation();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time read of browser URL state after mount
+    if (code) setInviteCode(code);
+  }, []);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeAccountId, setActiveAccountId] = useState("");
@@ -584,6 +593,12 @@ export default function MailClient({
   });
 
   const refreshFolders = useFolderRefresh({ activeAccountId, apiFetch, reportError, readErrorMessage, setFolders });
+  useEffect(() => {
+    if (authState !== "ok" || !inviteCode) return;
+    pushNotice({ type: "info", title: tn("inviteWhileSignedIn") });
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the invite code is consumed once
+    setInviteCode(null);
+  }, [authState, inviteCode, pushNotice, tn]);
 
   const [groupBy, setGroupBy] = useState<
     "none" | "date" | "week" | "sender" | "domain" | "year" | "folder" | "event"
@@ -5258,7 +5273,7 @@ export default function MailClient({
     {newMailboxOpen && isAdminUser && <CreateMailbox apiFetch={apiFetch} currentUserId={currentUser?.id} onAccessChanged={loadInitialData} onClose={() => setNewMailboxOpen(false)} onCreated={() => { void loadInitialData(); }} />}
     {adminOpen && <AdminPanel section={adminSection} onSectionChange={setAdminSection} isAdminUser={isAdminUser} currentUserId={currentUser?.id} onAccessChanged={loadInitialData} onClose={() => setAdminOpen(false)} apiFetch={apiFetch} />}
   </UrlHistoryContext.Provider>;
-  if (authState === "unauth") return <LoginScreen onAuthenticated={loadInitialData} />;
+  if (authState === "unauth") return <LoginScreen inviteCode={inviteCode} onAuthenticated={loadInitialData} />;
   if (mailboxState === "enrollment") {
     if (authSecurity?.reauthRequired && !authSecurity.enrollmentRequired) return <AuthFrame title="Sign in again" description="Your session needs fresh verification."><AuthButton onClick={() => { void logout(); }}>Return to sign in</AuthButton></AuthFrame>;
     return <EnrollmentScreen continuation={enrollmentContinuation ?? undefined} onLogout={async () => { if (await logout()) setEnrollmentContinuation(null); }} onComplete={async () => { setEnrollmentContinuation(null); await loadInitialData(); }} />;

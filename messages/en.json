@@ -1101,7 +1101,7 @@
       "expires": "Expires {time}",
       "deletedIssuer": "deleted user",
       "cleanup": "Clean up history",
-      "cleanupConfirm": "All redeemed, expired and revoked invites are deleted from the history. Issued invites that are still valid stay valid.",
+      "cleanupConfirm": "All redeemed, expired and revoked invites are deleted from the history. Issued invites that are still valid stay valid, as do codes with a sign-up in progress.",
       "cleaned": "{count, plural, =0 {Nothing to clean up.} one {# entry deleted.} other {# entries deleted.}}",
       "revoke": "Revoke",
       "revokeFor": "Revoke invite for {name}",
@@ -1705,7 +1705,8 @@
     "categoryFailed": "Failed to update category.",
     "todoFailed": "Failed to update To-Do flag.",
     "markedNotSuspicious": "Suspicious mark removed.",
-    "notSuspiciousFailed": "The suspicious mark could not be removed."
+    "notSuspiciousFailed": "The suspicious mark could not be removed.",
+    "inviteWhileSignedIn": "You are already signed in. The invite code is for a new sign-up."
   },
   "Compose": {
     "sender": {

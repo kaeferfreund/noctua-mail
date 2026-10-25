@@ -1,4 +1,5 @@
 /** Public, version-independent URL state for the single-page mail shell. */
+import { withoutInviteFragment } from "@/lib/inviteLink";
 export const SETTINGS_SECTIONS = ["account", "identities", "signatures", "preferences", "notifications", "categorization", "calendar", "topics", "translation", "mcp", "recipient-aliases", "members", "spam"] as const;
 export const ADMIN_SECTIONS = ["users", "mailboxes", "invites", "audit", "spam", "domains"] as const;
 export const GROUPS = ["none", "date", "week", "sender", "domain", "year", "folder", "event"] as const;
@@ -81,7 +82,8 @@ export function serializeDeepLink(state: DeepLinkState, current = "/"): string {
   put("panel", state.panel); put("calendar", state.calendar && "1");
   // An outgoing link may reopen a blank composer; never serialize its draft or recipients.
   put("c", state.compose && "mailto:");
-  return `${url.pathname}${url.search}${url.hash}`;
+  // A one-time invite code must never be copied into later history entries.
+  return `${url.pathname}${url.search}${withoutInviteFragment(url.hash)}`;
 }
 export function deepLinkHistoryMode(previous: DeepLinkState, next: DeepLinkState, keyboard = false): "push" | "replace" {
   // A cold mailbox can initially have no folders until its first sync completes.
