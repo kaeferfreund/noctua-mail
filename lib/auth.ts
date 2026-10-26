@@ -11,6 +11,8 @@ import { compareDisplayOrder } from "./accountPresentation";
 import type { AccountAccessSnapshot } from "./accountAccess";
 import { isMfaEnrollmentComplete } from "./authPolicy";
 
+export const SETUP_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 export type ActiveUserSession = {
   userId: string;
   sessionId: string;
@@ -83,8 +85,12 @@ export async function requireActiveUserSession(request?: Request | null, options
   // Even restricted access requires a bound, live sidecar; Slice 4 issues/finalizes it.
   if (!security || !["setup", "mfa"].includes(security.assurance) || security.userId !== user.id || security.generation !== security.currentGeneration ||
     !Number.isSafeInteger(security.authenticatedAt) || security.authenticatedAt > Date.now()) return denied(401, undefined, headers);
-  // Lifetime is Better Auth's sliding expiresAt alone; authenticatedAt only records when the factors were proven.
-  const expiresAt = new Date(result.session.expiresAt).getTime();
+  // Setup cannot be kept alive indefinitely by repeatedly opening enrollment.
+  // Use creation, not authenticatedAt/updatedAt, which can change during setup.
+  const createdAt = new Date(result.session.createdAt).getTime();
+  const expiresAt = security.assurance === "setup"
+    ? Math.min(new Date(result.session.expiresAt).getTime(), createdAt + SETUP_SESSION_MAX_AGE_MS)
+    : new Date(result.session.expiresAt).getTime();
   if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return denied(401, undefined, headers);
   const mfa = await isMfaEnrollmentComplete(user.id);
   const pendingSecurity = !!db.prepare(`SELECT 1 FROM admin_lifecycle_operations WHERE slot=?
