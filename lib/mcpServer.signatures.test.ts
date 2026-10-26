@@ -130,3 +130,36 @@ test("result links use the canonical BETTER_AUTH_URL origin", async () => {
     process.env.PASSKEY_RP_ID = previous.rpId;
   }
 });
+
+
+test("signature writes preserve unrelated mailbox settings and CalDAV configuration", async () => {
+  const db = await dbModulePromise;
+  const original = (await db.getAccountById(accountId))!;
+  const unrelated = {
+    sync: { maxIdleSessions: 2, backgroundPollIntervalMs: 120000, pollIntervalMs: 60000 },
+    calendar: { weekStartsOn: "sunday" as const },
+    reading: { autoMarkRead: "after3s" as const },
+    notifications: { newMail: false }
+  };
+  const caldav = { url: "https://calendar.example.test", user: "synthetic", password: "synthetic-caldav-password", calendarPath: "/calendar", syncIntervalMs: 900000 };
+  await db.upsertAccount({ ...original, settings: { ...original.settings, ...unrelated }, caldav });
+  try {
+    const saved = await tool("save_signature_template", { name: "Preservation", body: "Regards" });
+    expect(saved.isError).not.toBe(true);
+    const id = saved.structuredContent!.signature!.id;
+    for (const write of [
+      () => tool("save_signature_template", { signatureId: id, name: "Preservation", body: "Best regards" }),
+      () => tool("set_default_signature_template", { signatureId: id }),
+      () => tool("delete_signature_template", { signatureId: id })
+    ]) {
+      expect((await db.getAccountById(accountId))?.settings).toMatchObject(unrelated);
+      expect((await db.getAccountById(accountId))?.caldav).toEqual(caldav);
+      expect((await write()).isError).not.toBe(true);
+    }
+    const after = (await db.getAccountById(accountId))!;
+    expect(after.settings).toMatchObject(unrelated);
+    expect(after.caldav).toEqual(caldav);
+  } finally {
+    await db.upsertAccount(original);
+  }
+});

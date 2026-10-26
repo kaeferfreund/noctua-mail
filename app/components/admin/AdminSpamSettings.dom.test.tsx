@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import type { AdminFetch } from "@/app/hooks/useAdminApi";
@@ -76,9 +76,13 @@ describe("spam settings", () => {
     const page = render(<Theme><SpamTabContent accountId="synthetic" apiFetch={apiFetch} /></Theme>);
     const threshold = await page.findByLabelText(/Own threshold/) as HTMLInputElement;
     for (const value of ["abc", "0,3", "1.5"]) {
-      fireEvent.change(threshold, { target: { value } });
-      fireEvent.click(page.getByRole("button", { name: "Save" }));
-      expect((await page.findByRole("alert")).textContent).toBe("Enter a number between 0.5 and 1, or leave the field empty.");
+      await act(async () => {
+        fireEvent.change(threshold, { target: { value } });
+        fireEvent.click(page.getByRole("button", { name: "Save" }));
+      });
+      await waitFor(() => {
+        expect(page.getByRole("alert").textContent).toBe("Enter a number between 0.5 and 1, or leave the field empty.");
+      });
       expect(threshold.getAttribute("aria-invalid")).toBe("true");
       expect(threshold.getAttribute("aria-describedby")).toContain(page.getByRole("alert").id);
     }

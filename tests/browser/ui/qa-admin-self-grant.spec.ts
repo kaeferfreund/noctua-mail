@@ -75,41 +75,55 @@ test.describe("admin with partial membership (German UI)", () => {
     const origin = new URL(page.url()).origin;
     const users = (await (await page.request.get("/api/admin/users")).json()).users as Array<{ id: string; email: string }>;
     const jo = users.find(user => user.email === "jo@example.test")!;
-    // The other user also works in a mailbox the admin is a member of.
-    expect((await page.request.put(`/api/admin/accounts/qa-shared/members/${encodeURIComponent(jo.id)}`, { data: { role: "editor" }, headers: { origin } })).status()).toBe(200);
-    // Server-side: the foreign mailbox looks unknown.
-    const foreign = await page.request.put(`/api/admin/accounts/qa-private/members/${encodeURIComponent(jo.id)}`, { data: { role: "viewer" }, headers: { origin } });
-    expect([foreign.status(), (await foreign.json()).code]).toEqual([404, "account_not_found"]);
-    expect((await page.request.get("/api/admin/accounts/qa-private/spam-settings")).status()).toBe(404);
+    const mailbox = (await (await page.request.get("/api/admin/accounts")).json()).accounts
+      .find((account: { id: string }) => account.id === "qa-shared");
+    const previous = mailbox.members.find((member: { userId: string }) => member.userId === jo.id) as { role: string } | undefined;
+    const memberUrl = `/api/admin/accounts/qa-shared/members/${encodeURIComponent(jo.id)}`;
+    try {
+      // The other user also works in a mailbox the admin is a member of.
+      expect((await page.request.put(`/api/admin/accounts/qa-shared/members/${encodeURIComponent(jo.id)}`, { data: { role: "editor" }, headers: { origin } })).status()).toBe(200);
+      // Server-side: the foreign mailbox looks unknown.
+      const foreign = await page.request.put(`/api/admin/accounts/qa-private/members/${encodeURIComponent(jo.id)}`, { data: { role: "viewer" }, headers: { origin } });
+      expect([foreign.status(), (await foreign.json()).code]).toEqual([404, "account_not_found"]);
+      expect((await page.request.get("/api/admin/accounts/qa-private/spam-settings")).status()).toBe(404);
 
-    await page.goto("/?admin=mailboxes");
-    const admin = page.getByRole("dialog", { name: "Administration", exact: true });
-    await expect(admin.getByText("demo@monkeydent.test · 2 Mitglieder", { exact: true })).toBeVisible();
-    await expect(admin.getByText("second@example.test · 1 Mitglied", { exact: true })).toBeVisible();
-    await expect(admin.getByText("private@example.test", { exact: false })).toHaveCount(0);
-    await shot(page, "admin-scope-mailboxes");
+      await page.goto("/?admin=mailboxes");
+      const admin = page.getByRole("dialog", { name: "Administration", exact: true });
+      await expect(admin.getByText("demo@monkeydent.test · 2 Mitglieder", { exact: true })).toBeVisible();
+      await expect(admin.getByText("second@example.test · 1 Mitglied", { exact: true })).toBeVisible();
+      await expect(admin.getByText("private@example.test", { exact: false })).toHaveCount(0);
+      await shot(page, "admin-scope-mailboxes");
 
-    await admin.getByRole("button", { name: "Benutzer", exact: true }).click();
-    const joRow = admin.getByRole("row").filter({ hasText: "jo@example.test" });
-    await expect(joRow.getByText("QA Shared · Bearbeiter", { exact: true })).toBeVisible();
-    await expect(joRow.getByText("QA Private", { exact: false })).toHaveCount(0);
-    await shot(page, "admin-scope-users");
+      await admin.getByRole("button", { name: "Benutzer", exact: true }).click();
+      const joRow = admin.getByRole("row").filter({ hasText: "jo@example.test" });
+      const sharedMembership = joRow.getByRole("listitem").filter({ hasText: "QA Shared" });
+      await expect(sharedMembership).toContainText("Bearbeiter");
+      await expect(joRow.getByText("QA Private", { exact: false })).toHaveCount(0);
+      await shot(page, "admin-scope-users");
 
-    const deleted = page.waitForResponse(response => response.url().endsWith(`/api/admin/users/${encodeURIComponent(jo.id)}`) && response.request().method() === "DELETE");
-    await joRow.getByRole("button", { name: "Benutzer löschen", exact: true }).click();
-    const confirm = page.getByRole("dialog", { name: "Benutzer löschen", exact: true });
-    await confirm.getByRole("button", { name: "Bestätigen", exact: true }).click();
-    const refused = await deleted;
-    expect([refused.status(), (await refused.json()).code]).toEqual([409, "foreign_mailbox_membership"]);
-    await expect(confirm.getByRole("alert")).toHaveText("Diese Person ist Mitglied in Postfächern, in denen du kein Mitglied bist und die du deshalb nicht siehst. Löschen kann sie nur ein Administrator, der in allen ihren Postfächern Mitglied ist.");
-    await shot(page, "admin-scope-delete-refused");
-    await confirm.getByRole("button", { name: "Abbrechen", exact: true }).click();
-    expect((await (await page.request.get("/api/admin/users")).json()).users.some((user: { id: string }) => user.id === jo.id)).toBe(true);
+      const deleted = page.waitForResponse(response => response.url().endsWith(`/api/admin/users/${encodeURIComponent(jo.id)}`) && response.request().method() === "DELETE");
+      await joRow.getByRole("button", { name: "Weitere Aktionen für jo@example.test", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Benutzer löschen", exact: true }).click();
+      const confirm = page.getByRole("dialog", { name: "Benutzer löschen", exact: true });
+      await confirm.getByRole("button", { name: "Bestätigen", exact: true }).click();
+      const refused = await deleted;
+      expect([refused.status(), (await refused.json()).code]).toEqual([409, "foreign_mailbox_membership"]);
+      await expect(confirm.getByRole("alert")).toHaveText("Diese Person ist Mitglied in Postfächern, in denen du kein Mitglied bist und die du deshalb nicht siehst. Löschen kann sie nur ein Administrator, der in allen ihren Postfächern Mitglied ist.");
+      await shot(page, "admin-scope-delete-refused");
+      await confirm.getByRole("button", { name: "Abbrechen", exact: true }).click();
+      expect((await (await page.request.get("/api/admin/users")).json()).users.some((user: { id: string }) => user.id === jo.id)).toBe(true);
 
-    await admin.getByRole("button", { name: "Protokoll", exact: true }).click();
-    await expect(admin.getByText(/qa-shared/).first()).toBeVisible();
-    const audit = await (await page.request.get("/api/admin/audit?limit=500")).json();
-    expect(audit.entries.some((entry: { targetAccountId: string | null }) => entry.targetAccountId === "qa-private")).toBe(false);
-    await shot(page, "admin-scope-audit");
+      await admin.getByRole("button", { name: "Protokoll", exact: true }).click();
+      await expect(admin.getByText(/qa-shared/).first()).toBeVisible();
+      const audit = await (await page.request.get("/api/admin/audit?limit=500")).json();
+      expect(audit.entries.some((entry: { targetAccountId: string | null }) => entry.targetAccountId === "qa-private")).toBe(false);
+      await shot(page, "admin-scope-audit");
+    } finally {
+      // Restore the exact fixture membership even if an assertion above fails.
+      const restored = previous
+        ? await page.request.put(memberUrl, { data: { role: previous.role }, headers: { origin } })
+        : await page.request.delete(memberUrl, { headers: { origin } });
+      expect(restored.status()).toBe(200);
+    }
   });
 });

@@ -171,6 +171,8 @@ Links contain ids only, never subjects, recipients, bodies or search text.
 from the creator's accessible own/shared mailboxes. Managers see all tokens covering
 that mailbox; editors see their own. Token rows list only `accountIds` the requester can
 access plus `hiddenMailboxCount` for the others; the primary `accountId` is not returned. `POST` accepts `{label, ttlSeconds?, accountIds?, mode?}`.
+Token creation requires a fresh, single-use `mcp.create` grant in `x-noctua-reauth`,
+obtained from `/api/auth/reauth`; listing and deletion need no grant.
 `accountIds` must be a nonempty set of current memberships including the route mailbox
 (the primary); omission means primary only. `mode` defaults to `drafts`:
 
@@ -261,7 +263,10 @@ old one. The tool descriptions say so, so AI clients stop proposing that workaro
   replace the whole field (empty string clears it). `text`/`html`/`markdown` replace the whole
   body with the same rules as `create_draft_message` (format follows the richest field unless
   `composeFormat` is given; Markdown keeps its source as text/plain; HTML without `text` gets a
-  derived text/plain part). `appendBody` adds a paragraph after the authored text and
+  derived text/plain part). Passing `text` alone turns an HTML/Markdown reply into a plain-text
+  draft and discards the quoted original unless that quotation is included in the replacement.
+  Reply headers do not recreate quoted body content. Use `appendBody` to preserve the format
+  and quoted original. `appendBody` adds a paragraph after the authored text and
   before a quoted original. In Markdown drafts it is Markdown source, matching the UI
   editor; in text/HTML drafts it is plain text (HTML-escaped when needed).
   It cannot be combined with the body fields.

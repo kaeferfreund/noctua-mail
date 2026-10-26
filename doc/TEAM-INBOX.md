@@ -469,8 +469,9 @@ All message lookups, joins and mutations include the account. The durable keys a
   `(accountId, messageId, eventUid)`. Each has an account-scoped message foreign
   key with `ON DELETE CASCADE`. Attachment metadata, ids and removal additionally
   check the owning message before preview, bytes, ETag/304, or cache handling.
-- `message_fts_v2` stores `accountId` and the local row id (both unindexed). Search
-  matches the pair; sync/deletion replaces only that account's FTS entries.
+- `message_fts_v3` stores `accountId` and the local row id (both unindexed), with stable
+  integer rowids from `message_fts_identity(accountId,messageId)`. Search matches the pair;
+  sync/deletion replaces only that account's FTS entries.
 - `thread_topics`: `(accountId, threadId, topicId)`. Topic filters and remaps
   include accountId. Collaboration state already uses `(accountId, threadId)`;
   comments/activity use generated unique ids plus account-scoped thread queries.
@@ -489,10 +490,10 @@ before commit. SQLite foreign-key enforcement is disabled only around the atomic
 rebuild and restored even on failure; failures roll back all table swaps. Repeated
 opens do not rebuild or acquire a writer lock for the key/format check.
 
-Shard `PRAGMA user_version = 2` is installed in that same transaction, together
+Shard `PRAGMA user_version = 3` is installed in that same transaction, together
 with database-enforced legacy-writer rejection. Every ordinary table containing
 `accountId` has BEFORE INSERT/UPDATE/DELETE triggers requiring the connection-local
-`noctua_writer_v2()` SQL function. `configureAccountDb` registers it immediately
+`noctua_writer_v3()` SQL function. `configureAccountDb` registers it immediately
 on open, before schema/data writes, including the separate membership-cleanup
 handle; sync workers, recompute CLIs, watcher ingestion and maintenance scripts
 use the common account connection API. Schema initialization also registers it
@@ -501,10 +502,10 @@ the binary supports before configuration/schema writes.
 
 SQLite forbids persistent triggers referencing TEMP tables, and forbids triggers
 on virtual tables and FTS shadow tables. Therefore the guard uses a SQL function
-instead of a TEMP marker, and FTS is physically renamed to `message_fts_v2`.
-The legacy `message_fts` name becomes a read-only view. Legacy ordinary-table
+instead of a TEMP marker, and FTS is physically named `message_fts_v3`.
+The legacy `message_fts` and `message_fts_v2` names become read-only views. Legacy ordinary-table
 mutations fail at statement preparation with `no such function:
-noctua_writer_v2`; legacy FTS mutations fail with `cannot modify message_fts
+noctua_writer_v3`; legacy FTS mutations fail with `cannot modify message_fts
 because it is a view`. This also invalidates statements prepared before the
 migration. Legacy reads may work or fail; an old binary cannot safely resume
 writing this format. Direct shard writers must use `configureAccountDb` and
@@ -637,7 +638,7 @@ user: { modelName: "auth_user" },
 account: { modelName: "auth_account" },
 verification: { modelName: "auth_verification" },
 session: {
-  modelName: "auth_session", expiresIn: 86400, updateAge: 3600, freshAge: 300,
+  modelName: "auth_session", expiresIn: 259200, updateAge: 3600, freshAge: 300,
   cookieCache: { enabled: false },
   additionalFields: { activeAccountId: { type: "string", required: false, input: false } }
 },
@@ -691,14 +692,16 @@ or before finalization never authorizes mail. Two-session enrollment and each fa
 mandatory regressions. Restricted access is only /me, logout, /reauth and the explicitly approved
 setup/verification endpoints; sensitive raw BA endpoints run the same policy plugin.
 
-Absolute age is 24h against sidecar `authenticatedAt`, not Better Auth `createdAt`. Revoke at the
-minimum of library expiresAt and authenticatedAt+24h. New full password+factor/UV-passkey login can
-restart that clock; rotations and password-only proof cannot. Better Auth freshAge still applies
-separately and may demand a full login. The guard returns sidecar assurance/time/generation only
+Sessions expire after three days of inactivity, with no absolute age ceiling (user decision,
+2026-10-25). Better Auth refreshes `expiresAt` and the cookie to now + 259200 seconds once
+`updateAge:3600` has elapsed. `authenticatedAt` survives rotations as factor-proof metadata;
+its age does not expire a session. Better Auth `freshAge:300` still applies separately.
+See [Authentication: session lifetime](AUTHENTICATION.md#session-lifetime-three-days-of-inactivity).
+The guard returns sidecar assurance/time/generation only
 internally, never session tokens to the UI. `lib/auth.ts` owns ensureActiveAccountId; lib/authPolicy.ts
 owns isMfaEnrollmentComplete and operation proof, while lib/db/authPolicy.ts owns the persisted state.
 
-`GET /api/auth/me` returns `{ok:true,user,accountId:string|null,accounts,exp,ttlSeconds:86400,
+`GET /api/auth/me` returns `{ok:true,user,accountId:string|null,accounts,exp,ttlSeconds:259200,
 mailboxState:"selected"|"none"|"unselected"|"enrollment",
 security:{enrollmentRequired:boolean,reauthRequired:boolean}}`. During restricted enrollment return
 minimal identity, no mailbox details, `accounts:[]`, `accountId:null`, mailboxState=enrollment.
@@ -710,7 +713,7 @@ the write; a concurrently revoked choice retries once, then returns mailboxState
 Zero memberships alone means mailboxState=none, accounts=[], accountId=null (“No mailbox yet”).
 The UI must not locally pick accounts[0] and start calendar/import with an unpersisted selection.
 Selection-dependent handlers use the same helper; explicit account routes always recheck membership.
-`exp` is Unix seconds of the effective absolute/library expiry. Forward every getSession Set-Cookie.
+`exp` is Unix seconds of the sliding library expiry. Forward every getSession Set-Cookie.
 `POST /api/auth/logout` accepts a bodyless mutation (§4.6), invokes signOut with returnHeaders,
 forwards every deletion cookie and removes the DB session/sidecar and its proof state. The client
 clears local state only on success (already-absent session may return idempotent success).
@@ -782,7 +785,7 @@ that user's existing sessions and MCP tokens, then the current sign-in proceeds 
 challenge; no password is stored in the pending challenge. A wrong TOTP must still never yield mail
 access. Initialize request generation/time **after** this service's credential write-back and before
 creating the first-factor challenge, under the same user security slot; never issue a challenge with
-the generation intentionally revoked by this login itself. The absolute session-age rule in §4.1 bounds sessions established with mailbox passwords.
+the generation intentionally revoked by this login itself. The three-day idle lifetime in §4.1 also applies to sessions established with mailbox passwords.
 
 ### 4.3 Bootstrap, invites and provisioning
 
@@ -1132,8 +1135,8 @@ counts, comments and delayed polls), checking the live DB session, sidecar gener
 verified factor and current membership/role. No awaits between that check's final result and enqueue;
 queued messages are checked anew. This bounds delivery at the authorization-check linearization
 point; already-delivered network bytes cannot be recalled. Callback failure does not keep data flowing:
-a <=5-second liveness timer rechecks even idle streams, and an absolute-expiry timer closes at the
-effective session deadline. Clear timers, unsubscribe and close IMAP watchers on request abort/close.
+a <=5-second liveness timer rechecks even idle streams against the live session expiry.
+An expired session closes the stream within that interval; the stream itself does not refresh it. Clear timers, unsubscribe and close IMAP watchers on request abort/close.
 Do not abort a shared server mailbox watcher when a single browser loses access. Stage 3 per-user
 SSE must reuse this seam. Tests hold an open stream then revoke session, membership, ban, generation
 and expiry; no subsequent fetched envelope/summary may enqueue, all stream resources are released.
@@ -1822,7 +1825,7 @@ browser harness (no shipped route); Slice 7 exercises actual ui-shell login/secu
   Credential enrollment needs a new proof even with a stolen fresh cookie; IMAP-only first-password
   enrollment too. Grants bound to user/session/purpose/challenge, expiring and single-use; raw
   /two-factor/enable, /disable and passkey endpoints cannot bypass. FreshAge failures request login;
-  24h absolute expiry survives sliding refresh **and session replacement** via authenticatedAt. Wrong code in Security does not globally log out.
+  Three-day idle expiry slides on guarded requests and has no absolute age ceiling; authenticatedAt survives session replacement as proof metadata. Wrong code in Security does not globally log out.
 - Provisioning/recovery/admin: no mailbox takeover (409 BEFORE IMAP/invite reservation), duplicate
   user 409, first-admin invite only, concurrent first signup and invite maxUses, no bootstrap from
   a stored mailbox; crash/fault injection after every reservation/create/finalize step and idempotent

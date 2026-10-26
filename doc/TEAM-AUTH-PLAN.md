@@ -132,7 +132,7 @@ all desktop signup invite exemptions. Preserve membership/prefs/audit/safe merge
 before auth schema exists. Migrate every hand-sealed-cookie fixture to testAuthHarness.
 
 Implement the gate that denies missing sidecar, stale generation, non-mfa assurance, inconsistent
-user flag/verified TOTP record or absolute authenticatedAt age. Security sidecar issuance/finalization
+user flag/verified TOTP record or expired sliding session (three days idle; no absolute authenticatedAt limit). Security sidecar issuance/finalization
 is completed in Slice 4; no live public login is enabled yet. /me separates enrollment/none/unselected/
 selected, persists a deterministic default through ensureActiveAccountId/setActiveAccountId, retries
 revoked selection once and never returns local-only accounts[0]. Selection-dependent calendar/import

@@ -237,7 +237,7 @@ const UPDATE_DRAFT_MESSAGE_SCHEMA = {
   cc: z.string().optional().describe("Replaces the whole Cc list. Omit to keep it; empty string clears it."),
   bcc: z.string().optional().describe("Replaces the whole Bcc list. Omit to keep it; empty string clears it."),
   subject: z.string().optional().describe("Replaces the subject. Omit to keep it."),
-  text: z.string().optional().describe("Replaces the whole body (with html/markdown, same rules as create_draft_message)."),
+  text: z.string().optional().describe("Replaces the whole body (with html/markdown, same rules as create_draft_message). Text alone makes a plain-text draft and removes any quoted original unless you include it. Use appendBody to preserve format and quotation."),
   markdown: z.string().optional().describe("Replaces the whole body as Markdown."),
   html: z.string().optional().describe("Replaces the whole body as HTML."),
   composeFormat: z.enum(["text", "html", "markdown"]).optional().describe("Body format; only together with text, html or markdown."),
@@ -1417,7 +1417,7 @@ export async function executeMcpHttpRequest(params: {
 
   server.registerTool("update_draft_message", {
     title: "Revise a draft",
-    description: `Revise an existing draft in place (recipients, subject, sender or text). Only the fields you pass change; everything else (sender, recipients, subject, body, reply/forward headers, attachments) is kept. Use appendBody to add a sentence or paragraph, or text/html/markdown to replace the whole body (read it first with get_draft_message). Saving may assign a new draft id: always continue with the returned draftId (draftIdChanged tells you). The result includes a link that opens the draft. ${DRAFT_EDIT_HINT}`,
+    description: `Revise an existing draft in place (recipients, subject, sender or text). Only the fields you pass change; everything else (sender, recipients, subject, body, reply/forward headers, attachments) is kept. Use appendBody to add a sentence or paragraph, or text/html/markdown to replace the whole body (read it first with get_draft_message). Text alone converts an HTML/Markdown reply to plain text and removes its quoted original unless you include it in the replacement; appendBody preserves both. Saving may assign a new draft id: always continue with the returned draftId (draftIdChanged tells you). The result includes a link that opens the draft. ${DRAFT_EDIT_HINT}`,
     inputSchema: z.object(UPDATE_DRAFT_MESSAGE_SCHEMA).strict(),
     annotations: ADDITIVE_CHANGE,
     outputSchema: senderToolOutput({ mode: z.enum(["new", "reply", "forward"]), identityId: z.string(), draftId: z.string().nullable(),

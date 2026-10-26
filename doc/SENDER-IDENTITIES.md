@@ -1,4 +1,4 @@
-# Sender identities (slices 1–2)
+# Sender identities
 
 Slice 1 implements configuration, personal preferences, delivery observations and
 own-address recognition. Slice 2 implements authoritative sender selection and
@@ -94,7 +94,7 @@ omit `code` (401/403). A template cannot be removed until all identities unlink
 it. Manager mutations write one atomic admin audit entry; no-op/rejected changes
 write none. Personal signature text and credentials are excluded from that audit.
 
-## Personal preferences and future settings consumers
+## Personal preferences and settings consumers
 
 `GET/PUT .../prefs` (viewer+, authenticated user's own row) keeps
 `{ok:true,prefs}`. GET is sparse: absent keys mean inherit; it contains no null
@@ -117,18 +117,19 @@ actionable warning, allowing re-enablement without rewriting everyone's prefs.
 Signature overrides allow at most 8192 UTF-8 bytes and only these placeholders:
 `{{user.name}}`, `{{user.email}}`, `{{identity.displayName}}`, `{{identity.email}}`.
 
-The slices 2/3 signature-resolution contract is: own signatureOverride if present
+The signature-resolution contract is: own signatureOverride if present
 (including empty = none), own explicit defaultSignatureId (empty = none), selected
 identity.signatureId, mailbox settings.defaultSignatureId, then none. Skip missing
-or deleted template references with a warning. Rendering, HTML escaping, preview
-and insertion-once are not implemented by Slice 1.
+or deleted template references with a warning. `lib/signatureTemplates.ts` implements rendering and HTML escaping; compose initialization
+and `lib/mcpServer.ts` insert the resolved signature once for new/reply/forward drafts.
+Reopened drafts retain their existing body.
 
-Future controls must follow the existing role-aware settings frame/tab contract:
+The compose/settings controls follow the role-aware settings frame/tab contract:
 manager edits mailbox identities/default/templates; editor/viewer may inspect
 identities and change their own prefs, while composing/sending requires editor+.
 Read-only disabled identities are already visible to viewer mailbox members;
 MCP's internal own-address context uses the same scope, never foreign identities,
-personal overrides or credentials. Slice 2 adds the actor-aware identity MCP tools
+personal overrides or credentials. The actor-aware identity MCP tools are
 documented below.
 
 Mailbox signature templates (`settings.signatures`, `settings.defaultSignatureId`)
@@ -144,7 +145,7 @@ separately from `/settings`; never post a whole identities array or personal
 fields in account.settings/effectiveSettings. After identity saves, reload the
 identity list, account ownAddresses and effective prefs. Refresh on account switch
 and compose open; preserve an already-open composer's explicit choice and
-revalidate it at send. Slice 3 must implement these UI refresh behaviors.
+revalidate it at send. The compose controller and sender-settings change event implement these refresh behaviors.
 
 ## Observations, recognition and rebuild scope
 
@@ -314,11 +315,10 @@ builders; this slice adds optional builder/hash fields but no UI selection or se
 Draft-send accepts no identity override. Refresh From/name/Reply-To by reviewing and
 saving when `draft_identity_changed` is returned; never retry under a different sender.
 
-The shared signature renderer/initializer has not landed in this base. Slice 3 must
-implement it once for UI and call it once in MCP `createDraftMessage` before saving,
-using the token creator's profile/prefs and resolved identity. No signature is appended
+The shared signature renderer is `lib/signatureTemplates.ts`, used by compose initialization
+and MCP `createDraftMessage` before saving with the token creator's profile/prefs and resolved identity. No signature is appended
 at raw send. Keep reopened shared-draft text and existing insertion tracking intact.
-All remaining UI/signature work from the Slice 1 handoff remains owned by Slice 3.
+The Slice 3 implementation and its verification notes follow below.
 
 For integration round 5: no changes were made to `lib/mail/completeSend.ts` or to
 stored-message serialization/ingestion in `messageFromAppendedDraft`. `lib/drafts.ts`

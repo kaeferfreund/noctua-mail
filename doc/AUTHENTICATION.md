@@ -54,6 +54,12 @@ and close at most 5 seconds after it passes. An open stream does not extend the 
 requests through the guard do, so a tab that keeps polling keeps its session alive indefinitely.
 Restricted setup sessions slide the same way.
 
+An authenticated open mail tab polls `/api/auth/me` every 30 minutes in `MailClient`
+(the interval is clamped between one minute and `min(30 minutes, ttlSeconds / 3)`).
+These guarded requests refresh the session when its one-hour update age is reached,
+so the tab keeps the session alive even without clicks. Closing the tab stops this
+polling; a suspended/offline tab cannot refresh until requests resume.
+
 Security consequences: a stolen session cookie stays usable as long as it is used, and up to three
 days after its last use. The controls against that: sensitive actions (factor and password changes,
 passkeys, backup codes, session revocation, admin recovery and MCP token creation) need a fresh
