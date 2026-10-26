@@ -10,6 +10,8 @@ import { startSmtpSink } from "@/lib/testFixtures/mail/smtp-sink";
 import { demoPass, demoUser } from "@/lib/testFixtures/mail/seed";
 import { claimDueScheduledSends, getScheduledSend } from "@/lib/db";
 import { cancelDraftSchedule, releaseDraftScheduleForEdit } from "@/app/components/mailclient/scheduledSend/scheduledSendClient";
+import { ScheduledSendScheduler } from "@/lib/scheduledSendJob";
+import { defaultScheduledSendDeps } from "@/lib/scheduledSend";
 import type { Account } from "@/lib/data";
 import { POST as smtpSend } from "./route";
 import { POST as sendNow } from "../../drafts/[draftId]/send/route";
@@ -178,4 +180,41 @@ realMailTest("opening a draft scheduled by another member reads the schedule fre
   await claimDueScheduledSends(jobOwner(), s.sendAt, 1_000);
   expect(await releaseDraftScheduleForEdit(apiFetch, s.f.accountId, s.draftId)).toEqual({ ok: false, reason: "busy" });
   expect((await getScheduledSend(busy.scheduledSend.id))?.status).toBe("sending");
+});
+
+
+realMailTest("parallel compose sends after opening cancelled the schedule deliver exactly one copy", async () => {
+  const s = await setup();
+  expect((await cancelScheduled(s.f.request("POST"), s.f.params({ scheduleId: s.scheduleId }))).status).toBe(200);
+  const before = delivered("Synthetic planned");
+  const results = await Promise.all([s.compose(), s.compose()]);
+  expect(results.map(response => response.status).sort()).toEqual([200, 409]);
+  expect(delivered("Synthetic planned")).toBe(before + 1);
+  expect((await s.compose()).status).toBe(409);
+  expect((await s.sendDraftNow()).status).toBe(409);
+  expect(delivered("Synthetic planned")).toBe(before + 1);
+});
+
+realMailTest("saving a draft held by a live foreign job returns 409 and keeps its claim", async () => {
+  const s = await setup();
+  const owner = jobOwner();
+  expect((await claimDueScheduledSends(owner, s.sendAt, 1000)).some(row => row.id === s.scheduleId)).toBe(true);
+  const response = await saveDraft(s.f.request("POST", { draftId: s.draftId, identityId: s.f.identity.id,
+    to: "recipient@example.test", subject: "Synthetic edited", text: "Edited body" }, {}, s.f, "/drafts/save"), s.f.params());
+  expect(response.status).toBe(409);
+  expect(await getScheduledSend(s.scheduleId)).toMatchObject({ status: "sending", leaseOwner: owner });
+});
+
+
+realMailTest("the real job relays the fingerprinted draft exactly once across repeated ticks", async () => {
+  const s = await setup();
+  const before = delivered("Synthetic planned");
+  const scheduler = new ScheduledSendScheduler({ ...defaultScheduledSendDeps, now: () => s.sendAt });
+  try {
+    await scheduler.tick();
+    await scheduler.tick();
+    expect(delivered("Synthetic planned")).toBe(before + 1);
+    expect(await getScheduledSend(s.scheduleId)).toMatchObject({ status: "sent", lastError: null });
+    expect((await s.compose()).status).toBe(409);
+  } finally { await scheduler.stop(); }
 });

@@ -5,10 +5,11 @@ import { DraftSendError } from "@/lib/drafts";
 import { authorizeOutbound, OutboundAuthorizationError } from "@/lib/outboundAuthorization";
 import { SenderIdentityError } from "@/lib/senderIdentities";
 import { createRateLimiter } from "@/lib/rateLimit";
-import { createScheduledSend, listScheduledSends, ScheduledSendBusyError } from "@/lib/db";
+import { createScheduledSend, listScheduledSends } from "@/lib/db";
 import { assertSchedulableDraft, presentScheduledSend, SCHEDULED_SEND_MIN_ROLE, validateScheduledSendAt } from "@/lib/scheduledSend";
 import { getAccountIdFromParams, requireAccountContext, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { scheduledSendConflictResponse } from "@/app/api/_helpers/scheduledSendConflict";
 import { errorResponse, okResponse } from "@/app/api/_helpers/response";
 
 const SCHEDULE_WINDOW_SECONDS = 60;
@@ -73,7 +74,8 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       if (error instanceof DraftSendError) {
         return NextResponse.json({ ok: false, code: error.code ?? (error.status === 404 ? "scheduled_send_draft_missing" : "scheduled_send_draft_invalid"), message: error.message }, { status: error.status });
       }
-      if (error instanceof ScheduledSendBusyError) return NextResponse.json({ ok: false, code: "scheduled_send_busy", message: "This draft is being sent by its schedule right now." }, { status: 409 });
+      const conflict = scheduledSendConflictResponse(error);
+      if (conflict) return conflict;
       throw error;
     }
   });

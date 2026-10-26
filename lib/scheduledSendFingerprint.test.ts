@@ -14,7 +14,7 @@ for (const changed of ["source", "envelope", "trash", "legacy"] as const) test(`
   const claimed = (await claimDueScheduledSends(processScheduleOwner(), Date.now(), 1000)).find(item => item.id === row.id)!;
   if (changed === "source") await saveMessageSource(f.accountId, draftId, `${await getMessageSource(f.accountId, draftId)}Changed synthetic content`);
   if (changed === "envelope") await f.db.upsertMessages(f.accountId, null, [{ ...draft, to: "changed@example.test" }]);
-  if (changed === "trash") await f.db.updateMessageFolder(f.accountId, draftId, `${f.accountId}:INBOX`, null, null);
+  if (changed === "trash") await f.db.updateMessageFolder(f.accountId, draftId, `${f.accountId}:INBOX`, "INBOX", null);
   // Real preflight + real send path. The synthetic account has no reachable SMTP service;
   // an accidental network attempt cannot produce the expected cancellation reason.
   expect(await attemptScheduledSend(claimed)).toEqual({ status: "cancelled", reason: changed === "trash" ? "draft_deleted" : "draft_changed" });

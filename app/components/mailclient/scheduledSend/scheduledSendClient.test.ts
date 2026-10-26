@@ -33,3 +33,15 @@ test("scheduling refusals map to catalogue keys, including unknown server errors
     expect(await readScheduledSendRefusal(Response.json({ code, message: "English server detail" }, { status }))).toBe(key);
   }
 });
+
+test("opening re-reads a concurrently replaced plan while undo remains scoped to its id", async () => {
+  const cancelled: string[] = [];
+  let reads = 0;
+  const result = await releaseDraftScheduleForEdit(async (input, init) => {
+    if (init?.method !== "POST") return Response.json({ scheduledSends: [{ id: ++reads === 1 ? "old" : "new", draftId: "draft", status: "queued" }] });
+    cancelled.push(String(input));
+    return Response.json({}, { status: cancelled.length === 1 ? 404 : 200 });
+  }, "synthetic-account", "draft");
+  expect(result).toEqual({ ok: true });
+  expect(cancelled).toEqual(["/api/accounts/synthetic-account/drafts/scheduled/old/cancel", "/api/accounts/synthetic-account/drafts/scheduled/new/cancel"]);
+});

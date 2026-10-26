@@ -47,12 +47,19 @@ export async function cancelDraftSchedule(apiFetch: ApiFetch, accountId: string,
  * A failed read lets the draft open: saving and sending still settle the schedule server-side.
  */
 export async function releaseDraftScheduleForEdit(apiFetch: ApiFetch, accountId: string, draftId: string): Promise<ScheduleReleaseResult> {
-  const fresh = await listScheduledDraftSends(apiFetch, accountId, draftId);
-  if (!fresh.ok) return { ok: true };
-  const schedule = fresh.value.find(row => row.draftId === draftId);
-  if (!schedule) return { ok: true };
-  if (schedule.status === "sending") return { ok: false, reason: "busy" };
-  return cancelDraftSchedule(apiFetch, accountId, schedule);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const fresh = await listScheduledDraftSends(apiFetch, accountId, draftId);
+    if (!fresh.ok) return { ok: true };
+    const schedule = fresh.value.find(row => row.draftId === draftId);
+    if (!schedule) return { ok: true };
+    if (schedule.status === "sending") return { ok: false, reason: "busy" };
+    const result = await cancelScheduledDraftSend(apiFetch, accountId, schedule.id);
+    if (result.ok) return { ok: true };
+    if (result.status !== 404) return { ok: false, reason: result.status === 409 ? "busy" : "failed" };
+    // Editing intentionally releases the current plan; only this flow may re-read a
+    // replacement. Undo toasts always cancel their exact id via cancelDraftSchedule.
+  }
+  return { ok: false, reason: "failed" };
 }
 
 const refusalKeys = {
@@ -60,6 +67,7 @@ const refusalKeys = {
   scheduled_send_draft_deleted: "notInDrafts",
   scheduled_send_draft_missing: "draftMissing",
   scheduled_send_draft_invalid: "draftInvalid",
+  scheduled_send_sent: "sendConflictSent",
   scheduled_send_busy: "busy",
   send_at_past: "errors.past",
   send_at_too_soon: "errors.tooSoon",

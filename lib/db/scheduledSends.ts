@@ -97,6 +97,9 @@ export function createScheduledSend(input: {
     const now = input.now ?? Date.now();
     expireStaleLeases(db, now, { accountId: input.accountId, draftId: input.draftId });
     if (hasSendingRow(db, input.accountId, input.draftId)) throw new ScheduledSendBusyError();
+    if (db.query("SELECT 1 FROM scheduled_sends WHERE accountId=? AND draftId=? AND status='sent'").get(input.accountId, input.draftId)) {
+      throw new ScheduledSendAlreadySentError();
+    }
     db.query(`UPDATE scheduled_sends SET status='cancelled',lastError='rescheduled',updatedAt=?
       WHERE accountId=? AND draftId=? AND ${VISIBLE_PREDICATE}`).run(now, input.accountId, input.draftId);
     const row: ScheduledSend = { id: randomUUID(), accountId: input.accountId, userId: input.userId, draftId: input.draftId,

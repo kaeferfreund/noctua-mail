@@ -7,7 +7,7 @@ import { newLeaseOwner } from "./db/processLeases";
 import {
   cancelScheduledSend, claimDueScheduledSends, createScheduledSend, failInterruptedScheduledSends, finishDraftScheduleHold,
   getScheduledSend, holdDraftSchedules, listScheduledSends, processScheduleOwner, SCHEDULED_SEND_LEASE_MAX_MS,
-  ScheduledSendAlreadySentError, ScheduledSendBusyError, scheduleLeaseOwnerAlive, settleScheduledSend, type ScheduledSend
+  ScheduledSendAlreadySentError, ScheduledSendBusyError, pruneScheduledSends, scheduleLeaseOwnerAlive, settleScheduledSend, type ScheduledSend
 } from "./db/scheduledSends";
 import {
   attemptScheduledSend, classifyScheduledSendError, SCHEDULED_SEND_MAX_AHEAD_MS, SCHEDULED_SEND_RETRY_DELAYS_MS,
@@ -56,6 +56,20 @@ describe("scheduled_sends store", () => {
     expect(await listScheduledSends(accountId)).toEqual([]);
   });
 
+  test("reasoned cancellations remain visible until dismissed or re-planned, including after history pruning", async () => {
+    const accountId = mailbox();
+    const row = await queued(accountId);
+    const owner = processScheduleOwner();
+    await claimDueScheduledSends(owner, T0, 1000);
+    await settleScheduledSend(row.id, owner, { status: "cancelled", reason: "identity_unavailable" }, T0);
+    await pruneScheduledSends(T0 + 1);
+    expect((await listScheduledSends(accountId)).map(item => item.id)).toEqual([row.id]);
+    const replacement = await queued(accountId, T0 + 3_600_000, row.draftId);
+    expect((await listScheduledSends(accountId)).map(item => item.id)).toEqual([replacement.id]);
+    await cancelScheduledSend(accountId, replacement.id);
+    expect(await listScheduledSends(accountId)).toEqual([]);
+  });
+
   test("due-row selection claims only due queued rows, each exactly once across owners", async () => {
     const accountId = mailbox();
     const due = await queued(accountId, T0 - 1);
@@ -75,6 +89,8 @@ describe("scheduled_sends store", () => {
     await expect(cancelScheduledSend(accountId, due.id, T0)).rejects.toBeInstanceOf(ScheduledSendBusyError);
     await expect(queued(accountId, T0 + 5, claimed.draftId)).rejects.toBeInstanceOf(ScheduledSendBusyError);
     expect(await settleScheduledSend(due.id, claimed.leaseOwner!, { status: "sent", reason: null })).toBe(true);
+    // Re-planning during a failed/pending Sent copy must not send a second copy either.
+    await expect(queued(accountId, T0 + 3_600_000, claimed.draftId)).rejects.toBeInstanceOf(ScheduledSendAlreadySentError);
     // After the schedule sent the draft, an edit holds nothing and a manual send is refused.
     expect(await holdDraftSchedules(accountId, claimed.draftId, "manual-b", false, T0)).toBe(0);
     await expect(holdDraftSchedules(accountId, claimed.draftId, "manual-c", true, T0)).rejects.toBeInstanceOf(ScheduledSendAlreadySentError);
@@ -292,4 +308,19 @@ describe("scheduled send job", () => {
     for (const row of [overdue, later, flaky]) expect((await getScheduledSend(row.id))?.status).toBe("sent");
     await scheduler.stop();
   });
+});
+
+test("a manual send cannot resume an expired hold after another operation took over", async () => {
+  const { holdScheduleForDraftChange } = await import("./drafts");
+  const accountId = mailbox(), draftId = draft();
+  const original = await queued(accountId, Date.now() + 3_600_000, draftId);
+  const hold = await holdScheduleForDraftChange(accountId, draftId, "sent_now");
+  hold.assertCurrent();
+  const db = await getDb();
+  db.query("UPDATE scheduled_sends SET leaseStartedAt=? WHERE id=?").run(Date.now() - SCHEDULED_SEND_LEASE_MAX_MS - 1, original.id);
+  await failInterruptedScheduledSends();
+  const replacement = await queued(accountId, Date.now() + 3_600_000, draftId);
+  expect(() => hold.assertCurrent()).toThrow(ScheduledSendBusyError);
+  await hold.abort(new Error("stopped before SMTP"));
+  expect(await getScheduledSend(replacement.id)).toMatchObject({ status: "queued" });
 });

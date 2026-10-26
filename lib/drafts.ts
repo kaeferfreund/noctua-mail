@@ -1,3 +1,4 @@
+import { getDb } from "./db/connection";
 import { scheduledDraftFingerprint } from "./scheduledSendFingerprint";
 import { authorizeOutbound, prepareOutboundAssertion, type OutboundAuthorization } from "./outboundAuthorization";
 import { SenderIdentityError } from "./senderIdentities";
@@ -55,6 +56,7 @@ import { randomUUID } from "node:crypto";
 import {
   finishDraftScheduleHold,
   holdDraftSchedules,
+  SCHEDULED_SEND_LEASE_MAX_MS,
   processScheduleOwner,
   ScheduledSendAlreadySentError,
   ScheduledSendBusyError,
@@ -140,6 +142,8 @@ export class DraftSendError extends Error {
 export type SendDraftResult = SentCopyResult & { identityId: string };
 
 export type DraftScheduleHold = {
+  /** Re-check immediately at SMTP/APPEND: an expired or replaced hold must never resume. */
+  assertCurrent: () => void;
   /** The manual change happened: close the draft's schedule (and an old failure). */
   complete: () => Promise<void>;
   /** It did not: queue the schedule again, or fail it as `send_uncertain` if a send may have gone out. */
@@ -155,7 +159,8 @@ export type DraftScheduleHold = {
  */
 export async function holdScheduleForDraftChange(accountId: string, draftId: string, reason: ScheduledSendReason): Promise<DraftScheduleHold> {
   const owner = `${processScheduleOwner()}/manual:${randomUUID()}`;
-  await holdDraftSchedules(accountId, draftId, owner, reason === "sent_now");
+  const held = await holdDraftSchedules(accountId, draftId, owner, reason === "sent_now");
+  const master = await getDb();
   let finished = false;
   const finish = async (outcome: Parameters<typeof finishDraftScheduleHold>[3]) => {
     if (finished) return;
@@ -169,6 +174,12 @@ export async function holdScheduleForDraftChange(accountId: string, draftId: str
     }
   };
   return {
+    assertCurrent: () => {
+      if (!held) return;
+      if (!master.query(`SELECT 1 FROM scheduled_sends WHERE accountId=? AND draftId=? AND status='sending'
+        AND leaseOwner=? AND leaseStartedAt>? AND COALESCE(lastError,'')<>'security_revoked'`)
+        .get(accountId, draftId, owner, Date.now() - SCHEDULED_SEND_LEASE_MAX_MS)) throw new ScheduledSendBusyError();
+    },
     complete: () => finish({ kind: "done", reason }),
     abort: (error) => finish(smtpOutcomeUncertain(error) ? { kind: "uncertain" } : { kind: "restore" })
   };
@@ -510,7 +521,7 @@ export async function saveDraftForAccount(params: {
   }
   let uid: number | null | undefined;
   try {
-    uid = await appendImapMessage(account, draftsMailbox, raw, APPENDED_DRAFT_FLAGS, clientId, undefined, { beforeAppend: assertCurrent });
+    uid = await appendImapMessage(account, draftsMailbox, raw, APPENDED_DRAFT_FLAGS, clientId, undefined, { beforeAppend: () => { assertCurrent(); scheduleHold?.assertCurrent(); } });
   } catch (error) {
     await scheduleHold?.abort(error);
     throw error;
@@ -653,6 +664,7 @@ export async function sendDraftForAccount(params: {
   authorization?: OutboundAuthorization;
   /** Required content snapshot for a scheduler send; null is an untrusted legacy schedule. */
   scheduledFingerprint?: string | null;
+  assertScheduleHold?: () => void;
 }): Promise<SendDraftResult> {
   const { account, accountId, clientId, draftId } = params;
   const { draft, rawSource, messageId, identity } = await loadSendableDraft(accountId, draftId);
@@ -684,8 +696,9 @@ export async function sendDraftForAccount(params: {
   const wireSource = stripBccHeader(sentSource);
   const envelopeRecipients = buildDraftSendEnvelopeRecipients(draft);
   const authorization = params.authorization ? await authorizeOutbound(params.authorization, { accountId, minRole: "editor", identity }) : undefined;
-  const beforeSend = authorization ? await prepareOutboundAssertion(authorization) : undefined;
-  beforeSend?.();
+  const assertAuthorized = authorization ? await prepareOutboundAssertion(authorization) : undefined;
+  const beforeSend = () => { assertAuthorized?.(); params.assertScheduleHold?.(); };
+  beforeSend();
   await sendRawSmtpMessage(account, wireSource, {
     from: identity.email,
     to: envelopeRecipients
