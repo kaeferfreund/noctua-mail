@@ -9,7 +9,7 @@ export type ScheduledSendStatus = "queued" | "sending" | "sent" | "failed" | "ca
 export type ScheduledSendReason =
   | "rescheduled" | "cancelled" | "edited" | "discarded" | "sent_now" | "manual_send"
   | "permission_revoked" | "identity_unavailable" | "draft_missing" | "draft_invalid"
-  | "account_missing" | "smtp_rejected" | "send_failed" | "send_uncertain" | "interrupted";
+  | "security_revoked" | "account_missing" | "smtp_rejected" | "send_failed" | "send_uncertain" | "interrupted";
 
 export type ScheduledSend = {
   id: string;
@@ -44,9 +44,9 @@ export class ScheduledSendAlreadySentError extends Error {
 }
 
 /** Statuses shown to members: the active schedule and an unresolved failure. */
-const VISIBLE_STATUSES = "('queued','sending','failed')";
-/** Settling a draft (edit, discard, manual send) closes these; `sending` is never touched. */
-const OPEN_STATUSES = "('queued','failed')";
+const VISIBLE_PREDICATE = `(status IN ('queued','sending','failed') OR
+  (status='cancelled' AND lastError IN ('security_revoked','permission_revoked','identity_unavailable',
+    'draft_missing','draft_invalid','account_missing','interrupted','draft_changed','draft_deleted')))`;
 
 const ownerKey = Symbol.for("noctua.scheduledSendProcessOwner");
 const processHost = globalThis as typeof globalThis & { [ownerKey]?: string };
@@ -97,7 +97,7 @@ export function createScheduledSend(input: {
     expireStaleLeases(db, now, { accountId: input.accountId, draftId: input.draftId });
     if (hasSendingRow(db, input.accountId, input.draftId)) throw new ScheduledSendBusyError();
     db.query(`UPDATE scheduled_sends SET status='cancelled',lastError='rescheduled',updatedAt=?
-      WHERE accountId=? AND draftId=? AND status IN ${OPEN_STATUSES}`).run(now, input.accountId, input.draftId);
+      WHERE accountId=? AND draftId=? AND ${VISIBLE_PREDICATE}`).run(now, input.accountId, input.draftId);
     const row: ScheduledSend = { id: randomUUID(), accountId: input.accountId, userId: input.userId, draftId: input.draftId,
       sendAt: input.sendAt, status: "queued", attempts: 0, nextAttemptAt: input.sendAt, lastError: null, leaseOwner: null,
       leaseStartedAt: null, createdAt: now, updatedAt: now };
@@ -112,8 +112,8 @@ export function createScheduledSend(input: {
 export async function listScheduledSends(accountId: string, draftId?: string): Promise<ScheduledSend[]> {
   const db = await getDb();
   return (draftId
-    ? db.query(`SELECT * FROM scheduled_sends WHERE accountId=? AND draftId=? AND status IN ${VISIBLE_STATUSES} ORDER BY sendAt, id`).all(accountId, draftId)
-    : db.query(`SELECT * FROM scheduled_sends WHERE accountId=? AND status IN ${VISIBLE_STATUSES} ORDER BY sendAt, id`).all(accountId)) as ScheduledSend[];
+    ? db.query(`SELECT * FROM scheduled_sends WHERE accountId=? AND draftId=? AND ${VISIBLE_PREDICATE} ORDER BY sendAt, id`).all(accountId, draftId)
+    : db.query(`SELECT * FROM scheduled_sends WHERE accountId=? AND ${VISIBLE_PREDICATE} ORDER BY sendAt, id`).all(accountId)) as ScheduledSend[];
 }
 
 export async function getScheduledSend(id: string): Promise<ScheduledSend | null> {
@@ -126,7 +126,9 @@ export function cancelScheduledSend(accountId: string, id: string, now = Date.no
   return write("cancelScheduledSend", db => {
     expireStaleLeases(db, now, { accountId, id });
     const row = db.query("SELECT * FROM scheduled_sends WHERE id=? AND accountId=?").get(id, accountId) as ScheduledSend | null;
-    if (!row || !["queued", "failed", "sending"].includes(row.status)) return null;
+    if (!row) return null;
+    const visible = db.query(`SELECT 1 FROM scheduled_sends WHERE id=? AND ${VISIBLE_PREDICATE}`).get(id);
+    if (!visible) return null;
     if (row.status === "sending") throw new ScheduledSendBusyError();
     db.query("UPDATE scheduled_sends SET status='cancelled',lastError='cancelled',updatedAt=? WHERE id=?").run(now, id);
     return { ...row, status: "cancelled" as const, lastError: "cancelled" as const, updatedAt: now };
@@ -171,7 +173,7 @@ export function finishDraftScheduleHold(accountId: string, draftId: string, owne
   return write("finishDraftScheduleHold", db => {
     const held = "accountId=? AND draftId=? AND status='sending' AND leaseOwner=?";
     if (outcome.kind === "restore") {
-      return db.query(`UPDATE scheduled_sends SET status=CASE WHEN lastError='manual_send' THEN 'cancelled' ELSE 'queued' END,
+      return db.query(`UPDATE scheduled_sends SET status=CASE WHEN lastError IN ('manual_send','security_revoked') THEN 'cancelled' ELSE 'queued' END,
         lastError=CASE WHEN lastError='manual_send' THEN 'cancelled' ELSE lastError END,
         leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=? WHERE ${held}`)
         .run(now, accountId, draftId, owner).changes as number;
@@ -208,6 +210,8 @@ export function settleScheduledSend(id: string, owner: string, outcome:
   { status: "sent" | "failed" | "cancelled"; reason: ScheduledSendReason | null } |
   { status: "queued"; reason: ScheduledSendReason; nextAttemptAt: number }, now = Date.now()) {
   return write("settleScheduledSend", db => {
+    const row = db.query("SELECT lastError FROM scheduled_sends WHERE id=? AND leaseOwner=? AND status='sending'").get(id, owner) as { lastError: string | null } | null;
+    if (row?.lastError === "security_revoked" && outcome.status !== "sent") outcome = { status: "cancelled", reason: "security_revoked" };
     const nextAttemptAt = outcome.status === "queued" ? outcome.nextAttemptAt : null;
     const result = db.query(`UPDATE scheduled_sends SET status=?,lastError=?,leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=?,
       nextAttemptAt=COALESCE(?,nextAttemptAt) WHERE id=? AND leaseOwner=? AND status='sending'`)
@@ -242,5 +246,5 @@ export async function nextScheduledSendAttemptAt(): Promise<number | null> {
 /** Drops settled history (sent/cancelled) older than `before`; failures stay until the draft is settled. */
 export function pruneScheduledSends(before: number) {
   return write("pruneScheduledSends", db =>
-    db.query("DELETE FROM scheduled_sends WHERE status IN ('sent','cancelled') AND updatedAt<?").run(before).changes as number);
+    db.query(`DELETE FROM scheduled_sends WHERE (status='sent' OR (status='cancelled' AND NOT ${VISIBLE_PREDICATE})) AND updatedAt<?`).run(before).changes as number);
 }
