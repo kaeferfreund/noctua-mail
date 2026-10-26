@@ -9,7 +9,7 @@ export type ScheduledSendStatus = "queued" | "sending" | "sent" | "failed" | "ca
 export type ScheduledSendReason =
   | "rescheduled" | "cancelled" | "edited" | "discarded" | "sent_now" | "manual_send"
   | "permission_revoked" | "identity_unavailable" | "draft_missing" | "draft_invalid"
-  | "security_revoked" | "account_missing" | "smtp_rejected" | "send_failed" | "send_uncertain" | "interrupted";
+  | "draft_changed" | "draft_deleted" | "security_revoked" | "account_missing" | "smtp_rejected" | "send_failed" | "send_uncertain" | "interrupted";
 
 export type ScheduledSend = {
   id: string;
@@ -23,6 +23,7 @@ export type ScheduledSend = {
   lastError: ScheduledSendReason | null;
   leaseOwner: string | null;
   leaseStartedAt: number | null;
+  sourceFingerprint: string | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -89,7 +90,7 @@ function hasSendingRow(db: any, accountId: string, draftId: string) {
  * `assertCurrent` runs inside the write transaction (live outbound authorization).
  */
 export function createScheduledSend(input: {
-  accountId: string; userId: string; draftId: string; sendAt: number; now?: number; assertCurrent?: (db: any) => void;
+  accountId: string; userId: string; draftId: string; sendAt: number; now?: number; sourceFingerprint?: string; assertCurrent?: (db: any) => void;
 }) {
   return write("createScheduledSend", db => {
     input.assertCurrent?.(db);
@@ -100,10 +101,10 @@ export function createScheduledSend(input: {
       WHERE accountId=? AND draftId=? AND ${VISIBLE_PREDICATE}`).run(now, input.accountId, input.draftId);
     const row: ScheduledSend = { id: randomUUID(), accountId: input.accountId, userId: input.userId, draftId: input.draftId,
       sendAt: input.sendAt, status: "queued", attempts: 0, nextAttemptAt: input.sendAt, lastError: null, leaseOwner: null,
-      leaseStartedAt: null, createdAt: now, updatedAt: now };
-    db.query(`INSERT INTO scheduled_sends (id,accountId,userId,draftId,sendAt,status,attempts,nextAttemptAt,lastError,leaseOwner,leaseStartedAt,createdAt,updatedAt)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(row.id, row.accountId, row.userId, row.draftId, row.sendAt, row.status,
-      row.attempts, row.nextAttemptAt, row.lastError, row.leaseOwner, row.leaseStartedAt, row.createdAt, row.updatedAt);
+      leaseStartedAt: null, sourceFingerprint: input.sourceFingerprint ?? null, createdAt: now, updatedAt: now };
+    db.query(`INSERT INTO scheduled_sends (id,accountId,userId,draftId,sendAt,status,attempts,nextAttemptAt,lastError,leaseOwner,leaseStartedAt,sourceFingerprint,createdAt,updatedAt)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(row.id, row.accountId, row.userId, row.draftId, row.sendAt, row.status,
+      row.attempts, row.nextAttemptAt, row.lastError, row.leaseOwner, row.leaseStartedAt, row.sourceFingerprint, row.createdAt, row.updatedAt);
     return row;
   });
 }

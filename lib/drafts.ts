@@ -1,3 +1,4 @@
+import { scheduledDraftFingerprint } from "./scheduledSendFingerprint";
 import { authorizeOutbound, prepareOutboundAssertion, type OutboundAuthorization } from "./outboundAuthorization";
 import { SenderIdentityError } from "./senderIdentities";
 import { resolveSendIdentity, IDENTITY_HEADER } from "./sendIdentity";
@@ -650,9 +651,22 @@ export async function sendDraftForAccount(params: {
   draftId: string;
   actor: CollabActor;
   authorization?: OutboundAuthorization;
+  /** Required content snapshot for a scheduler send; null is an untrusted legacy schedule. */
+  scheduledFingerprint?: string | null;
 }): Promise<SendDraftResult> {
   const { account, accountId, clientId, draftId } = params;
   const { draft, rawSource, messageId, identity } = await loadSendableDraft(accountId, draftId);
+  if (params.scheduledFingerprint !== undefined) {
+    const draftsFolder = findDraftsFolder(await getFolders(accountId), accountId);
+    if (!draftsFolder || draft.folderId !== draftsFolder.id) {
+      throw new DraftSendError(409, "The draft left Drafts.", "scheduled_send_draft_deleted");
+    }
+    // Compare the exact source/envelope we will relay, not a preflight read that another
+    // IMAP sync could replace before this load. No changed content reaches SMTP.
+    if (!params.scheduledFingerprint || scheduledDraftFingerprint(draft, rawSource) !== params.scheduledFingerprint) {
+      throw new DraftSendError(409, "The scheduled draft changed. Review and schedule it again.", "scheduled_send_draft_changed");
+    }
+  }
   // Prepare the wire copy:
   //   - `stripBccHeader` removes the `Bcc:` header that's in the cached
   //     draft (saved with `keepBcc: true`). Relaying that unchanged would

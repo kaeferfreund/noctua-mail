@@ -57,10 +57,10 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     }
     const resolvedAccountId = accountContext.accountId;
     try {
-      const { identity } = await assertSchedulableDraft(resolvedAccountId, draftId);
+      const { identity, sourceFingerprint } = await assertSchedulableDraft(resolvedAccountId, draftId);
       const actor = await authorizeOutbound({ request }, { accountId: resolvedAccountId, minRole: SCHEDULED_SEND_MIN_ROLE, identity });
       const row = await createScheduledSend({ accountId: resolvedAccountId, userId: accountContext.userId, draftId, sendAt: sendAt.sendAt,
-        assertCurrent: actor.assertCurrent });
+        sourceFingerprint, assertCurrent: actor.assertCurrent });
       console.info("[scheduled-send] scheduled", { scheduleId: row.id, accountId: resolvedAccountId, userId: row.userId, sendAt: row.sendAt });
       return NextResponse.json({ ok: true, scheduledSend: presentScheduledSend(row) }, { status: 201 });
     } catch (error) {

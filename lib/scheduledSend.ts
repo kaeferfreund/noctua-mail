@@ -1,3 +1,4 @@
+import { scheduledDraftFingerprint } from "./scheduledSendFingerprint";
 import type { Account } from "@/lib/data";
 import { DraftSendError, loadSendableDraft, sendDraftForAccount } from "@/lib/drafts";
 import { OutboundAuthorizationError } from "@/lib/outboundAuthorization";
@@ -61,10 +62,10 @@ export function validateScheduledSendAt(sendAt: unknown, now = Date.now()): { ok
 export async function assertSchedulableDraft(accountId: string, draftId: string) {
   const { draft, rawSource, identity } = await loadSendableDraft(accountId, draftId);
   const draftsFolder = findDraftsFolder(await getFolders(accountId), accountId);
-  if (!draftsFolder || draft.folderId !== draftsFolder.id) throw new DraftSendError(409, "Only drafts in the Drafts folder can be scheduled.");
+  if (!draftsFolder || draft.folderId !== draftsFolder.id) throw new DraftSendError(409, "Only drafts in the Drafts folder can be scheduled.", "scheduled_send_draft_deleted");
   // A stored draft carries invitation metadata only; sending it would drop the calendar invitation.
   if (extractComposeInviteDraftFromSource(rawSource)) throw new DraftSendError(409, "Drafts with an event invitation cannot be scheduled.", "scheduled_send_invite");
-  return { draft, identity };
+  return { draft, identity, sourceFingerprint: scheduledDraftFingerprint(draft, rawSource) };
 }
 
 export type ScheduledSendOutcome =
@@ -100,7 +101,9 @@ export function classifyScheduledSendError(error: unknown, row: ScheduledSend, n
   if (error instanceof SenderIdentityError) return { status: "cancelled", reason: "identity_unavailable" };
   if (error instanceof DraftSendError) {
     if (error.code === "scheduled_send_claim_lost") return { status: "cancelled", reason: "interrupted" };
-    if (error.code === "scheduled_send_security_revoked") return { status: "cancelled", reason: "permission_revoked" };
+    if (error.code === "scheduled_send_security_revoked") return { status: "cancelled", reason: "security_revoked" };
+    if (error.code === "scheduled_send_draft_deleted") return { status: "cancelled", reason: "draft_deleted" };
+    if (error.code === "scheduled_send_draft_changed") return { status: "cancelled", reason: "draft_changed" };
     return error.status === 404 ? { status: "cancelled", reason: "draft_missing" } : { status: "failed", reason: "draft_invalid" };
   }
   if (isSmtpUpstreamFailure(error)) {
@@ -133,6 +136,7 @@ export async function attemptScheduledSend(row: ScheduledSend, deps: ScheduledSe
       clientId: "scheduled-send",
       draftId: row.draftId,
       actor: { userId: row.userId, clientId: "scheduled-send" },
+      scheduledFingerprint: row.sourceFingerprint,
       authorization: jobAuthorization(row)
     });
     return { status: "sent", reason: null };

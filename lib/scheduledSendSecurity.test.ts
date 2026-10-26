@@ -16,7 +16,7 @@ for (const action of ["password", "revoke-all"] as const) test(`${action} cancel
   const claimed = (await claimDueScheduledSends(processScheduleOwner(), now, 1000)).find(row => row.id === active.id)!;
   let token: ScheduledSendAuthorization | undefined;
   await attemptScheduledSend(claimed, { getAccount: () => f.db.getAccountById(f.accountId), resolveRole: async () => "editor",
-    assertDraft: async () => ({}), send: async params => { token = params.authorization as ScheduledSendAuthorization; return {}; }, now: () => now } as ScheduledSendDeps);
+    assertDraft: async () => ({} as Awaited<ReturnType<ScheduledSendDeps["assertDraft"]>>), send: async params => { token = params.authorization as ScheduledSendAuthorization; return {}; }, now: () => now } as ScheduledSendDeps);
   const actor = await authorizeOutbound(token!, { accountId: f.accountId, minRole: "editor" });
   f.master.transaction(() => {
     if (action === "password") f.master.query("UPDATE auth_account SET password='synthetic-changed-hash' WHERE userId=? AND providerId='credential'").run(f.user.id);
