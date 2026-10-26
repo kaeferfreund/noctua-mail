@@ -28,6 +28,8 @@ export default function AdminAuditLog({ apiFetch = fetch }: { apiFetch?: AdminFe
     } catch (error) { setError(error); }
     finally { setBusy(false); }
   }, [apiFetch]);
+  // Initial load and explicit refresh share the same loading/error transition.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentionally show loading while the async admin request runs.
   useEffect(() => { void load(); }, [load]);
   return <section className="space-y-4" aria-label={t("audit.title")}><div className={adminHeaderRow}><h3 className={adminSectionTitle}>{t("audit.title")}</h3><Button variant="outline" disabled={busy} onClick={() => void load()}>{t("audit.refresh")}</Button></div>
     {Boolean(error) && <p role="alert">{formatAdminError(error, t, locale)}</p>}

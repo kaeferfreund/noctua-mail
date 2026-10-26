@@ -115,5 +115,16 @@ export async function listAdminAudit(
        LIMIT ?`
     )
     .all(...args, limit) as StoredAdminAuditRow[];
-  return rows.map(mapAdminAuditRow);
+  const entries = rows.map(mapAdminAuditRow);
+  if (!options.visibleTo) return entries;
+  const viewerUserId = options.visibleTo.userId;
+  // The admin user directory is global; mailbox labels require current membership.
+  const userLabel = db.prepare("SELECT COALESCE(NULLIF(name,''), email) AS label FROM auth_user WHERE id=?");
+  const accountLabel = db.prepare(`SELECT COALESCE(NULLIF(name,''), email) AS label FROM accounts a WHERE id=?
+    AND (ownerUserId=? OR EXISTS (SELECT 1 FROM user_accounts WHERE accountId=a.id AND userId=?))`);
+  return entries.map(entry => ({ ...entry,
+    actorLabel: (userLabel.get(entry.actorUserId) as { label: string } | null)?.label ?? null,
+    targetUserLabel: entry.targetUserId ? (userLabel.get(entry.targetUserId) as { label: string } | null)?.label ?? null : null,
+    targetAccountLabel: entry.targetAccountId ? (accountLabel.get(entry.targetAccountId, viewerUserId, viewerUserId) as { label: string } | null)?.label ?? null : null
+  }));
 }

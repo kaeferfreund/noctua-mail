@@ -71,6 +71,8 @@ export default function AdminMailboxes({ apiFetch = fetch, users, onAccessChange
     catch (error) { setError(error); }
     finally { setBusy(false); }
   }, [apiFetch]);
+  // Initial load and explicit refresh share the same loading/error transition.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentionally show loading while the async admin request runs.
   useEffect(() => { void load(); }, [load]);
   const remove = async () => {
     if (!deleting) return;
