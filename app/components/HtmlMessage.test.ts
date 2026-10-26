@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { buildPreviewDocument } from "./HtmlMessage";
 import { extractBodyContent } from "@/lib/html";
+import { APP_FONT_STACK } from "@/lib/ui/fonts";
 
 const build = (html: string, hostViewportHeight?: number, darkMode = false) => buildPreviewDocument({
   html, safeHtml: html, darkMode, fontScale: 1, zoom: 1,
@@ -43,6 +44,17 @@ describe("HTML preview document text colour", () => {
     for (const dark of [true, false]) {
       expect(bodyRule(build('<p style="color:#123456">Own</p>', undefined, dark))).not.toContain("color:");
     }
+  });
+});
+
+describe("HTML preview document font", () => {
+  // The app font sits on <html>; the content div only inherits, so a body rule
+  // in the mail's own <style> (emitted after the host styles) still wins.
+  test("sets the app font on the root and lets mail styles override it", () => {
+    const output = build("<html><head><style>body { font-family: Georgia, serif; }</style></head><body><p>Text</p></body></html>");
+    expect(output.match(/\nhtml \{[^}]*\}/)?.[0]).toContain(`font-family: ${APP_FONT_STACK};`);
+    expect(output.match(/\n\.noctua-email-content \{[^}]*\}/)?.[0]).not.toContain("font-family");
+    expect(output.indexOf("body { font-family: Georgia")).toBeGreaterThan(output.indexOf(`font-family: ${APP_FONT_STACK}`));
   });
 });
 

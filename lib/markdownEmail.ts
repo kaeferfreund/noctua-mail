@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { markdownToHtml } from "./markdownConverters";
+import { APP_FONT_STACK } from "./ui/fonts";
 
 const MARKDOWN_PREVIEW_CSS_PATH = join(
   process.cwd(),
@@ -37,9 +38,16 @@ function getMarkdownPreviewCss() {
   return markdownPreviewCss;
 }
 
+// Sent mails carry the app font instead of the preview package's GitHub stack.
+// The <style> rule follows the package CSS so it wins; the inline style covers
+// clients that strip <style>. Code blocks keep their own monospace rules.
+const EMAIL_TYPOGRAPHY = `font-family:${APP_FONT_STACK};font-size:15px;line-height:1.5`;
+const EMAIL_TYPOGRAPHY_CSS = `.wmde-markdown{${EMAIL_TYPOGRAPHY}}`;
+const EMAIL_TYPOGRAPHY_STYLE_ATTRIBUTE = EMAIL_TYPOGRAPHY.replaceAll('"', "'");
+
 function renderMarkdownPreviewHtml(markdown: string) {
   const html = markdownToHtml(markdown);
-  return `<div class="wmde-markdown wmde-markdown-color" data-color-mode="light">${html}</div>`;
+  return `<div class="wmde-markdown wmde-markdown-color" data-color-mode="light" style="${EMAIL_TYPOGRAPHY_STYLE_ATTRIBUTE}">${html}</div>`;
 }
 
 /**
@@ -50,5 +58,5 @@ export async function markdownToEmailHtml(markdown: string): Promise<string> {
   if (!markdown.trim()) return "";
   const previewHtml = renderMarkdownPreviewHtml(markdown);
   const css = getMarkdownPreviewCss();
-  return `<style data-noctua-markdown-preview="true">${css}</style>${previewHtml}`;
+  return `<style data-noctua-markdown-preview="true">${css}${EMAIL_TYPOGRAPHY_CSS}</style>${previewHtml}`;
 }

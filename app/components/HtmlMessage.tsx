@@ -471,9 +471,11 @@ export function buildPreviewDocument({
     '<meta name="referrer" content="no-referrer">',
     "<style>",
     `:root { color-scheme: ${darkMode ? "dark" : "light"}; --zoom: ${zoom}; --font-scale: ${fontScale}; --noctua-vh: ${viewportUnit}px; }`,
-    "html { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; font-size: 100%; }",
+    // The app font sits on <html> so a mail's own font wins, whether it comes
+    // inline (body attributes move onto the content div) or as a body/html rule.
+    `html { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; font-family: ${APP_FONT_STACK}; font-size: 100%; }`,
     `body { margin: 0; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; background: transparent; ${hostTextColor} font-size: 100%; }`,
-    `.${NOCTUA_EMAIL_CONTENT_CLASS} { font-family: ${APP_FONT_STACK}; color: inherit; background: transparent; font-size: 100%; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }`,
+    `.${NOCTUA_EMAIL_CONTENT_CLASS} { color: inherit; background: transparent; font-size: 100%; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; }`,
     // The width must counter the scale so the visual width stays the pane
     // width at any zoom; a max-width would cap it below 100% when zoomed out,
     // shrinking the scroll viewport (and its clip edge) along with the content.
