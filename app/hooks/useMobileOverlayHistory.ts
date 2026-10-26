@@ -11,6 +11,30 @@ let nextId = 0;
 let returning = false;
 let listening = false;
 let deferred: Array<() => void> = [];
+let returnTimer: number | undefined;
+
+/**
+ * Safety net: if the browser never reports the Back we asked for (seen as a
+ * frozen UI in the iOS home-screen app), stop waiting so navigation resumes.
+ */
+export const MOBILE_OVERLAY_BACK_TIMEOUT_MS = 600;
+
+function finishReturn() {
+  if (returnTimer !== undefined) { window.clearTimeout(returnTimer); returnTimer = undefined; }
+  returning = false;
+  // A close and another open can happen in one React commit (sidebar →
+  // settings, or calendar → message). Finish Back before creating entries.
+  const callbacks = deferred;
+  deferred = [];
+  callbacks.forEach((callback) => callback());
+  overlays.filter((overlay) => !overlay.pushed).forEach(pushOverlay);
+}
+
+function beginReturn() {
+  returning = true;
+  if (returnTimer !== undefined) window.clearTimeout(returnTimer);
+  returnTimer = window.setTimeout(() => { returnTimer = undefined; if (returning) { finishReturn(); updateListener(); } }, MOBILE_OVERLAY_BACK_TIMEOUT_MS);
+}
 
 /** Classify from current state too: a window listener may run before onPop. */
 export const isMobileOverlayPop = (event: PopStateEvent) => consumedPops.has(event) || returning ||
@@ -32,13 +56,7 @@ function updateListener() {
 function onPop(event: PopStateEvent) {
   if (returning) {
     consumedPops.add(event);
-    returning = false;
-    // A close and another open can happen in one React commit (sidebar →
-    // settings, or calendar → message). Finish Back before creating entries.
-    const callbacks = deferred;
-    deferred = [];
-    callbacks.forEach((callback) => callback());
-    overlays.filter((overlay) => !overlay.pushed).forEach(pushOverlay);
+    finishReturn();
   } else {
     const destination = event.state?.noctuaMobileOverlay;
     while (overlays.length && overlays.at(-1)!.id !== destination) {
@@ -81,7 +99,7 @@ export function useMobileOverlayHistory(open: boolean, close: () => void) {
       if (index < 0) return; // Already dismissed by browser Back.
       overlays.splice(index, 1);
       if (overlay.pushed && window.history.state?.noctuaMobileOverlay === overlay.id) {
-        returning = true;
+        beginReturn();
         window.history.back();
       }
       updateListener();
