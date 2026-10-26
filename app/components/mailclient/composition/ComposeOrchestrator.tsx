@@ -15,7 +15,8 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
-  useState
+  useState,
+  useLayoutEffect
 } from "react";
 import { useMobileComposeView } from "@/app/hooks/useMobileComposeView";
 import { createPortal } from "react-dom";
@@ -123,6 +124,7 @@ export type ComposeOrchestratorHandle = {
    * via ThreadView's render-prop.
    */
   renderInlineCard: (wrapperClassName?: string) => React.ReactNode;
+  setInlineSlot: (element: HTMLDivElement | null) => void;
   /** Reset all compose state — used when the active account changes. */
   resetSession: () => void;
   /**
@@ -381,7 +383,7 @@ function ComposeOrchestratorImpl(
   const closingDetachedComposeRef = useRef(false);
   const discardingDraftRequestRef = useRef(false);
   const composeScopeRef = useRef({ accountId: activeAccountId, ownerUserId });
-  composeScopeRef.current = { accountId: activeAccountId, ownerUserId };
+  useLayoutEffect(() => { composeScopeRef.current = { accountId: activeAccountId, ownerUserId }; });
   const sendOperationRef = useRef<{ accountId: string; sessionVersion: number } | null>(null);
   const composeInitRef = useRef<{ token: number; key: string | null }>({ token: 0, key: null });
   const {
@@ -490,8 +492,8 @@ function ComposeOrchestratorImpl(
     composeLastEditedRef
   } = compose;
 
-  const composeRef = useRef(compose);
-  composeRef.current = compose;
+  const composeRef = useRef({ ...compose });
+  useLayoutEffect(() => { composeRef.current = { ...compose }; });
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -1411,10 +1413,12 @@ function ComposeOrchestratorImpl(
     setComposeView("inline");
   };
 
-  const currentDraftChangeState = (() => {
+  const [draftStatus, setDraftStatus] = useState({ canManualSave: false, hasUnsavedChanges: false });
+  // The payload builder samples the live editor DOM, so read it after commit.
+  useLayoutEffect(() => {
     const preferText = composeTab === "html" && composeLastEditedRef.current === "text";
     const composePayload = buildComposePayload({ preferText });
-    return getDraftChangeState({
+    const next = getDraftChangeState({
       identityId: composeIdentityId,
       draftId: composeDraftId,
       lastSavedHash: lastDraftHashRef.current,
@@ -1427,17 +1431,19 @@ function ComposeOrchestratorImpl(
       attachments: composePayload.attachments,
       invite: currentComposeInviteDraft
     });
-  })();
+    const hasUnsavedChanges = composeOpen && composeDirtyRef.current && (next.hasContent || Boolean(composeDraftId));
+    setDraftStatus(previous => previous.canManualSave === next.canManualSave && previous.hasUnsavedChanges === hasUnsavedChanges
+      ? previous : { canManualSave: next.canManualSave, hasUnsavedChanges });
+  }, [buildComposePayload, composeTab, composeLastEditedRef, composeIdentityId, composeDraftId,
+    lastDraftHashRef, composeTo, composeCc, composeBcc, composeSubject, currentComposeInviteDraft,
+    composeOpen, composeDirtyRef]);
   const canSaveCurrentDraft =
     composeOpen &&
     Boolean(composeDraftId) &&
     !attachmentLoadState && !senderLoading && senderCanCompose &&
     Boolean(sender?.identities.some(item => item.id === composeIdentityId && item.enabled)) &&
-    currentDraftChangeState.canManualSave;
-  const hasUnsavedChanges =
-    composeOpen &&
-    composeDirtyRef.current &&
-    (currentDraftChangeState.hasContent || Boolean(composeDraftId));
+    draftStatus.canManualSave;
+  const hasUnsavedChanges = draftStatus.hasUnsavedChanges;
 
   // Mirror the slice of compose state consumed by the owning window. The
   // detached host also uses the persistence flags for native-close protection.
@@ -1684,9 +1690,15 @@ function ComposeOrchestratorImpl(
   // propagate via context; its DOM is portalled into a caller-supplied slot.
   const [inlineSlotEl, setInlineSlotEl] = useState<HTMLDivElement | null>(null);
 
+  const setInlineSlot = useCallback((element: HTMLDivElement | null) => {
+    composeCardRef.current = element;
+    setInlineSlotEl(element);
+  }, [composeCardRef]);
+
   useImperativeHandle(
     ref,
     () => ({
+      setInlineSlot,
       renderInlineCard: (wrapperClassName?: string) => (
         <InlineComposeSlot
           wrapperClassName={wrapperClassName}
@@ -1746,6 +1758,20 @@ function InlineComposeSlot({
     [externalRef, setSlot]
   );
   return <div ref={setRef} className={wrapperClassName} />;
+}
+
+/** Declarative portal target; the imperative handle is read only after commit. */
+export function ComposeInlineHost({ handleRef, wrapperClassName }: {
+  handleRef: React.RefObject<ComposeOrchestratorHandle | null>;
+  wrapperClassName?: string;
+}) {
+  const slotRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handle = handleRef.current;
+    handle?.setInlineSlot(slotRef.current);
+    return () => handle?.setInlineSlot(null);
+  }, [handleRef]);
+  return <div ref={slotRef} className={wrapperClassName} />;
 }
 
 const ComposeOrchestrator = forwardRef<ComposeOrchestratorHandle, ComposeOrchestratorProps>(

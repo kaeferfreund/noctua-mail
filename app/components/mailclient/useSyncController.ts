@@ -7,7 +7,7 @@ import { folderIdBelongsToAccount, isAccountFolder } from "@/lib/folderAccount";
 import type { OwnAddressInput } from "@/lib/ownAddresses";
 
 import type React from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useLayoutEffect } from "react";
 import {
   buildAccountApiPath,
   buildAccountFolderConsistencyPath,
@@ -89,6 +89,7 @@ const createStreamKey = () =>
 export type UseSyncControllerParams = {
   activeAccountId: string;
   activeFolderId: string;
+  completionState?: [number, React.Dispatch<React.SetStateAction<number>>];
   activeVirtualFolderId: string;
   searchScope: "folder" | "all";
   authState: "loading" | "ok" | "unauth";
@@ -140,6 +141,7 @@ export function useSyncController({
   activeAccountId,
   activeFolderId,
   activeVirtualFolderId,
+  completionState,
   searchScope,
   authState,
   inboxMailboxPath,
@@ -164,14 +166,15 @@ export function useSyncController({
   currentKeyRef
 }: UseSyncControllerParams) {
   const tn = useTranslations("Notifications");
-  // Assign during render: async callbacks from the previous account can run before effects.
+  // Publish the committed account before passive effects and async completions.
   const currentAccountIdRef = useRef(activeAccountId);
-  currentAccountIdRef.current = activeAccountId;
+  useLayoutEffect(() => { currentAccountIdRef.current = activeAccountId; });
   const [isSyncing, setIsSyncing] = useState(false);
   const [isRecomputingThreads, setIsRecomputingThreads] = useState(false);
   const [isRecomputingCategories, setIsRecomputingCategories] = useState(false);
   const [syncingFolders, setSyncingFolders] = useState<Set<string>>(new Set());
-  const [syncCompletionVersion, setSyncCompletionVersion] = useState(0);
+  const localCompletionState = useState(0);
+  const [syncCompletionVersion, setSyncCompletionVersion] = completionState ?? localCompletionState;
   const [syncProgressByJobId, setSyncProgressByJobId] = useState<
     Record<string, SyncJobProgress>
   >({});
@@ -541,7 +544,7 @@ export function useSyncController({
   const currentViewIncludesFolder = (folderId: string) =>
     searchScope !== "folder" || Boolean(activeVirtualFolderId) || activeFolderId === folderId;
   const currentViewIncludesFolderRef = useRef(currentViewIncludesFolder);
-  currentViewIncludesFolderRef.current = currentViewIncludesFolder;
+  useLayoutEffect(() => { currentViewIncludesFolderRef.current = currentViewIncludesFolder; });
 
   const syncFolderWithBackground = async (
     folderId: string,
@@ -586,7 +589,7 @@ export function useSyncController({
       });
     }
   };
-  syncFolderWithBackgroundRef.current = syncFolderWithBackground;
+  useLayoutEffect(() => { syncFolderWithBackgroundRef.current = syncFolderWithBackground; });
 
   const executeFolderSyncDecision = useCallback(
     async (
@@ -805,7 +808,7 @@ export function useSyncController({
       setIsSyncing(false);
     })();
   };
-  syncAccountRef.current = syncAccount;
+  useLayoutEffect(() => { syncAccountRef.current = syncAccount; });
 
   // Clear the consistency-check guard when the user navigates to a different folder.
   // This is a separate effect so that unrelated callback identity changes don't
@@ -943,7 +946,7 @@ export function useSyncController({
       }
     });
   };
-  recomputeThreadsRef.current = recomputeThreads;
+  useLayoutEffect(() => { recomputeThreadsRef.current = recomputeThreads; });
 
   const recomputeCategories = async () => {
     if (!activeAccountId) return;

@@ -473,8 +473,8 @@ export default function MailClient({
     readerRowsRendered ? readerRowsStore.getRows : getNoReaderRows
   );
   const readerListScrollRef = useRef<number | null>(null);
-  const clearMobileMessage = useCallback(() => setViewMessage(null), []);
   const [viewMessage, setViewMessage] = useState<Message | null>(null);
+  const clearMobileMessage = useCallback(() => setViewMessage(null), []);
   const [query, setQuery] = useState("");
   // next-themes owns the theme (class and color-scheme on <html>, persisted
   // under "noctua:theme"); the kept renderers read the resulting html class,
@@ -513,7 +513,7 @@ export default function MailClient({
     useState<RecipientAliasDialogState | null>(null);
   const previousAccountIdRef = useRef("");
 
-  const clientId = useMemo(() => {
+  const [clientId] = useState(() => {
     if (typeof window === "undefined") return "";
     const key = "noctuaClientId";
     let id = window.localStorage.getItem(key);
@@ -522,7 +522,7 @@ export default function MailClient({
       window.localStorage.setItem(key, id);
     }
     return id;
-  }, []);
+  });
   const apiFetch = useCallback(
     async (input: RequestInfo | URL, init?: RequestInit) => {
       const headers = new Headers(
@@ -742,8 +742,6 @@ export default function MailClient({
     },
     []
   );
-  const searchScopeRef = useRef<"folder" | "all">("folder");
-  const activeVirtualFolderIdRef = useRef("");
   const threadMessagesRef = useRef<Message[]>([]);
   const currentKeyRef = useRef("");
   // Fixed sender/date columns need a two-line row in a split pane.
@@ -873,60 +871,8 @@ export default function MailClient({
     return inboxFolder.id.replace(`${activeAccountId}:`, "");
   }, [activeAccountId, inboxFolder]);
 
-  const {
-    isSyncing,
-    isRecomputingThreads,
-    isRecomputingCategories,
-    syncingFolders,
-    syncCompletionVersion,
-    syncProgressByJobId,
-    mailCheckMode,
-    mailCheckStatus,
-    syncStateRef,
-    syncAccountRef,
-    recomputeThreadsRef,
-    syncFolderWithBackgroundRef,
-    autoRepairAttemptedFolderIdsRef,
-    lastUidNextByFolderRef,
-    localDeleteReconcileByFolderRef,
-    localDeleteReconcileByUidRef,
-    seedNotificationDedupKeys,
-    syncAccount,
-    runSyncJob,
-    recomputeThreads,
-    recomputeCategories
-  } = useSyncController({
-    activeAccountId,
-    activeFolderId,
-    activeVirtualFolderId: activeVirtualFolderIdRef.current,
-    searchScope: searchScopeRef.current,
-    authState,
-    inboxMailboxPath,
-    accountFolders,
-    currentAccountEmail: accounts.find((a) => a.id === activeAccountId)?.ownAddresses,
-    currentAccountSyncSettings: accounts.find((a) => a.id === activeAccountId)?.settings?.sync,
-    apiFetch,
-    readErrorMessage,
-    reportError,
-    pushNotice,
-    showNotification,
-    refreshMailboxData: (options) => refreshMailboxDataRef.current(options),
-    refreshFolders,
-    refreshPendingCalendarReminders,
-    setFolders,
-    setMessages: (updater) => setMessagesRef.current(updater),
-    setActiveFolderId,
-    isNotificationSuppressedFolder: (folderId: string) =>
-      checkIsNotificationSuppressedFolder(folderId, accountFolders),
-    updateMessagesWithCurrentResultPrune: forwardMessageResultPruneUpdate,
-    confirmFullSyncStart: (state) =>
-      FULL_SYNC_CONFIRM_DIALOG_ENABLED
-        ? confirmFullSyncStart(state)
-        : Promise.resolve(true),
-    inboxFolder: inboxFolder ?? null,
-    currentKeyRef
-  });
-
+  const syncCompletionState = useState(0);
+  const [syncCompletionVersion] = syncCompletionState;
   // Search state hook (needs folderById to be defined first)
   const { state: searchState, actions: searchActions } = useSearchState({
     activeAccountId,
@@ -966,8 +912,59 @@ export default function MailClient({
     activateVirtualFolder
   } = searchActions;
 
-  searchScopeRef.current = searchScope;
-  activeVirtualFolderIdRef.current = activeVirtualFolderId ?? "";
+  const {
+    isSyncing,
+    isRecomputingThreads,
+    isRecomputingCategories,
+    syncingFolders,
+    syncProgressByJobId,
+    mailCheckMode,
+    mailCheckStatus,
+    syncStateRef,
+    syncAccountRef,
+    recomputeThreadsRef,
+    syncFolderWithBackgroundRef,
+    autoRepairAttemptedFolderIdsRef,
+    lastUidNextByFolderRef,
+    localDeleteReconcileByFolderRef,
+    localDeleteReconcileByUidRef,
+    seedNotificationDedupKeys,
+    syncAccount,
+    runSyncJob,
+    recomputeThreads,
+    recomputeCategories
+  } = useSyncController({
+    activeAccountId,
+    activeFolderId,
+    activeVirtualFolderId: activeVirtualFolderId ?? "",
+    searchScope,
+    completionState: syncCompletionState,
+    authState,
+    inboxMailboxPath,
+    accountFolders,
+    currentAccountEmail: accounts.find((a) => a.id === activeAccountId)?.ownAddresses,
+    currentAccountSyncSettings: accounts.find((a) => a.id === activeAccountId)?.settings?.sync,
+    apiFetch,
+    readErrorMessage,
+    reportError,
+    pushNotice,
+    showNotification,
+    refreshMailboxData: (options) => refreshMailboxDataRef.current(options),
+    refreshFolders,
+    refreshPendingCalendarReminders,
+    setFolders,
+    setMessages: (updater) => setMessagesRef.current(updater),
+    setActiveFolderId,
+    isNotificationSuppressedFolder: (folderId: string) =>
+      checkIsNotificationSuppressedFolder(folderId, accountFolders),
+    updateMessagesWithCurrentResultPrune: forwardMessageResultPruneUpdate,
+    confirmFullSyncStart: (state) =>
+      FULL_SYNC_CONFIRM_DIALOG_ENABLED
+        ? confirmFullSyncStart(state)
+        : Promise.resolve(true),
+    inboxFolder: inboxFolder ?? null,
+    currentKeyRef
+  });
 
   // Computed values that depend on search state
   const searchFieldKey = useMemo(() => {
@@ -1014,7 +1011,7 @@ export default function MailClient({
       searchScope
     ]
   );
-  currentKeyRef.current = messagesKey;
+  useLayoutEffect(() => { currentKeyRef.current = messagesKey; });
 
   const findSentFolder = () => {
     const lowered = accountFolders.map((folder) => ({
@@ -1262,17 +1259,14 @@ export default function MailClient({
   const isSpamFolder = (folderId?: string | null) => checkIsSpamFolder(folderId, folders);
   const isSentFolder = (folderId?: string | null) => checkIsSentFolder(folderId, folders);
 
-  // Memoize Set of excluded folder IDs - only changes when folder structure changes
-  const excludedFolderIdsForThreads = useMemo(() => {
-    const ids = new Set<string>();
-    folders.forEach(folder => {
-      const special = (folder.specialUse ?? "").toLowerCase();
-      if (special === "\\trash" || special === "\\junk" || special === "\\spam") {
-        ids.add(folder.id);
-      }
-    });
-    return ids;
-  }, [folders.map(f => `${f.id}:${f.specialUse}`).join('|')]);
+  // Preserve identity when counts change but thread-exclusion structure does not.
+  const excludedThreadFolderIdsKey = JSON.stringify(folders.filter(folder =>
+    ["\\trash", "\\junk", "\\spam"].includes((folder.specialUse ?? "").toLowerCase())
+  ).map(folder => folder.id));
+  const excludedFolderIdsForThreads = useMemo(
+    () => new Set<string>(JSON.parse(excludedThreadFolderIdsKey)),
+    [excludedThreadFolderIdsKey]
+  );
 
   // CRITICAL: This IS passed to useMessageListDerivedState and MUST be stable
   const checkIsThreadExcludedFolder = useMemo(
@@ -1354,8 +1348,8 @@ export default function MailClient({
     currentKeyRef,
     viewCache
   });
-  refreshMailboxDataRef.current = refreshMailboxData;
-  setMessagesRef.current = setMessages;
+  useLayoutEffect(() => { refreshMailboxDataRef.current = refreshMailboxData; });
+  useLayoutEffect(() => { setMessagesRef.current = setMessages; });
 
   // Topics per thread, from the topics included in the list response. Derived during
   // render so a list change commits once, not once more from an effect.
@@ -1369,8 +1363,10 @@ export default function MailClient({
     return next;
   }, [messages]);
 
-  const accountMessages = useMemo(() => {
-    const { deduped, duplicates } = dedupeAccountMessages(messages, activeAccountId);
+  const deduplication = useMemo(() => dedupeAccountMessages(messages, activeAccountId), [messages, activeAccountId]);
+  const accountMessages = deduplication.deduped;
+  useEffect(() => {
+    const { duplicates } = deduplication;
     if (duplicates.length > 0) {
       // Summarize each duplicate's PRE-reassignment message so the log
       // payload reports the original colliding id (e.g. "m1"), not the
@@ -1392,8 +1388,7 @@ export default function MailClient({
     } else if (duplicateMessageIdLogFingerprintRef.current) {
       duplicateMessageIdLogFingerprintRef.current = "";
     }
-    return deduped;
-  }, [activeAccountId, messages]);
+  }, [activeAccountId, deduplication]);
 
   const filteredMessages = accountMessages;
 
@@ -2955,7 +2950,7 @@ export default function MailClient({
   }, [authState, mailboxSummaries, pushDeviceSettings]);
   const collabRole = collab.readDenied ? undefined : (currentAccount as ShellAccount | null)?.accessRole ?? collab.members.find(member => member.userId === collab.me && !member.disabled)?.role;
   const activeMessageRef = useRef<Message | null>(null);
-  activeMessageRef.current = activeMessage ?? null;
+  useLayoutEffect(() => { activeMessageRef.current = activeMessage ?? null; });
   const activeMessageThreadKey = (() => {
     if (!activeMessage) return "";
     const threadId = activeMessage.threadId ?? activeMessage.messageId ?? activeMessage.id;
@@ -3217,7 +3212,7 @@ export default function MailClient({
       setMessages
     ]
   );
-  updateMessagesRef.current = updateMessagesWithCurrentResultPrune;
+  useLayoutEffect(() => { updateMessagesRef.current = updateMessagesWithCurrentResultPrune; });
   // "Kein Spam" on a "Verdächtig" mark: the message stays, the mark goes and becomes an example.
   const handleMarkNotSuspicious = useCallback(async (message: Message) => {
     const res = await apiFetch(buildAccountMessageActionPath(message.accountId, message.id, "not-suspicious"), { method: "POST" });
@@ -3832,9 +3827,9 @@ export default function MailClient({
     message,
     pendingMessageActions,
     openCompose,
-    updateFlagStateRef.current,
-    toggleTodoFlagRef.current,
-    clearTodoFlagRef.current,
+    updateFlagState,
+    toggleTodoFlag,
+    clearTodoFlag,
     handleMarkSpam,
     handleMarkNotSpam,
     handleArchiveMessage,
@@ -3869,14 +3864,8 @@ export default function MailClient({
       : undefined
   );
 
-  const updateFlagStateRef = useRef(updateFlagState);
-  updateFlagStateRef.current = updateFlagState;
 
-  const toggleTodoFlagRef = useRef(toggleTodoFlag);
-  toggleTodoFlagRef.current = toggleTodoFlag;
 
-  const clearTodoFlagRef = useRef(clearTodoFlag);
-  clearTodoFlagRef.current = clearTodoFlag;
 
   const { handleMessageDragStart, handleMessageDragEnd } = useMessageDragDrop({
     selectionStore,
