@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import type { Message } from "@/lib/data";
 import { saveMessageSource } from "@/lib/storage";
 import { createCollabFixture } from "../../testThreadCollabHarness";
@@ -342,4 +342,27 @@ test("stage B applies static rules without a model and leaves other mail uncheck
     restoreRescan(); restoreService();
     if (previous === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = previous;
   }
+});
+
+
+test("stage B pages only to the remaining room after stage A, with one truncation lookahead", async () => {
+  const f = await fixture();
+  await f.flagged("first@lottery.invalid");
+  await f.flagged("second@lottery.invalid");
+  const now = Date.now();
+  const insert = f.db.prepare(`INSERT INTO messages(id,accountId,folderId,threadId,subject,fromAddr,toAddr,preview,body,date,dateValue,spamVerdict,spamCheckedAt,flags)
+    VALUES(?,?,?,'synthetic-thread','','','','','','',?,'spam',?,'[]')`);
+  f.db.transaction(() => {
+    for (let index = 0; index < 5001; index++) insert.run(`marked-${index}`, f.accountId, f.folderId, now, now);
+  })();
+  const prepare = spyOn(f.db, "prepare");
+  try {
+    await f.run(() => rescan.startSpamRescan({ accountId: f.accountId, period: "all", withModel: true, modelLimit: 0, userId: ADMIN }));
+    const state = await rescan.loadSpamRescanState(f.accountId);
+    expect(state.items).toHaveLength(5000);
+    expect(state.job?.counts).toMatchObject({ serverFlagSelected: 2, classifierMarked: 4998, items: 5000, truncated: true });
+    const pages = prepare.mock.calls.filter(([sql]) => String(sql).includes("spamVerdict = 'spam' AND folderId"));
+    expect(pages).toHaveLength(10);
+    expect(state.items.filter(item => item.stage === "classifier")).toHaveLength(4998);
+  } finally { prepare.mockRestore(); }
 });

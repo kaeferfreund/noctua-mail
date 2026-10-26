@@ -1,4 +1,5 @@
 export {
+  AccountNotFoundError,
   closeAllDbConnections,
   initializeMasterDb,
   withAccountDb

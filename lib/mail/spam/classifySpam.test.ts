@@ -318,9 +318,13 @@ describe("trusted senders", () => {
     expect(await classifySpam({ input: trustedInput, allowlist: noDecision, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model, trust: trust(plainId) }))
       .toEqual({ verdict: "ham", confidence: 1, reasons: ["trusted:profile (25 Mails seit 2026-03, DKIM service.example.test)"], source: "trusted:profile", trust: { kind: "skip" } });
     expect(model.doGenerateCalls).toHaveLength(0);
-    // Without a model the skip still decides.
-    expect(await classifySpam({ input: trustedInput, staticRules: EMPTY_STATIC_RULES, getExamples: async () => [], model: null, trust: trust(canaryId) }))
-      .toMatchObject({ source: "trusted:profile" });
+  });
+
+  test("rules-only checks leave trusted and canary mail undecided", async () => {
+    for (const id of [plainId, canaryId]) {
+      expect(await classifySpam({ input: trustedInput, staticRules: EMPTY_STATIC_RULES,
+        getExamples: async () => { throw new Error("must not load model examples"); }, model: null, trust: trust(id) })).toBeNull();
+    }
   });
 
   test("the canary sample goes to the model without a trust hint and reports a mismatch", async () => {

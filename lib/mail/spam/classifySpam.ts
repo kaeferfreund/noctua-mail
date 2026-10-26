@@ -1,5 +1,6 @@
 import { APICallError, generateText, NoObjectGeneratedError, Output, RetryError, type LanguageModel, type SystemModelMessage } from "ai";
 import { z } from "zod";
+import { AccountNotFoundError } from "@/lib/db";
 import { matchSpamAllowlist, type SpamAllowlistContext } from "./allowlist";
 import { assessSenderTrust, type SpamTrustContext } from "./anomaly";
 import { isTrustCanary, TRUSTED_SPAM_THRESHOLD } from "./senderProfile";
@@ -72,12 +73,13 @@ export class SpamOutputTruncatedError extends Error {
 }
 
 /**
- * Errors another attempt cannot fix: the provider rejected the request itself
+ * Errors another attempt cannot fix: the mailbox no longer exists, or the provider rejected the request itself
  * (bad key, unknown model id, invalid request — APICallError says so per status).
  * Rate limits, overload, timeouts, network errors and invalid or truncated
  * output may succeed later.
  */
 export function isRetryableSpamError(error: unknown): boolean {
+  if (error instanceof AccountNotFoundError) return false;
   if (RetryError.isInstance(error)) return isRetryableSpamError(error.lastError);
   if (APICallError.isInstance(error)) return error.isRetryable;
   return true;
@@ -234,14 +236,14 @@ function abortable<T>(promise: Promise<T>, signal: AbortSignal) {
 }
 
 /**
- * Allowlist → static rules → trusted sender profile → model. Returns null when
- * the model is needed but not available (static-only mode): the message then
- * stays unchecked. Model errors (network, 429, timeout, invalid output) are
+ * Allowlist → static rules → trusted sender profile → model. Without an available
+ * model (static-only mode), only allowlist/static rules decide; everything else
+ * returns null and stays unchecked. Model errors (network, 429, timeout, invalid output) are
  * thrown to the caller. A user's latest "Als Spam" for the sender outranks
  * static allow rules and trust: the model then decides, with that decision
  * among the examples.
  *
- * A trusted sender without anomalies is ham without a model call, except for
+ * With a usable model configured, a trusted sender without anomalies is ham without a call, except for
  * the canary sample, which the model checks without any trust hint. A trusted
  * sender with anomalies goes to the model with the deviations as a hint and
  * the stricter TRUSTED_SPAM_THRESHOLD; a static rule hint that is not weak
@@ -260,6 +262,8 @@ export async function classifySpam(params: ClassifySpamParams): Promise<SpamDeci
   if (rules.decision === "deny") {
     return { verdict: "spam", confidence: 1, reasons: ["Absender oder Muster laut Regel eindeutig Spam"], source: "static-deny" };
   }
+  // Rules-only checks leave profile/canary mail unchecked for a later model run.
+  if (!params.model) return null;
   const assessed = params.trust && !userSaidSpam ? await assessSenderTrust(input, params.trust) : null;
   // A static rule hint that is not weak vetoes the skip: the model decides, as for an anomaly.
   const trust = assessed?.kind === "skip" && rules.hints.some((hint) => !isWeakRuleHint(hint))
@@ -269,8 +273,7 @@ export async function classifySpam(params: ClassifySpamParams): Promise<SpamDeci
     ? { verdict: "ham", confidence: 1, reasons: [`trusted:profile (${trust.summary})`], source: "trusted:profile", trust: { kind: "skip" } }
     : null;
   const canary = Boolean(skip && params.trust && isTrustCanary(params.trust.canaryKey));
-  if (skip && (!canary || !params.model)) return skip;
-  if (!params.model) return null;
+  if (skip && !canary) return skip;
   const hints = trust?.kind === "anomaly"
     ? [...rules.hints, `Vertrauter Absender (${trust.summary}); Abweichung: ${trust.anomalies.join(", ")}`]
     : rules.hints;

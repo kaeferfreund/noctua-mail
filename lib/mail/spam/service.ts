@@ -1,6 +1,7 @@
 import type { LanguageModel } from "ai";
 import { simpleParser } from "mailparser";
 import {
+  AccountNotFoundError,
   getAccountById,
   getAccounts,
   getFolders,
@@ -107,7 +108,8 @@ const state: SpamServiceState = runtime.__noctuaSpamService ??= (() => {
     queue: createSpamQueue({
       check: (job) => checkMessage(job),
       isRetryable: isRetryableSpamError,
-      onAttemptFailed: (job, failedAttempts) => recordSpamCheckFailure(job.accountId, job.messageId, failedAttempts),
+      onAttemptFailed: (job, failedAttempts, error) => error instanceof AccountNotFoundError
+        ? undefined : recordSpamCheckFailure(job.accountId, job.messageId, failedAttempts),
       onFailure: (job, error) => logFailure(job.accountId, "classification failed; message left unmarked", spamErrorLogFields(error)),
       sleep: (ms) => deps().sleep(ms)
     })
@@ -120,8 +122,11 @@ const rescanUsage = () => state.rescanUsage ??= new Map();
 /** Tests: replaces outside dependencies until the returned function restores them. */
 export function replaceSpamServiceDeps(overrides: Partial<SpamServiceDeps>) {
   const previous = state.deps;
+  const previousIdentity = state.identity;
   state.deps = { ...deps(), ...overrides };
-  return () => { state.deps = previous; };
+  // Each synthetic household must discover its own mailboxes instead of a previous test's cached IDs.
+  state.identity = undefined;
+  return () => { state.deps = previous; state.identity = previousIdentity; };
 }
 
 /** Resolves once every queued check has finished. */
