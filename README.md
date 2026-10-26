@@ -9,7 +9,7 @@ does not require sharing an application login. The installed app is named **Mail
 
 The fork lives at [kaeferfreund/noctua-mail](https://github.com/kaeferfreund/noctua-mail).
 Implemented features below describe this checkout, not completed household
-migration or production acceptance. The package version is `1.0.0`.
+migration or production acceptance. The package version is `1.0.1`.
 
 ## Features
 

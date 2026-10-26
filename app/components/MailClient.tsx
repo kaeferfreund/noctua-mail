@@ -7,6 +7,7 @@ import { isAccountFolder } from "@/lib/folderAccount";
 import { findInboxFolder } from "@/lib/specialFolders";
 import ReaderToolbar, { ReaderFocusHint } from "./mailclient/message/ReaderToolbar";
 import { useReaderFocusPlacement } from "@/lib/ui/useReaderFocusPlacement";
+import { setClientErrorBuild } from "@/lib/ui/clientErrorReporter";
 import { useReaderFocus } from "@/lib/ui/useReaderFocus";
 import { useReaderNavigation } from "@/lib/ui/useReaderNavigation";
 import { readerShortcut } from "@/lib/ui/readerFocus";
@@ -593,6 +594,7 @@ export default function MailClient({
     buildVersionLabel,
     apiFetch
   });
+  useEffect(() => { setClientErrorBuild(buildVersionLabel); }, [buildVersionLabel]);
 
   const refreshFolders = useFolderRefresh({ activeAccountId, apiFetch, reportError, readErrorMessage, setFolders });
   useEffect(() => {

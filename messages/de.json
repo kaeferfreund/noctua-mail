@@ -495,6 +495,12 @@
   "Pwa": {
     "description": "Webmail für persönliche und gemeinsame Postfächer"
   },
+  "Crash": {
+    "title": "Die Oberfläche ist abgestürzt",
+    "description": "Ein Fehler hat die Ansicht beendet und wurde gemeldet. Neu laden öffnet sie wieder.",
+    "reload": "Neu laden",
+    "home": "Zur Startseite"
+  },
   "Shell": {
     "theme": {
       "label": "Design",
