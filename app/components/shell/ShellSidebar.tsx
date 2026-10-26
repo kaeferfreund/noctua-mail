@@ -40,7 +40,7 @@ import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxLabel, s
 import { useStableHandlers } from "@/app/hooks/useStableHandlers";
 import { useCollapsedDomains } from "@/lib/ui/collapsedDomains";
 import { versionedIconUrl } from "@/lib/appBranding";
-import type { DomainIconVersions } from "@/app/hooks/useDomainIconVersions";
+import { domainIconVersionFor, type DomainIconVersions } from "@/app/hooks/useDomainIconVersions";
 
 export type ShellSidebarProps = {
   onNavigate?: () => void;
@@ -279,7 +279,7 @@ export function MailboxRows({
                 {/* The slot keeps the heading text in line with the rows'
                     names while the icon loads, and when there is none. */}
                 <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
-                  {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} version={domainIcons?.[group.domain]} /> : null}
+                  {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} version={domainIconVersionFor(domainIcons ?? {}, group.domain)} /> : null}
                 </span>
                 {/* A long domain ellipsizes before the counters, which never
                     shrink; the full name stays available as a tooltip. */}

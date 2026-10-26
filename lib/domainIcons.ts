@@ -130,8 +130,21 @@ export async function listDomainIconEntries(accounts: ReadonlyArray<{ email: str
   return [...entries.values()].sort((a, b) => a.domain.localeCompare(b.domain, "en"));
 }
 
+// Route bundles share one process-wide queue per domain. Always release it, including on errors.
+const mutationsKey = Symbol.for("noctua.domainIconMutations");
+const host = globalThis as typeof globalThis & { [mutationsKey]?: Map<string, Promise<unknown>> };
+const mutations = host[mutationsKey] ??= new Map<string, Promise<unknown>>();
+function mutateDomainIcon<T>(domain: string, work: () => Promise<T>): Promise<T> {
+  const previous = mutations.get(domain) ?? Promise.resolve();
+  const next = previous.catch(() => {}).then(work);
+  mutations.set(domain, next);
+  void next.finally(() => { if (mutations.get(domain) === next) mutations.delete(domain); }).catch(() => {});
+  return next;
+}
+
 /** Stores an already normalised PNG (lib/domainIconImage.ts) and logs it. */
 export async function saveDomainIcon(domain: string, png: Buffer, userId: string) {
+  return mutateDomainIcon(domain, async () => {
   const file = domainIconPath(domain);
   await mkdir(path.dirname(file), { recursive: true });
   const temp = `${file}.${randomUUID()}.tmp`;
@@ -144,11 +157,14 @@ export async function saveDomainIcon(domain: string, png: Buffer, userId: string
   const hash = sha256(png);
   await saveDomainIconRow({ domain, hash, size: png.byteLength, userId });
   return { domain, version: domainIconVersion(hash) };
+  });
 }
 
 /** Drops the override (row, log entry, file); false when there was none. */
 export async function resetDomainIcon(domain: string, userId: string) {
+  return mutateDomainIcon(domain, async () => {
   const removed = await deleteDomainIconRow(domain, userId);
   await rm(domainIconPath(domain), { force: true });
   return removed;
+  });
 }
