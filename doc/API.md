@@ -254,7 +254,10 @@ old one. The tool descriptions say so, so AI clients stop proposing that workaro
   replace the whole field (empty string clears it). `text`/`html`/`markdown` replace the whole
   body with the same rules as `create_draft_message` (format follows the richest field unless
   `composeFormat` is given; Markdown keeps its source as text/plain; HTML without `text` gets a
-  derived text/plain part). `appendBody` adds a plain-text paragraph after the authored text and
+  derived text/plain part). Passing `text` alone turns an HTML/Markdown reply into a plain-text
+  draft and discards the quoted original unless that quotation is included in the replacement.
+  Reply headers do not recreate quoted body content. Use `appendBody` to preserve the format
+  and quoted original. `appendBody` adds a plain-text paragraph after the authored text and
   before a quoted original, in the draft's format; it cannot be combined with the body fields.
   Reply/forward headers, the calendar invite and all attachments are kept; an
   attachment that is not available locally fails the update (409) instead of being dropped.
