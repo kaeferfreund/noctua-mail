@@ -46,8 +46,13 @@ exact-id source only when that file matches the row's recorded byte size,
 Message-ID and From mailbox (`checkLegacySourceOwnership`); a copy with the
 same Message-ID that overwrote the file under the legacy writer fails these
 checks and the row stays unknown.
-Rows without an owned source stay unknown until resynced; the reader explains
-why their Always load button is disabled. SMTPUTF8 local parts remain UTF-8, while IDN
+`--resync` handles those remaining rows: it checks each folder and UID
+read-only on IMAP and, with `--write`, re-ingests the rows whose UID still
+holds the stored Message-ID through the reader's resync path. Rows whose UID
+is gone or now holds another message are reported and stay unknown. A From
+header without a single mailbox leaves `senderKey` NULL with a digest set,
+like a fresh sync. Every row without a key shows "Sender unknown" next to the
+disabled Always load button. SMTPUTF8 local parts remain UTF-8, while IDN
 domains are canonicalized to punycode for permission keys.
 
 Fragment links in the reader scroll to an ID or legacy named anchor inside the

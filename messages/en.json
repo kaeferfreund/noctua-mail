@@ -1696,7 +1696,7 @@
     "loadOnceShort": "Load",
     "alwaysLoadSender": "Always load from this sender",
     "alwaysLoadSenderShort": "Always load",
-    "unknownSender": "Sender unknown until the original message is available or resynced.",
+    "unknownSender": "Sender unknown",
     "flags": {
       "forwarded": "Forwarded",
       "calendar": "Calendar Invite",

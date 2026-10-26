@@ -24,7 +24,7 @@ for (const from of legacyUnkeyedSenders) {
     const frame = view.getByTitle("HTML message") as HTMLIFrameElement;
     expect(frame.srcdoc).toContain("data-remote-src=");
     expect(view.getByRole("button", { name: "Always load from this sender" }).hasAttribute("disabled")).toBe(true);
-    expect(view.getByText("Sender unknown until the original message is available or resynced.")).toBeTruthy();
+    expect(view.getByText("Sender unknown")).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Load once" }));
     expect(frame.srcdoc).toContain('src="https://images.example.test/photo"');
     expect(writes).toBe(0);

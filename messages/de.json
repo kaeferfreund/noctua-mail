@@ -1696,7 +1696,7 @@
     "loadOnceShort": "Laden",
     "alwaysLoadSender": "Von diesem Absender immer laden",
     "alwaysLoadSenderShort": "Immer laden",
-    "unknownSender": "Der Absender ist erst bekannt, wenn die Originalnachricht verfügbar ist oder erneut synchronisiert wurde.",
+    "unknownSender": "Absender unbekannt",
     "flags": {
       "forwarded": "Weitergeleitet",
       "calendar": "Kalendereinladung",

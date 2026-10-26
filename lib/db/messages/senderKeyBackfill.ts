@@ -5,6 +5,7 @@ import { withDbWriteRetry } from "../../dbWriteRetry";
 import { getDataDir, getDefaultAccountDbPath } from "../../runtimePaths";
 import { getExactMessageSourcePath } from "../../storage";
 import { configureAccountDb } from "../connection";
+import { mapAccountRow } from "../rowParsers";
 import { assertSupportedShardFormat, SHARD_FORMAT_VERSION, shardWriterGuardsInstalled } from "../shardFormat";
 import { checkLegacySourceOwnership, type LegacySourceSkipReason } from "./senderKey";
 
@@ -14,10 +15,12 @@ import { checkLegacySourceOwnership, type LegacySourceSkipReason } from "./sende
  * where both columns are NULL and whose exact retained source passes
  * `checkLegacySourceOwnership` are written; nothing else in the row changes and
  * no IMAP connection is opened. The dry run uses read-only connections.
+ * `--resync` re-fetches the remaining rows from IMAP instead
+ * (lib/mail/senderKeyResync.ts).
  */
 
 export const SENDER_KEY_BACKFILL_USAGE = `Usage: bun scripts/backfill-sender-keys.ts --data <data dir> [--account <accountId>] [--write]
-       [--batch <n>] [--limit <n>] [--out <report.json>]
+       [--resync] [--batch <n>] [--limit <n>] [--out <report.json>]
 
 Fills messages.senderKey and messages.sourceSha256 for rows synced before the
 sync stored them, from the retained source under the row's exact id. A source
@@ -25,15 +28,22 @@ must match the row's byte size, Message-ID and From mailbox; other rows are
 skipped. Default is a dry run (read-only). --write stamps in transactions of
 --batch rows (default 500) while the app keeps running; --limit stops after n
 examined rows. --out writes counts and the ids of skipped rows (outside the
-data dir). Shards older than the app's format are refused, never migrated.`;
+data dir). Shards older than the app's format are refused, never migrated.
+
+--resync handles the rows the retained source cannot: it fetches each one
+read-only from IMAP by folder and UID (the mailbox credentials come from
+main.db and need the service's IMAP_SECRET_KEY) and, with --write, re-ingests
+it like the reader's "resync message" action. UIDs that are gone or now hold
+another message are reported, never written. The dry run checks IMAP only.`;
 
 export type SenderKeyBackfillArgs =
   | { kind: "help" }
   | { kind: "error"; message: string }
-  | { kind: "run"; dataDir: string; account: string | null; write: boolean; batch: number; limit: number | null; out: string | null };
+  | { kind: "run"; dataDir: string; account: string | null; write: boolean; resync: boolean; batch: number; limit: number | null;
+      out: string | null };
 
 const VALUE_OPTIONS = new Set(["--data", "--account", "--batch", "--limit", "--out"]);
-const FLAGS = new Set(["--write", "--dry-run"]);
+const FLAGS = new Set(["--write", "--dry-run", "--resync"]);
 
 function positiveInteger(value: string | undefined) {
   if (value === undefined) return undefined;
@@ -68,10 +78,11 @@ export function parseSenderKeyBackfillArgs(argv: readonly string[]): SenderKeyBa
   if (limit === null) return { kind: "error", message: "--limit must be a positive integer" };
   const out = values.has("--out") ? path.resolve(values.get("--out")!) : null;
   if (out && !path.relative(dataDir, out).startsWith("..")) return { kind: "error", message: "--out must not point into the data dir" };
-  return { kind: "run", dataDir, account: values.get("--account") ?? null, write, batch: batch ?? 500, limit: limit ?? null, out };
+  return { kind: "run", dataDir, account: values.get("--account") ?? null, write, resync: flags.has("--resync"), batch: batch ?? 500,
+    limit: limit ?? null, out };
 }
 
-export type SenderKeyBackfillAccount = {
+export type SenderKeyLegacyCounts = {
   accountId: string;
   email: string;
   /** Null when the shard can be processed; otherwise why --write refuses to run. */
@@ -86,6 +97,9 @@ export type SenderKeyBackfillAccount = {
   /** Rows with senderKey and sourceSha256 NULL: the backfill candidates. */
   legacy: number;
   legacyHasSource: number;
+};
+
+export type SenderKeyBackfillAccount = SenderKeyLegacyCounts & {
   examined: number;
   sourcePresent: number;
   withoutSource: number;
@@ -138,6 +152,86 @@ async function readExactSource(accountId: string, id: string) {
   }
 }
 
+/**
+ * Read-only inspection of every target shard before anything is written:
+ * main.db's accounts, shard location and format, and the legacy counts.
+ * `close()` releases the read-only connections; `writer()` opens a shard with
+ * the app's configuration (busy timeout, writer guards); `account()` maps the
+ * main.db row read before (IMAP credentials decrypted with IMAP_SECRET_KEY).
+ */
+export function inspectSenderKeyLegacyRows(options: { dataDir: string; account?: string | null }) {
+  const dataDir = path.resolve(options.dataDir);
+  // Source paths and default shard paths come from the app's runtime paths.
+  if (getDataDir() !== dataDir) throw new Error(`NOCTUA_DATA_DIR (${getDataDir()}) must equal --data (${dataDir})`);
+  const mainFile = path.join(dataDir, "db", "main.db");
+  if (!existsSync(mainFile)) throw new Error(`No main.db in ${dataDir}`);
+
+  const main = new Database(mainFile, { readonly: true });
+  const allAccounts = main.prepare("SELECT * FROM accounts ORDER BY id").all() as
+    Array<{ id: string; email: string; dbPath: string | null } & Record<string, unknown>>;
+  main.close();
+  const targets = allAccounts.filter(account => !options.account || account.id === options.account);
+  if (!targets.length) throw new Error(options.account ? `Account ${options.account} not found in ${dataDir}` : `No accounts in ${dataDir}`);
+
+  const readers = new Map<string, Database>();
+  const files = new Map<string, string>();
+  const accounts: SenderKeyLegacyCounts[] = [];
+  const close = () => {
+    for (const reader of readers.values()) reader.close();
+    readers.clear();
+  };
+  try {
+    for (const account of targets) {
+      const file = shardFile(dataDir, account);
+      const counts: SenderKeyLegacyCounts = {
+        accountId: account.id, email: account.email, refused: null, missingShard: false, rows: 0, nullKey: 0, withDigest: 0, legacy: 0,
+        legacyHasSource: 0
+      };
+      accounts.push(counts);
+      if (!existsSync(file)) {
+        counts.missingShard = true;
+        continue;
+      }
+      let reader = readers.get(file);
+      if (!reader) {
+        reader = new Database(file, { readonly: true });
+        readers.set(file, reader);
+      }
+      counts.refused = schemaProblem(reader);
+      if (counts.refused) continue;
+      files.set(account.id, file);
+      Object.assign(counts, reader.prepare(`SELECT COUNT(*) AS rows,
+          COALESCE(SUM(senderKey IS NULL), 0) AS nullKey,
+          COALESCE(SUM(senderKey IS NULL AND sourceSha256 IS NOT NULL), 0) AS withDigest,
+          COALESCE(SUM(senderKey IS NULL AND sourceSha256 IS NULL), 0) AS legacy,
+          COALESCE(SUM(senderKey IS NULL AND sourceSha256 IS NULL AND hasSource = 1), 0) AS legacyHasSource
+        FROM messages WHERE accountId = ?`).get(account.id) as Omit<SenderKeyLegacyCounts, "accountId" | "email" | "refused" | "missingShard">);
+    }
+  } catch (error) {
+    close();
+    throw error;
+  }
+  return {
+    dataDir,
+    accounts,
+    /** The shard of a processable account, if any. */
+    file: (accountId: string) => files.get(accountId),
+    reader: (file: string) => readers.get(file),
+    account: (accountId: string) => mapAccountRow(targets.find(account => account.id === accountId)),
+    /** Throws before the first write when any target shard was refused. */
+    assertWritable() {
+      const refused = accounts.filter(counts => counts.refused);
+      if (refused.length) throw new Error(`Refusing to write: ${refused.map(counts => `${counts.accountId}: ${counts.refused}`).join("; ")}`);
+    },
+    writer(file: string) {
+      const db = new Database(file);
+      configureAccountDb(db);
+      return db;
+    },
+    close
+  };
+}
+
 export async function runSenderKeyBackfill(options: {
   dataDir: string;
   account?: string | null;
@@ -147,61 +241,18 @@ export async function runSenderKeyBackfill(options: {
   log?: (line: string) => void;
 }): Promise<SenderKeyBackfillResult> {
   const started = performance.now();
-  const dataDir = path.resolve(options.dataDir);
   const log = options.log ?? (() => {});
   const batchSize = options.batch ?? 500;
-  // Source paths and default shard paths come from the app's runtime paths.
-  if (getDataDir() !== dataDir) throw new Error(`NOCTUA_DATA_DIR (${getDataDir()}) must equal --data (${dataDir})`);
-  const mainFile = path.join(dataDir, "db", "main.db");
-  if (!existsSync(mainFile)) throw new Error(`No main.db in ${dataDir}`);
-
-  const main = new Database(mainFile, { readonly: true });
-  const allAccounts = main.prepare("SELECT id, email, dbPath FROM accounts ORDER BY id").all() as
-    Array<{ id: string; email: string; dbPath: string | null }>;
-  main.close();
-  const targets = allAccounts.filter(account => !options.account || account.id === options.account);
-  if (!targets.length) throw new Error(options.account ? `Account ${options.account} not found in ${dataDir}` : `No accounts in ${dataDir}`);
-
-  // Inspect every target read-only before the first write.
-  const readers = new Map<string, Database>();
-  const files = new Map<string, string>();
-  const accounts: SenderKeyBackfillAccount[] = [];
+  const inspection = inspectSenderKeyLegacyRows(options);
+  const { dataDir } = inspection;
   try {
-    for (const account of targets) {
-      const file = shardFile(dataDir, account);
-      const stats: SenderKeyBackfillAccount = {
-        accountId: account.id, email: account.email, refused: null, missingShard: false, rows: 0, nullKey: 0, withDigest: 0, legacy: 0,
-        legacyHasSource: 0, examined: 0, sourcePresent: 0, withoutSource: 0, accepted: 0,
-        skipped: { size: 0, "message-id": 0, "no-sender-key": 0, sender: 0 }, stamped: 0
-      };
-      accounts.push(stats);
-      if (!existsSync(file)) {
-        stats.missingShard = true;
-        continue;
-      }
-      let reader = readers.get(file);
-      if (!reader) {
-        reader = new Database(file, { readonly: true });
-        readers.set(file, reader);
-      }
-      stats.refused = schemaProblem(reader);
-      if (stats.refused) continue;
-      files.set(account.id, file);
-      const counts = reader.prepare(`SELECT COUNT(*) AS rows,
-          COALESCE(SUM(senderKey IS NULL), 0) AS nullKey,
-          COALESCE(SUM(senderKey IS NULL AND sourceSha256 IS NOT NULL), 0) AS withDigest,
-          COALESCE(SUM(senderKey IS NULL AND sourceSha256 IS NULL), 0) AS legacy,
-          COALESCE(SUM(senderKey IS NULL AND sourceSha256 IS NULL AND hasSource = 1), 0) AS legacyHasSource
-        FROM messages WHERE accountId = ?`).get(account.id) as Pick<SenderKeyBackfillAccount, "rows" | "nullKey" | "withDigest" | "legacy" | "legacyHasSource">;
-      Object.assign(stats, counts);
-    }
-    const refused = accounts.filter(stats => stats.refused);
-    if (options.write && refused.length) {
-      throw new Error(`Refusing to write: ${refused.map(stats => `${stats.accountId}: ${stats.refused}`).join("; ")}`);
-    }
+    const accounts: SenderKeyBackfillAccount[] = inspection.accounts.map(counts => ({
+      ...counts, examined: 0, sourcePresent: 0, withoutSource: 0, accepted: 0,
+      skipped: { size: 0, "message-id": 0, "no-sender-key": 0, sender: 0 }, stamped: 0
+    }));
     if (options.write) {
-      for (const reader of readers.values()) reader.close();
-      readers.clear();
+      inspection.assertWritable();
+      inspection.close();
     }
 
     const writers = new Map<string, Database>();
@@ -209,12 +260,11 @@ export async function runSenderKeyBackfill(options: {
     let remaining = options.limit ?? Number.POSITIVE_INFINITY;
     try {
       for (const stats of accounts) {
-        const file = files.get(stats.accountId);
+        const file = inspection.file(stats.accountId);
         if (!file || remaining <= 0) continue;
-        let db = options.write ? writers.get(file) : readers.get(file);
+        let db = options.write ? writers.get(file) : inspection.reader(file);
         if (!db) {
-          db = new Database(file);
-          configureAccountDb(db);
+          db = inspection.writer(file);
           writers.set(file, db);
         }
         const select = db.prepare(`SELECT id, messageId, fromAddr, sizeBytes FROM messages
@@ -273,7 +323,7 @@ export async function runSenderKeyBackfill(options: {
     }
     return { dataDir, write: options.write, accounts, skippedRows, ms: performance.now() - started };
   } finally {
-    for (const reader of readers.values()) reader.close();
+    inspection.close();
   }
 }
 

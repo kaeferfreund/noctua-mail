@@ -148,7 +148,7 @@ test("reader and standalone enforce sender permissions, send no Referer and neve
       expect(requests, `reader sender case ${index}`).toEqual([]);
       if (index >= legacyStart) {
         expect(await page.getByRole("button", { name: "Always load from this sender" }).isDisabled()).toBe(true);
-        await page.getByText("Sender unknown until the original message is available or resynced.").waitFor();
+        await page.getByText("Sender unknown").waitFor();
         await page.getByRole("button", { name: "Load once" }).click();
         await waitForReaderImages();
         expect(requests.map(request => request.path).sort()).toEqual(["/picture", "/pixel"]);

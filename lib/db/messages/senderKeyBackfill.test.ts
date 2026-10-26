@@ -165,7 +165,8 @@ test("legacy ownership needs the row's size, Message-ID and From mailbox", () =>
 
 test("argument parsing keeps the dry run default and the report outside the data dir", () => {
   expect(parseSenderKeyBackfillArgs(["--data", "/srv/data"])).toEqual(
-    { kind: "run", dataDir: "/srv/data", account: null, write: false, batch: 500, limit: null, out: null });
+    { kind: "run", dataDir: "/srv/data", account: null, write: false, resync: false, batch: 500, limit: null, out: null });
+  expect(parseSenderKeyBackfillArgs(["--data", "/srv/data", "--resync"])).toMatchObject({ kind: "run", write: false, resync: true });
   expect(parseSenderKeyBackfillArgs(["--data", "/srv/data", "--write", "--batch", "50", "--limit", "10", "--account", "acc"]))
     .toMatchObject({ kind: "run", write: true, batch: 50, limit: 10, account: "acc" });
   expect(parseSenderKeyBackfillArgs([])).toMatchObject({ kind: "error" });

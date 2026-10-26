@@ -109,6 +109,7 @@ export {
 } from "./db/messages";
 
 export { upsertMessages } from "./db/messages";
+export { inspectSenderKeyLegacyRows, type SenderKeyLegacyCounts } from "./db/messages/senderKeyBackfill";
 
 export {
   getTombstonedDraftMessageIds,

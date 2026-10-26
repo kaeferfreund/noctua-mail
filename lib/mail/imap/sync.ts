@@ -8,6 +8,7 @@ import { parseDeliveryMetadata } from "./parser";
 //   - syncImapAccountBatched + ImapSyncBatch
 //   - syncImapMessage
 //   - findMissingStoredMailboxCopies + StoredMailboxCopyCandidate
+//   - inspectStoredMailboxCopies + StoredMailboxCopyState
 // The remaining private helpers (range resolution, lightweight/full message
 // parsing, category classification, watermark maintenance) stay co-located
 // with their callers in this file.
@@ -62,6 +63,7 @@ import {
   parseHeaderMessageIdList,
   resolveEnvelopeAddressEmail,
   resolveMessageAddresses,
+  resolveMessageSenderKey,
   resolveEnvelopeInReplyTo,
   resolveHeaderDate,
   resolveHeaderInReplyTo
@@ -431,6 +433,13 @@ function buildLightweightImapMessage(params: {
   } as Message;
 }
 
+/** The stored `messages.messageId` of a fully parsed IMAP message. */
+function resolveImapMessageId(envelope: ImapEnvelope | undefined, headers: Map<string, string[]>, uid: number) {
+  return normalizeEnvelopeHeaderId(envelope?.messageId)
+    ?? normalizeEnvelopeHeaderId(getHeaderValue(headers, "message-id"))
+    ?? `imap-msg-${uid}`;
+}
+
 export async function parseImapMessage(
   account: Account,
   mailboxToOpen: string,
@@ -532,10 +541,7 @@ export async function parseImapMessage(
   const envelopeInReplyTo = resolveEnvelopeInReplyTo(envelope);
   const headerInReplyTo = resolveHeaderInReplyTo(headers);
   const inReplyTo = envelopeInReplyTo ?? headerInReplyTo;
-  const envelopeMessageId = normalizeEnvelopeHeaderId(envelope?.messageId);
-  const headerMessageId = normalizeEnvelopeHeaderId(headerValue("message-id"));
-  const internalMessageId = `imap-msg-${message.uid}`;
-  const messageId = envelopeMessageId ?? headerMessageId ?? internalMessageId;
+  const messageId = resolveImapMessageId(envelope, headers, message.uid);
   const messageFlags = withCalendarInviteFlag(flags, {
     attachments,
     textBody: body,
@@ -1475,4 +1481,56 @@ export async function findMissingStoredMailboxCopies(
   });
 
   return missingIds;
+}
+
+export type StoredMailboxCopyState =
+  | { state: "present"; senderKey: string | null }
+  | { state: "gone" | "mismatch" };
+
+/**
+ * Read-only check of stored copies in one mailbox (EXAMINE, then UID FETCH of
+ * envelope and header in batches): whether each UID still holds the message
+ * with the stored Message-ID, derived as `syncImapMessage` would, and the
+ * sender key a resync would store. "mismatch" means another message now owns
+ * the UID (for example after a UIDVALIDITY reset). Errors propagate.
+ */
+export async function inspectStoredMailboxCopies(
+  account: Account,
+  mailboxPath: string,
+  candidates: Array<{ id: string; messageId: string | null; imapUid: number }>,
+  options: { batch?: number; clientId?: string } = {}
+) {
+  const states = new Map<string, StoredMailboxCopyState>();
+  if (candidates.length === 0) return states;
+  const logContext = buildLogContext(account, options.clientId);
+  const batch = options.batch ?? 50;
+  await withPooledImapClient(account, logContext, async (client) => {
+    await logImapOp("mailboxOpen", { mailbox: mailboxPath, readOnly: true, ...logContext }, () =>
+      client.mailboxOpen(mailboxPath, { readOnly: true })
+    );
+    const uids = [...new Set(candidates.map((candidate) => candidate.imapUid))].sort((a, b) => a - b);
+    const fetched = new Map<number, { envelope?: ImapEnvelope; headers: Map<string, string[]> }>();
+    for (let start = 0; start < uids.length; start += batch) {
+      const range = uids.slice(start, start + batch).join(",");
+      const items = await logImapOp("fetchAll", { mailbox: mailboxPath, uids: range, ...logContext }, () =>
+        client.fetchAll(range, { uid: true, envelope: true, headers: true }, { uid: true })
+      );
+      for (const item of items) {
+        fetched.set(item.uid, {
+          envelope: item.envelope as ImapEnvelope | undefined,
+          headers: parseHeaderMap(item.headers ?? Buffer.alloc(0))
+        });
+      }
+    }
+    for (const candidate of candidates) {
+      const item = fetched.get(candidate.imapUid);
+      if (!item) states.set(candidate.id, { state: "gone" });
+      else if (resolveImapMessageId(item.envelope, item.headers, candidate.imapUid) !== candidate.messageId) {
+        states.set(candidate.id, { state: "mismatch" });
+      } else {
+        states.set(candidate.id, { state: "present", senderKey: resolveMessageSenderKey(item.envelope, item.headers) });
+      }
+    }
+  });
+  return states;
 }
