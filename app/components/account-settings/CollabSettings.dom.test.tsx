@@ -166,3 +166,23 @@ it("slice2b preferences: saved personal overrides round trip on remount without 
     expect(JSON.stringify(account.settings)).toBe(defaults);
   } finally { window.removeEventListener("noctua:account-prefs-changed", listener); }
 });
+
+it("managers save the mailbox auto-read default separately from personal preferences", async () => {
+  const writes: unknown[] = [];
+  const page = render(<Theme><PreferencesTabContent editingAccount={account} onClose={() => {}} apiFetch={async (input, init) => {
+    if (init?.method === "PUT") writes.push({ url: String(input), body: JSON.parse(String(init.body)) });
+    return response({ ok: true, prefs: { reading: { autoMarkRead: "never" } } });
+  }} /></Theme>);
+  await page.findByLabelText("Default for all members");
+  fireEvent.change(page.getByLabelText("Default for all members"), { target: { value: "after3s" } });
+  fireEvent.click(page.getByRole("button", { name: "Save mailbox default" }));
+  await waitFor(() => expect(writes).toEqual([{ url: "/api/accounts/synthetic-account/settings", body: { teamDefaults: true, settings: { reading: { autoMarkRead: "after3s" } } } }]));
+  expect((page.getByLabelText("Mark opened messages as read") as HTMLSelectElement).value).toBe("never");
+});
+
+it("editors do not see the mailbox-wide auto-read default", async () => {
+  const page = render(<Theme><PreferencesTabContent editingAccount={{ ...account, accessRole: "editor" }} onClose={() => {}}
+    apiFetch={async () => response({ ok: true, prefs: {} })} /></Theme>);
+  await page.findByLabelText("Mark opened messages as read");
+  expect(page.queryByLabelText("Default for all members")).toBeNull();
+});

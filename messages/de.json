@@ -38,6 +38,8 @@
       "confirmRemove": "{email}: Zugriff auf das Postfach entziehen."
     },
     "preferences": {
+      "mailboxDefault": "Vorgabe für alle Mitglieder",
+      "saveMailboxDefault": "Postfachvorgabe speichern",
       "help": "Deine persönlichen Einstellungen für dieses Postfach. Du kannst die Postfachvorgaben übernehmen. Nur Änderungen werden gespeichert.",
       "loading": "Einstellungen werden geladen …",
       "saved": "Einstellungen gespeichert.",

@@ -16,6 +16,8 @@ import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 import { senderSettingsError } from "@/lib/senderMessages";
 import { notifySenderPreferencesChanged } from "@/lib/ui/senderSettings";
 import { validSignatureTemplate } from "@/lib/signatureTemplates";
+import AutoMarkReadControl from "../AutoMarkReadControl";
+import MailboxReadingPreference from "./MailboxReadingPreference";
 import { AUTO_MARK_READ_MODES } from "@/lib/autoMarkRead";
 
 type PreferenceOption = { value: string; label: string; literal?: boolean };
@@ -92,7 +94,9 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
           const stored = prefs[field.group] as Record<string, unknown> | undefined;
           const value = changes && field.key in changes ? changes[field.key] : stored?.[field.key];
           const helpId = field.help ? `preference-help-${field.group}-${field.key}` : undefined;
-          const control = <label key={`${field.group}.${field.key}`} className="grid min-w-0 gap-1 text-sm">{t(`preferences.fields.${field.key}`)}
+          const control = field.key === "autoMarkRead" ? <AutoMarkReadControl label={t("preferences.fields.autoMarkRead")}
+            value={(value ?? "inherit") as "inherit" | import("@/lib/data").AutoMarkReadMode} inherit describedBy={helpId}
+            onChange={next => { setSaved(false); setPatch(previous => ({ ...previous, reading: { autoMarkRead: next === "inherit" ? null : next } })); }} /> : <label key={`${field.group}.${field.key}`} className="grid min-w-0 gap-1 text-sm">{t(`preferences.fields.${field.key}`)}
             <select className={nativeControlClass} aria-describedby={helpId} value={value == null ? "inherit" : String(value)} onChange={event => {
               const value = event.target.value;
               setSaved(false);
@@ -112,6 +116,7 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
         </select></label>}
       </fieldset>
       {senderPreferences && <SenderPreferences editingAccount={editingAccount} apiFetch={apiFetch} prefs={prefs} patch={patch} disabled={loading || busy} onChange={change} />}
+      {editingAccount.accessRole === "manager" && <MailboxReadingPreference key={editingAccount.id} account={editingAccount} apiFetch={apiFetch} />}
       <MailtoHandlerSection />
     </div>
     <div className="flex flex-wrap justify-end gap-3 border-t pt-3"><Button variant="outline" onClick={onClose}>{t("preferences.close")}</Button>
