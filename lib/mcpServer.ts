@@ -1,6 +1,9 @@
 import { authorizeOutbound } from "./outboundAuthorization";
 import { resolveComposeIdentity } from "./senderIdentitySelection";
 import { createSenderIdentityWithRecompute, updateSenderIdentity, SenderIdentityError } from "./senderIdentities";
+import { SIGNATURE_PLACEHOLDERS, SignatureTemplateError } from "./signatureTemplates";
+import { deleteSignatureTemplate, listSignatureTemplates, saveSignatureTemplate, setDefaultSignatureTemplate, type SignatureTemplateActor } from "./signatureTemplateStore";
+import { MailboxCredentialError } from "./mailboxCredentials";
 import { getIdentityRecomputeJob } from "./threadRecomputeJobs";
 import { accountPrefsPatchSchema } from "./accountPrefs";
 import { getUserAccountPrefs, mergeUserAccountPrefs, listSenderIdentities, InvalidAccountPreferencesError } from "./serverDb";
@@ -382,6 +385,9 @@ const SENDER_IDENTITY_SCHEMA = z.object({ id: z.string(), accountId: z.string(),
   createdBy: z.string().nullable(), createdAt: z.number(), updatedAt: z.number() });
 const IDENTITY_JOB_SCHEMA = z.object({ id: z.string(), accountId: z.string(), status: z.enum(["queued", "running", "done", "failed"]),
   startedAt: z.number(), finishedAt: z.number().optional(), error: z.string().optional(), pid: z.number().optional() }).nullable();
+const SIGNATURE_TEMPLATE_SCHEMA = z.object({ id: z.string(), name: z.string(), body: z.string() });
+const SIGNATURE_TEMPLATES_OUTPUT = { signatures: z.array(SIGNATURE_TEMPLATE_SCHEMA), defaultSignatureId: z.string().optional() };
+const SIGNATURE_ID_ARG = z.string().min(1).max(256);
 const SENDER_PREFS_SCHEMA = z.object({ defaultIdentityId: z.string().optional(), defaultSignatureId: z.string().optional(), signatureOverride: z.string().optional() });
 function senderPrefs(prefs: import("./data").UserAccountPrefs) {
   return { defaultIdentityId: prefs.defaultIdentityId, defaultSignatureId: prefs.defaultSignatureId, signatureOverride: prefs.signatureOverride };
@@ -400,11 +406,17 @@ function senderToolOutput(shape: Record<string, z.ZodType>) {
     }).meta({ anyOf: z.toJSONSchema(variants).oneOf ?? z.toJSONSchema(variants).anyOf });
 }
 
+/** Keep the mailbox service's status visible so clients can retry a conflict instead of treating it as a rejection. */
+export function mailboxErrorCode(status: number) {
+  return status === 409 ? "mailbox_conflict" : status === 404 ? "account_not_found" : status === 403 ? "forbidden" : "mailbox_update_rejected";
+}
 async function senderToolCall(run: () => Promise<ReturnType<typeof buildToolResult>>) {
   try { return await run(); }
   catch (error) {
-    if (error instanceof SenderIdentityError || error instanceof InvalidAccountPreferencesError || error instanceof DraftSaveError) {
-      const code = error instanceof SenderIdentityError ? error.code : error instanceof InvalidAccountPreferencesError ? "invalid_preferences" : "invalid_draft";
+    if (error instanceof SenderIdentityError || error instanceof SignatureTemplateError || error instanceof MailboxCredentialError ||
+        error instanceof InvalidAccountPreferencesError || error instanceof DraftSaveError) {
+      const code = error instanceof SenderIdentityError || error instanceof SignatureTemplateError ? error.code
+        : error instanceof MailboxCredentialError ? mailboxErrorCode(error.status) : error instanceof InvalidAccountPreferencesError ? "invalid_preferences" : "invalid_draft";
       return { ...buildToolResult(error.message, { ok: false, code, message: error.message }), isError: true };
     }
     throw error;
@@ -422,6 +434,9 @@ async function resolveAccountContext(
 }
 function mcpActor(context: McpAccountContext) {
   return { userId: context.tokenRecord.createdByUserId, clientId: `mcp:${context.tokenRecord.id}` };
+}
+function identityManagementActor(context: McpAccountContext): SignatureTemplateActor {
+  return { ...mcpActor(context), beforeWrite: () => authorizeOutbound({ tokenId: context.tokenRecord.id }, { accountId: context.accountId, minRole: "manager", purpose: "identity-management" }) };
 }
 
 function normalizeStringList(values?: string[] | null) {
@@ -1363,6 +1378,51 @@ export async function executeMcpHttpRequest(params: {
       const prefs = await mergeUserAccountPrefs(ctx.tokenRecord.createdByUserId, ctx.accountId, args.patch,
         () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "viewer", purpose: "identity-management", identity: args.patch.defaultIdentityId ?? undefined }));
       return buildToolResult("Sender preferences saved.", { ok: true, prefs: senderPrefs(prefs) });
+    });
+  });
+
+  server.registerTool("list_signature_templates", {
+    description: `Read this mailbox's signature templates (with body) and the mailbox default. Placeholders: ${SIGNATURE_PLACEHOLDERS}.`,
+    inputSchema: z.object(ACCOUNT_ID_ARG).strict(),
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    outputSchema: senderToolOutput(SIGNATURE_TEMPLATES_OUTPUT)
+  }, async args => {
+    const ctx = await resolveAccountContext(context, args.accountId);
+    const result = listSignatureTemplates(ctx.account.settings);
+    return buildToolResult(`Returned ${result.signatures.length} signature templates.`, { ok: true, ...result });
+  });
+  server.registerTool("save_signature_template", {
+    description: `Create a mailbox signature template (omit signatureId) or replace name and body of an existing one (manager). Plain text, at most 8 KiB; placeholders: ${SIGNATURE_PLACEHOLDERS}.`,
+    inputSchema: z.object({ ...ACCOUNT_ID_ARG, signatureId: SIGNATURE_ID_ARG.optional(), name: z.string().trim().min(1).max(256), body: z.string() }).strict(),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    outputSchema: senderToolOutput({ signature: SIGNATURE_TEMPLATE_SCHEMA, ...SIGNATURE_TEMPLATES_OUTPUT })
+  }, async args => {
+    const ctx = await resolveAccountContext(context, args.accountId, "manager");
+    return senderToolCall(async () => {
+      const result = await saveSignatureTemplate(ctx.accountId, args, identityManagementActor(ctx));
+      return buildToolResult(`Saved signature template ${result.signature.id}.`, { ok: true, ...result });
+    });
+  });
+  server.registerTool("delete_signature_template", {
+    description: "Delete a mailbox signature template (manager). Fails with signature_in_use while a sender identity uses it; clears the mailbox default if it was the default.",
+    inputSchema: z.object({ ...ACCOUNT_ID_ARG, signatureId: SIGNATURE_ID_ARG }).strict(),
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
+    outputSchema: senderToolOutput(SIGNATURE_TEMPLATES_OUTPUT)
+  }, async args => {
+    const ctx = await resolveAccountContext(context, args.accountId, "manager");
+    return senderToolCall(async () => buildToolResult(`Deleted signature template ${args.signatureId}.`, { ok: true,
+      ...await deleteSignatureTemplate(ctx.accountId, args.signatureId, identityManagementActor(ctx)) }));
+  });
+  server.registerTool("set_default_signature_template", {
+    description: "Set the mailbox default signature template (manager). Null or an empty id means no default. Members' own choices (set_sender_preferences) still take precedence.",
+    inputSchema: z.object({ ...ACCOUNT_ID_ARG, signatureId: z.string().trim().max(256).nullable() }).strict(),
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+    outputSchema: senderToolOutput(SIGNATURE_TEMPLATES_OUTPUT)
+  }, async args => {
+    const ctx = await resolveAccountContext(context, args.accountId, "manager");
+    return senderToolCall(async () => {
+      const result = await setDefaultSignatureTemplate(ctx.accountId, args.signatureId || null, identityManagementActor(ctx));
+      return buildToolResult(result.defaultSignatureId ? `Default signature template is ${result.defaultSignatureId}.` : "No default signature template.", { ok: true, ...result });
     });
   });
 

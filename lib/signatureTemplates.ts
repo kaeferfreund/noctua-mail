@@ -4,6 +4,7 @@ import { escapeHtml, extractVisibleHtmlText, hasRenderableHtmlMedia } from "./ht
 
 export type SignatureUser = { name?: string | null; email: string };
 export type SignatureBlock = { id: string; text: string; html: string; markdown?: string };
+export const SIGNATURE_PLACEHOLDERS = "{{user.name}}, {{user.email}}, {{identity.displayName}}, {{identity.email}}";
 const tokens = /\{\{(user\.(?:name|email)|identity\.(?:displayName|email))\}\}/g;
 
 export class SignatureTemplateError extends Error {

@@ -39,6 +39,7 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpScope>> = {
   assign_topics: "drafts", unassign_topics: "drafts", create_draft_message: "drafts", update_draft_message: "drafts",
   list_sender_identities: "read", create_sender_identity: "manage", update_sender_identity: "manage",
   get_sender_preferences: "read", set_sender_preferences: "manage",
+  list_signature_templates: "read", save_signature_template: "manage", delete_signature_template: "manage", set_default_signature_template: "manage",
   flag_message: "drafts", unflag_message: "drafts", mark_message_todo: "drafts", mark_message_done: "drafts", clear_message_todo: "drafts",
   list_mailbox_members: "read", get_thread_collaboration: "read", set_thread_status: "drafts",
   assign_thread: "drafts", add_internal_comment: "drafts", list_thread_activity: "read"
