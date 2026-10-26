@@ -90,7 +90,7 @@ if (!scenario) {
         id: "synthetic-inbox", accountId: "synthetic-account", name: "Inbox", path: "INBOX", specialUse: "\\Inbox"
       }]);
       return Response.json({ ok: true, users: [], accounts: [], items: [], messages: [],
-        total: 0, hasMore: false, topics: [], aliases: [], members: [], mailboxes: [], invites: [], prefs: {} });
+        total: 0, hasMore: false, jobs: [], topics: [], aliases: [], members: [], mailboxes: [], invites: [], prefs: {} });
     }) as typeof fetch;
     const flushIdle = async () => {
       await act(async () => {
@@ -210,7 +210,9 @@ if (!scenario) {
         await flushIdle();
         await waitFor(() => expect(Boolean(require.cache[require.resolve("../AccountSettingsModal")])).toBe(true));
         expectCold();
-        expect(calls.some(url => url.startsWith("/api/admin/"))).toBe(false);
+        expect(calls.filter(url => url.startsWith("/api/admin/"))).toEqual(
+          scenario === "cancel warm-up on role change" ? ["/api/admin/spam-rescan"] : []
+        );
         view.unmount();
         const userMenu = render(menu(false));
         openMenu(userMenu);
@@ -225,7 +227,8 @@ if (!scenario) {
         await flushIdle();
         await waitFor(() => expect(loaded()).toEqual([true, true, true]));
         expect(view.queryByRole("dialog")).toBeNull();
-        expect(calls.some(url => url.startsWith("/api/admin/"))).toBe(false);
+        // One cheap activity discovery is expected; lazy admin panels still fetch nothing.
+        expect(calls.filter(url => url.startsWith("/api/admin/"))).toEqual(["/api/admin/spam-rescan"]);
       }
       if (scenario === "cold mailbox creation from mailbox gate") {
         act(() => { fireEvent.click(view.getByRole("button", { name: "Add a mailbox" })); });
