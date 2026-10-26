@@ -190,7 +190,7 @@ final effect; draft saves explicitly require `drafts`, identity/preferences writ
 The HTTP web send authorization is unchanged.
 
 Every authorized `tools/call` has a per-token, process-local fixed-window budget:
-60 calls per minute in total and 10 writes per minute, shared across tools, HTTP
+60 calls per minute in total and 30 writes per minute, shared across tools, HTTP
 requests, batches and covered mailboxes. Non-`read` scopes and `check_new_mail`
 consume the write budget; `tools/list` and protocol messages do not. A limited call
 performs no tool work and returns HTTP 200 with an MCP tool error (`isError:true`)

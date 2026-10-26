@@ -1131,7 +1131,7 @@ class StatelessJsonResponseTransport implements Transport {
           continue;
         }
         if (isMcpToolRateLimited(this.tokenId, String(message.params?.name ?? ""))) {
-          const text = "MCP rate limit exceeded (60 calls/minute, 10 writes/minute per token). Retry after 60 seconds.";
+          const text = "MCP rate limit exceeded (60 calls/minute, 30 writes/minute per token). Retry after 60 seconds.";
           await this.send({ jsonrpc: "2.0", id: message.id, result: { content: [{ type: "text", text }], isError: true,
             structuredContent: { ok: false, code: "rate_limited", status: 429, message: text, retryAfterSeconds: 60 } } });
           continue;
