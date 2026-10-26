@@ -152,6 +152,9 @@ async function readExactSource(accountId: string, id: string) {
   }
 }
 
+/** Busy timeout of the read-only connections (the dry run reads while the app writes). */
+const READER_BUSY_TIMEOUT_MS = 15_000;
+
 /**
  * Read-only inspection of every target shard before anything is written:
  * main.db's accounts, shard location and format, and the legacy counts.
@@ -167,6 +170,7 @@ export function inspectSenderKeyLegacyRows(options: { dataDir: string; account?:
   if (!existsSync(mainFile)) throw new Error(`No main.db in ${dataDir}`);
 
   const main = new Database(mainFile, { readonly: true });
+  main.exec(`PRAGMA busy_timeout = ${READER_BUSY_TIMEOUT_MS}`);
   const allAccounts = main.prepare("SELECT * FROM accounts ORDER BY id").all() as
     Array<{ id: string; email: string; dbPath: string | null } & Record<string, unknown>>;
   main.close();
@@ -195,6 +199,8 @@ export function inspectSenderKeyLegacyRows(options: { dataDir: string; account?:
       let reader = readers.get(file);
       if (!reader) {
         reader = new Database(file, { readonly: true });
+        // The app may hold the write lock during a checkpoint; wait like its own connections.
+        reader.exec(`PRAGMA busy_timeout = ${READER_BUSY_TIMEOUT_MS}`);
         readers.set(file, reader);
       }
       counts.refused = schemaProblem(reader);

@@ -35,7 +35,9 @@ export type {
 } from "./sync";
 export {
   findMissingStoredMailboxCopies,
+  ImapUidValidityChangedError,
   inspectStoredMailboxCopies,
+  isImapFallbackMessageId,
   planImapNewSyncFolders,
   syncImapAccountBatched,
   syncImapMessage

@@ -1,3 +1,4 @@
+import type { Database } from "bun:sqlite";
 import { parseAddressEmails } from "../../ownAddresses";
 import type { OutboundWriteAuthorization } from "../../outboundAuthorization";
 import { withOutboundWrite } from "../../outboundWrite";
@@ -93,12 +94,26 @@ function normalizeCategoryManualState(value?: string | null): CategoryManualStat
   return null;
 }
 
+/** `upsertMessages` wrote nothing: its `precondition` no longer held inside the write transaction. */
+export class UpsertPreconditionError extends Error {
+  constructor() {
+    super("upsertMessages precondition no longer holds; nothing was written");
+    this.name = "UpsertPreconditionError";
+  }
+}
+
 export async function upsertMessages(
   accountId: string,
   folderId: string | null,
   nextMessages: Message[],
   replaceExisting = false,
-  options: { recomputeThreads?: boolean; beforeWrite?: OutboundWriteAuthorization; replaceDraftId?: string } = {}
+  options: {
+    recomputeThreads?: boolean;
+    beforeWrite?: OutboundWriteAuthorization;
+    replaceDraftId?: string;
+    /** Evaluated on the shard first thing inside the immediate write transaction; false throws UpsertPreconditionError. */
+    precondition?: (db: Database) => boolean;
+  } = {}
 ) {
   return withOutboundWrite("upsertMessages", options.beforeWrite, async authorizedWrite => {
     const shouldRecomputeThreads = options.recomputeThreads ?? true;
@@ -737,6 +752,7 @@ export async function upsertMessages(
     try {
       const collabChanges = authorizedWrite(db, () => {
         try {
+          if (options.precondition && !options.precondition(db)) throw new UpsertPreconditionError();
           captureIdentitySnapshots();
           if (options.replaceDraftId) {
             const previous = findMessageById.get(accountId, options.replaceDraftId) as ReplacedRow | undefined;

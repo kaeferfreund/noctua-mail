@@ -18,8 +18,9 @@
  *
  * --resync fetches the rows that are still legacy afterwards from IMAP and
  * re-ingests them like the reader's "resync message" action
- * (lib/mail/senderKeyResync.ts). It needs the service's IMAP_SECRET_KEY and
- * reports UIDs that are gone instead of writing them.
+ * (lib/mail/senderKeyResync.ts), mailboxes opened read-only. It needs the
+ * service's IMAP_SECRET_KEY, trusts UIDs only under the UIDVALIDITY stored in
+ * mailbox_state and reports UIDs that are gone instead of writing them.
  */
 import { writeFileSync } from "node:fs";
 import { parseSenderKeyBackfillArgs, SENDER_KEY_BACKFILL_USAGE } from "../lib/db/messages/senderKeyBackfill";
@@ -43,11 +44,12 @@ if (args.resync) {
   const result = await runSenderKeyResync({ dataDir: args.dataDir, account: args.account, write: args.write, batch: args.batch,
     limit: args.limit, log: line => console.log(line) });
   for (const account of result.accounts) console.log(describeSenderKeyResyncAccount(account, args.write));
-  const total = (key: "legacy" | "examined" | "present" | "resynced" | "stampedSenderKey" | "gone" | "uidMismatch") =>
-    result.accounts.reduce((sum, account) => sum + account[key], 0);
+  const total = (key: "legacy" | "examined" | "present" | "resynced" | "stampedSenderKey" | "gone" | "uidMismatch"
+    | "noMessageId" | "uidValidityChanged") => result.accounts.reduce((sum, account) => sum + account[key], 0);
   console.log(`Summary: ${total("legacy")} legacy rows, ${total("examined")} examined, ${total("present")} on IMAP`
     + `${args.write ? `, ${total("resynced")} resynced (${total("stampedSenderKey")} with sender key)` : " would be resynced"}, `
-    + `${total("gone")} gone, ${total("uidMismatch")} UID mismatches, ${result.reportedRows.length} rows reported, `
+    + `${total("gone")} gone, ${total("uidMismatch")} UID mismatches, ${total("noMessageId")} without Message-ID, `
+    + `${total("uidValidityChanged")} with unknown or changed UIDVALIDITY, ${result.reportedRows.length} rows reported, `
     + `${(result.ms / 1000).toFixed(1)} s`);
   if (args.out) {
     const accounts = result.accounts.map(({ email: _email, ...account }) => account);
