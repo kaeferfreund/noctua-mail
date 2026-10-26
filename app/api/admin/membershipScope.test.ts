@@ -106,7 +106,9 @@ describe("admin routes are limited to the admin's own mailboxes", () => {
     expect(f.admin.master.prepare("SELECT 1 FROM admin_audit WHERE action='user.delete' AND targetUserId=?").get(f.member.id)).toBeNull();
     // A user whose memberships are all visible can be deleted.
     await f.admin.master.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(f.member.id, f.foreign.id);
+    f.admin.master.prepare("INSERT INTO user_provisioning(id,userId,normalizedEmail,kind,state,createdAt,updatedAt) VALUES(?,?,?,'migration','complete',1,1)").run(crypto.randomUUID(), f.member.id, f.member.email);
     expect((await deleteUser(request(f.admin, "admin/users", "DELETE", {}), params)).status).toBe(200);
+    expect(f.admin.master.prepare("SELECT 1 FROM user_provisioning WHERE userId=?").get(f.member.id)).toBeNull();
   });
 
   test("Protokoll hides entries of foreign mailboxes; own actions also require membership", async () => {

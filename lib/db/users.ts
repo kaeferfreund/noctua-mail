@@ -117,6 +117,7 @@ export function detachUserDomainRows(db:any,userId:string,reassignOwnerTo?:strin
 }
 
 export function deleteUserProfileRow(db:any,userId:string) {
+  db.prepare(`DELETE FROM user_provisioning WHERE userId=?`).run(userId);
   return changedRows(db.prepare(`DELETE FROM users WHERE id=?`).run(userId))>0;
 }
 
