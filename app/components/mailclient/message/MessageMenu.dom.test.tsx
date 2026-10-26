@@ -75,7 +75,8 @@ function setup({ collapsed = true, allRead = false, origin = "list", single = fa
     onToggleTopic: noop, onGetRecentFolders: () => [], onMoveToFolder: noop,
     onMoveTo: noop, isTrashFolder: () => inTrash, isSpamFolder: () => false
   };
-  const view = render(<Theme><TooltipProvider><MessageMenu {...props} /></TooltipProvider></Theme>);
+  let rowClicks = 0;
+  const view = render(<Theme><TooltipProvider><div onClick={() => { rowClicks++; }}><MessageMenu {...props} /></div></TooltipProvider></Theme>);
   const open = async () => {
     await act(async () => {
       fireEvent.keyDown(view.getByRole("button", { name: "Message actions" }), { key: "Enter" });
@@ -89,7 +90,7 @@ function setup({ collapsed = true, allRead = false, origin = "list", single = fa
       await new Promise(resolve => setTimeout(resolve, 0));
     });
   };
-  return { view, open, choose, messages, calls, flags, todos, deletes, archives, resolutions: () => resolutions };
+  return { view, open, choose, messages, calls, flags, todos, deletes, archives, resolutions: () => resolutions, rowClicks: () => rowClicks };
 }
 
 describe("row read/unread menu", () => {
@@ -211,4 +212,12 @@ describe("row menu focus return", () => {
       Element.prototype.matches = originalMatches;
     }
   });
+});
+
+it("portal menu actions never bubble into the owning message row", async () => {
+  const menu = setup();
+  await menu.open();
+  await menu.choose("Mark as read");
+  expect(menu.rowClicks()).toBe(0);
+  expect(menu.calls).toHaveLength(1);
 });
