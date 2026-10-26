@@ -109,7 +109,8 @@ export {
   listRecipientSuggestions
 } from "./db/messages";
 
-export { upsertMessages } from "./db/messages";
+export { UpsertPreconditionError, upsertMessages } from "./db/messages";
+export { inspectSenderKeyLegacyRows, type SenderKeyLegacyCounts } from "./db/messages/senderKeyBackfill";
 
 export {
   getTombstonedDraftMessageIds,

@@ -72,7 +72,7 @@ export {
   listRecipientSuggestions
 } from "./utility";
 
-export { upsertMessages } from "./upsert";
+export { UpsertPreconditionError, upsertMessages } from "./upsert";
 
 export {
   getTombstonedDraftMessageIds,
