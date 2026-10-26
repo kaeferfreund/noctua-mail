@@ -38,7 +38,7 @@ import { buildSenderIconSrc } from "@/app/components/mailclient/SenderIcon";
 import type { BuildIdentity } from "@/lib/buildVersion";
 import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxLabel, sortMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
 import { useStableHandlers } from "@/app/hooks/useStableHandlers";
-import { useCollapsedDomains, type MailboxSection } from "@/lib/ui/collapsedDomains";
+import { useCollapsedDomains } from "@/lib/ui/collapsedDomains";
 import { versionedIconUrl } from "@/lib/appBranding";
 import type { DomainIconVersions } from "@/app/hooks/useDomainIconVersions";
 
@@ -241,20 +241,17 @@ export function MailboxRows({
   onSwitch,
   summaries,
   userId,
-  section,
   domainIcons
 }: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "summaries" | "userId" | "domainIcons"> & {
   pendingAccountId?: string | null;
   onSwitch: (accountId: string) => void;
-  /** Keys the collapsed domain groups together with the domain. */
-  section: MailboxSection;
 }) {
   const t = useTranslations("Shell");
   const listId = useId();
   const summaryById = useMemo(() => new Map(summaries?.map(summary => [summary.accountId, summary])), [summaries]);
   const groups = useMemo(() => groupMailboxes(accounts), [accounts]);
   const grouped = accounts.length >= MAILBOX_GROUPING_MIN;
-  const { collapsed, toggle } = useCollapsedDomains(userId, section);
+  const { collapsed, toggle } = useCollapsedDomains(userId);
   // Headings and row lists are siblings: no wrapper per group adds padding
   // or margins of its own; a heading after the first opens with the gap
   // between groups.
@@ -429,7 +426,6 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               <SidebarGroupContent>
                 {accounts.length > 0 ? (
                   <MailboxRows
-                    section="mine"
                     accounts={accounts}
                     summaries={mailboxes.summaries}
                     activeAccountId={mailboxes.activeAccountId}
