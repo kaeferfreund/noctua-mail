@@ -30,7 +30,9 @@ insertUserAccountLinkRow(db,seeds[0].id,account.id,'manager');
 if (process.env.QA_DEEP_LINKS_FIXTURE === "1") {
  for (const [id, name, email, owner] of [
   ["qa-second", "QA Second", "second@example.test", seeds[0].id],
-  ["qa-private", "QA Private", "private@example.test", seeds[1].id]
+  ["qa-private", "QA Private", "private@example.test", seeds[1].id],
+  // Notification → reader → mailbox switch needs a third granted mailbox.
+  ...(process.env.QA_NOTIFICATION_FIXTURE === "1" ? [["qa-third", "QA Third", "third@example.test", seeds[0].id] as const] : [])
  ] as const) {
   persistAccountRow(db, { ...account, id, name, email, ownerUserId: owner });
   insertUserAccountLinkRow(db, owner, id, "manager");

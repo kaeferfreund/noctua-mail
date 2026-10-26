@@ -12,6 +12,7 @@ import { getTranslator } from "@/lib/i18n/translator";
 import LocaleSessionSync from "@/app/components/i18n/LocaleSessionSync";
 import I18nProvider from "@/app/components/i18n/I18nProvider";
 import ThemeColorSync from "@/app/components/shell/ThemeColorSync";
+import ClientErrorReporting from "@/app/components/ClientErrorReporting";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { locale } = await getLocaleSettings();
@@ -60,6 +61,7 @@ export default async function RootLayout({
         <script id="ios-standalone" dangerouslySetInnerHTML={{ __html: IOS_STANDALONE_SCRIPT }} />
       </head>
       <body suppressHydrationWarning>
+        <ClientErrorReporting />
         <I18nProvider {...settings}>
           <LocaleSessionSync uiLocale={settings.uiLocale} />
           <ThemeProvider attribute="class" storageKey="noctua:theme" enableSystem>

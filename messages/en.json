@@ -495,6 +495,12 @@
   "Pwa": {
     "description": "Webmail for personal and shared mailboxes"
   },
+  "Crash": {
+    "title": "The interface crashed",
+    "description": "An error stopped the view and has been reported. Reload opens it again.",
+    "reload": "Reload",
+    "home": "Go to start page"
+  },
   "Shell": {
     "theme": {
       "label": "Theme",
