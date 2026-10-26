@@ -297,9 +297,20 @@ async function runScan(job: StoredSpamRescanJob, inboxId: string) {
       counts.modelCalls = usage.calls;
     }
     // Flagged, answered or $NotJunk mail stays, as in Stage A and the move's re-check.
-    const marked = (await listMarkedSpamMessages(accountId, inboxId, since, SPAM_RESCAN_ITEM_LIMIT + listedIds.size + 1))
-      .filter((row) => !listedIds.has(row.id)
-        && !keptInInbox({ flags: storedStrings(row.flags), flagged: row.flagged === 1, answered: row.answered === 1, spamVerdict: "spam" }));
+    const marked: Awaited<ReturnType<typeof listMarkedSpamMessages>> = [];
+    let before: { dateValue: number; id: string } | undefined;
+    // Page past protected rows before applying the display cap; one extra movable hit detects truncation.
+    while (marked.length <= SPAM_RESCAN_ITEM_LIMIT && !isCancelled()) {
+      const page = await listMarkedSpamMessages(accountId, inboxId, since, 500, before);
+      for (const row of page) {
+        if (!listedIds.has(row.id) && !keptInInbox({ flags: storedStrings(row.flags), flagged: row.flagged === 1,
+          answered: row.answered === 1, spamVerdict: "spam" })) marked.push(row);
+        if (marked.length > SPAM_RESCAN_ITEM_LIMIT) break;
+      }
+      if (page.length < 500) break;
+      const last = page[page.length - 1];
+      before = { dateValue: last.dateValue, id: last.id };
+    }
     counts.classifierMarked = marked.length;
     await list(marked.map((row) => ({
       id: row.id, rfcMessageId: row.messageId, from: row.fromAddr ?? "", subject: (row.subject ?? "").slice(0, 200), date: row.date,

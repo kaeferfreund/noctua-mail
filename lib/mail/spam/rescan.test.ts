@@ -285,3 +285,20 @@ describe("admin INBOX rescan", () => {
     expect(state.items.map((item) => item.moveStatus)).toEqual(["changed", "changed"]);
   });
 });
+
+
+test("protected hits before the cap do not hide older movable hits or truncation", async () => {
+  const f = await fixture();
+  const now = Date.now();
+  const insert = f.db.prepare(`INSERT INTO messages(id,accountId,folderId,date,dateValue,spamVerdict,spamCheckedAt,flagged,flags)
+    VALUES(?,?,?,'',?,'spam',?, ?, ?)`);
+  f.db.transaction(() => {
+    for (let index = 0; index < 5001; index++) insert.run(`protected-${index}`, f.accountId, f.folderId, now, now, 1, '["NONJUNK"]');
+    for (let index = 0; index < 5001; index++) insert.run(`movable-${index}`, f.accountId, f.folderId, now - 1000, now, 0, '[]');
+  })();
+  await f.run(() => rescan.startSpamRescan({ accountId: f.accountId, period: "all", withModel: true, modelLimit: 0, userId: ADMIN }));
+  const state = await rescan.loadSpamRescanState(f.accountId);
+  expect(state.items).toHaveLength(5000);
+  expect(state.items.every(item => item.id.startsWith("movable-"))).toBe(true);
+  expect(state.job?.counts.truncated).toBe(true);
+});
