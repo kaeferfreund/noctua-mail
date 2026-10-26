@@ -302,3 +302,19 @@ test("protected hits before the cap do not hide older movable hits or truncation
   expect(state.items.every(item => item.id.startsWith("movable-"))).toBe(true);
   expect(state.job?.counts.truncated).toBe(true);
 });
+
+
+test("a failed example write after a successful move leaves the item moved", async () => {
+  const f = await fixture();
+  const [message] = await f.seed(f.mail());
+  const job = await f.run(() => rescan.startSpamRescan({ accountId: f.accountId, period: "all", withModel: true, modelLimit: 1, userId: ADMIN }));
+  f.db.exec("CREATE TRIGGER synthetic_example_failure BEFORE INSERT ON spam_examples BEGIN SELECT RAISE(ABORT,'synthetic example failure'); END");
+  try {
+    await f.run(() => rescan.startSpamRescanMove({ accountId: f.accountId, jobId: job.id, ids: [message.id], userId: ADMIN }));
+    const state = await rescan.loadSpamRescanState(f.accountId);
+    expect(state.items.find(item => item.id === message.id)?.moveStatus).toBe("moved");
+    expect(state.job?.counts).toMatchObject({ moved: 1, errors: 0 });
+    expect(await f.run(() => rescan.startSpamRescanMove({ accountId: f.accountId, jobId: job.id, ids: [message.id], userId: ADMIN }))).toBe(0);
+    expect(f.moved).toEqual([message.id]);
+  } finally { f.db.exec("DROP TRIGGER synthetic_example_failure"); }
+});

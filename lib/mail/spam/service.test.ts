@@ -12,7 +12,7 @@ import type { SpamAdminSettings } from "./config";
 import type { SpamServiceDeps } from "./service";
 
 // The service with a mocked model and a recorded Junk move: no API call, no IMAP.
-const { replaceSpamServiceDeps, runSpamSweep, spamChecksIdle } = await import("./service");
+const { replaceSpamServiceDeps, runSpamSweep, runRescanSpamChecks, spamChecksIdle } = await import("./service");
 
 const ADMIN = "spam-service-test";
 const answer = (verdict: string, confidence: number) => JSON.stringify({ verdict, confidence, reasons: ["Synthetischer Grund"] });
@@ -160,4 +160,18 @@ describe("spam service \"Kein Spam\" roles", () => {
     expect(model.doGenerateCalls).toHaveLength(1);
     expect(await f.api.getMessageById(f.accountId, third.id)).toMatchObject({ spamVerdict: "ham", spamReasons: ["Absender wurde als „Kein Spam“ markiert"] });
   });
+});
+
+
+test("a queued rescan skips mail judged by the sweep meanwhile", async () => {
+  const f = await fixture();
+  const [message] = await f.seed(f.mail());
+  await f.api.saveSpamVerdict(f.accountId, message.id, { verdict: "ham", confidence: 1, reasons: ["Synthetic sweep verdict"] });
+  const model = mockSpamModel(answer("spam", 0.99));
+  const restore = replaceSpamServiceDeps({ languageModel: () => model, sleep: async () => {} });
+  try {
+    await runRescanSpamChecks(f.accountId, [{ id: message.id }], { rescanJobId: crypto.randomUUID(), isCancelled: () => false, onProgress: () => {} });
+    expect(model.doGenerateCalls).toHaveLength(0);
+    expect(f.row(message.id).spamVerdict).toBe("ham");
+  } finally { restore(); }
 });

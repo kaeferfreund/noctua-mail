@@ -226,7 +226,8 @@ async function checkMessage(job: SpamCheckJob) {
   const mailbox = await loadMailboxSpamSettings(job.accountId);
   if (!isSpamDetectionOn(config, mailbox)) return;
   const message = await getMessageById(job.accountId, job.messageId);
-  if (!message) return;
+  // A sweep or rescan may have judged this row while this job waited in the queue.
+  if (!message || message.spamVerdict !== undefined) return;
   const folders = await getFolders(job.accountId);
   // Moved meanwhile (Junk, Trash, Sent, Drafts …): only INBOX mail is checked.
   if (message.folderId !== findInboxFolder(folders, job.accountId)?.id) return;
