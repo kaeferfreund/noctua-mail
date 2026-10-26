@@ -1087,7 +1087,7 @@ export async function executeMcpHttpRequest(params: {
   const server = new McpServer(
     {
       name: "mywebmail-mcp",
-      version: "1.0.0"
+      version: "1.0.1"
     },
     {
       capabilities: {
