@@ -3,7 +3,18 @@ import { evidencePath, recordQa, signInQa } from "./qaRound2Session";
 
 // Settings layout regressions (QA-205/207/216, 320 px overflow, hyphenation scope)
 // on the synthetic shell fixture, in German.
+const previousLocales = new WeakMap<Page, string | null>();
+test.afterEach(async ({ page }) => {
+  if (!previousLocales.has(page)) return;
+  const restored = await page.request.put("/api/auth/preferences", { data: { uiLocale: previousLocales.get(page) },
+    headers: { origin: new URL(page.url()).origin } });
+  expect(restored.status()).toBe(200);
+  previousLocales.delete(page);
+});
+
 async function setGerman(page: Page) {
+  const identity = await (await page.request.get("/api/auth/me")).json();
+  previousLocales.set(page, identity.user.uiLocale ?? null);
   await page.goto("/message/window");
   const response = await page.request.put("/api/auth/preferences", { data: { uiLocale: "de" },
     headers: { origin: new URL(page.url()).origin } });
@@ -53,13 +64,11 @@ test("settings fit phones, use 44px selects there, save once and hint the member
       await expect(panel).toBeVisible();
       if (tab === "Persönliche Einstellungen") await expect(panel.getByLabel("Standardabsender", { exact: true })).toBeEnabled();
       if (tab === "Mitglieder") await expect(panel.locator("tbody tr")).not.toHaveCount(0);
-      const selects = await panel.locator("select").evaluateAll(elements => elements
-        .filter(element => (element as HTMLElement).offsetParent)
-        .map(element => ({ label: element.getAttribute("aria-label") ?? element.closest("label")?.textContent?.slice(0, 40) ?? element.id, height: (element as HTMLElement).offsetHeight })));
+      const selects = await nativeSelects(panel);
       const overflow = await sidewaysScrollers(page);
       results.push({ width, tab, overflow, selects });
       expect(overflow).toEqual([]);
-      for (const select of selects) expect(select.height).toBeGreaterThanOrEqual(width < 768 ? 44 : 36);
+      if (selects.length) expectStyledSelects(selects, width);
       const slug = { Postfach: "account", "Persönliche Einstellungen": "preferences", Themen: "topics", Mitglieder: "members" }[tab];
       await page.screenshot({ path: evidencePath(`settings-${slug}-${width}.png`) });
       if (tab === "Persönliche Einstellungen") {
@@ -93,12 +102,16 @@ async function nativeSelects(scope: ReturnType<Page["locator"]>) {
   return scope.locator("select").evaluateAll(elements => elements
     .filter(element => (element as HTMLElement).offsetParent)
     .map(element => ({ label: element.getAttribute("aria-label") ?? element.closest("label")?.textContent?.slice(0, 40) ?? "",
+      // Desktop native controls have intrinsic line-height, p-2 and a border; no 36px minimum.
+      desktopMin: Number.parseFloat(getComputedStyle(element).fontSize)
+        + Number.parseFloat(getComputedStyle(element).paddingTop) + Number.parseFloat(getComputedStyle(element).paddingBottom)
+        + Number.parseFloat(getComputedStyle(element).borderTopWidth) + Number.parseFloat(getComputedStyle(element).borderBottomWidth),
       height: (element as HTMLElement).offsetHeight, radius: getComputedStyle(element).borderTopLeftRadius, padding: getComputedStyle(element).paddingLeft })));
 }
 function expectStyledSelects(selects: Awaited<ReturnType<typeof nativeSelects>>, width: number) {
   expect(selects.length).toBeGreaterThan(0);
   for (const select of selects) {
-    expect(select.height).toBeGreaterThanOrEqual(width < 768 ? 44 : 36);
+    expect(select.height).toBeGreaterThanOrEqual(width < 768 ? 44 : select.desktopMin);
     expect(Number.parseFloat(select.radius)).toBeGreaterThan(0);
     expect(Number.parseFloat(select.padding)).toBeGreaterThanOrEqual(8);
   }
@@ -123,7 +136,8 @@ test("admin selects are styled and the admin members table sits on a card in bot
       const inviteSelects = await nativeSelects(admin);
       expectStyledSelects(inviteSelects, width);
       await admin.getByRole("button", { name: "Postfächer", exact: true }).click();
-      await admin.getByRole("button", { name: "Mitglieder verwalten", exact: true }).first().click();
+      await admin.locator("div.rounded-md.border").filter({ has: admin.getByText("QA Shared", { exact: true }) })
+        .getByRole("button", { name: "Mitglieder verwalten", exact: true }).click();
       const members = page.getByRole("dialog", { name: "Mitglieder von demo@monkeydent.test", exact: true });
       const table = members.locator("[data-members-table]");
       await expect(table.locator("tbody tr")).not.toHaveCount(0);
@@ -205,12 +219,28 @@ test("QA-205: one Escape closes Settings opened from the user menu", async ({ pa
 });
 
 test("QA-215: the reader labels IMAP system flags in German", async ({ page }) => {
+  test.skip(!process.env.QA_SHELL_CONTROL_URL, "Requires the synthetic IMAP control fixture to seed a Seen message");
+  const subject = "Synthetic QA-215 seen flag";
+  const injected = await fetch(`${process.env.QA_SHELL_CONTROL_URL}/inject`, { method: "POST", body: JSON.stringify({
+    source: ["From: Synthetic Reader <reader@example.test>", "To: reader@example.test",
+      `Message-ID: <qa-215-${Date.now()}@example.test>`, `Date: ${new Date(Date.now() + 3_600_000).toUTCString()}`,
+      `Subject: ${subject}`, "", "Synthetic message for the German Seen badge."].join("\r\n"), flags: ["\\Seen"]
+  }) });
+  expect(injected.ok).toBe(true);
   await signInQa(page);
   await setGerman(page);
   await page.setViewportSize({ width: 1280, height: 844 });
-  await page.goto("/");
-  // A seed message that is already \\Seen (its row has no "Ungelesen" prefix).
-  await page.getByRole("button", { name: /^Jona Testperson Vorsorge nach den Ferien/ }).first().click();
+  const row = page.locator('[data-message-list-row="true"]').filter({ hasText: subject });
+  // Initial IMAP sync can outlast navigation; wait for each first list fetch before inspecting it.
+  await expect(async () => {
+    const fetched = page.waitForResponse(response => response.request().method() === "GET"
+      && new URL(response.url()).pathname === "/api/accounts/qa-shared/messages");
+    await page.goto("/");
+    expect((await fetched).ok()).toBe(true);
+    await expect(row).toBeVisible();
+  }).toPass({ timeout: 90_000 });
+  await expect(row).not.toContainText("Ungelesen");
+  await row.click();
   // The flag badges sit in the header of the expanded message card.
   const badge = page.getByText("Gelesen", { exact: true }).first();
   await expect(badge).toBeVisible();
