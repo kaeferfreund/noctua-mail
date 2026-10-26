@@ -939,6 +939,10 @@ export function initMasterSchema(db: any) {
       ON scheduled_sends(accountId, draftId) WHERE status IN ('queued','sending');
   `);
 
+  // Existing schedules have no trusted content snapshot: they are retained, but must be
+  // planned again instead of silently authorizing whatever an IMAP client last saved.
+  ensureTableColumns(db, "scheduled_sends", [["sourceFingerprint", "TEXT"]]);
+
   db.prepare(
     `CREATE INDEX IF NOT EXISTS idx_mcp_tokens_account_created
      ON mcp_tokens(accountId, createdAt DESC)`

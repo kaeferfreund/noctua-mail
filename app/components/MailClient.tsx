@@ -23,7 +23,7 @@ import { useThreadCollab } from "@/app/hooks/useThreadCollab";
 import { createAutoReadCoordinator, useAutoMarkReadDelay } from "@/app/hooks/useAutoMarkRead";
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
 import { SpamCorrectionProvider } from "./mailclient/SpamBadge";
-import { ScheduledSendProvider } from "./mailclient/scheduledSend/ScheduledSend";
+import { ScheduledSendProvider, ScheduledSendList } from "./mailclient/scheduledSend/ScheduledSend";
 import ScheduleSendDialog from "./mailclient/composition/ScheduleSendDialog";
 import { useScheduledSendControls } from "./mailclient/scheduledSend/useScheduledSends";
 import { readScheduledSendConflict } from "./mailclient/scheduledSend/scheduledSendClient";
@@ -5480,6 +5480,7 @@ export default function MailClient({
                 toggleAllGroups
               }}
             />
+            {activeFolderIsDrafts && <ScheduledSendList />}
             <SelectionActionsMenu
               selectionStore={selectionStore}
               hasActiveMessage={Boolean(activeMessageId)}

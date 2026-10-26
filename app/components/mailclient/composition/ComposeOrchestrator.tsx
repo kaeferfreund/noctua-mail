@@ -50,7 +50,7 @@ import ComposeMessageField from "./ComposeMessageField";
 import ComposeMinimized from "./ComposeMinimized";
 import ComposeModal from "./ComposeModal";
 import ScheduleSendDialog from "./ScheduleSendDialog";
-import { readScheduledSendConflict, scheduleDraftSend } from "../scheduledSend/scheduledSendClient";
+import { readScheduledSendConflict, readScheduledSendRefusal, scheduleDraftSend } from "../scheduledSend/scheduledSendClient";
 import type { ScheduledSendView } from "@/lib/scheduledSendView";
 import { ComposeContextProvider, type ComposeContextValue } from "./ComposeContext";
 import { getDraftChangeState } from "./draftSaveUtils";
@@ -1005,7 +1005,7 @@ function ComposeOrchestratorImpl(
       }
       const result = await scheduleDraftSend(apiFetch, activeAccountId, saved.draftId, sendAt);
       if (!result.ok) {
-        reportError(result.response ? renderMessage(await readSenderError(result.response, readErrorMessage)) || t("schedule.failed") : t("schedule.failed"));
+        reportError(t(`schedule.${result.response ? await readScheduledSendRefusal(result.response) : "failed"}`));
         return false;
       }
       // Compose closes like after a send; the saved draft stays in Drafts with its schedule.
