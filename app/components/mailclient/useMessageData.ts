@@ -209,6 +209,7 @@ export function useMessageData({
       filteredSearchRefreshTimerRef.current = null;
     }
     const cached = cacheableView ? viewCache?.readList(firstPageUrl, activeAccountId) ?? null : null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Restore the external view cache and abort the superseded request atomically before paint.
     setMessages(cached?.rows ?? []);
     setMessagesPage(1);
     setHasMoreMessages(cached?.hasMore ?? true);

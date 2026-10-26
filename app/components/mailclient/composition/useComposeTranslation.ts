@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useLayoutEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import type React from "react";
 import { buildAccountComposeTranslatePath } from "@/lib/accountApiPaths";
@@ -121,9 +121,9 @@ export function useComposeTranslation({
   // Ref mirrors so the async response handler sees current values, not the
   // ones captured when the request started.
   const composeTabRef = useRef(composeTab);
-  composeTabRef.current = composeTab;
+  useLayoutEffect(() => { composeTabRef.current = composeTab; });
   const stateRef = useRef(state);
-  stateRef.current = state;
+  useLayoutEffect(() => { stateRef.current = state; });
 
   const setTargetLang = useCallback((lang: string) => {
     const normalized = normalizeDeeplTargetLang(lang);

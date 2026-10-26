@@ -178,11 +178,13 @@ export default function CalendarEventPreview({
     return () => { active = false; };
   }, [attachment]);
 
-  useEffect(() => {
+  const [previousInviteInputs, setPreviousInviteInputs] = useState<readonly unknown[] | null>(null);
+  if (previousInviteInputs === null || previousInviteInputs[0] !== sourceMessageRowId || previousInviteInputs[1] !== attachment?.id) {
+    setPreviousInviteInputs([sourceMessageRowId, attachment?.id]);
     setInviteStateOverrides({});
     setProcessingInviteUid(null);
     setStoredEventsByUid({});
-  }, [sourceMessageRowId, attachment?.id]);
+  }
 
   const hasCurrentResult = Boolean(attachment && result.attachmentId === attachment.id);
   const events = useMemo(
@@ -256,20 +258,15 @@ export default function CalendarEventPreview({
     [events]
   );
 
-  const refreshStoredEvents = useCallback(async () => {
-    setStoredEventsLoaded(false);
-    if (!accountId.trim()) {
-      setStoredEventsByUid({});
-      setStoredEventsLoaded(true);
-      return;
-    }
-    if (eventUids.length === 0) {
-      setStoredEventsByUid({});
-      setStoredEventsLoaded(true);
-      return;
-    }
-    try {
-      const responses = await Promise.all(
+  const [previousStoredEventInputs, setPreviousStoredEventInputs] = useState<{ accountId: string; eventUids: string[] } | null>(null);
+  if (previousStoredEventInputs === null || previousStoredEventInputs.accountId !== accountId || previousStoredEventInputs.eventUids !== eventUids) {
+    setPreviousStoredEventInputs({ accountId, eventUids });
+    setStoredEventsLoaded(!accountId.trim() || eventUids.length === 0);
+    if (!accountId.trim() || eventUids.length === 0) setStoredEventsByUid({});
+  }
+  const refreshStoredEvents = useCallback(() => {
+    if (!accountId.trim() || eventUids.length === 0) return Promise.resolve();
+    return Promise.all(
         eventUids.map(async (eventUid) => {
           const params = new URLSearchParams({ eventUid });
           const res = await fetch(buildAccountCalendarEventsPath(accountId, params), { cache: "no-store" });
@@ -277,18 +274,15 @@ export default function CalendarEventPreview({
           const payload = (await res.json()) as { event?: CalendarEvent | null };
           return payload.event ? [eventUid.trim().toLowerCase(), payload.event] as const : null;
         })
-      );
+      ).then(responses => {
       const next: Record<string, CalendarEvent> = {};
       responses.forEach((entry) => {
         if (!entry) return;
         next[entry[0]] = entry[1];
       });
       setStoredEventsByUid(next);
-    } catch {
-      // ignore
-    } finally {
-      setStoredEventsLoaded(true);
-    }
+    }).catch(() => { /* Keep previously discovered events on failure. */ })
+      .finally(() => { setStoredEventsLoaded(true); });
   }, [accountId, eventUids]);
 
   useEffect(() => {
@@ -371,7 +365,8 @@ export default function CalendarEventPreview({
         if (statePatches.length > 0) {
           onInviteStateChange?.(statePatches);
         }
-        await refreshStoredEvents();
+        setStoredEventsLoaded(false);
+      await refreshStoredEvents();
         dispatchCalendarRemindersUpdatedEvent();
       } catch (error) {
         reportError(error instanceof Error ? error.message : t("calendarInviteFailed"));

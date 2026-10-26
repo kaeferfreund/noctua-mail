@@ -66,6 +66,7 @@ export default function EventDialog({
     const now = defaultStart ?? new Date();
     const end = defaultEnd ?? new Date(now.getTime() + 60 * 60 * 1000);
     const isAllDay = defaultAllDay ?? false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Opening the dialog samples the wall clock and hydrates its form in the same commit lifecycle.
     setSummary(event?.summary ?? "");
     setDescription(event?.description ?? "");
     setLocation(event?.location ?? "");

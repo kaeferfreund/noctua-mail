@@ -2,7 +2,7 @@ import { readSenderError } from "./senderErrors";
 import { useTranslations } from "next-intl";
 import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 import { loadMarkdownConverters } from "@/lib/markdownConvert";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import type React from "react";
 import type { ComposeInviteDraft } from "@/lib/composeInvite";
 import {
@@ -146,10 +146,12 @@ export function useDraftManager(params: UseDraftManagerParams) {
   const activeAccountIdRef = useRef(activeAccountId);
   const accountScopeVersionRef = useRef(0);
   const draftSaveLoopPromiseRef = useRef<Promise<void> | null>(null);
-  if (activeAccountIdRef.current !== activeAccountId) {
-    activeAccountIdRef.current = activeAccountId;
-    accountScopeVersionRef.current += 1;
-  }
+  useLayoutEffect(() => {
+    if (activeAccountIdRef.current !== activeAccountId) {
+      activeAccountIdRef.current = activeAccountId;
+      accountScopeVersionRef.current += 1;
+    }
+  }, [activeAccountId]);
 
   // Opening compose brings the shared alias read forward from browser idle.
   // The recipient hook publishes the result to shared alias UI.

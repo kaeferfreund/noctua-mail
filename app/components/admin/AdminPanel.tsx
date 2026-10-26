@@ -57,12 +57,17 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
   const [inviteRevision, setInviteRevision] = useState(0);
   const [inviteRole, setInviteRole] = useState<"admin" | "user">("user");
   const auth = useMemo(() => client ?? createAuthClient(apiFetch), [client, apiFetch]);
-  const load = useCallback(async () => {
-    setLoading(true); setError(null);
-    try { setUsers((await adminRequest<{ users: AdminUser[] }>(apiFetch, "/api/admin/users")).users); }
-    catch (error) { setError(error); }
-    finally { setLoading(false); }
+  const load = useCallback(() => {
+    return adminRequest<{ users: AdminUser[] }>(apiFetch, "/api/admin/users")
+      .then(data => { setUsers(data.users); })
+      .catch(error => { setError(error); })
+      .finally(() => { setLoading(false); });
   }, [apiFetch]);
+  const [previousLoadInputs, setPreviousLoadInputs] = useState<readonly unknown[] | null>(null);
+  if (previousLoadInputs === null || previousLoadInputs[0] !== load) {
+    setPreviousLoadInputs([load]);
+    setLoading(true); setError(null);
+  }
   useEffect(() => { void load(); }, [load]);
   const begin = (action: Action) => { setActionError(null); setPending(action); setOwner(""); setReauthOpen(false); setVerified(false); setPasskeyId(""); };
   const cancel = () => { setPending(null); setActionError(null); setReauthOpen(false); setVerified(false); setPasskeyId(""); setOwner(""); };
@@ -84,7 +89,7 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
       if (pending.type === "mfa-reset") await adminRequest(apiFetch, `${base}/mfa-reset`, jsonMutation("POST", { confirmedTarget: true }, grant));
       if (pending.type === "sessions") await adminRequest(apiFetch, `${base}/sessions`, jsonMutation("DELETE", undefined, grant));
       if (pending.type === "passkey") await adminRequest(apiFetch, `${base}/passkeys/${encodeURIComponent(passkeyId)}`, jsonMutation("DELETE", undefined, grant));
-      cancel(); await load();
+      cancel(); setLoading(true); setError(null); await load();
     } catch (error) { setReauthOpen(false); setActionError(error); }
     finally { setBusy(false); }
   };
@@ -101,7 +106,7 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
     <nav aria-label={t("sections")} className={`${adminActionRow} ${settingsNavClass.buttons}`}>{ADMIN_SECTIONS.map(value => <Button key={value} variant="ghost" aria-pressed={tab === value} onClick={() => setTab(value)}>{t(`tabs.${value}`)}</Button>)}</nav>
     <div className="min-h-0 flex-1 overflow-auto">
       {Boolean(error) && <p role="alert" className="mb-3 text-destructive">{formatAdminError(error, t, locale)}</p>}
-      {tab === "users" && <section className="space-y-4" aria-label={t("tabs.users")}><div className={adminHeaderRow}><h3 className={adminSectionTitle}>{t("tabs.users")}</h3><Button variant="outline" disabled={loading || busy} onClick={() => void load()}>{t("users.refresh")}</Button></div>
+      {tab === "users" && <section className="space-y-4" aria-label={t("tabs.users")}><div className={adminHeaderRow}><h3 className={adminSectionTitle}>{t("tabs.users")}</h3><Button variant="outline" disabled={loading || busy} onClick={() => { setLoading(true); setError(null); void load(); }}>{t("users.refresh")}</Button></div>
         {loading && <p role="status">{t("users.loading")}</p>}
         <AdminUsersTable users={users} busy={busy} onAction={(user, type, role) => begin({ user, type, role })} />
       </section>}
