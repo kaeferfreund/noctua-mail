@@ -1,5 +1,6 @@
 "use client";
 
+import { SENDER_SETTINGS_STORAGE_KEY } from "@/lib/ui/senderSettings";
 import { retryAutoReadOnce } from "@/lib/autoMarkRead";
 
 import { useLocale } from "next-intl";
@@ -128,6 +129,24 @@ export default function MessageWindowPage() {
       active = false;
     };
   }, [accountId, messageId, missingParams]);
+
+  // The mailbox default can change while this detached window stays open too.
+  useEffect(() => {
+    let active = true;
+    let revision = 0;
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== SENDER_SETTINGS_STORAGE_KEY || !event.newValue) return;
+      try { if (JSON.parse(event.newValue).accountId !== accountId) return; } catch { return; }
+      const started = ++revision;
+      void fetch("/api/accounts", { credentials: "include", cache: "no-store" })
+        .then(response => response.ok ? response.json() as Promise<Account[]> : null)
+        .then(accounts => {
+          if (active && started === revision && accounts) setAccount(accounts.find(item => item.id === accountId) ?? null);
+        }).catch(() => { /* Retain the last known mailbox configuration. */ });
+    };
+    window.addEventListener("storage", onStorage);
+    return () => { active = false; window.removeEventListener("storage", onStorage); };
+  }, [accountId]);
 
   const folderById = useMemo(
     () => new Map(folders.map((folder) => [folder.id, folder])),

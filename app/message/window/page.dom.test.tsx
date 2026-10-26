@@ -37,3 +37,25 @@ test("an already open detached reader reloads changed preferences and retries ma
   await waitFor(() => expect(attempts).toBe(2));
   expect(page.queryByText("Synthetic failure")).toBeNull();
 });
+
+test("an open detached reader also follows a changed inherited mailbox default", async () => {
+  let mode = "never", attempts = 0;
+  const message = { id: "synthetic", accountId: "synthetic", folderId: "synthetic:INBOX", subject: "Synthetic inherited mail",
+    from: "sender@example.test", to: "reader@example.test", body: "Synthetic body", date: "2026-10-26", dateValue: 0, preview: "", seen: false };
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.endsWith("/prefs")) return Response.json({ prefs: {} });
+    if (url === "/api/accounts") return Response.json([{ id: "synthetic", accessRole: "editor", settings: { reading: { autoMarkRead: mode } } }]);
+    if (url.endsWith("/folders")) return Response.json([]);
+    if (url.endsWith("/flags")) { attempts++; return Response.json({ flags: ["\\Seen"] }); }
+    return Response.json({ message });
+  }) as typeof fetch;
+  const page = render(<Theme><SearchParamsContext.Provider value={new URLSearchParams({ accountId: "synthetic", messageId: "synthetic" })}>
+    <MessageWindowPage />
+  </SearchParamsContext.Provider></Theme>);
+  await page.findByText("Synthetic inherited mail");
+  expect(attempts).toBe(0);
+  mode = "immediate";
+  act(() => { window.dispatchEvent(new StorageEvent("storage", { key: SENDER_SETTINGS_STORAGE_KEY, newValue: JSON.stringify({ accountId: "synthetic" }) })); });
+  await waitFor(() => expect(attempts).toBe(1));
+});

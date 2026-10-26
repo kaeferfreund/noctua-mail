@@ -254,3 +254,16 @@ it("reloads an open detached reader's preferences from another window's receipt"
   await waitFor(() => expect(result.current).toBe(3000));
   expect(calls).toBe(2);
 });
+
+it("a cross-window change restarts an initial preference read still in flight", async () => {
+  let resolveOld: (value: Response) => void = () => {};
+  const old = new Promise<Response>(resolve => { resolveOld = resolve; });
+  let calls = 0;
+  const apiFetch = async () => ++calls === 1 ? old : Response.json({ prefs: { reading: { autoMarkRead: "after3s" } } });
+  const { result } = renderHook(() => useAutoMarkReadDelay(editor(), true, apiFetch));
+  act(() => { window.dispatchEvent(new StorageEvent("storage", { key: SENDER_SETTINGS_STORAGE_KEY, newValue: JSON.stringify({ accountId: "synthetic-account" }) })); });
+  await waitFor(() => expect(result.current).toBe(3000));
+  await act(async () => { resolveOld(Response.json({ prefs: { reading: { autoMarkRead: "immediate" } } })); });
+  expect(result.current).toBe(3000);
+  expect(calls).toBe(2);
+});

@@ -26,6 +26,7 @@ export function useAutoMarkReadDelay(
   const [loaded, setLoaded] = useState<{ accountId: string; prefs: UserAccountPrefs } | null>(null);
   // Bumped by every save in this window: a read still in flight is older.
   const revision = useRef(0);
+  const [refreshRevision, setRefreshRevision] = useState(0);
   useEffect(() => {
     if (!accountId) return;
     const onChanged = (event: Event) => {
@@ -40,6 +41,7 @@ export function useAutoMarkReadDelay(
         if (JSON.parse(event.newValue).accountId !== accountId) return;
         revision.current += 1;
         setLoaded(null); // Reload private preferences; the receipt carries no values.
+        setRefreshRevision(value => value + 1);
       } catch { /* Ignore malformed receipts. */ }
     };
     window.addEventListener(ACCOUNT_PREFS_CHANGED, onChanged);
@@ -61,7 +63,7 @@ export function useAutoMarkReadDelay(
       })
       .catch(() => { /* Stay on "never" when the preferences are unavailable. */ });
     return () => { active = false; };
-  }, [accountId, apiFetch, needed]);
+  }, [accountId, apiFetch, needed, refreshRevision]);
   if (!accountId || loaded?.accountId !== accountId) return null;
   return autoMarkReadDelayMs(resolveAutoMarkReadMode(account?.settings, loaded.prefs));
 }
