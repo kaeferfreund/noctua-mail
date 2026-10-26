@@ -116,7 +116,7 @@ Worker flow:
 ## Search And UI Usage
 
 - Category search badges are defined in `lib/ui/searchFilters.ts`.
-- SQL filtering is done via `m.category = ?` in `applyBadgeFilters(...)` (`lib/db.ts`).
+- SQL filtering is done via `m.category = ?` in `applyBadgeFilters(...)` (`lib/db/messages/query.ts`).
 - Message/thread badges render category badges in:
   - `app/components/mailclient/CategoryBadge.tsx`
   - `lib/ui/messageView.ts`
