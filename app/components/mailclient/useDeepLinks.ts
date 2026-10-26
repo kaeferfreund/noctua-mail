@@ -214,5 +214,13 @@ export function useDeepLinks(options: Options) {
     const target = { ...emptyDeepLink(), accountId: accountId || latest.current.state.accountId, messageId };
     afterMobileOverlayNavigation(() => request(target, "link", "push", true));
   }, [request]);
-  return { navigateAccount, navigateMessage };
+  // Folder clicks can arrive after the destination renders but before its
+  // mailbox transaction applies its default place. Keep the latest choice.
+  const queueFolderChoice = useCallback((folderId: string) => {
+    const work = pending.current;
+    if (!work || !["requested", "switching", "account"].includes(work.phase)) return false;
+    work.target = { ...work.target, folderId, messageId: "", scope: "folder", query: "", badges: [], view: null };
+    return true;
+  }, []);
+  return { navigateAccount, navigateMessage, queueFolderChoice };
 }

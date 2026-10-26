@@ -4958,7 +4958,7 @@ export default function MailClient({
     security: securityOpen, panel: openBottomStatusPanel === "exceptions" ? "exception" : openBottomStatusPanel === "reminders" ? "reminder" : openBottomStatusPanel,
     calendar: calendarSidebarOpen, compose: composeOpen && composeMode === "new" && composeView !== "minimized"
   };
-  const { navigateAccount: navigateLinkedAccount, navigateMessage } = useDeepLinks({
+  const { navigateAccount: navigateLinkedAccount, navigateMessage, queueFolderChoice } = useDeepLinks({
     ready: authState === "ok" && initialDataReady &&
       (initialFoldersLoadedAccountId === activeAccountId || foldersUnavailableAccountId === activeAccountId),
     state: deepLinkState, messages, accountIds: accounts.map(account => account.id), switchAccount,
@@ -5328,7 +5328,7 @@ export default function MailClient({
               ? () => {
                   clearSearch();
                   setSearchScope("folder");
-                  setActiveFolderId(draftsFolder.id);
+                  if (!queueFolderChoice(draftsFolder.id)) setActiveFolderId(draftsFolder.id);
                 }
               : null
           },
@@ -5402,7 +5402,10 @@ export default function MailClient({
             folderById,
             searchScope,
             activeFolderId,
-            setActiveFolderId,
+            setActiveFolderId: next => {
+              const folderId = typeof next === "function" ? next(activeFolderId) : next;
+              if (!queueFolderChoice(folderId)) setActiveFolderId(folderId);
+            },
             setSearchScope,
             clearSearch,
             syncingFolders,

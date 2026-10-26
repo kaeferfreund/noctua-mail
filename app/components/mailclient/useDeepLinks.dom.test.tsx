@@ -24,7 +24,7 @@ function Harness({ switcher, resolver, resolution, expired, deferFolder = false,
   const [ready, setReady] = useState(true);
   const [overlay, setOverlay] = useState(false);
   useMobileOverlayHistory(overlay, () => setOverlay(false));
-  const { navigateAccount, navigateMessage } = useDeepLinks({ ready, state, messages, accountIds, onForbidden,
+  const { navigateAccount, navigateMessage, queueFolderChoice } = useDeepLinks({ ready, state, messages, accountIds, onForbidden,
     switchAccount: async id => { const epoch = ++version.current; await switcher?.(id); if (epoch === version.current) setState(old => ({ ...old, accountId: id })); },
     applyPlace: target => { const applied = { ...target, folderId: target.folderId || `${target.accountId}:INBOX`, messageId: "" }; if (deferFolder) { setState({ ...applied, folderId: "" }); setTimeout(() => setState(applied), 0); } else setState(applied); return applied; },
     onUnauthenticated: () => { setReady(false); expired?.(); },
@@ -39,6 +39,7 @@ function Harness({ switcher, resolver, resolution, expired, deferFolder = false,
     <button onClick={() => setState(old => ({ ...old, panel: "reminder", calendar: true }))}>Open panels</button>
     <button onClick={() => { navigateMessage("imap-one"); setState(old => ({ ...old, panel: null })); }}>Reminder entry</button>
     <button onClick={() => { setState(old => ({ ...old, folderId: `${old.accountId}:Sent` })); setOverlay(false); }}>Folder Sent</button>
+    <button onClick={() => { if (!queueFolderChoice("b:Drafts")) setState(old => ({ ...old, folderId: "b:Drafts" })); }}>Destination drafts</button>
     <button onClick={() => setOverlay(true)}>Show overlay</button><output data-testid="overlay">{String(overlay)}</output>
     <button onClick={back}>Back</button><button onClick={() => setReady(value => !value)}>Ready</button>
     <input aria-label="Search" onChange={event => setState(old => ({ ...old, query: event.target.value }))} />
@@ -300,4 +301,16 @@ it("leaves the switching phase only in a render that carries the switch's commit
   expect(new URLSearchParams(window.location.search).get("a")).toBe("~b");
   expect(new URLSearchParams(window.location.search).get("f")).toBe("INBOX");
   expect(page.getByTestId("state").textContent).toContain('"folderId":"b:INBOX"');
+});
+
+it("keeps the last folder choice made while a mailbox switch is pending", async () => {
+  let finish = () => {};
+  const switcher = (id: string) => id === "b" ? new Promise<void>(resolve => { finish = resolve; }) : Promise.resolve();
+  const page = render(<Harness switcher={switcher} />);
+  await settled();
+  fireEvent.click(page.getByText("Mailbox B"));
+  fireEvent.click(page.getByText("Destination drafts"));
+  await act(async () => { finish(); });
+  await waitFor(() => expect(parseDeepLink(window.location.search).folderId).toBe("b:Drafts"));
+  expect(JSON.parse(page.getByTestId("state").textContent!).accountId).toBe("b");
 });
