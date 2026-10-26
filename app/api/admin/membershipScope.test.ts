@@ -119,7 +119,9 @@ describe("admin routes are limited to the admin's own mailboxes", () => {
       const page = await listAudit(request(f.admin, "admin/audit?limit=3"));
       expect(page.status).toBe(200);
       // Filtering also hides the viewer's own actions in a foreign mailbox.
-      const entries = (await page.json()).entries.map((entry: { id: string }) => entry.id);
+      const body = await page.json();
+      expect(body.entries.find((entry: { id: string }) => entry.id === ids[1])).toMatchObject({ actorLabel: f.owner.name || f.owner.email, targetAccountLabel: f.own.name });
+      const entries = body.entries.map((entry: { id: string }) => entry.id);
       expect(entries.slice(0, 2)).toEqual([ids[2], ids[1]]);
       expect(entries).not.toContain(ids[0]); expect(entries).not.toContain(ids[3]);
       f.admin.master.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(f.admin.user.id, f.own.id);

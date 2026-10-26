@@ -544,6 +544,10 @@ export type AdminAuditAction =
 export type AdminAuditEntry = {
   id: string;
   actorUserId: string;
+  /** Display labels resolved for an authorized admin viewer; absent when no longer available. */
+  actorLabel?: string | null;
+  targetUserLabel?: string | null;
+  targetAccountLabel?: string | null;
   /** An `AdminAuditAction` when written by this version; read back as stored. */
   action: string;
   targetUserId: string | null;

@@ -160,11 +160,13 @@ describe("AdminPanel", () => {
     expect((await dialog.findByRole("alert")).textContent).toContain("Retry after 75 seconds");
   });
   it("pages equal-timestamp audit entries with the opaque nextCursor", async () => {
-    const entries = Array.from({ length: 50 }, (_, index) => ({ id: `synthetic-audit-${index}`, actorUserId: "synthetic-actor", targetUserId: "synthetic-target", targetAccountId: null, action: "user.disable", createdAt: 1792900000000 }));
+    const entries = Array.from({ length: 50 }, (_, index) => ({ id: `synthetic-audit-${index}`, actorUserId: "synthetic-actor", targetUserId: "synthetic-target", targetAccountId: null, action: "user.disable", actorLabel: "Synthetic Actor", targetUserLabel: "Synthetic Target", createdAt: 1792900000000 }));
     const { page, calls } = harness(url => url.startsWith("/api/admin/audit?") ? response({ ok: true, entries: url.includes("before=") ? [{ ...entries[0], id: "synthetic-older", action: "user.enable", createdAt: 1792890000000 }] : entries, nextCursor: url.includes("before=") ? null : "synthetic+/opaque=cursor" }) : undefined);
     await page.findByText("Synthetic User"); fireEvent.click(page.getByRole("button", { name: "Audit" }));
-    await waitFor(() => expect(page.getAllByText("user.disable")).toHaveLength(50));
-    fireEvent.click(page.getByRole("button", { name: "Load older entries" })); await page.findByText("user.enable");
+    await waitFor(() => expect(page.getAllByText("User disabled")).toHaveLength(50));
+    expect(page.getAllByText("Synthetic Actor")).toHaveLength(50);
+    expect(page.getAllByText(/Synthetic Target/)).toHaveLength(50);
+    fireEvent.click(page.getByRole("button", { name: "Load older entries" })); await page.findByText("User enabled");
     expect(calls.some(call => call.url === `/api/admin/audit?limit=50&before=${encodeURIComponent("synthetic+/opaque=cursor")}`)).toBe(true);
     expect((page.getByRole("button", { name: "Load older entries" }) as HTMLButtonElement).disabled).toBe(true);
   });
