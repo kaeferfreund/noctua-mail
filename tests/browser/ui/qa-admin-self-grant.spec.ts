@@ -96,12 +96,14 @@ test.describe("admin with partial membership (German UI)", () => {
 
       await admin.getByRole("button", { name: "Benutzer", exact: true }).click();
       const joRow = admin.getByRole("row").filter({ hasText: "jo@example.test" });
-      await expect(joRow.getByText("QA Shared · Bearbeiter", { exact: true })).toBeVisible();
+      const sharedMembership = joRow.getByRole("listitem").filter({ hasText: "QA Shared" });
+      await expect(sharedMembership).toContainText("Bearbeiter");
       await expect(joRow.getByText("QA Private", { exact: false })).toHaveCount(0);
       await shot(page, "admin-scope-users");
 
       const deleted = page.waitForResponse(response => response.url().endsWith(`/api/admin/users/${encodeURIComponent(jo.id)}`) && response.request().method() === "DELETE");
-      await joRow.getByRole("button", { name: "Benutzer löschen", exact: true }).click();
+      await joRow.getByRole("button", { name: "Weitere Aktionen für jo@example.test", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Benutzer löschen", exact: true }).click();
       const confirm = page.getByRole("dialog", { name: "Benutzer löschen", exact: true });
       await confirm.getByRole("button", { name: "Bestätigen", exact: true }).click();
       const refused = await deleted;
