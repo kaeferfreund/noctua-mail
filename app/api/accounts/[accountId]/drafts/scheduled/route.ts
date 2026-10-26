@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getMessageById } from "@/lib/serverDb";
 import { withAuthResponse } from "@/lib/auth";
 import { DraftSendError } from "@/lib/drafts";
 import { authorizeOutbound, OutboundAuthorizationError } from "@/lib/outboundAuthorization";
@@ -25,7 +26,9 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
   return withAuthResponse(accountContext, async () => {
     const draftId = new URL(request.url).searchParams.get("draftId")?.trim();
     if (draftId !== undefined && (!draftId || draftId.length > 256)) return errorResponse("Invalid draftId", 400);
-    return okResponse({ scheduledSends: (await listScheduledSends(accountContext.accountId, draftId)).map(presentScheduledSend) });
+    const rows = await listScheduledSends(accountContext.accountId, draftId);
+    return okResponse({ scheduledSends: await Promise.all(rows.map(async row => ({ ...presentScheduledSend(row),
+      subject: (await getMessageById(accountContext.accountId, row.draftId))?.subject ?? "" }))) });
   });
 }
 

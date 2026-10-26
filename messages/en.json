@@ -1952,6 +1952,12 @@
       "failed": "Translation failed."
     },
     "schedule": {
+      "badgeCancelled": "Cancelled",
+      "barCancelled": "Cancelled: {reason}",
+      "retry": "Schedule again",
+      "dismiss": "Dismiss",
+      "listTitle": "Scheduled sends",
+      "untitled": "Untitled draft",
       "existing": "Already scheduled for {time}. Scheduling again replaces this time.",
       "notInDrafts": "Only drafts in the Drafts folder can be scheduled.",
       "draftInvalid": "This draft cannot be scheduled. Review recipients and content, then save it again.",
@@ -2003,6 +2009,13 @@
       "sendNow": "Send now",
       "unschedule": "Remove schedule",
       "reasons": {
+        "security_revoked": "The password or security permissions changed. Review the draft and schedule it again.",
+        "permission_revoked": "Permission to send was revoked.",
+        "identity_unavailable": "The sender identity is no longer available.",
+        "draft_missing": "The draft was deleted or is no longer available.",
+        "draft_deleted": "Draft deleted or moved out of Drafts.",
+        "draft_changed": "Content or recipients changed outside this schedule. Review the draft and schedule it again.",
+        "account_missing": "The mailbox is no longer available.",
         "manual_interrupted": "Editing, saving or manual sending was interrupted by a server failure. Check the draft and Sent folder before scheduling again.",
         "send_failed": "The mail server could not be reached after several attempts.",
         "smtp_rejected": "The mail server rejected the message.",

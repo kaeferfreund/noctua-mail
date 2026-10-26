@@ -138,11 +138,11 @@ export function useScheduledSendControls(input: {
 
   // The saved draft „Senden planen“ was opened for from the list or the reader.
   const [scheduleTarget, setScheduleTarget] = useState<Message | null>(null);
-  const openSchedule = useCallback(async (draft: Message) => {
-    // Refresh before showing the previous time, including plans from another tab/member.
-    if (!await refresh()) { reportError(t("failed")); return; }
+  const openSchedule = useCallback((draft: Message) => {
     setScheduleTarget(draft);
-  }, [refresh, reportError, t]);
+    // Keep the existing time current, including plans from another tab/member.
+    void refresh();
+  }, [refresh]);
   const scheduleTargetDraft = useCallback(async (sendAt: number) => {
     const draft = scheduleTarget;
     if (!draft || !accountId || draft.accountId !== accountId) return false;
@@ -166,12 +166,19 @@ export function useScheduledSendControls(input: {
   /** Compose was refused because the schedule is sending or already sent the draft. */
   const onScheduledSendConflict = useCallback(() => { void refresh(); }, [refresh]);
 
+  const retry = useCallback(async (schedule: ScheduledSendView) => {
+    const draft = await loadDraft(schedule.draftId).catch(() => null);
+    if (!draft) { reportError(t("draftMissing")); return; }
+    openSchedule(draft);
+  }, [loadDraft, openSchedule, reportError, t]);
+
   const controls = useMemo<ScheduledSendControls>(() => ({
     byDraftId,
+    retry,
     unschedule: async (schedule) => { await unschedule(schedule); },
     sendNow: async (message) => { await sendDraft(message); await refresh(); },
     schedule: enabled ? openSchedule : undefined
-  }), [byDraftId, enabled, openSchedule, refresh, sendDraft, unschedule]);
+  }), [byDraftId, enabled, openSchedule, refresh, retry, sendDraft, unschedule]);
 
   return { controls, scheduleDialog, refresh, onScheduledSend, onDetachedScheduled, releaseBeforeEdit, onScheduledSendConflict };
 }

@@ -1952,6 +1952,12 @@
       "failed": "Die Übersetzung ist fehlgeschlagen."
     },
     "schedule": {
+      "badgeCancelled": "Abgebrochen",
+      "barCancelled": "Abgebrochen: {reason}",
+      "retry": "Erneut planen",
+      "dismiss": "Hinweis entfernen",
+      "listTitle": "Geplante Sendungen",
+      "untitled": "Entwurf ohne Betreff",
       "existing": "Bereits geplant für {time}. „Planen“ ersetzt diesen Zeitpunkt.",
       "notInDrafts": "Nur Entwürfe im Ordner „Entwürfe“ können geplant werden.",
       "draftInvalid": "Der Entwurf kann nicht geplant werden. Prüfe Empfänger und Inhalt und speichere ihn erneut.",
@@ -2003,6 +2009,13 @@
       "sendNow": "Jetzt senden",
       "unschedule": "Planung aufheben",
       "reasons": {
+        "security_revoked": "Passwort oder Sicherheitsfreigaben wurden geändert. Prüfe den Entwurf und plane ihn erneut.",
+        "permission_revoked": "Die Berechtigung zum Senden wurde entzogen.",
+        "identity_unavailable": "Die Absenderidentität ist nicht mehr verfügbar.",
+        "draft_missing": "Der Entwurf wurde gelöscht oder ist nicht mehr verfügbar.",
+        "draft_deleted": "Entwurf gelöscht oder aus „Entwürfe“ verschoben.",
+        "draft_changed": "Der Inhalt oder die Empfänger wurden außerhalb der Planung geändert. Prüfe den Entwurf und plane ihn erneut.",
+        "account_missing": "Das Postfach ist nicht mehr verfügbar.",
         "manual_interrupted": "Die Bearbeitung, das Speichern oder das manuelle Senden wurde durch einen Serverabbruch unterbrochen. Prüfe den Entwurf und den Gesendet-Ordner, bevor du erneut planst.",
         "send_failed": "Der Mailserver war nach mehreren Versuchen nicht erreichbar.",
         "smtp_rejected": "Der Mailserver hat die Nachricht abgelehnt.",
