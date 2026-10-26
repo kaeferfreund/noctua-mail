@@ -12,6 +12,7 @@ import { listAccountMembersForRole } from "@/lib/accountAccess";
 import { getOwnAddresses } from "@/lib/ownAddresses";
 import { assertMcpToolPermission, listMcpTokenAccounts, mcpTokenScopes, resolveMcpToolContext } from "@/lib/mcpAuth";
 import { mcpToolScope, type McpScope } from "@/lib/mcpPermissions";
+import { isMcpToolRateLimited } from "@/lib/mcpRateLimit";
 import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
 import { getThreadCollabState, listThreadComments, listThreadActivity,
   updateThreadCollabState, addThreadComment } from "@/lib/threadCollab";
@@ -1045,7 +1046,7 @@ class StatelessJsonResponseTransport implements Transport {
   private readonly toolListIds = new Set<string>();
 
   constructor(extra: MessageExtraInfo, private readonly authorizeTool: (name: string) => Promise<void>,
-    private readonly toolScopes: () => Promise<readonly McpScope[]>) {
+    private readonly toolScopes: () => Promise<readonly McpScope[]>, private readonly tokenId: string) {
     this.extra = extra;
   }
 
@@ -1127,6 +1128,12 @@ class StatelessJsonResponseTransport implements Transport {
         catch (error) {
           const text = error instanceof Error ? error.message : "MCP authorization failed";
           await this.send({ jsonrpc: "2.0", id: message.id, result: { content: [{ type: "text", text }], isError: true } });
+          continue;
+        }
+        if (isMcpToolRateLimited(this.tokenId, String(message.params?.name ?? ""))) {
+          const text = "MCP rate limit exceeded (60 calls/minute, 10 writes/minute per token). Retry after 60 seconds.";
+          await this.send({ jsonrpc: "2.0", id: message.id, result: { content: [{ type: "text", text }], isError: true,
+            structuredContent: { ok: false, code: "rate_limited", status: 429, message: text, retryAfterSeconds: 60 } } });
           continue;
         }
       }
@@ -1688,7 +1695,7 @@ export async function executeMcpHttpRequest(params: {
   const transport = new StatelessJsonResponseTransport({
     authInfo: params.authInfo,
     requestInfo: params.requestInfo
-  }, name => assertMcpToolPermission(context.tokenRecord.id, name), () => mcpTokenScopes(context.tokenRecord.id));
+  }, name => assertMcpToolPermission(context.tokenRecord.id, name), () => mcpTokenScopes(context.tokenRecord.id), context.tokenRecord.id);
   await server.connect(transport);
 
   try {
