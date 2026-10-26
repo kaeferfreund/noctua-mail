@@ -1022,6 +1022,25 @@ describe("/api/mcp", () => {
         url: updated.result.structuredContent.url }] });
   });
 
+  test("update_draft_message returns success and a warning when old IMAP cleanup fails", async () => {
+    for (const retrySucceeds of [true, false]) {
+      const accountId = uniqueAccountId("acc-mcp-cleanup");
+      await seedMailbox(accountId);
+      const { token } = await createScopedToken(accountId);
+      const created = await callTool(token, "create_draft_message", { to: "peer@example.test", subject: "Initial", text: "Original" });
+      deleteImapMessage.mockClear();
+      deleteImapMessage.mockRejectedValueOnce(new Error("Synthetic deletion failure"));
+      if (!retrySucceeds) deleteImapMessage.mockRejectedValueOnce(new Error("Synthetic retry failure"));
+      appendImapMessage.mockResolvedValueOnce(9002);
+      const updated = await callTool(token, "update_draft_message", { draftId: created.result.structuredContent.draftId, text: "Saved body" });
+      expect(updated.result.isError).toBeUndefined();
+      expect(updated.result.structuredContent.ok).toBe(true);
+      expect(updated.result.structuredContent.warning).toContain(retrySucceeds ? "retried once" : "duplicate may remain");
+      expect(deleteImapMessage).toHaveBeenCalledTimes(2);
+      expect((await getMessageById(accountId, updated.result.structuredContent.draftId))?.body).toBe("Saved body");
+    }
+  });
+
   test("update_draft_message replaces only the passed fields and keeps reply headers, identity and attachments", async () => {
     const accountId = uniqueAccountId("acc-mcp-draft-partial");
     await seedMailbox(accountId);
