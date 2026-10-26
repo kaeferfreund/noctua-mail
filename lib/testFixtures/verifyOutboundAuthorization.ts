@@ -205,9 +205,9 @@ const { POST: mcp } = await import("../../app/api/mcp/route");
 const outbound = { identityId: alias.id, to: "recipient@example.test", subject: "Synthetic boundary", text: "Synthetic body" };
 const request = (body: unknown) => new Request("http://localhost:3000/api/send", { method: "POST", headers: user.jar.headers({ origin: "http://localhost:3000", "content-type": "application/json" }), body: JSON.stringify(body) });
 const params = (extra = {}) => ({ params: Promise.resolve({ accountId, ...extra }) });
-const messageId = "<synthetic-boundary-draft@example.test>";
-const draftId = buildImapMessageRowId(messageId);
-const raw = [`From: ${alias.displayName} <${alias.email}>`, "To: recipient@example.test", `Message-ID: ${messageId}`, `X-Noctua-Identity-Id: ${alias.id}`, "Subject: Synthetic boundary", "", "Synthetic body"].join("\r\n");
+let messageId = "<synthetic-boundary-draft@example.test>";
+let draftId = buildImapMessageRowId(messageId);
+let raw = [`From: ${alias.displayName} <${alias.email}>`, "To: recipient@example.test", `Message-ID: ${messageId}`, `X-Noctua-Identity-Id: ${alias.id}`, "Subject: Synthetic boundary", "", "Synthetic body"].join("\r\n");
 await api.upsertMessages(accountId, null, [{ id: draftId, messageId, threadId: messageId, accountId, folderId: `${accountId}:Drafts`, from: `${alias.displayName} <${alias.email}>`, to: outbound.to, subject: outbound.subject, body: outbound.text, preview: "", date: new Date().toISOString(), dateValue: Date.now(), flags: ["\\Draft"], senderIdentityId: alias.id, source: raw, attachments: [{ id: "synthetic-boundary-attachment", filename: "synthetic.txt", contentType: "text/plain", size: 4, inline: false }], mailboxPath: "Drafts", imapUid: 22 }]);
 await saveMessageSource(accountId, draftId, raw);
 const eventId = "synthetic-boundary-event";
@@ -218,6 +218,15 @@ const minted = await mintMcpToken(session, accountId, "Synthetic boundary", 3600
 const isMcp = path.startsWith("mcp-");
 const management = path === "mcp-create-identity" || path === "mcp-update-identity";
 const ensureDraft = async () => {
+  // Each successful transmission consumes its draft permanently. Later authorization
+  // probes need a fresh synthetic Message-ID; never delete the receipt to permit a resend.
+  const sent = path === "draft-send" && master.prepare("SELECT 1 FROM scheduled_sends WHERE accountId=? AND draftId=? AND status='sent'").get(accountId, draftId);
+  if (sent) {
+    const nextId = `<synthetic-boundary-${crypto.randomUUID()}@example.test>`;
+    raw = raw.replace(messageId, nextId);
+    messageId = nextId;
+    draftId = buildImapMessageRowId(messageId);
+  }
   if (["draft-save", "draft-send"].includes(path) && !await api.getMessageById(accountId, draftId)) {
     await api.upsertMessages(accountId, null, [{ id: draftId, messageId, threadId: messageId, accountId, folderId: `${accountId}:Drafts`, from: `${alias.displayName} <${alias.email}>`, to: outbound.to, subject: outbound.subject, body: outbound.text, preview: "", date: new Date().toISOString(), dateValue: Date.now(), flags: ["\\Draft"], senderIdentityId: alias.id, source: raw, attachments: [{ id: "synthetic-boundary-attachment", filename: "synthetic.txt", contentType: "text/plain", size: 4, inline: false }], mailboxPath: "Drafts", imapUid: 22 }]);
     await saveMessageSource(accountId, draftId, raw);

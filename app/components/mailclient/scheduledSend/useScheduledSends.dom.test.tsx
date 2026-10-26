@@ -23,3 +23,20 @@ test("undo cancellation stays successful and gives a clear hint when draft reloa
   await act(async () => { await notices[0].onAction?.(); });
   expect(errors).toEqual(["Die Planung wurde aufgehoben. Der Entwurf konnte nicht geöffnet werden. Öffne ihn im Ordner „Entwürfe“."]);
 });
+
+test("opening the planning dialog refreshes and shows the existing schedule time", async () => {
+  const { waitFor } = await import("@testing-library/react");
+  function noop() {}
+  const input: Parameters<typeof useScheduledSendControls>[0] = {
+    accountId: "a", enabled: true, locale: "de",
+    apiFetch: async () => Response.json({ scheduledSends: [row] }),
+    pushNotice: noop, reportError: noop, readErrorMessage: async () => "", loadDraft: async () => null,
+    editDraft: noop, sendDraft: async () => {}
+  };
+  const { result } = renderHook(() => useScheduledSendControls(input), {
+    wrapper: ({ children }) => <I18nTestProvider locale="de">{children}</I18nTestProvider>
+  });
+  act(() => result.current.controls.schedule?.({ id: "d", accountId: "a", draft: true } as import("@/lib/data").Message));
+  await waitFor(() => expect(result.current.scheduleDialog.existingSendAt).toBe(row.sendAt));
+  expect(result.current.scheduleDialog.open).toBe(true);
+});
