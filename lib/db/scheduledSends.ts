@@ -7,7 +7,7 @@ export type ScheduledSendStatus = "queued" | "sending" | "sent" | "failed" | "ca
 
 /** Reason codes stored in `lastError`; the UI translates them, raw upstream text is never stored. */
 export type ScheduledSendReason =
-  | "rescheduled" | "cancelled" | "edited" | "discarded" | "sent_now"
+  | "rescheduled" | "cancelled" | "edited" | "discarded" | "sent_now" | "manual_send"
   | "permission_revoked" | "identity_unavailable" | "draft_missing" | "draft_invalid"
   | "account_missing" | "smtp_rejected" | "send_failed" | "send_uncertain" | "interrupted";
 
@@ -146,8 +146,18 @@ export function holdDraftSchedules(accountId: string, draftId: string, owner: st
     if (rejectSent && db.query("SELECT 1 FROM scheduled_sends WHERE accountId=? AND draftId=? AND status='sent'").get(accountId, draftId)) {
       throw new ScheduledSendAlreadySentError();
     }
-    return db.query(`UPDATE scheduled_sends SET status='sending',leaseOwner=?,leaseStartedAt=?,updatedAt=?
+    const held = db.query(`UPDATE scheduled_sends SET status='sending',leaseOwner=?,leaseStartedAt=?,updatedAt=?
       WHERE accountId=? AND draftId=? AND status='queued'`).run(owner, now, now, accountId, draftId).changes as number;
+    // Opening compose may already have cancelled the schedule. Still serialize sends of this
+    // draft, and retain a durable receipt before Sent-copy work can leave the draft visible.
+    if (rejectSent && !held) {
+      db.query(`INSERT INTO scheduled_sends
+        (id,accountId,userId,draftId,sendAt,status,attempts,nextAttemptAt,lastError,leaseOwner,leaseStartedAt,createdAt,updatedAt)
+        VALUES (?,?,?, ?,?,'sending',0,?,'manual_send',?,?,?,?)`)
+        .run(randomUUID(), accountId, "", draftId, now, now, owner, now, now, now);
+      return 1;
+    }
+    return held;
   });
 }
 
@@ -161,15 +171,18 @@ export function finishDraftScheduleHold(accountId: string, draftId: string, owne
   return write("finishDraftScheduleHold", db => {
     const held = "accountId=? AND draftId=? AND status='sending' AND leaseOwner=?";
     if (outcome.kind === "restore") {
-      return db.query(`UPDATE scheduled_sends SET status='queued',leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=? WHERE ${held}`)
+      return db.query(`UPDATE scheduled_sends SET status=CASE WHEN lastError='manual_send' THEN 'cancelled' ELSE 'queued' END,
+        lastError=CASE WHEN lastError='manual_send' THEN 'cancelled' ELSE lastError END,
+        leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=? WHERE ${held}`)
         .run(now, accountId, draftId, owner).changes as number;
     }
     if (outcome.kind === "uncertain") {
       return db.query(`UPDATE scheduled_sends SET status='failed',lastError='send_uncertain',leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=? WHERE ${held}`)
         .run(now, accountId, draftId, owner).changes as number;
     }
-    const closed = db.query(`UPDATE scheduled_sends SET status='cancelled',lastError=?,leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=? WHERE ${held}`)
-      .run(outcome.reason, now, accountId, draftId, owner).changes as number;
+    const status = outcome.reason === "sent_now" ? "sent" : "cancelled";
+    const closed = db.query(`UPDATE scheduled_sends SET status=?,lastError=?,leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=? WHERE ${held}`)
+      .run(status, outcome.reason, now, accountId, draftId, owner).changes as number;
     return closed + (db.query(`UPDATE scheduled_sends SET status='cancelled',lastError=?,updatedAt=? WHERE accountId=? AND draftId=? AND status='failed'`)
       .run(outcome.reason, now, accountId, draftId).changes as number);
   });

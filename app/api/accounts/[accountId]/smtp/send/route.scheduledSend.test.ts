@@ -98,14 +98,17 @@ async function setup(smtpPort = sink.port) {
 const delivered = (subject: string) => sink.received.filter(mail => mail.source.toString().includes(subject)).length;
 
 // Manual send vs. scheduled send (isolatedImapTest matches top-level test names).
-realMailTest("compose „Senden“ with the draft id cancels the queued schedule; the job cannot send it again", async () => {
+realMailTest("compose „Senden“ with the draft id records a sent receipt; repeat sends cannot reach SMTP", async () => {
   const s = await setup();
   const before = delivered("Synthetic planned");
   const response = await s.compose();
   expect(response.status).toBe(200);
   expect(delivered("Synthetic planned")).toBe(before + 1);
-  expect(await getScheduledSend(s.scheduleId)).toMatchObject({ status: "cancelled", lastError: "sent_now", leaseOwner: null });
+  expect(await getScheduledSend(s.scheduleId)).toMatchObject({ status: "sent", lastError: "sent_now", leaseOwner: null });
   expect((await claimDueScheduledSends(jobOwner(), s.sendAt, 1_000)).some(row => row.id === s.scheduleId)).toBe(false);
+  expect((await s.compose()).status).toBe(409);
+  expect((await s.sendDraftNow()).status).toBe(409);
+  expect(delivered("Synthetic planned")).toBe(before + 1);
 });
 
 realMailTest("409 while the job sends the draft and after it sent it; nothing reaches SMTP", async () => {

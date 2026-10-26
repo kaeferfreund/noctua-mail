@@ -83,7 +83,7 @@ describe("scheduled_sends store", () => {
   test("a manual hold keeps the job away and settles: done closes, restore re-queues, uncertain fails", async () => {
     const accountId = mailbox();
     for (const [outcome, expected] of [
-      [{ kind: "done", reason: "sent_now" }, { status: "cancelled", lastError: "sent_now" }],
+      [{ kind: "done", reason: "sent_now" }, { status: "sent", lastError: "sent_now" }],
       [{ kind: "restore" }, { status: "queued", lastError: null, leaseOwner: null }],
       [{ kind: "uncertain" }, { status: "failed", lastError: "send_uncertain" }]
     ] as const) {
