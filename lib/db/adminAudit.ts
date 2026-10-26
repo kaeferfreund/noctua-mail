@@ -88,9 +88,9 @@ export function decodeAdminAuditCursor(cursor: string): { createdAt: number; id:
 }
 
 /**
- * Newest (createdAt,id) first. Numeric `before` remains a legacy storage API. `visibleTo` limits the
+ * Newest (createdAt,rowid) first. Numeric `before` remains a legacy storage API. `visibleTo` limits the
  * entries to what one admin may see: entries without a mailbox, entries of the given mailboxes (the
- * admin's memberships) and the admin's own actions. Filtering happens before LIMIT, so pages stay full.
+ * admin's memberships). Filtering happens before LIMIT, so pages stay full.
  */
 export async function listAdminAudit(
   options: { limit?: number; before?: number | string | null; visibleTo?: { userId: string; accountIds: Iterable<string> } } = {}
@@ -100,18 +100,18 @@ export async function listAdminAudit(
   const cursor = typeof options.before === "string" ? decodeAdminAuditCursor(options.before) : null;
   const before = typeof options.before === "number" && Number.isFinite(options.before) ? options.before : null;
   const where: string[] = [], args: Array<string | number> = [];
-  if (cursor) { where.push("(createdAt < ? OR (createdAt = ? AND id < ?))"); args.push(cursor.createdAt, cursor.createdAt, cursor.id); }
+  if (cursor) { where.push("(createdAt < ? OR (createdAt = ? AND rowid < (SELECT rowid FROM admin_audit WHERE id = ?)))"); args.push(cursor.createdAt, cursor.createdAt, cursor.id); }
   else if (before !== null) { where.push("createdAt < ?"); args.push(before); }
   if (options.visibleTo) {
-    where.push("(targetAccountId IS NULL OR actorUserId = ? OR targetAccountId IN (SELECT value FROM json_each(?)))");
-    args.push(options.visibleTo.userId, JSON.stringify([...options.visibleTo.accountIds]));
+    where.push("(targetAccountId IS NULL OR targetAccountId IN (SELECT value FROM json_each(?)))");
+    args.push(JSON.stringify([...options.visibleTo.accountIds]));
   }
   const rows = db
     .prepare(
       `SELECT id, actorUserId, action, targetUserId, targetAccountId, payload, createdAt
        FROM admin_audit
        ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-       ORDER BY createdAt DESC, id DESC
+       ORDER BY createdAt DESC, rowid DESC
        LIMIT ?`
     )
     .all(...args, limit) as StoredAdminAuditRow[];

@@ -109,7 +109,7 @@ describe("admin routes are limited to the admin's own mailboxes", () => {
     expect((await deleteUser(request(f.admin, "admin/users", "DELETE", {}), params)).status).toBe(200);
   });
 
-  test("Protokoll hides entries of foreign mailboxes; entries without a mailbox and own actions stay", async () => {
+  test("Protokoll hides entries of foreign mailboxes; own actions also require membership", async () => {
     const f = await fixture(), createdAt = Date.now() + 2_000_000;
     const rows = [["foreign", f.owner.id, f.foreign.id], ["own", f.owner.id, f.own.id], ["none", f.owner.id, null], ["self", f.admin.user.id, f.foreign.id]] as const;
     const ids = rows.map(([name]) => `${f.own.id}-${name}`);
@@ -118,8 +118,13 @@ describe("admin routes are limited to the admin's own mailboxes", () => {
     try {
       const page = await listAudit(request(f.admin, "admin/audit?limit=3"));
       expect(page.status).toBe(200);
-      // Filtered before the limit: three visible entries, newest first, the foreign one never.
-      expect((await page.json()).entries.map((entry: { id: string }) => entry.id)).toEqual([ids[3], ids[2], ids[1]]);
+      // Filtering also hides the viewer's own actions in a foreign mailbox.
+      const entries = (await page.json()).entries.map((entry: { id: string }) => entry.id);
+      expect(entries.slice(0, 2)).toEqual([ids[2], ids[1]]);
+      expect(entries).not.toContain(ids[0]); expect(entries).not.toContain(ids[3]);
+      f.admin.master.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(f.admin.user.id, f.own.id);
+      const afterLeaving = (await (await listAudit(request(f.admin, "admin/audit?limit=10"))).json()).entries;
+      expect(afterLeaving.some((entry: { targetAccountId: string }) => entry.targetAccountId === f.own.id)).toBe(false);
       const outsider = await createAuthenticatedTestSession(undefined, "admin");
       const seen = (await (await listAudit(request(outsider, "admin/audit?limit=10"))).json()).entries.map((entry: { id: string }) => entry.id);
       expect(seen).toContain(ids[2]); expect(seen).not.toContain(ids[0]); expect(seen).not.toContain(ids[1]); expect(seen).not.toContain(ids[3]);
