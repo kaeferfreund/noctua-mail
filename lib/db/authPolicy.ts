@@ -1,3 +1,4 @@
+import { effectiveSessionExpiry } from "../authSessionLifetime";
 import { withDbWriteRetry } from "../dbWriteRetry";
 import { getDb } from "./connection";
 import type { Database } from "bun:sqlite";
@@ -388,10 +389,14 @@ export function enrollmentState(db: Database, userId: string) {
 }
 
 export function readSessionSecurity(db: Database, sessionId: string): SessionSecurity {
-  const row = db.prepare(`SELECT p.* FROM auth_session_security p JOIN auth_session s ON s.id=p.sessionId
-    WHERE p.sessionId=? AND p.userId=s.userId AND julianday(s.expiresAt)>julianday('now')`).get(sessionId) as SessionSecurity | null;
+  const row = db.prepare(`SELECT p.*,s.createdAt,s.expiresAt FROM auth_session_security p JOIN auth_session s ON s.id=p.sessionId
+    WHERE p.sessionId=? AND p.userId=s.userId AND julianday(s.expiresAt)>julianday('now')`).get(sessionId) as (SessionSecurity & { createdAt: string; expiresAt: string }) | null;
   if (!row || !Number.isSafeInteger(row.authenticatedAt) || !["setup","mfa"].includes(row.assurance) || row.generation !== readGeneration(db, row.userId) || row.authenticatedAt > Date.now()) throw new AuthPolicyError("Unauthorized", 401);
-  return row;
+  const expiresAt = effectiveSessionExpiry(row, row.assurance);
+  if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) throw new AuthPolicyError("Unauthorized", 401);
+  const { createdAt: _createdAt, expiresAt: _expiresAt, ...security } = row;
+  void _createdAt; void _expiresAt;
+  return security;
 }
 
 export async function reserveSecurityOperation(db: Database, userId: string, action: string): Promise<SecurityOperation> {

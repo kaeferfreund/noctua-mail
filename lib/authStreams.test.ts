@@ -1,4 +1,4 @@
-import {test,expect} from "bun:test";
+import {test,expect,spyOn} from "bun:test";
 import {createAuthenticatedTestSession} from "./testAuthHarness";
 import {requireActiveUserSession} from "./auth";
 import {assertStreamAuthorized} from "./authStreams";
@@ -36,4 +36,18 @@ test("a used session authenticated days ago keeps stream access until its slidin
   f.master.prepare("UPDATE auth_session SET expiresAt=? WHERE id=?").run(new Date(Date.now()-1000).toISOString(),f.session.id);
   await expect(assertStreamAuthorized(identity,()=>{delivered++;})).rejects.toThrow("revoked");
   expect(delivered).toBe(1);
+});
+
+test("stream expiry uses the library boundary: equality is live, the next millisecond is expired", async () => {
+  const f = await createAuthenticatedTestSession();
+  const identity = await requireActiveUserSession(new Request("http://localhost:3000", { headers: f.jar.headers() }));
+  if (identity instanceof Response) throw new Error("Missing fixture");
+  const expiresAt = Date.now();
+  f.master.prepare("UPDATE auth_session SET expiresAt=? WHERE id=?").run(new Date(expiresAt).toISOString(), f.session.id);
+  const now = spyOn(Date, "now").mockReturnValue(expiresAt);
+  try {
+    await expect(assertStreamAuthorized(identity)).resolves.toBeUndefined();
+    now.mockReturnValue(expiresAt + 1);
+    await expect(assertStreamAuthorized(identity)).rejects.toThrow("revoked");
+  } finally { now.mockRestore(); }
 });

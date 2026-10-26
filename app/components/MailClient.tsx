@@ -1,5 +1,7 @@
 "use client";
 
+import { readerNavigationActiveId } from "@/lib/ui/readerFocus";
+
 import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 import { useStartupSync } from "./mailclient/useStartupSync";
 import { useEmptyFolderRepair } from "./mailclient/useEmptyFolderRepair";
@@ -9,6 +11,7 @@ import ReaderToolbar, { ReaderFocusHint } from "./mailclient/message/ReaderToolb
 import { useReaderFocusPlacement } from "@/lib/ui/useReaderFocusPlacement";
 import { setClientErrorBuild } from "@/lib/ui/clientErrorReporter";
 import { useReaderFocus } from "@/lib/ui/useReaderFocus";
+import { useVisibleInterval } from "@/app/hooks/useVisibleInterval";
 import { useReaderNavigation } from "@/lib/ui/useReaderNavigation";
 import { readerShortcut } from "@/lib/ui/readerFocus";
 
@@ -2847,7 +2850,7 @@ export default function MailClient({
   const loadReaderPage = useCallback(() => setMessagesPage(page => page + 1), [setMessagesPage]);
   const readerNavigation = useReaderNavigation({
     enabled: !isMobile && readerLayout === "focus",
-    rows: readerRows, activeId: activeMessage?.id ?? "", listKey: messagesKey,
+    rows: readerRows, activeId: readerNavigationActiveId(readerRows, activeMessage), listKey: messagesKey,
     hasMore: hasMoreMessages, loading: loadingMessages, revision: authoritativeRevision,
     error: messageListError, select: handleSelectMessage, loadNextPage: loadReaderPage
   });
@@ -3530,8 +3533,8 @@ export default function MailClient({
   );
   const autoMarkReadDelayMs = useAutoMarkReadDelay(currentAccount, Boolean(activeMessage), apiFetch);
   const handleAutoMarkRead = useCallback(
-    (message: Message) => autoReadCoordinator.autoRead(message, () =>
-      listHandleRef.current?.updateFlagState(message, "seen", true) ?? Promise.resolve()),
+    (message: Message) => autoReadCoordinator.autoRead(message, shouldRetry =>
+      listHandleRef.current?.updateFlagState(message, "seen", true, shouldRetry) ?? Promise.resolve()),
     [autoReadCoordinator]
   );
   const updateKeywordFlag = useCallback(
@@ -4331,13 +4334,7 @@ export default function MailClient({
     };
   }, [clientId]);
 
-  useEffect(() => {
-    if (authState !== "ok" || !sessionTtlSeconds) return;
-    const intervalMs = Math.max(
-      60_000,
-      Math.min(30 * 60_000, Math.floor((sessionTtlSeconds * 1000) / 3))
-    );
-    const timer = window.setInterval(async () => {
+  const refreshVisibleSession = useCallback(async () => {
       try {
         const res = await apiFetch("/api/auth/me", {
           credentials: "include",
@@ -4363,9 +4360,9 @@ export default function MailClient({
       } catch {
         // ignore refresh errors
       }
-    }, intervalMs);
-    return () => window.clearInterval(timer);
-  }, [authState, sessionTtlSeconds, apiFetch, mailboxState, activeAccountId, authSecurity?.enrollmentRequired, authSecurity?.reauthRequired, loadInitialData]);
+  }, [apiFetch, mailboxState, activeAccountId, authSecurity, loadInitialData]);
+  useVisibleInterval(refreshVisibleSession, authState === "ok" && sessionTtlSeconds
+    ? Math.max(60_000, Math.min(30 * 60_000, Math.floor((sessionTtlSeconds * 1000) / 3))) : null);
 
   useEffect(() => {
     let active = true;
@@ -4961,7 +4958,7 @@ export default function MailClient({
     security: securityOpen, panel: openBottomStatusPanel === "exceptions" ? "exception" : openBottomStatusPanel === "reminders" ? "reminder" : openBottomStatusPanel,
     calendar: calendarSidebarOpen, compose: composeOpen && composeMode === "new" && composeView !== "minimized"
   };
-  const { navigateAccount: navigateLinkedAccount, navigateMessage } = useDeepLinks({
+  const { navigateAccount: navigateLinkedAccount, navigateMessage, queueFolderChoice } = useDeepLinks({
     ready: authState === "ok" && initialDataReady &&
       (initialFoldersLoadedAccountId === activeAccountId || foldersUnavailableAccountId === activeAccountId),
     state: deepLinkState, messages, accountIds: accounts.map(account => account.id), switchAccount,
@@ -5268,7 +5265,7 @@ export default function MailClient({
       onSelect: () => {
         clearSearch();
         setSearchScope("folder");
-        setActiveFolderId(inboxFolder.id);
+        if (!queueFolderChoice(inboxFolder.id)) setActiveFolderId(inboxFolder.id);
       }
     };
   }, [
@@ -5276,6 +5273,7 @@ export default function MailClient({
     activeVirtualFolder,
     clearSearch,
     inboxFolder,
+    queueFolderChoice,
     searchScope,
     setActiveFolderId,
     setSearchScope,
@@ -5331,7 +5329,7 @@ export default function MailClient({
               ? () => {
                   clearSearch();
                   setSearchScope("folder");
-                  setActiveFolderId(draftsFolder.id);
+                  if (!queueFolderChoice(draftsFolder.id)) setActiveFolderId(draftsFolder.id);
                 }
               : null
           },
@@ -5405,7 +5403,10 @@ export default function MailClient({
             folderById,
             searchScope,
             activeFolderId,
-            setActiveFolderId,
+            setActiveFolderId: next => {
+              const folderId = typeof next === "function" ? next(activeFolderId) : next;
+              if (!queueFolderChoice(folderId)) setActiveFolderId(folderId);
+            },
             setSearchScope,
             clearSearch,
             syncingFolders,

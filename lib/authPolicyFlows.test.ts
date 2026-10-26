@@ -321,3 +321,14 @@ test("a concurrent activation rejection cannot cancel the request holding the se
   expect((await source(f,jar)).assurance).toBe("mfa");
   expect(f.master.prepare("SELECT 1 FROM admin_lifecycle_operations WHERE slot=?").get(`security:${f.user.id}`)).toBeNull();
 });
+
+test("a setup session older than 24 hours cannot use a fresh enrollment grant on the raw factor endpoint", async () => {
+  const f = await fixture(), jar = await login(f, f.user.email);
+  const grant = await proof(f, jar, { purpose: "totp.enroll", currentPassword: password });
+  const session = await f.auth.api.getSession({ headers: jar.headers() });
+  if (!session) throw new Error("Missing setup fixture");
+  f.master.prepare("UPDATE auth_session SET createdAt=?,updatedAt=?,expiresAt=? WHERE id=?")
+    .run(new Date(Date.now() - 86400_001).toISOString(), new Date().toISOString(), new Date(Date.now() + 86400_000).toISOString(), session.session.id);
+  expect((await http(f, jar, "/two-factor/enable", { password }, grant.grant)).status).toBe(401);
+  expect(f.master.prepare("SELECT 1 FROM auth_two_factor WHERE userId=?").get(f.user.id)).toBeNull();
+});

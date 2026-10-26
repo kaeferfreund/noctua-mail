@@ -233,6 +233,7 @@ export default function AccountSettingsModal({
 
             {settingsTabVisible("account", initialAccount.accessRole, isExistingAccount) && <Tabs.Content value="account" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
               <AccountTabContent
+                apiFetch={apiFetch}
                 editingAccount={localAccount}
                 isExistingAccount={isExistingAccount}
                 imapDetecting={imapDetecting}

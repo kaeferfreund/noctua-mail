@@ -8,6 +8,8 @@ export type ClientErrorSource = (typeof CLIENT_ERROR_SOURCES)[number];
 
 export type ClientErrorReport = {
   source: ClientErrorSource;
+  kind?: "overlay-back-fallback";
+  count?: number;
   message: string;
   stack: string;
   /** Next.js digest of a server-rendered error, if any. */
@@ -41,7 +43,9 @@ export function sanitizeClientErrorReport(input: unknown): ClientErrorReport | n
   if (!source || !message) return null;
   return {
     source, message,
-    stack: clip(raw.stack, CLIENT_ERROR_LIMITS.stack),
+    ...(raw.kind === "overlay-back-fallback" && Number.isSafeInteger(raw.count) && Number(raw.count) > 0
+      ? { kind: "overlay-back-fallback" as const, count: Math.min(Number(raw.count), 100_000) } : {}),
+    stack: raw.kind === "overlay-back-fallback" ? "" : clip(raw.stack, CLIENT_ERROR_LIMITS.stack),
     digest: clip(raw.digest, CLIENT_ERROR_LIMITS.digest),
     path: clip(raw.path, CLIENT_ERROR_LIMITS.path).split("?")[0],
     queryKeys: (Array.isArray(raw.queryKeys) ? raw.queryKeys : [])

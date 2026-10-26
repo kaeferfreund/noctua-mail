@@ -35,3 +35,15 @@ export function resolveAutoMarkReadMode(
 export function autoMarkReadDelayMs(mode: AutoMarkReadMode): number | null {
   return DELAY_MS[mode];
 }
+
+export const AUTO_READ_RETRY_DELAY_MS = 1000;
+
+/** Retry an automatic mark once; manual read/unread during the wait wins. */
+export async function retryAutoReadOnce<T>(request: () => Promise<T>, shouldRetry: () => boolean): Promise<T | undefined> {
+  try { return await request(); }
+  catch {
+    await new Promise<void>(resolve => setTimeout(resolve, AUTO_READ_RETRY_DELAY_MS));
+    if (!shouldRetry()) return undefined;
+    return request();
+  }
+}

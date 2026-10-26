@@ -47,7 +47,7 @@ export function assertStreamAuthorizedRow(db: Database, identity: AuthStreamIden
       AND NOT EXISTS (SELECT 1 FROM user_provisioning WHERE userId=u.id AND state NOT IN ('complete','cancelled'))`)
     .get(identity.sessionId, identity.userId, identity.generation, identity.authenticatedAt) as { expiresAt: string | number; authenticatedAt: number } | undefined;
   // The live row's expiresAt slides with session use; an expiry snapshot from the opening request would end active streams early.
-  if (!row || !Number.isSafeInteger(identity.generation) || !Number.isSafeInteger(identity.authenticatedAt) || !Number.isFinite(new Date(row.expiresAt).getTime()) || new Date(row.expiresAt).getTime() <= now ||
+  if (!row || !Number.isSafeInteger(identity.generation) || !Number.isSafeInteger(identity.authenticatedAt) || !Number.isFinite(new Date(row.expiresAt).getTime()) || new Date(row.expiresAt).getTime() < now ||
       row.authenticatedAt > now ||
       (identity.accountId && !roleAtLeast(resolveAccountRoleRow(db, identity.userId, identity.accountId), identity.minRole ?? "viewer"))) {
     throw new Error("Stream authorization revoked");

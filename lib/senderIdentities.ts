@@ -8,11 +8,11 @@ import { getDb } from "./db/connection";
 import { listSenderIdentityRows, getIdentitySignatureIds, persistSenderIdentityMutation } from "./db/senderIdentities";
 import { resolveAccountRoleRow } from "./db/accountAccess";
 import { withDbWriteRetry } from "./dbWriteRetry";
-import { normalizeIdentityDisplayName, normalizeIdentityEmail } from "./ownAddresses";
+import { hasUnsafeNameCharacters, normalizeIdentityDisplayName, normalizeIdentityEmail } from "./ownAddresses";
 
 const address = z.string().max(254).transform(value => normalizeIdentityEmail(value))
   .refine((value): value is string => value !== null, "Expected one valid email address");
-const displayName = z.string().max(256).refine(value => !/[\x00-\x1f\x7f]/.test(value)).transform(normalizeIdentityDisplayName);
+const displayName = z.string().max(256).refine(value => !hasUnsafeNameCharacters(value)).transform(normalizeIdentityDisplayName);
 const optionalId = z.string().min(1).max(256);
 export const createSenderIdentitySchema = z.object({
   email: address, displayName, replyTo: address.optional(), signatureId: optionalId.optional(),

@@ -276,6 +276,8 @@ export default function MessageMenu({
       </DropdownMenu.Trigger>
       <Theme asChild><DropdownMenu.Content
         align="end"
+        onClick={event => event.stopPropagation()}
+        onKeyDown={event => event.stopPropagation()}
         sideOffset={6}
         onCloseAutoFocus={quietFocusReturn.onCloseAutoFocus}
         className={`${styles.menuContent} ${isMobile ? mobileStyles.messageMenu : ""}`}
