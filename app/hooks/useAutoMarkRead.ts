@@ -5,7 +5,7 @@ import { buildAccountApiPath } from "@/lib/accountApiPaths";
 import { autoMarkReadDelayMs, resolveAutoMarkReadMode } from "@/lib/autoMarkRead";
 import { roleAtLeast } from "@/lib/accountRole";
 import type { Account, Message, UserAccountPrefs } from "@/lib/data";
-import { ACCOUNT_PREFS_CHANGED } from "@/lib/ui/senderSettings";
+import { ACCOUNT_PREFS_CHANGED, SENDER_SETTINGS_STORAGE_KEY } from "@/lib/ui/senderSettings";
 import { useLatestRef } from "./useLatestRef";
 
 type Fetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -34,8 +34,20 @@ export function useAutoMarkReadDelay(
       revision.current += 1;
       setLoaded({ accountId, prefs: detail.prefs });
     };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== SENDER_SETTINGS_STORAGE_KEY || !event.newValue) return;
+      try {
+        if (JSON.parse(event.newValue).accountId !== accountId) return;
+        revision.current += 1;
+        setLoaded(null); // Reload private preferences; the receipt carries no values.
+      } catch { /* Ignore malformed receipts. */ }
+    };
     window.addEventListener(ACCOUNT_PREFS_CHANGED, onChanged);
-    return () => window.removeEventListener(ACCOUNT_PREFS_CHANGED, onChanged);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(ACCOUNT_PREFS_CHANGED, onChanged);
+      window.removeEventListener("storage", onStorage);
+    };
   }, [accountId]);
   const needed = Boolean(accountId) && opened && loaded?.accountId !== accountId;
   useEffect(() => {

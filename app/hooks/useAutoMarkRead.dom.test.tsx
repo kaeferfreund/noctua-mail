@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, jest } from "bun:test";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import type { Message } from "@/lib/data";
-import { ACCOUNT_PREFS_CHANGED } from "@/lib/ui/senderSettings";
+import { ACCOUNT_PREFS_CHANGED, SENDER_SETTINGS_STORAGE_KEY } from "@/lib/ui/senderSettings";
 import { createAutoReadCoordinator, useAutoMarkRead, useAutoMarkReadDelay } from "./useAutoMarkRead";
 import type { Account } from "@/lib/data";
 
@@ -240,4 +240,17 @@ describe("useAutoMarkReadDelay", () => {
     await act(async () => {});
     expect(result.current).toBeNull();
   });
+});
+
+it("reloads an open detached reader's preferences from another window's receipt", async () => {
+  let calls = 0;
+  const apiFetch = async () => Response.json({ prefs: { reading: { autoMarkRead: ++calls === 1 ? "never" : "after3s" } } });
+  const { result } = renderHook(() => useAutoMarkReadDelay(editor(), true, apiFetch));
+  await waitFor(() => expect(calls).toBe(1));
+  expect(result.current).toBeNull();
+  act(() => { window.dispatchEvent(new StorageEvent("storage", { key: SENDER_SETTINGS_STORAGE_KEY, newValue: JSON.stringify({ accountId: "other" }) })); });
+  expect(calls).toBe(1);
+  act(() => { window.dispatchEvent(new StorageEvent("storage", { key: SENDER_SETTINGS_STORAGE_KEY, newValue: JSON.stringify({ accountId: "synthetic-account", nonce: "synthetic" }) })); });
+  await waitFor(() => expect(result.current).toBe(3000));
+  expect(calls).toBe(2);
 });

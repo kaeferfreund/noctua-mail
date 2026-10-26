@@ -8,13 +8,13 @@ import type { Account, UserAccountPrefs, UserAccountPrefsPatch } from "@/lib/dat
 import { ACCOUNT_DATE_FORMAT_OPTIONS } from "@/lib/dateFormatting";
 import { Button } from "@/app/components/ui/button";
 import MailtoHandlerSection from "@/app/components/account-settings/MailtoHandlerSection";
-import SenderPreferences, { applySenderPatch, touchesSenderPrefs } from "@/app/components/account-settings/tabs/SenderPreferences";
+import SenderPreferences, { applySenderPatch } from "@/app/components/account-settings/tabs/SenderPreferences";
 import { nativeControlClass } from "@/app/components/account-settings/Field";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 import { senderSettingsError } from "@/lib/senderMessages";
-import { ACCOUNT_PREFS_CHANGED, notifySenderPreferencesChanged } from "@/lib/ui/senderSettings";
+import { notifySenderPreferencesChanged } from "@/lib/ui/senderSettings";
 import { validSignatureTemplate } from "@/lib/signatureTemplates";
 import { AUTO_MARK_READ_MODES } from "@/lib/autoMarkRead";
 
@@ -70,8 +70,7 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
       // The collaboration settings resolver can subscribe without persisting
       // personal values back into the team-level /settings route. Sender changes
       // also tell other windows (compose) to reload their sender settings.
-      if (touchesSenderPrefs(patch)) notifySenderPreferencesChanged(editingAccount.id, data.prefs);
-      else window.dispatchEvent(new CustomEvent(ACCOUNT_PREFS_CHANGED, { detail: { accountId: editingAccount.id, prefs: data.prefs } }));
+      notifySenderPreferencesChanged(editingAccount.id, data.prefs);
     } catch (error) { setError(error); }
     finally { setBusy(false); }
   };
