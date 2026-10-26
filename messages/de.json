@@ -248,6 +248,7 @@
       },
       "serverHeading": "MCP-Server",
       "endpointHint": "Verwende den MCP-Endpunkt unten mit dem Header <code>{header}</code>.",
+      "assistantHint": "So nutzt du es in Claude: Server-URL und Token dort als MCP-Server (HTTP) eintragen. Danach genügt eine normale Bitte, z. B. „Schreib eine Antwort auf die Mail von …“ oder „Was ist heute Neues in meinem Postfach?“. Entwürfe landen im Ordner Entwürfe, Claude nennt jeweils den Link dazu; gesendet wird erst, wenn du den Entwurf hier abschickst.",
       "copyServerUrl": "Server-URL kopieren",
       "copiedServerUrl": "Server-URL kopiert",
       "createHeading": "Token erstellen",

@@ -95,6 +95,7 @@ it("names the full endpoint URL and marks mailbox names as user text inside thei
   expect(label.style.overflowWrap).toBe("");
   const url = `${window.location.origin}/api/mcp`;
   expect(page.getByText(url).getAttribute("title")).toBe(url);
+  expect(page.getByText(/^Using it in Claude: .*Write a reply to the e-mail from/)).toBeTruthy();
 });
 
 it("shows only accessible mailbox names plus a count, warns before revoking other mailboxes, labels invalid scopes", async () => {

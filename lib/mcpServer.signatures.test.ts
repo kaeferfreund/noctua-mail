@@ -9,6 +9,7 @@ import { createSenderIdentity } from "./senderIdentities";
 import { MailboxCredentialError } from "./mailboxCredentials";
 import { saveSignatureTemplate } from "./signatureTemplateStore";
 import { GET } from "../app/api/accounts/route";
+import { parseDeepLink } from "./navigation/deepLinks";
 
 const accountId = `mcp-signatures-${crypto.randomUUID()}`;
 const account = identityTestAccount(accountId);
@@ -41,6 +42,9 @@ test("viewers list templates; editors cannot change them; managers save, set the
   const created = await tool("save_signature_template", { name: "Team", body: "Regards\n{{user.name}} · {{identity.email}}" });
   expect(created.isError).not.toBe(true);
   const id = created.structuredContent!.signature!.id;
+  const signaturesUrl = created.structuredContent!.url as string;
+  expect(parseDeepLink(new URL(signaturesUrl).search)).toMatchObject({ accountId, settings: "signatures" });
+  expect(created.content[0].text).toContain(`Open in Noctua Mail: ${signaturesUrl}`);
   expect(created.structuredContent!.signatures).toEqual([{ id, name: "Team", body: "Regards\n{{user.name}} · {{identity.email}}" }]);
 
   setRole("viewer");
@@ -102,3 +106,17 @@ test("a concurrent mailbox change is reported as a retryable conflict, not a rej
   expect(mailboxErrorCode(400)).toBe("mailbox_update_rejected");
   expect((await tool("list_signature_templates")).structuredContent!.signatures!.length).toBe(before);
 }, 20000);
+
+test("result links use the canonical BETTER_AUTH_URL origin", async () => {
+  const previous = { url: process.env.BETTER_AUTH_URL, rpId: process.env.PASSKEY_RP_ID };
+  process.env.BETTER_AUTH_URL = "https://mail.example.test";
+  process.env.PASSKEY_RP_ID = "mail.example.test";
+  try {
+    const listed = await tool("list_signature_templates");
+    expect(listed.structuredContent!.url).toBe(`https://mail.example.test/?a=%7E${accountId}&settings=signatures`);
+    expect((await tool("list_sender_identities")).structuredContent!.url).toStartWith("https://mail.example.test/?");
+  } finally {
+    process.env.BETTER_AUTH_URL = previous.url;
+    process.env.PASSKEY_RP_ID = previous.rpId;
+  }
+});

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { evidencePath, recordQa, signInQa } from "./qaRound2Session";
+import { evidencePath, reauthQa, recordQa, signInQa } from "./qaRound2Session";
 import { catalogs } from "./qaSweep3";
 
 // Evidence for drafts in the reader (also with a new message open) and „Senden planen“
@@ -16,6 +16,7 @@ async function mcpCall(page: Page, token: string, name: string, args: Record<str
     data: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }
   });
   expect(response.status()).toBe(200);
+  return (await response.json() as { result: { content: Array<{ text: string }>; structuredContent: Record<string, unknown> } }).result;
 }
 
 async function seedDrafts(page: Page) {
@@ -27,12 +28,14 @@ async function seedDrafts(page: Page) {
   const saved = await page.request.post(`${mailbox}/drafts/save`, { headers: { origin },
     data: { to: "praxis-kunde@example.test", subject: "Angebot Prophylaxe-Termine", text: "Hallo,\n\nanbei das synthetische Angebot.\n\nViele Grüße\nAlex" } });
   expect(saved.status()).toBe(200);
-  const minted = await page.request.post(`${mailbox}/mcp-tokens`, { headers: { origin }, data: { label: "Synthetic draft QA", accountIds: ["qa-shared"], mode: "drafts" } });
+  // Creating a token needs a fresh factor proof (mcp.create).
+  const minted = await page.request.post(`${mailbox}/mcp-tokens`, { headers: { origin, "x-noctua-reauth": await reauthQa(page, "mcp.create") }, data: { label: "Synthetic draft QA", accountIds: ["qa-shared"], mode: "drafts" } });
   expect(minted.status()).toBe(201);
   const { token } = await minted.json() as { token: string };
   for (const [to, subject] of [["kunde@example.test", "Ihr Wunsch wurde umgesetzt"], ["labor@example.test", "Rückfrage Laborauftrag"]]) {
     await mcpCall(page, token, "create_draft_message", { accountId: "qa-shared", to, subject, text: "Hallo,\n\nsynthetischer Entwurf eines Assistenten.\n" });
   }
+  return token;
 }
 
 test("QA drafts open in the reader, also while a new message is open", async ({ page }) => {
@@ -51,6 +54,27 @@ test("QA drafts open in the reader, also while a new message is open", async ({ 
   await expect(page.getByRole("button", { name: copy.Compose.window.restore, exact: true })).toBeVisible();
   await page.screenshot({ path: evidencePath("draft-reader-with-minimized-compose-1280.png") });
   recordQa("draft-reader", { readerShown: true, composeMinimized: true });
+});
+
+test("QA the link in an MCP draft result opens that draft in the reader at 1280/390 px", async ({ page }) => {
+  test.setTimeout(600_000);
+  await page.setViewportSize({ width: 1280, height: 860 });
+  await signInQa(page);
+  page.on("pageerror", error => console.log("[pageerror]", error.message));
+  const token = await seedDrafts(page);
+  const created = await mcpCall(page, token, "create_draft_message", { accountId: "qa-shared", to: "link@example.test",
+    subject: "Entwurf per Link öffnen", text: "Hallo,\n\nsynthetischer Entwurf, geöffnet über den Link aus dem MCP-Ergebnis.\n" });
+  const url = created.structuredContent.url as string;
+  expect(new URL(url).origin).toBe(new URL(page.url()).origin);
+  expect(created.content[0]?.text).toContain(url);
+  for (const [width, height] of [[1280, 860], [390, 844]]) {
+    await page.setViewportSize({ width, height });
+    await page.goto(url);
+    await expect(page.getByText("synthetischer Entwurf, geöffnet über den Link aus dem MCP-Ergebnis.").first()).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(copy.Reader.selectThread)).toHaveCount(0);
+    await page.screenshot({ path: evidencePath(`mcp-draft-link-${width}.png`) });
+  }
+  recordQa("mcp-draft-link", { url: new URL(url).search });
 });
 
 test("QA schedule a draft without opening it at 1280/390 px", async ({ page }) => {
