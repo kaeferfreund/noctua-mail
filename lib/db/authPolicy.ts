@@ -106,6 +106,12 @@ const triggers: Record<string, string> = {
       (SELECT identifier FROM auth_pending_challenges WHERE userId=NEW.userId);
     DELETE FROM auth_pending_challenges WHERE userId=NEW.userId;
     DELETE FROM auth_reauth_grants WHERE userId=NEW.userId;
+    -- Password changes/resets, revoke-all and other credential revocations commit here.
+    -- Preserve a live lease: an SMTP operation already in progress must still block a second send.
+    UPDATE scheduled_sends SET
+      status=CASE WHEN status='sending' THEN 'sending' ELSE 'cancelled' END,
+      lastError='security_revoked',updatedAt=CAST((julianday('now')-2440587.5)*86400000 AS INTEGER)
+      WHERE userId=NEW.userId AND status IN ('queued','sending','failed');
   END`,
   noctua_credential_insert: `CREATE TRIGGER noctua_credential_insert AFTER INSERT ON auth_account
     WHEN NEW.providerId='credential' AND NEW.password IS NOT NULL BEGIN

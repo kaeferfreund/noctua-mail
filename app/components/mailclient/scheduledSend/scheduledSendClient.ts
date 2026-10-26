@@ -32,28 +32,14 @@ export function listScheduledDraftSends(apiFetch: ApiFetch, accountId: string, d
     body => (Array.isArray(body.scheduledSends) ? body.scheduledSends : []) as ScheduledSendView[]);
 }
 
-export type ScheduleReleaseResult = { ok: true } | { ok: false; reason: "busy" | "failed" };
+export type ScheduleReleaseResult = { ok: true; alreadyGone?: true } | { ok: false; reason: "busy" | "failed" };
 
-/**
- * Cancels the draft's schedule. A 404 counts as „already gone“ only when a fresh read of the
- * draft's schedules agrees; a newer schedule of the same draft (another tab or member) is
- * cancelled instead.
- */
+/** Cancels only the requested id: an old undo toast must never cancel a replacement schedule. */
 export async function cancelDraftSchedule(apiFetch: ApiFetch, accountId: string, schedule: Pick<ScheduledSendView, "id" | "draftId">): Promise<ScheduleReleaseResult> {
-  let target = schedule.id;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const result = await cancelScheduledDraftSend(apiFetch, accountId, target);
-    if (result.ok) return { ok: true };
-    if (result.status === 409) return { ok: false, reason: "busy" };
-    if (result.status !== 404) return { ok: false, reason: "failed" };
-    const fresh = await listScheduledDraftSends(apiFetch, accountId, schedule.draftId);
-    if (!fresh.ok) return { ok: false, reason: "failed" };
-    const open = fresh.value.find(row => row.id !== target);
-    if (!open) return { ok: true };
-    if (open.status === "sending") return { ok: false, reason: "busy" };
-    target = open.id;
-  }
-  return { ok: false, reason: "failed" };
+  const result = await cancelScheduledDraftSend(apiFetch, accountId, schedule.id);
+  if (result.ok) return { ok: true };
+  if (result.status === 404) return { ok: true, alreadyGone: true };
+  return { ok: false, reason: result.status === 409 ? "busy" : "failed" };
 }
 
 /**
@@ -62,18 +48,46 @@ export async function cancelDraftSchedule(apiFetch: ApiFetch, accountId: string,
  * A failed read lets the draft open: saving and sending still settle the schedule server-side.
  */
 export async function releaseDraftScheduleForEdit(apiFetch: ApiFetch, accountId: string, draftId: string): Promise<ScheduleReleaseResult> {
-  const fresh = await listScheduledDraftSends(apiFetch, accountId, draftId);
-  if (!fresh.ok) return { ok: true };
-  const schedule = fresh.value.find(row => row.draftId === draftId);
-  if (!schedule) return { ok: true };
-  if (schedule.status === "sending") return { ok: false, reason: "busy" };
-  return cancelDraftSchedule(apiFetch, accountId, schedule);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const fresh = await listScheduledDraftSends(apiFetch, accountId, draftId);
+    if (!fresh.ok) return { ok: true };
+    const schedule = fresh.value.find(row => row.draftId === draftId);
+    if (!schedule) return { ok: true };
+    if (schedule.status === "sending") return { ok: false, reason: "busy" };
+    const result = await cancelScheduledDraftSend(apiFetch, accountId, schedule.id);
+    if (result.ok) return { ok: true };
+    if (result.status !== 404) return { ok: false, reason: result.status === 409 ? "busy" : "failed" };
+    // Editing intentionally releases the current plan; only this flow may re-read a
+    // replacement. Undo toasts always cancel their exact id via cancelDraftSchedule.
+  }
+  return { ok: false, reason: "failed" };
 }
 
-/** The `code` of a refused POST …/drafts/scheduled for a draft that can never be planned, or null. */
+const refusalKeys = {
+  scheduled_send_invite: "inviteUnsupported",
+  scheduled_send_draft_deleted: "notInDrafts",
+  scheduled_send_draft_missing: "draftMissing",
+  scheduled_send_draft_invalid: "draftInvalid",
+  scheduled_send_sent: "sendConflictSent",
+  scheduled_send_busy: "busy",
+  send_at_past: "errors.past",
+  send_at_too_soon: "errors.tooSoon",
+  send_at_too_far: "tooFar",
+  send_at_invalid: "errors.invalid",
+  identity_unavailable: "identityUnavailable",
+  identity_not_found: "identityUnavailable",
+  draft_identity_changed: "identityUnavailable"
+} as const;
+
+/** Catalogue key only: scheduling never surfaces raw (English or upstream) server text. */
 export async function readScheduledSendRefusal(response: Response) {
   const body = (await response.clone().json().catch(() => null)) as { code?: unknown } | null;
-  return body?.code === "scheduled_send_invite" ? body.code : null;
+  const key = typeof body?.code === "string" ? refusalKeys[body.code as keyof typeof refusalKeys] : undefined;
+  if (key) return key;
+  if (response.status === 404) return "draftMissing";
+  if (response.status === 403 || response.status === 401) return "permissionDenied";
+  if (response.status === 429) return "rateLimited";
+  return "failed";
 }
 
 /** The `code` of a 409 from a send route racing the draft's schedule, or null. */
