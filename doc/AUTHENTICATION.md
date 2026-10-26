@@ -37,7 +37,8 @@ Active mailbox selection is a UI preference and never authorizes the route's req
 ### Session lifetime: three days of inactivity
 
 User decision of 2026-10-25: a session stays valid as long as it is used and ends after three days
-without use. There is no absolute lifetime. Better Auth runs with `expiresIn` 259200 s
+without use. Fully authenticated sessions have no absolute lifetime. Restricted setup sessions
+end at most 24 hours after `auth_session.createdAt`, even when requests slide their library expiry. Better Auth runs with `expiresIn` 259200 s
 (`SESSION_IDLE_TIMEOUT_SECONDS`), `updateAge` 3600 s and the cookie cache disabled. Every guarded
 request reads the session through `getSession`; when the last refresh is at least one hour old it
 moves `auth_session.expiresAt` to now + 3 days and sends a new session cookie with `Max-Age=259200`,
@@ -45,14 +46,18 @@ which `withAuthResponse`/`forwardAuthHeaders` pass through. The effective idle l
 between 71 and 72 hours after the last request. After that the row has expired, the guard answers
 401 and the deletion cookie is forwarded.
 
-The session's `expiresAt` is the only lifetime. `auth_session_security.authenticatedAt` still records
+For fully authenticated sessions, `expiresAt` is the only lifetime. `auth_session_security.authenticatedAt` still records
 when the factors were last proven and binds stream and MCP checks to that proof, but its age no
 longer ends a session, a stream or a reauth proof. `/api/auth/me` returns the sliding expiry as
 `exp` and the idle timeout as `ttlSeconds` (259200). Open streams check the live session row every
 5 seconds, so they follow the sliding expiry instead of a snapshot from the request that opened them
-and close at most 5 seconds after it passes. An open stream does not extend the session; only
-requests through the guard do, so a tab that keeps polling keeps its session alive indefinitely.
-Restricted setup sessions slide the same way.
+and close within the next liveness check (a ≤ 5 s polling window, subject to event-loop scheduling).
+The comparison matches Better Auth: a timestamp exactly equal to `expiresAt` is still live;
+it expires when `now > expiresAt`. Event delivery also checks authorization before enqueueing.
+An open IMAP/SSE live connection never extends the session by itself: these checks only read the
+session row. Only ordinary requests through `getSession` can slide expiry. A visible tab's periodic
+`/api/auth/me` request therefore counts as activity. Hidden tabs skip this refresh and refresh once
+when visible again; a background tab alone does not keep the session alive.
 
 An authenticated open mail tab polls `/api/auth/me` every 30 minutes in `MailClient`
 (the interval is clamped between one minute and `min(30 minutes, ttlSeconds / 3)`).

@@ -118,17 +118,17 @@ export default function MembersTabContent({ accountId, accessRole, apiFetch = fe
       })}</tbody></table></div>
     <div className="space-y-2 border-t pt-4">
       <h4 className="text-sm font-medium">{t("members.add")}</h4>
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        {!admin && <form role="search" className="flex items-center gap-1 max-md:w-full" onSubmit={event => { event.preventDefault(); setTarget(""); setSearch(query.trim()); }}>
-          <Input className="md:w-44" aria-label={t("members.find")} placeholder={t("members.find")} value={query} maxLength={128} onChange={event => setQuery(event.target.value)} />
+      <div className="flex flex-wrap items-center gap-2 text-sm md:flex-nowrap">
+        {!admin && <form role="search" className="flex min-w-0 items-center gap-1 max-md:w-full md:w-44 md:shrink" onSubmit={event => { event.preventDefault(); setTarget(""); setSearch(query.trim()); }}>
+          <Input className="min-w-0 flex-1" aria-label={t("members.find")} placeholder={t("members.find")} value={query} maxLength={128} onChange={event => setQuery(event.target.value)} />
           <Button variant="outline" size="icon" className="max-md:size-11" disabled={directoryLoading} aria-label={t("members.search")} title={t("members.search")}><Search /></Button>
         </form>}
-        <form className="flex flex-wrap items-center gap-2 max-md:w-full" onSubmit={event => { event.preventDefault(); if (target) void mutate(target, role); }}>
-          <select className={`${nativeControlClass} md:w-52`} aria-label={t("members.addEnabled")} value={target} disabled={busy || loading || directoryLoading} onChange={event => setTarget(event.target.value)}>
+        <form className="flex min-w-0 flex-wrap items-center gap-2 max-md:w-full md:flex-1 md:flex-nowrap" onSubmit={event => { event.preventDefault(); if (target) void mutate(target, role); }}>
+          <select className={`${nativeControlClass} md:w-auto md:flex-1`} aria-label={t("members.addEnabled")} value={target} disabled={busy || loading || directoryLoading} onChange={event => setTarget(event.target.value)}>
             <option value="">{t("members.choose")}</option>{available.map(user => <option key={user.id} value={user.id}>{user.name || user.email} ({user.email})</option>)}
           </select>
-          <select className={`${nativeControlClass} md:w-32`} aria-label={t("members.newRole")} value={role} onChange={event => setRole(event.target.value as AccountRole)}>{roles.map(role => <option key={role} value={role}>{t(`roles.${role}`)}</option>)}</select>
-          <Button aria-label={t("members.add")} disabled={busy || !target}>{t("members.addButton")}</Button>
+          <select className={`${nativeControlClass} md:w-28 md:shrink-0`} aria-label={t("members.newRole")} value={role} onChange={event => setRole(event.target.value as AccountRole)}>{roles.map(role => <option key={role} value={role}>{t(`roles.${role}`)}</option>)}</select>
+          <Button className="shrink-0 whitespace-nowrap" aria-label={t("members.add")} disabled={busy || !target}>{t("members.addButton")}</Button>
         </form>
       </div>
       {!admin && <p className="text-xs text-muted-foreground">{t("members.searchHelp")}</p>}

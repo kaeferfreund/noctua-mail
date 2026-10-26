@@ -5,7 +5,7 @@ import { buildAccountApiPath } from "@/lib/accountApiPaths";
 import { autoMarkReadDelayMs, resolveAutoMarkReadMode } from "@/lib/autoMarkRead";
 import { roleAtLeast } from "@/lib/accountRole";
 import type { Account, Message, UserAccountPrefs } from "@/lib/data";
-import { ACCOUNT_PREFS_CHANGED } from "@/lib/ui/senderSettings";
+import { ACCOUNT_PREFS_CHANGED, SENDER_SETTINGS_STORAGE_KEY } from "@/lib/ui/senderSettings";
 import { useLatestRef } from "./useLatestRef";
 
 type Fetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -26,6 +26,7 @@ export function useAutoMarkReadDelay(
   const [loaded, setLoaded] = useState<{ accountId: string; prefs: UserAccountPrefs } | null>(null);
   // Bumped by every save in this window: a read still in flight is older.
   const revision = useRef(0);
+  const [refreshRevision, setRefreshRevision] = useState(0);
   useEffect(() => {
     if (!accountId) return;
     const onChanged = (event: Event) => {
@@ -34,8 +35,21 @@ export function useAutoMarkReadDelay(
       revision.current += 1;
       setLoaded({ accountId, prefs: detail.prefs });
     };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== SENDER_SETTINGS_STORAGE_KEY || !event.newValue) return;
+      try {
+        if (JSON.parse(event.newValue).accountId !== accountId) return;
+        revision.current += 1;
+        setLoaded(null); // Reload private preferences; the receipt carries no values.
+        setRefreshRevision(value => value + 1);
+      } catch { /* Ignore malformed receipts. */ }
+    };
     window.addEventListener(ACCOUNT_PREFS_CHANGED, onChanged);
-    return () => window.removeEventListener(ACCOUNT_PREFS_CHANGED, onChanged);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(ACCOUNT_PREFS_CHANGED, onChanged);
+      window.removeEventListener("storage", onStorage);
+    };
   }, [accountId]);
   const needed = Boolean(accountId) && opened && loaded?.accountId !== accountId;
   useEffect(() => {
@@ -49,7 +63,7 @@ export function useAutoMarkReadDelay(
       })
       .catch(() => { /* Stay on "never" when the preferences are unavailable. */ });
     return () => { active = false; };
-  }, [accountId, apiFetch, needed]);
+  }, [accountId, apiFetch, needed, refreshRevision]);
   if (!accountId || loaded?.accountId !== accountId) return null;
   return autoMarkReadDelayMs(resolveAutoMarkReadMode(account?.settings, loaded.prefs));
 }
@@ -68,9 +82,10 @@ export function createAutoReadCoordinator() {
   const autoRequests = new Map<string, Promise<unknown>>();
   return {
     manualSeenVersion: (message: Pick<Message, "accountId" | "id">) => versions.get(messageKey(message)) ?? 0,
-    autoRead: (message: Message, request: () => Promise<unknown>) => {
+    autoRead: (message: Message, request: (shouldRetry: () => boolean) => Promise<unknown>) => {
       const key = messageKey(message);
-      const pending: Promise<unknown> = request().catch(() => {}).finally(() => {
+      const version = versions.get(key) ?? 0;
+      const pending: Promise<unknown> = request(() => (versions.get(key) ?? 0) === version).catch(() => {}).finally(() => {
         if (autoRequests.get(key) === pending) autoRequests.delete(key);
       });
       autoRequests.set(key, pending);
@@ -105,8 +120,8 @@ const periodKey = messageKey;
  * card) or a hidden page cancels its timer. Each open period marks a message
  * at most once, and not at all once its read state changed or the user took a
  * read/unread action on it (`manualSeenVersion` moved) while it was open:
- * opening it again starts a new period. A failed mark-read request is
- * therefore not retried until the message is opened again.
+ * opening it again starts a new period. The request layer retries a failed automatic mark once;
+ * the coordinator cancels that retry when a manual action wins.
  */
 export function useAutoMarkRead({ messages, delayMs, onMarkRead, manualSeenVersion }: {
   messages: Message[];

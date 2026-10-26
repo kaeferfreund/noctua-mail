@@ -38,6 +38,8 @@
       "confirmRemove": "{email}: revoke mailbox access."
     },
     "preferences": {
+      "mailboxDefault": "Default for all members",
+      "saveMailboxDefault": "Save mailbox default",
       "help": "Personal preferences for this mailbox. Inherit uses the mailbox default; only changed preferences are saved.",
       "loading": "Loading preferences…",
       "saved": "Preferences saved.",

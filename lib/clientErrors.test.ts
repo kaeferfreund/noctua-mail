@@ -32,3 +32,8 @@ test("anything that is not a report is rejected", () => {
   }
   expect(sanitizeClientErrorReport({ source: "error", message: "x", standalone: "yes" })?.standalone).toBe(false);
 });
+
+test("overlay fallback reports keep their aggregate kind/count and never a stack", () => {
+  expect(sanitizeClientErrorReport({ source: "error", message: "Mobile overlay Back timeout", kind: "overlay-back-fallback", count: 3, stack: "private stack" }))
+    .toMatchObject({ kind: "overlay-back-fallback", count: 3, stack: "" });
+});

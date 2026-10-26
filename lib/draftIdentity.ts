@@ -1,6 +1,6 @@
 import { simpleParser } from "mailparser";
 import type { Message, SenderIdentity } from "./data";
-import { normalizeIdentityDisplayName, normalizeIdentityEmail, parseAddressEmails } from "./ownAddresses";
+import { hasUnsafeNameCharacters, normalizeIdentityEmail, parseAddressEmails } from "./ownAddresses";
 import { configuredReplyTo, IDENTITY_HEADER } from "./sendIdentity";
 import { SenderIdentityError } from "./senderIdentityError";
 
@@ -18,7 +18,10 @@ function unavailable(): never {
  * normalized on both sides: the parser trims quoted names, legacy rows may carry extra spaces.
  */
 function fromDisplayName(name: string, email: string) {
-  const normalized = normalizeIdentityDisplayName(name);
+  // Validate the decoded value before trimming/collapsing: RFC 2047 can hide
+  // controls and non-ASCII whitespace that must never compare as plain spaces.
+  if (name.length > 256 || hasUnsafeNameCharacters(name) || /[\u00a0\ufeff]/.test(name)) changed();
+  const normalized = name.replace(/ +/g, " ").replace(/^ +| +$/g, "");
   return normalizeIdentityEmail(normalized) === email ? "" : normalized;
 }
 

@@ -1,3 +1,4 @@
+import { retryAutoReadOnce } from "@/lib/autoMarkRead";
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import type React from "react";
@@ -143,19 +144,28 @@ export function useMessageMutations({
 
   const requestMessageFlagMutation = useCallback(async (
     messageId: string,
-    payload: { value: boolean; flag?: SystemFlag; keyword?: string }
+    payload: { value: boolean; flag?: SystemFlag; keyword?: string },
+    shouldRetry?: () => boolean
   ) => {
-    const res = await apiFetch(buildAccountMessageActionPath(activeAccountId, messageId, "flags"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) {
-      await reportResponseError(res);
+    const request = async () => {
+      const response = await apiFetch(buildAccountMessageActionPath(activeAccountId, messageId, "flags"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) throw response;
+      return response;
+    };
+    try {
+      const res = shouldRetry ? await retryAutoReadOnce(request, shouldRetry) : await request();
+      if (!res) return null;
+      const data = (await res.json()) as { flags?: string[] };
+      return data.flags ?? [];
+    } catch (error) {
+      if (!(error instanceof Response)) throw error;
+      await reportResponseError(error);
       return null;
     }
-    const data = (await res.json()) as { flags?: string[] };
-    return data.flags ?? [];
   }, [activeAccountId, apiFetch, reportResponseError]);
 
   const requestBulkFlagMutation = useCallback(async (
@@ -502,10 +512,11 @@ export function useMessageMutations({
   const updateFlagState = useCallback(async (
     message: Message,
     flag: SystemFlag,
-    value: boolean
+    value: boolean,
+    shouldRetry?: () => boolean
   ) => {
     try {
-      const flags = await requestMessageFlagMutation(message.id, { flag, value });
+      const flags = await requestMessageFlagMutation(message.id, { flag, value }, shouldRetry);
       if (!flags) return;
       applyFlagsResults([{ message, nextFlags: flags }], "update-flag-state");
       queueFilteredSearchRefresh(hasFilteredSearchCriteria);

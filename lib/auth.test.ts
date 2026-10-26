@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { SETUP_SESSION_MAX_AGE_MS } from "./authSessionLifetime";
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { requireActiveUserSession, forwardAuthHeaders } from "./auth";
@@ -148,4 +149,22 @@ test("keeps a route's own Cache-Control while forwarding auth headers", () => {
     expect(response.headers.getSetCookie()).toEqual(["synthetic=1; Path=/"]);
   }
   expect(forwardAuthHeaders(new Response(), headers).headers.get("cache-control")).toBe("no-store");
+});
+
+test("restricted setup sessions end 24 hours after creation despite recent sliding activity", async () => {
+  const f = await createAuthenticatedTestSession();
+  await f.seedSessionSecurity(f.session.id, f.user.id, "setup");
+  const createdAt = Date.now() - SETUP_SESSION_MAX_AGE_MS + 60_000;
+  await withDbWriteRetry("test.setup-age", () => f.master.prepare("UPDATE auth_session SET createdAt=? WHERE id=?")
+    .run(new Date(createdAt).toISOString(), f.session.id));
+  const guard = () => requireActiveUserSession(request(f.jar.header()), { allowRestricted: true });
+  const live = await guard();
+  if (live instanceof NextResponse) throw new Error(`Setup prematurely denied: ${live.status}`);
+  expect(live.expiresAt).toBe(createdAt + SETUP_SESSION_MAX_AGE_MS);
+  // Even a newly proven setup sidecar cannot reset the original creation limit.
+  await f.seedSessionSecurity(f.session.id, f.user.id, "setup");
+  await withDbWriteRetry("test.setup-age", () => f.master.prepare("UPDATE auth_session SET createdAt=?,updatedAt=?,expiresAt=? WHERE id=?")
+    .run(new Date(Date.now() - SETUP_SESSION_MAX_AGE_MS - 1).toISOString(), new Date().toISOString(), new Date(Date.now() + 86400_000).toISOString(), f.session.id));
+  expect((await guard() as NextResponse).status).toBe(401);
+  expect((await requireActiveUserSession(request(f.jar.header())) as NextResponse).status).toBe(401);
 });

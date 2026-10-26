@@ -105,7 +105,8 @@ export type MessageListHandle = {
   updateFlagState: (
     message: Message,
     flag: "seen" | "answered" | "flagged" | "draft" | "deleted",
-    value: boolean
+    value: boolean,
+    shouldRetry?: () => boolean
   ) => Promise<void>;
   updateFlagStateBulk: (
     messages: Message[],

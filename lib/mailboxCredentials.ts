@@ -1,3 +1,4 @@
+import { hasUnsafeNameCharacters } from "./ownAddresses";
 import { assertSignatureTemplate, SignatureTemplateError } from "./signatureTemplates";
 import { assertIdentitySignaturesAvailable } from "./senderIdentities";
 import { recordAdminAuditRow } from "./db/adminAudit";
@@ -58,7 +59,10 @@ export async function updateMailboxCredentials(accountId: string, patchInput: Ma
   }
   if (patch.settings?.signatures !== undefined) {
     if (!Array.isArray(patch.settings.signatures)) throw new SignatureTemplateError("invalid signature list");
-    for (const signature of patch.settings.signatures) assertSignatureTemplate(signature?.body);
+    for (const signature of patch.settings.signatures) {
+      if (typeof signature?.name !== "string" || hasUnsafeNameCharacters(signature.name)) throw new SignatureTemplateError("invalid signature name");
+      assertSignatureTemplate(signature?.body);
+    }
   }
   const next = mergeAccount(original, { ...patch,
     ...(patch.caldav && !patch.caldav.password?.trim() ? { caldav: { ...patch.caldav, password: original.caldav?.password ?? "" } } : {}),

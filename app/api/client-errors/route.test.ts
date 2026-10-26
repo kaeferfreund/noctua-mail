@@ -63,3 +63,9 @@ test("limits each session to ten reports per minute", async () => {
   const other = await createAuthenticatedTestSession();
   expect((await POST(request(other.jar.header()))).status).toBe(204);
 });
+
+test("overlay Back telemetry reaches the journal with count and no stack", async () => {
+  const f = await createAuthenticatedTestSession();
+  expect((await POST(request(f.jar.header(), { ...report, source: "error", kind: "overlay-back-fallback", count: 4, stack: "ignored" }))).status).toBe(204);
+  expect(JSON.parse(crashLines()[0][1] as string)).toMatchObject({ kind: "overlay-back-fallback", count: 4, stack: "" });
+});

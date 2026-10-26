@@ -99,3 +99,14 @@ test("display name whitespace differences on either side still match, other name
   const ownRaw = "X-Noctua-Identity-Id: own\r\nFrom: own@example.test\r\nMessage-ID: <own@example.test>\r\n\r\nBody";
   expect((await validateDraftIdentity(ownRaw, { accountId: "mailbox", from: "own@example.test", senderIdentityId: "own" } as Message, [own])).id).toBe("own");
 });
+
+for (const [label, name] of [
+  ["CR", "Synthetic\rAlias"], ["LF", "Synthetic\nAlias"], ["TAB", "Synthetic\tAlias"],
+  ["NBSP", "Synthetic\u00a0Alias"], ["BOM", "Synthetic\ufeffAlias"],
+  ["C1", "Synthetic\u0085Alias"], ["bidi", "Synthetic\u202eAlias"],
+  ["oversized spaces", `Synthetic${" ".repeat(256)}Alias`]
+]) test(`draft refuses RFC 2047 decoded ${label}`, async () => {
+  const encoded = `=?UTF-8?B?${Buffer.from(name).toString("base64")}?=`;
+  await expect(validateDraftIdentity(raw.replace("Synthetic Alias", encoded), draft, [identity]))
+    .rejects.toMatchObject({ code: "draft_identity_changed", status: 409 });
+});

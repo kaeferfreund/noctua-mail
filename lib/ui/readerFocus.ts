@@ -23,6 +23,12 @@ export function readerNavigationRows(items: ListItem[]): Message[] {
   const seen = new Set<string>();
   return rows.filter(row => { if (seen.has(row.id)) return false; seen.add(row.id); return true; });
 }
+/** A collapsed row can represent the reply currently shown in the reader. */
+export function readerNavigationActiveId(rows: Message[], message: Message | undefined): string {
+  if (!message) return "";
+  if (rows.some(row => row.id === message.id)) return message.id;
+  return rows.find(row => row.accountId === message.accountId && Boolean(message.threadId) && row.threadId === message.threadId)?.id ?? message.id;
+}
 export function readerPosition(rows: Message[], id: string, hasMore: boolean) {
   const index = rows.findIndex(row => row.id === id);
   return { index, position: index + 1, total: rows.length,

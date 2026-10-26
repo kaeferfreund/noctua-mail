@@ -77,8 +77,9 @@ function setup({ collapsed = true, allRead = false, origin = "list", single = fa
     onToggleTopic: noop, onGetRecentFolders: () => [], onMoveToFolder: noop,
     onMoveTo: noop, isTrashFolder: () => inTrash, isSpamFolder: () => false
   };
+  let rowClicks = 0;
   const tree = () => <Theme><TooltipProvider><ScheduledSendProvider value={{ byDraftId: new Map(),
-    unschedule: async () => {}, sendNow: async () => {}, schedule: noop }}><MessageMenu {...props} /></ScheduledSendProvider></TooltipProvider></Theme>;
+    unschedule: async () => {}, sendNow: async () => {}, schedule: noop }}><div onClick={() => { rowClicks++; }}><MessageMenu {...props} /></div></ScheduledSendProvider></TooltipProvider></Theme>;
   const view = render(tree());
   const markPending = () => { props.pendingMessageActions.add(root.id); view.rerender(tree()); };
   const open = async () => {
@@ -94,7 +95,7 @@ function setup({ collapsed = true, allRead = false, origin = "list", single = fa
       await new Promise(resolve => setTimeout(resolve, 0));
     });
   };
-  return { view, open, choose, markPending, messages, calls, flags, todos, deletes, archives, resolutions: () => resolutions };
+  return { view, open, choose, markPending, messages, calls, flags, todos, deletes, archives, resolutions: () => resolutions, rowClicks: () => rowClicks };
 }
 
 describe("row read/unread menu", () => {
@@ -225,4 +226,12 @@ it("disables scheduling when an action becomes pending while the draft menu is o
   expect(menu.view.getByRole("menuitem", { name: "Schedule send …" }).getAttribute("aria-disabled")).not.toBe("true");
   menu.markPending();
   expect(menu.view.getByRole("menuitem", { name: "Schedule send …" }).getAttribute("aria-disabled")).toBe("true");
+});
+
+it("portal menu actions never bubble into the owning message row", async () => {
+  const menu = setup();
+  await menu.open();
+  await menu.choose("Mark as read");
+  expect(menu.rowClicks()).toBe(0);
+  expect(menu.calls).toHaveLength(1);
 });

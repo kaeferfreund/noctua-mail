@@ -4,18 +4,19 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { useEffect, useState } from "react";
 import LanguageSelector from "@/app/components/i18n/LanguageSelector";
-import type { Account, UserAccountPrefs, UserAccountPrefsPatch } from "@/lib/data";
+import type { Account, AutoMarkReadMode, UserAccountPrefs, UserAccountPrefsPatch } from "@/lib/data";
 import { ACCOUNT_DATE_FORMAT_OPTIONS } from "@/lib/dateFormatting";
 import { Button } from "@/app/components/ui/button";
 import MailtoHandlerSection from "@/app/components/account-settings/MailtoHandlerSection";
-import SenderPreferences, { applySenderPatch, touchesSenderPrefs } from "@/app/components/account-settings/tabs/SenderPreferences";
+import SenderPreferences, { applySenderPatch } from "@/app/components/account-settings/tabs/SenderPreferences";
 import { nativeControlClass } from "@/app/components/account-settings/Field";
 import { formatAdminError } from "@/lib/i18n/adminMessages";
 import { adminRequest, jsonMutation, type AdminFetch } from "@/app/hooks/useAdminApi";
 import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 import { senderSettingsError } from "@/lib/senderMessages";
-import { ACCOUNT_PREFS_CHANGED, notifySenderPreferencesChanged } from "@/lib/ui/senderSettings";
+import { notifySenderPreferencesChanged } from "@/lib/ui/senderSettings";
 import { validSignatureTemplate } from "@/lib/signatureTemplates";
+import AutoMarkReadControl from "../AutoMarkReadControl";
 import { AUTO_MARK_READ_MODES } from "@/lib/autoMarkRead";
 
 type PreferenceOption = { value: string; label: string; literal?: boolean };
@@ -70,8 +71,7 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
       // The collaboration settings resolver can subscribe without persisting
       // personal values back into the team-level /settings route. Sender changes
       // also tell other windows (compose) to reload their sender settings.
-      if (touchesSenderPrefs(patch)) notifySenderPreferencesChanged(editingAccount.id, data.prefs);
-      else window.dispatchEvent(new CustomEvent(ACCOUNT_PREFS_CHANGED, { detail: { accountId: editingAccount.id, prefs: data.prefs } }));
+      notifySenderPreferencesChanged(editingAccount.id, data.prefs);
     } catch (error) { setError(error); }
     finally { setBusy(false); }
   };
@@ -93,7 +93,9 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
           const stored = prefs[field.group] as Record<string, unknown> | undefined;
           const value = changes && field.key in changes ? changes[field.key] : stored?.[field.key];
           const helpId = field.help ? `preference-help-${field.group}-${field.key}` : undefined;
-          const control = <label key={`${field.group}.${field.key}`} className="grid min-w-0 gap-1 text-sm">{t(`preferences.fields.${field.key}`)}
+          const control = field.key === "autoMarkRead" ? <AutoMarkReadControl label={t("preferences.fields.autoMarkRead")}
+            value={(value ?? "inherit") as "inherit" | AutoMarkReadMode} inherit describedBy={helpId}
+            onChange={next => { setSaved(false); setPatch(previous => ({ ...previous, reading: { autoMarkRead: next === "inherit" ? null : next } })); }} /> : <label key={`${field.group}.${field.key}`} className="grid min-w-0 gap-1 text-sm">{t(`preferences.fields.${field.key}`)}
             <select className={nativeControlClass} aria-describedby={helpId} value={value == null ? "inherit" : String(value)} onChange={event => {
               const value = event.target.value;
               setSaved(false);

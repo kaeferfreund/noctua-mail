@@ -27,7 +27,7 @@ function isStandalone() {
 }
 
 /** Never throws: it runs on error paths, including inside an error boundary. */
-export function reportClientError(source: ClientErrorSource, error: unknown, now = Date.now()) {
+export function reportClientError(source: ClientErrorSource, error: unknown, now = Date.now(), detail?: Pick<ClientErrorReport, "kind" | "count">) {
   try {
     const { message, stack, digest } = describe(error);
     if (!message) return;
@@ -37,7 +37,7 @@ export function reportClientError(source: ClientErrorSource, error: unknown, now
     for (const [entry, at] of recent) if (now - at >= CLIENT_ERROR_DEDUPE_MS) recent.delete(entry);
     recent.set(key, now);
     const report: ClientErrorReport = {
-      source, message: key, stack: stack.slice(0, CLIENT_ERROR_LIMITS.stack), digest: digest.slice(0, CLIENT_ERROR_LIMITS.digest),
+      source, ...detail, message: key, stack: stack.slice(0, CLIENT_ERROR_LIMITS.stack), digest: digest.slice(0, CLIENT_ERROR_LIMITS.digest),
       ...clientErrorLocation(window.location.href), build: build.slice(0, CLIENT_ERROR_LIMITS.build),
       userAgent: navigator.userAgent.slice(0, CLIENT_ERROR_LIMITS.userAgent), standalone: isStandalone()
     };
@@ -73,4 +73,36 @@ export function installClientErrorReporting() {
 export function resetClientErrorReporterForTests() {
   recent.clear();
   build = "";
+  overlayFallbackCount = 0;
+  overlayFallbackReported = false;
+  overlayFallbackListening = false;
+  window.removeEventListener("pagehide", flushOverlayFallbacks);
+  document.removeEventListener("visibilitychange", flushHiddenOverlayFallbacks);
+  window.sessionStorage.removeItem(OVERLAY_FALLBACK_REPORT_KEY);
+}
+
+const OVERLAY_FALLBACK_REPORT_KEY = "noctua:overlay-back-fallback-reported";
+let overlayFallbackCount = 0;
+let overlayFallbackReported = false;
+let overlayFallbackListening = false;
+function flushOverlayFallbacks() {
+  if (!overlayFallbackCount || overlayFallbackReported) return;
+  overlayFallbackReported = true;
+  try { window.sessionStorage.setItem(OVERLAY_FALLBACK_REPORT_KEY, "1"); } catch { /* In-memory dedupe remains. */ }
+  window.removeEventListener("pagehide", flushOverlayFallbacks);
+  document.removeEventListener("visibilitychange", flushHiddenOverlayFallbacks);
+  overlayFallbackListening = false;
+  reportClientError("error", "Mobile overlay Back timeout", Date.now(), { kind: "overlay-back-fallback", count: overlayFallbackCount });
+}
+function flushHiddenOverlayFallbacks() { if (document.hidden) flushOverlayFallbacks(); }
+
+/** Aggregate cheaply, then send once per tab session when it first leaves view. */
+export function recordOverlayBackFallback() {
+  if (overlayFallbackReported) return;
+  try { if (window.sessionStorage.getItem(OVERLAY_FALLBACK_REPORT_KEY)) { overlayFallbackReported = true; return; } } catch { /* In-memory dedupe remains. */ }
+  overlayFallbackCount++;
+  if (overlayFallbackListening) return;
+  overlayFallbackListening = true;
+  window.addEventListener("pagehide", flushOverlayFallbacks);
+  document.addEventListener("visibilitychange", flushHiddenOverlayFallbacks);
 }
