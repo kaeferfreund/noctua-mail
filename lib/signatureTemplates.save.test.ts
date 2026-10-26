@@ -71,3 +71,16 @@ for (const body of ["Legacy {{user.title}} / {{user.name}}", "é".repeat(4097)])
     if (body.startsWith("Legacy")) expect(rendered.text).toContain("Synthetic Alex");
   } finally { f.close(); }
 });
+
+test("signature names reject the same controls and bidi formatting as sender names", async () => {
+  const f = await createTestAuthHarness();
+  try {
+    const user = await f.createUser(`manager-${crypto.randomUUID()}@example.test`);
+    persistAccountRow(f.master, identityTestAccount("a", user.id));
+    for (const char of ["\t", "\u0080", "\u009f", "\u202e", "\u2066", "\u200f"]) {
+      await expect(updateMailboxCredentials("a", {
+        settings: { signatures: [{ id: "bad", name: `Synthetic${char}name`, body: "Synthetic" }] }, teamDefaults: true
+      }, { userId: user.id }, undefined, f.master)).rejects.toMatchObject({ code: "signature_template_invalid", status: 400 });
+    }
+  } finally { f.close(); }
+});

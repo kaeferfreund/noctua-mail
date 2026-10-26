@@ -51,7 +51,10 @@ describe("sender identity service", () => {
       expect((await updateSenderIdentity("a", created.id, { displayName: "Synthetic  Team\u00a0" }, f.actor, db)).displayName).toBe("Synthetic Team");
       expect(stored()).toBe("Synthetic Team");
       expect((await updateSenderIdentity("a", created.id, { displayName: "   " }, f.actor, db)).displayName).toBe("");
-      await expect(updateSenderIdentity("a", created.id, { displayName: "Synthetic\tTeam" }, f.actor, db)).rejects.toMatchObject({ code: "invalid_identity" });
+      for (const char of ["\t", "\u0080", "\u009f", "\u202e", "\u2066", "\u200f"]) {
+        await expect(updateSenderIdentity("a", created.id, { displayName: `Synthetic${char}Team` }, f.actor, db)).rejects.toMatchObject({ code: "invalid_identity" });
+        await expect(createSenderIdentity("a", { email: "unsafe@example.test", displayName: `Synthetic${char}Team` }, f.actor, db)).rejects.toMatchObject({ code: "invalid_identity" });
+      }
       persistAccountRow(db, { ...identityTestAccount("c", f.actor.userId), name: " Synthetic  Mailbox " });
       expect(listSenderIdentityRows(db, "c")[0].displayName).toBe("Synthetic Mailbox");
       db.prepare("UPDATE sender_identities SET displayName=? WHERE id=?").run(" Legacy  Name ", created.id);

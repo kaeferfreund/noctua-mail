@@ -21,6 +21,11 @@ function memoizeAddressResult<T>(cache: Map<string, T>, key: string, compute: (k
 const normalizedIdentityEmails = new Map<string, string | null>();
 const parsedAddressEmails = new Map<string, readonly string[]>();
 
+/** Controls and directional formatting are never valid configured names. */
+export function hasUnsafeNameCharacters(value: string): boolean {
+  return /[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/.test(value);
+}
+
 /**
  * Canonical sender display name: trimmed, inner whitespace runs collapsed to one space.
  * Header parsers trim quoted names, so a stored trailing space would never match the draft.
