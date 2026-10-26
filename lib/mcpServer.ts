@@ -1548,14 +1548,14 @@ export async function executeMcpHttpRequest(params: {
   });
   server.registerTool("set_default_signature_template", {
     title: "Set the default signature",
-    description: "Choose the signature this mailbox uses by default (mailbox managers only). Null or an empty id means no default. Members' own choices (set_sender_preferences) still take precedence.",
-    inputSchema: z.object({ ...ACCOUNT_ID_ARG, signatureId: z.string().trim().max(256).nullable() }).strict(),
+    description: "Choose the signature this mailbox uses by default (mailbox managers only). Use null to clear the default; blank ids are rejected. Members' own choices (set_sender_preferences) still take precedence.",
+    inputSchema: z.object({ ...ACCOUNT_ID_ARG, signatureId: z.string().trim().min(1).max(256).nullable() }).strict(),
     annotations: IDEMPOTENT_CHANGE,
     outputSchema: senderToolOutput({ ...SIGNATURE_TEMPLATES_OUTPUT, url: URL_OUTPUT })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId, "manager");
     return senderToolCall(async () => {
-      const result = await setDefaultSignatureTemplate(ctx.accountId, args.signatureId || null, identityManagementActor(ctx));
+      const result = await setDefaultSignatureTemplate(ctx.accountId, args.signatureId, identityManagementActor(ctx));
       const url = settingsUrl(ctx.accountId, "signatures");
       return buildToolResult(withLink(result.defaultSignatureId ? `Default signature template is ${result.defaultSignatureId}.` : "No default signature template.", url),
         { ok: true, ...result, url });

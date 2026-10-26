@@ -27,7 +27,13 @@ beforeAll(async () => {
 type ToolResult = { isError?: boolean; content: { text: string }[]; structuredContent?: Record<string, unknown> & {
   signatures?: { id: string; name: string; body: string }[]; defaultSignatureId?: string; signature?: { id: string } } };
 const tool = async (name: string, args: Record<string, unknown> = {}) => {
-  const response = await executeMcpHttpRequest({ body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }, accountId, account, tokenRecord,
+  // These cases exercise signatures and roles independently of the per-token call budget.
+  const session = await requireActiveUserSession(new Request("http://localhost:3000", { headers: fixture.jar.headers() }));
+  if (session instanceof Response) throw new Error("Synthetic session missing");
+  const membership = fixture.master.prepare("SELECT role FROM user_accounts WHERE userId=? AND accountId=?").get(fixture.user.id, accountId) as { role: string };
+  const callToken = membership.role === "viewer" ? tokenRecord :
+    (await mintMcpToken(session, accountId, "Synthetic signature call", 3600, { mode: "full" })).tokenRecord;
+  const response = await executeMcpHttpRequest({ body: { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }, accountId, account, tokenRecord: callToken,
     authInfo: { token: "", clientId: "synthetic", scopes: ["manage"], extra: { userId: fixture.user.id } } });
   return (response.responses[0] as unknown as { result: ToolResult }).result;
 };
@@ -66,6 +72,10 @@ test("viewers list templates; editors cannot change them; managers save, set the
 
   expect((await tool("set_default_signature_template", { signatureId: id })).structuredContent).toMatchObject({ ok: true, defaultSignatureId: id });
   expect((await uiSettings())?.defaultSignatureId).toBe(id);
+  for (const signatureId of ["", "   "]) {
+    expect((await tool("set_default_signature_template", { signatureId })).isError).toBe(true);
+    expect((await uiSettings())?.defaultSignatureId).toBe(id);
+  }
   expect((await tool("set_default_signature_template", { signatureId: null })).structuredContent!.defaultSignatureId).toBeUndefined();
   expect((await uiSettings())?.defaultSignatureId).toBe("");
   expect((await tool("set_default_signature_template", { signatureId: "missing" })).structuredContent).toMatchObject({ ok: false, code: "signature_not_found" });
