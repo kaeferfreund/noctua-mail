@@ -4,7 +4,7 @@ import { useLocale, useTranslations } from "next-intl";
 
 import { useEffect, useState } from "react";
 import LanguageSelector from "@/app/components/i18n/LanguageSelector";
-import type { Account, UserAccountPrefs, UserAccountPrefsPatch } from "@/lib/data";
+import type { Account, AutoMarkReadMode, UserAccountPrefs, UserAccountPrefsPatch } from "@/lib/data";
 import { ACCOUNT_DATE_FORMAT_OPTIONS } from "@/lib/dateFormatting";
 import { Button } from "@/app/components/ui/button";
 import MailtoHandlerSection from "@/app/components/account-settings/MailtoHandlerSection";
@@ -94,7 +94,7 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
           const value = changes && field.key in changes ? changes[field.key] : stored?.[field.key];
           const helpId = field.help ? `preference-help-${field.group}-${field.key}` : undefined;
           const control = field.key === "autoMarkRead" ? <AutoMarkReadControl label={t("preferences.fields.autoMarkRead")}
-            value={(value ?? "inherit") as "inherit" | import("@/lib/data").AutoMarkReadMode} inherit describedBy={helpId}
+            value={(value ?? "inherit") as "inherit" | AutoMarkReadMode} inherit describedBy={helpId}
             onChange={next => { setSaved(false); setPatch(previous => ({ ...previous, reading: { autoMarkRead: next === "inherit" ? null : next } })); }} /> : <label key={`${field.group}.${field.key}`} className="grid min-w-0 gap-1 text-sm">{t(`preferences.fields.${field.key}`)}
             <select className={nativeControlClass} aria-describedby={helpId} value={value == null ? "inherit" : String(value)} onChange={event => {
               const value = event.target.value;

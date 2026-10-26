@@ -5265,7 +5265,7 @@ export default function MailClient({
       onSelect: () => {
         clearSearch();
         setSearchScope("folder");
-        setActiveFolderId(inboxFolder.id);
+        if (!queueFolderChoice(inboxFolder.id)) setActiveFolderId(inboxFolder.id);
       }
     };
   }, [
@@ -5273,6 +5273,7 @@ export default function MailClient({
     activeVirtualFolder,
     clearSearch,
     inboxFolder,
+    queueFolderChoice,
     searchScope,
     setActiveFolderId,
     setSearchScope,
