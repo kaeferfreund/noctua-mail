@@ -1756,13 +1756,18 @@ function InlineComposeSlot({
   return <div ref={setRef} className={wrapperClassName} />;
 }
 
-/** Declarative portal target; the imperative handle is read only after commit. */
+/**
+ * Declarative portal target; the imperative handle is read only after commit.
+ * The slot is published in a layout effect so the card portals in before paint
+ * regardless of sibling order (the detached window renders the orchestrator
+ * before the reader, whose scroll-into-view bails on a missing card).
+ */
 export function ComposeInlineHost({ handleRef, wrapperClassName }: {
   handleRef: React.RefObject<ComposeOrchestratorHandle | null>;
   wrapperClassName?: string;
 }) {
   const slotRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const handle = handleRef.current;
     handle?.setInlineSlot(slotRef.current);
     return () => handle?.setInlineSlot(null);
