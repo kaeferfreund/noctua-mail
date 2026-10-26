@@ -109,7 +109,7 @@ export function ScheduledSendBar({ message }: { message: Message }) {
           {!cancelled && <Button size="1" variant="soft" disabled={busy} onClick={() => run(() => controls.sendNow(message, schedule))}>{t("sendNow")}</Button>}
           {(failed || cancelled) && controls.retry && <Button size="1" variant="soft" disabled={busy}
             onClick={() => run(() => controls.retry!(schedule))}>{t("retry")}</Button>}
-          <Button size="1" variant="soft" color="gray" disabled={busy} onClick={() => run(() => controls.unschedule(schedule))}>{t("unschedule")}</Button>
+          <Button size="1" variant="soft" color="gray" disabled={busy} onClick={() => run(() => controls.unschedule(schedule))}>{t(failed || cancelled ? "dismiss" : "unschedule")}</Button>
         </span>
       )}
     </div>
@@ -142,7 +142,7 @@ export function ScheduledSendList() {
               : row.status === "sending" ? t("barSending") : t("barScheduled", { time: formatScheduledSendTime(row.sendAt, locale) })}</p>
           {row.status !== "sending" && <div className={styles.barActions}>
             {controls.retry && <Button size="1" variant="soft" disabled={busy} onClick={() => run(() => controls.retry!(row))}>{t("retry")}</Button>}
-            <Button size="1" variant="soft" color="gray" disabled={busy} onClick={() => run(() => controls.unschedule(row))}>{t("dismiss")}</Button>
+            <Button size="1" variant="soft" color="gray" disabled={busy} onClick={() => run(() => controls.unschedule(row))}>{t(row.status === "failed" || row.status === "cancelled" ? "dismiss" : "unschedule")}</Button>
           </div>}
         </li>)}
       </ul>

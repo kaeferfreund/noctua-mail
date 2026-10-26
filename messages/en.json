@@ -2007,7 +2007,7 @@
       "barSending": "Sending right now …",
       "barFailed": "Scheduled send for {time} failed: {reason}",
       "sendNow": "Send now",
-      "unschedule": "Remove schedule",
+      "unschedule": "Cancel schedule",
       "reasons": {
         "security_revoked": "The password or security permissions changed. Review the draft and schedule it again.",
         "permission_revoked": "Permission to send was revoked.",

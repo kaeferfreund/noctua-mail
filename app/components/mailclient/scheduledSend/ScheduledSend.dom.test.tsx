@@ -18,14 +18,14 @@ const schedule = (overrides: Partial<ScheduledSendView> = {}): ScheduledSendView
   id: "schedule-1", draftId: "imap-synthetic-draft", sendAt, status: "queued", attempts: 0, lastError: null, scheduledByUserId: "u", ...overrides
 });
 
-function wrap(node: React.ReactNode, row: ScheduledSendView | null, calls: string[] = []) {
+function wrap(node: React.ReactNode, row: ScheduledSendView | null, calls: string[] = [], locale: "de" | "en" = "de") {
   const controls: ScheduledSendControls = {
     retry: async item => { calls.push(`retry:${item.id}`); },
     byDraftId: new Map(row ? [[row.draftId, row]] : []),
     unschedule: async (item) => { calls.push(`unschedule:${item.id}`); },
     sendNow: async (message, item) => { calls.push(`send:${message.id}:${item.id}`); }
   };
-  return render(<I18nTestProvider locale="de"><Theme><ScheduledSendProvider value={controls}>{node}</ScheduledSendProvider></Theme></I18nTestProvider>);
+  return render(<I18nTestProvider locale={locale}><Theme><ScheduledSendProvider value={controls}>{node}</ScheduledSendProvider></Theme></I18nTestProvider>);
 }
 
 describe("ScheduledSendBadge", () => {
@@ -73,7 +73,7 @@ describe("ScheduledSendBar", () => {
     expect(failed.getByRole("alert").textContent).toContain("Das Senden wurde unterbrochen. Prüfe den Gesendet-Ordner, bevor du erneut sendest.");
     expect(failed.getByRole("button", { name: "Jetzt senden" })).toBeTruthy();
     // A failed (e.g. interrupted or uncertain) schedule can always be removed.
-    expect(failed.getByRole("button", { name: "Planung aufheben" })).toBeTruthy();
+    expect(failed.getByRole("button", { name: "Hinweis entfernen" })).toBeTruthy();
     cleanup();
     const uncertain = wrap(<ScheduledSendBar message={draft()} />, schedule({ status: "failed", lastError: "send_uncertain" }));
     expect(uncertain.getByRole("alert").textContent).toContain("Prüfe den Gesendet-Ordner");
@@ -104,6 +104,29 @@ it("lists unresolved schedules even without a draft row, and lets the user dismi
   fireEvent.click(page.getByRole("button", { name: "Hinweis entfernen" }));
   await waitFor(() => expect(calls).toEqual(["unschedule:schedule-1"]));
 });
+
+for (const locale of ["de", "en"] as const) {
+  for (const status of ["queued", "cancelled", "failed", "sending"] as const) {
+    it(`labels the ${status} list action by its effect (${locale})`, async () => {
+      const calls: string[] = [];
+      const labels = locale === "de" ? { list: "Geplante Sendungen", cancel: "Planung aufheben", dismiss: "Hinweis entfernen" }
+        : { list: "Scheduled sends", cancel: "Cancel schedule", dismiss: "Dismiss" };
+      const page = wrap(<ScheduledSendList />, schedule({ status, lastError: status === "cancelled" ? "draft_changed" : null }), calls, locale);
+      fireEvent.click(page.getByRole("button", { name: labels.list }));
+      await waitFor(() => expect(page.getByRole("heading", { name: labels.list })).toBeTruthy());
+      if (status === "sending") {
+        expect(page.queryByRole("button", { name: labels.cancel })).toBeNull();
+        expect(page.queryByRole("button", { name: labels.dismiss })).toBeNull();
+        expect(calls).toEqual([]);
+      } else {
+        const terminal = status === "cancelled" || status === "failed";
+        expect(page.queryByRole("button", { name: terminal ? labels.cancel : labels.dismiss })).toBeNull();
+        fireEvent.click(page.getByRole("button", { name: terminal ? labels.dismiss : labels.cancel }));
+        await waitFor(() => expect(calls).toEqual(["unschedule:schedule-1"]));
+      }
+    });
+  }
+}
 
 it("explains an interrupted manual hold and offers re-scheduling", () => {
   const page = wrap(<ScheduledSendBar message={draft()} />, schedule({ status: "failed", lastError: "manual_interrupted" }));
