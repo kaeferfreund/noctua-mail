@@ -7,10 +7,9 @@ import { SPAM_RESCAN_EVENT, type SpamRescanActivity } from "@/lib/mail/spam/resc
 const POLL_MS = 2_000;
 
 /**
- * Admin INBOX rescans (doc/SPAM-DETECTION.md) for the activity panel. Nothing
- * is read at start-up (the admin idle warm-up stays free of admin API calls):
- * the list is read when a status panel opens and whenever the admin UI
- * announces a start, cancel or move, and polled only while a job runs.
+ * Admin INBOX rescans (doc/SPAM-DETECTION.md) for the activity panel. One read on mount restores activity after a reload; an open panel polls
+ * even while idle, so jobs started by another admin appear there. Events
+ * refresh this tab immediately; running jobs keep polling with the panel closed.
  * Non-admins never ask.
  */
 export function useSpamRescanActivity(apiFetch: AdminFetch, enabled: boolean, panelOpen: boolean) {
@@ -25,13 +24,12 @@ export function useSpamRescanActivity(apiFetch: AdminFetch, enabled: boolean, pa
       window.clearTimeout(timer);
       let next: SpamRescanActivity[] | null;
       try { next = (await adminRequest<{ jobs: SpamRescanActivity[] }>(apiFetch, "/api/admin/spam-rescan")).jobs; } catch { next = null; }
-      if (!active || !next) return;
-      running.current = next.length > 0;
-      setJobs(next);
-      if (next.length) timer = window.setTimeout(() => void refresh(), POLL_MS);
+      if (!active) return;
+      if (next) { running.current = next.length > 0; setJobs(next); }
+      if (panelOpen || running.current) timer = window.setTimeout(() => void refresh(), POLL_MS);
     };
     const onEvent = () => { void refresh(); };
-    if (panelOpen || running.current) void refresh();
+    void refresh();
     window.addEventListener(SPAM_RESCAN_EVENT, onEvent);
     return () => { active = false; window.clearTimeout(timer); window.removeEventListener(SPAM_RESCAN_EVENT, onEvent); };
   }, [apiFetch, enabled, panelOpen]);

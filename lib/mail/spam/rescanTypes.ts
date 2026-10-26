@@ -10,11 +10,19 @@ export const SPAM_RESCAN_MODEL_MAX = 2_000;
 /** Stored preview items per rescan; more are counted, not listed. */
 export const SPAM_RESCAN_ITEM_LIMIT = 5_000;
 
-const DAY_MS = 24 * 60 * 60_000;
-
 /** The range by `dateValue` (the sender's Date header, as the sweep's window); null: the whole INBOX. */
 export function spamRescanSince(period: SpamRescanPeriod, now = Date.now()) {
-  return period === "30d" ? now - 30 * DAY_MS : period === "12m" ? now - 365 * DAY_MS : null;
+  if (period === "all") return null;
+  const since = new Date(now);
+  since.setHours(0, 0, 0, 0);
+  if (period === "30d") since.setDate(since.getDate() - 30);
+  else {
+    const day = since.getDate(), month = since.getMonth();
+    since.setFullYear(since.getFullYear() - 1, month, 1);
+    const lastDay = new Date(since.getFullYear(), month + 1, 0).getDate();
+    since.setDate(Math.min(day, lastDay));
+  }
+  return since.getTime();
 }
 
 export const isSpamRescanPeriod = (value: unknown): value is SpamRescanPeriod =>
