@@ -117,6 +117,16 @@ export const renderMessageMenu = (
   />
 );
 
+// Keep event callbacks behind a React component boundary so rendering a menu
+// cannot be mistaken for executing its mutation handlers.
+export function QuickActionsView({ args }: { args: Parameters<typeof renderQuickActions> }) {
+  return renderQuickActions(...args);
+}
+
+export function MessageMenuView({ args }: { args: Parameters<typeof renderMessageMenu> }) {
+  return renderMessageMenu(...args);
+}
+
 export const renderSourcePanel = (
   messageId: string,
   fetchSource: (messageId: string) => Promise<string | null>,

@@ -91,6 +91,7 @@ export function useMessageMutations({
   updateThreadCacheWithCategory,
   queueFilteredSearchRefresh
 }: UseMessageMutationsProps) {
+  const viewMessageId = viewMessage?.id;
   const folderRefreshGeneration = useRef(0);
   useEffect(() => () => { folderRefreshGeneration.current += 1; }, [activeAccountId]);
 
@@ -113,7 +114,7 @@ export function useMessageMutations({
       );
     });
     updateThreadCacheWithFlags(message.id, flags);
-    if (viewMessage?.id === message.id && !shouldKeepUpdatedMessage) {
+    if (viewMessageId === message.id && !shouldKeepUpdatedMessage) {
       setViewMessage(null);
       setActiveMessageId("");
     }
@@ -125,7 +126,7 @@ export function useMessageMutations({
     shouldKeepMessageInCurrentResults,
     updateMessagesWithCurrentResultPrune,
     updateThreadCacheWithFlags,
-    viewMessage?.id
+    viewMessageId
   ]);
 
   const reportResponseError = useCallback(async (res: Response) => {
@@ -648,7 +649,7 @@ export function useMessageMutations({
         typeof updated.categoryScore === "number" ? updated.categoryScore : null,
         updated.categorySignals ?? []
       );
-      if (viewMessage?.id === message.id && !shouldKeepUpdatedMessage) {
+      if (viewMessageId === message.id && !shouldKeepUpdatedMessage) {
         setViewMessage(null);
         setActiveMessageId("");
       }
@@ -682,7 +683,7 @@ export function useMessageMutations({
     shouldKeepMessageInCurrentResults,
     updateMessagesWithCurrentResultPrune,
     updateThreadCacheWithCategory,
-    viewMessage?.id,
+    viewMessageId,
     tn
   ]);
 
@@ -742,9 +743,9 @@ export function useMessageMutations({
 
       const hasTodo = hasTodoFlag(message);
       const hasDone = hasDoneFlag(message);
-    
+
       let finalFlags = message.flags ?? [];
-      
+
       if (hasTodo) {
         const removeFlags = await requestMessageFlagMutation(message.id, {
           keyword: TODO_FLAG,
@@ -779,7 +780,7 @@ export function useMessageMutations({
         if (!flags) return;
         finalFlags = flags;
       }
-      
+
       reconcileMessageFlags(message, finalFlags, "toggle-todo-flag");
       queueFilteredSearchRefresh(hasFilteredSearchCriteria);
     } catch {

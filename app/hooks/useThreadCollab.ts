@@ -13,7 +13,7 @@
  * Pending: one mutation per scope key; other keys run independently and their finalizers cannot clear this key. Test: "R5-pending: overlapping account mutations keep pending on the originating key after navigation".
  * Limits: post-commit refresh may fail, leaving partial lists; mutation remains committed and the next successful admissible read repairs them. Test: "R6-repair: failed post-commit refresh is repaired by the next successful read".
  */
-import { useCallback, useEffect, useRef, useState, useLayoutEffect } from "react";
+import { useCallback, useEffect, useRef, useLayoutEffect, useState } from "react";
 import type {
   CollabMember,
   ThreadCollabState,

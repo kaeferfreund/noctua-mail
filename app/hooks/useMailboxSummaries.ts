@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, useLayoutEffect } from "react";
+import { useEffect, useRef, useLayoutEffect, useState } from "react";
 import type { UserMailboxSummary, MailboxSummaryResult } from "@/lib/mailboxSummary";
 import type { MailboxState } from "@/lib/authClient";
 import type { UserEvent } from "@/lib/userEvents";

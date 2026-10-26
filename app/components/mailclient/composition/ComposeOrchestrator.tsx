@@ -390,8 +390,6 @@ function ComposeOrchestratorImpl(
     composeIdentityId,
     composeOpen,
     setComposeOpen,
-    composeView,
-    setComposeView,
     composeDraftId,
     setComposeDraftId,
     composeMode,
@@ -490,10 +488,8 @@ function ComposeOrchestratorImpl(
     composeDirtyRef,
     composeEditorInitRef,
     composeLastEditedRef
-  } = compose;
-
-  const composeRef = useRef({ ...compose });
-  useLayoutEffect(() => { composeRef.current = { ...compose }; });
+  } = composeState;
+  const { composeView, setComposeView } = mobileView;
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -1713,7 +1709,7 @@ function ComposeOrchestratorImpl(
         sendOperationRef.current = null;
         deliveredRef.current = false;
         setDeliveredWarnings([]);
-        resetComposeSession(composeRef.current);
+        resetComposeSession(compose);
         resetComposeTranslation();
       },
       openCompose,

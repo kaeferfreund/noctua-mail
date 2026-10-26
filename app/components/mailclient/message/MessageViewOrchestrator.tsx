@@ -1,5 +1,7 @@
 "use client";
 
+import { ComposeInlineHost } from "../composition/ComposeOrchestrator";
+
 import { useTranslations } from "next-intl";
 import ThreadCollaborationBar from "@/app/components/collab/ThreadCollaborationBar";
 import { useInternalNoteDrafts } from "@/app/components/collab/useInternalNoteDrafts";
@@ -15,7 +17,8 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
-  useState
+  useState,
+  useLayoutEffect
 } from "react";
 import { Badge, Flex, SegmentedControl, Tooltip } from "@radix-ui/themes";
 import { Rows3, StretchHorizontal } from "lucide-react";
@@ -268,7 +271,11 @@ function MessageViewOrchestratorImpl(
   const [noteOpen, setNoteOpen] = useState(false);
   const activityRef = useRef<HTMLElement>(null);
   const noteDraft = useInternalNoteDrafts(body.activeAccountId, header.activeMessage?.threadId);
-  useEffect(() => { setNoteOpen(false); }, [header.activeMessage?.threadId, body.activeAccountId]);
+  const [previousNoteInputs, setPreviousNoteInputs] = useState<readonly unknown[] | null>(null);
+  if (previousNoteInputs === null || previousNoteInputs[0] !== header.activeMessage?.threadId || previousNoteInputs[1] !== body.activeAccountId) {
+    setPreviousNoteInputs([header.activeMessage?.threadId, body.activeAccountId]);
+    setNoteOpen(false);
+  }
   const [threadViewMode, setThreadViewMode] = useState<"full" | "compact">("compact");
   const [messageFontScale, setMessageFontScale] = useState<Record<string, number>>({});
   const [messageZoom, setMessageZoom] = useState<Record<string, number>>({});
@@ -285,7 +292,7 @@ function MessageViewOrchestratorImpl(
   // Ref mirror so the async translate handler reads the latest results/target
   // language without being rebuilt on every state change.
   const messageTranslationsRef = useRef(messageTranslations);
-  messageTranslationsRef.current = messageTranslations;
+  useLayoutEffect(() => { messageTranslationsRef.current = messageTranslations; });
   // Per-message request counter so a slow/out-of-order translate response can't
   // overwrite state from a newer request (or one issued after the map was
   // cleared on account change). Only the latest request per message commits.
@@ -294,16 +301,15 @@ function MessageViewOrchestratorImpl(
   // method (created with empty deps) reads the latest map without
   // rebuilding the handle object on every tab change.
   const messageTabsRef = useRef(messageTabs);
-  messageTabsRef.current = messageTabs;
+  useLayoutEffect(() => { messageTabsRef.current = messageTabs; });
   // Ref mirror of `collapsedMessages` so the stable `getCollapsedMessages`
   // handle method reads the latest map without rebuilding the handle
   // object on every collapse/expand.
   const collapsedMessagesRef = useRef(collapsedMessages);
-  collapsedMessagesRef.current = collapsedMessages;
+  useLayoutEffect(() => { collapsedMessagesRef.current = collapsedMessages; });
   // Dedupe key for the compose-thread-focus auto-collapse effect — one
   // focus change applies exactly one sibling-collapse sweep even as the
   // user expands individual siblings afterwards.
-  const composeThreadCollapseKeyRef = useRef("");
 
   const adjustMessageZoom = useCallback((messageId: string, delta: number) => {
     setMessageZoom((prev) => {
@@ -609,24 +615,18 @@ function MessageViewOrchestratorImpl(
     [showTranslation]
   );
 
-  useEffect(() => {
-    // Close the popover when the active thread or account changes.
-    // Also invalidate the in-flight fetch key so any pending response
-    // bails before writing state, and clear loading/error so a bailed
-    // response can't leave a stuck spinner or a stale error message
-    // behind. The cached explanation
-    // (`topicSuggestionExplanation` + `topicSuggestionExplanationThreadId`)
-    // is preserved across thread switches within the same account so
-    // reopening the popover on a previously-explained thread can
-    // short-circuit via the dedupe guard in
-    // `handleLoadTopicSuggestionExplanation`.
-    explanationRequestThreadIdRef.current = "";
+  const [explanationScope, setExplanationScope] = useState({ threadId: activeMessage?.threadId, activeAccountId });
+  if (explanationScope.threadId !== activeMessage?.threadId || explanationScope.activeAccountId !== activeAccountId) {
+    setExplanationScope({ threadId: activeMessage?.threadId, activeAccountId });
     setTopicSuggestionExplanationOpen(false);
     setTopicSuggestionExplanationLoading(false);
     setTopicSuggestionExplanationError("");
-  }, [activeMessage?.threadId, activeAccountId]);
+  }
+  useLayoutEffect(() => { explanationRequestThreadIdRef.current = ""; }, [activeMessage?.threadId, activeAccountId]);
 
-  useEffect(() => {
+  const [previousReaderAccountInputs, setPreviousReaderAccountInputs] = useState<readonly unknown[] | null>(null);
+  if (previousReaderAccountInputs === null || previousReaderAccountInputs[0] !== activeAccountId) {
+    setPreviousReaderAccountInputs([activeAccountId]);
     // Thread ids are only unique within an account. On account change,
     // wipe the cached explanation and its threadId so the dedupe guard
     // can't short-circuit on a coincidental thread-id match and show one
@@ -644,70 +644,46 @@ function MessageViewOrchestratorImpl(
     setMessageTranslations({});
     // Drop any in-flight translate requests so a late response can't
     // re-introduce a translation for the previous account's message id.
-    translationRequestSeqRef.current = {};
-  }, [activeAccountId]);
+  }
+  useLayoutEffect(() => { translationRequestSeqRef.current = {}; }, [activeAccountId]);
 
   // Collapse all messages in the active thread except the selected one when
   // that selection was triggered explicitly by the user. Skip when threads
   // are disabled — `activeThread` may still contain siblings (threadId
   // matches in the visible list), and writing collapse entries for them
   // pollutes state that the next thread-enabled view would inherit.
-  useEffect(() => {
-    if (!activeMessage) return;
-    if (pendingSelectionCollapseMessageId !== activeMessage.id) return;
-    if (!supportsThreads) {
-      onPendingSelectionCollapseConsumed(activeMessage.id);
-      return;
-    }
-    setCollapsedMessages((prev) => {
-      const next: Record<string, boolean> = { ...prev };
-      activeThread.forEach((msg) => {
-        next[msg.id] = msg.id === activeMessage.id ? false : true;
+  const [selectionCollapseInputs, setSelectionCollapseInputs] = useState<readonly unknown[] | null>(null);
+  if (selectionCollapseInputs === null || selectionCollapseInputs[0] !== activeMessage || selectionCollapseInputs[1] !== activeThread || selectionCollapseInputs[2] !== pendingSelectionCollapseMessageId || selectionCollapseInputs[3] !== supportsThreads) {
+    setSelectionCollapseInputs([activeMessage, activeThread, pendingSelectionCollapseMessageId, supportsThreads]);
+    if (activeMessage && pendingSelectionCollapseMessageId === activeMessage.id && supportsThreads) {
+      setCollapsedMessages(previous => {
+        const next = { ...previous };
+        activeThread.forEach(message => { next[message.id] = message.id !== activeMessage.id; });
+        return next;
       });
-      return next;
-    });
-    onPendingSelectionCollapseConsumed(activeMessage.id);
-  }, [
-    activeMessage,
-    activeThread,
-    onPendingSelectionCollapseConsumed,
-    pendingSelectionCollapseMessageId,
-    supportsThreads
-  ]);
+    }
+  }
+  // Acknowledge the committed collapse map, including a render-phase adjustment.
+  useEffect(() => {
+    if (activeMessage && pendingSelectionCollapseMessageId === activeMessage.id) onPendingSelectionCollapseConsumed(activeMessage.id);
+  }, [activeMessage, pendingSelectionCollapseMessageId, onPendingSelectionCollapseConsumed, collapsedMessages]);
 
   // Collapse siblings so the compose card stays visible when the user
   // opens a reply / forward inside the active thread. Keyed on
   // mode/focus/draft/thread-ids so each distinct focus change applies
   // exactly once — the user can re-expand siblings afterwards without
   // the effect re-collapsing them on unrelated renders.
-  useEffect(() => {
-    if (!showComposeInline || !composeThreadFocusMessageId) {
-      composeThreadCollapseKeyRef.current = "";
-      return;
-    }
-    if (activeThread.length === 0) return;
-    const collapseKey = [
-      composeMode,
-      composeThreadFocusMessageId,
-      composeDraftId ?? "",
-      activeThread.map((message) => message.id).join("|")
-    ].join("::");
-    if (composeThreadCollapseKeyRef.current === collapseKey) return;
-    composeThreadCollapseKeyRef.current = collapseKey;
-    setCollapsedMessages((prev) => {
-      const next = { ...prev };
-      activeThread.forEach((message) => {
-        next[message.id] = message.id !== composeThreadFocusMessageId;
-      });
+  const composeCollapseKey = !showComposeInline || !composeThreadFocusMessageId ? "" : activeThread.length === 0 ? null :
+    [composeMode, composeThreadFocusMessageId, composeDraftId ?? "", activeThread.map(message => message.id).join("|")].join("::");
+  const [previousComposeCollapseKey, setPreviousComposeCollapseKey] = useState("");
+  if (composeCollapseKey !== null && previousComposeCollapseKey !== composeCollapseKey) {
+    setPreviousComposeCollapseKey(composeCollapseKey);
+    if (composeCollapseKey) setCollapsedMessages(previous => {
+      const next = { ...previous };
+      activeThread.forEach(message => { next[message.id] = message.id !== composeThreadFocusMessageId; });
       return next;
     });
-  }, [
-    activeThread,
-    composeDraftId,
-    composeMode,
-    composeThreadFocusMessageId,
-    showComposeInline
-  ]);
+  }
 
   const threadCardProps = useMemo<ThreadViewCardProps>(() => ({
     ...messageCardProps,
@@ -842,7 +818,7 @@ function MessageViewOrchestratorImpl(
           // The orchestrator owns the inline card; MailClient just asks it
           // to render at the appropriate slots.
           const renderComposeCard = (wrapperClassName?: string) =>
-            composeHandleRef.current?.renderInlineCard(wrapperClassName) ?? null;
+            <ComposeInlineHost handleRef={composeHandleRef} wrapperClassName={wrapperClassName} />;
 
           return (
             <>

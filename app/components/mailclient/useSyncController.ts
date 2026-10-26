@@ -7,7 +7,7 @@ import { folderIdBelongsToAccount, isAccountFolder } from "@/lib/folderAccount";
 import type { OwnAddressInput } from "@/lib/ownAddresses";
 
 import type React from "react";
-import { useCallback, useEffect, useRef, useState, useLayoutEffect } from "react";
+import { useCallback, useEffect, useRef, useLayoutEffect, useState } from "react";
 import {
   buildAccountApiPath,
   buildAccountFolderConsistencyPath,

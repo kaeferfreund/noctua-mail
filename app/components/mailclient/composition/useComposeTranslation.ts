@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, useLayoutEffect } from "react";
+import { useCallback, useRef, useLayoutEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import type React from "react";
 import { buildAccountComposeTranslatePath } from "@/lib/accountApiPaths";
