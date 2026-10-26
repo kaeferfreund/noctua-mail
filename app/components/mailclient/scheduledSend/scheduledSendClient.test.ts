@@ -7,7 +7,7 @@ test("undo of an old schedule only cancels its id, never its replacement", async
     calls.push(String(input));
     return Response.json({}, { status: 404 });
   }, "synthetic-account", { id: "old", draftId: "draft" });
-  expect(result).toEqual({ ok: true });
+  expect(result).toEqual({ ok: true, alreadyGone: true });
   expect(calls).toEqual(["/api/accounts/synthetic-account/drafts/scheduled/old/cancel"]);
 });
 

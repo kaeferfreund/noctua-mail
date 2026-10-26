@@ -172,7 +172,7 @@ realMailTest("opening a draft scheduled by another member reads the schedule fre
 
   // An old undo toast must leave the replacement schedule alone.
   const replanned = await (await schedule(s.f.request("POST", { draftId: s.draftId, sendAt: s.sendAt }), s.f.params())).json();
-  expect(await cancelDraftSchedule(apiFetch, s.f.accountId, { id: s.scheduleId, draftId: s.draftId })).toEqual({ ok: true });
+  expect(await cancelDraftSchedule(apiFetch, s.f.accountId, { id: s.scheduleId, draftId: s.draftId })).toEqual({ ok: true, alreadyGone: true });
   expect(await getScheduledSend(replanned.scheduledSend.id)).toMatchObject({ status: "queued" });
 
   // While the job sends it, the draft does not open.

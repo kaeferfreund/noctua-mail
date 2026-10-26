@@ -40,3 +40,23 @@ test("opening the planning dialog refreshes and shows the existing schedule time
   await waitFor(() => expect(result.current.scheduleDialog.existingSendAt).toBe(row.sendAt));
   expect(result.current.scheduleDialog.open).toBe(true);
 });
+
+test("undo of an already replaced plan does not reopen compose and release the newer plan", async () => {
+  const notices: NoticeInput[] = [];
+  let reloads = 0, edits = 0;
+  const input: Parameters<typeof useScheduledSendControls>[0] = {
+    accountId: "a", enabled: true, locale: "de",
+    apiFetch: async (_input, init) => init?.method === "POST" ? Response.json({}, { status: 404 })
+      : Response.json({ scheduledSends: [{ ...row, id: "newer-plan" }] }),
+    pushNotice: notice => notices.push(notice), reportError: () => {}, readErrorMessage: async () => "",
+    loadDraft: async () => { reloads++; return null; }, editDraft: () => { edits++; }, sendDraft: async () => {}
+  };
+  const { result } = renderHook(() => useScheduledSendControls(input), {
+    wrapper: ({ children }) => <I18nTestProvider locale="de">{children}</I18nTestProvider>
+  });
+  act(() => result.current.onScheduledSend({ scheduledSend: row, subject: "Synthetic old plan" }));
+  await act(async () => { await notices[0].onAction?.(); });
+  expect(reloads).toBe(0);
+  expect(edits).toBe(0);
+  expect(result.current.controls.byDraftId.get("d")?.id).toBe("newer-plan");
+});

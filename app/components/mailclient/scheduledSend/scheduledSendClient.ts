@@ -32,12 +32,13 @@ export function listScheduledDraftSends(apiFetch: ApiFetch, accountId: string, d
     body => (Array.isArray(body.scheduledSends) ? body.scheduledSends : []) as ScheduledSendView[]);
 }
 
-export type ScheduleReleaseResult = { ok: true } | { ok: false; reason: "busy" | "failed" };
+export type ScheduleReleaseResult = { ok: true; alreadyGone?: true } | { ok: false; reason: "busy" | "failed" };
 
 /** Cancels only the requested id: an old undo toast must never cancel a replacement schedule. */
 export async function cancelDraftSchedule(apiFetch: ApiFetch, accountId: string, schedule: Pick<ScheduledSendView, "id" | "draftId">): Promise<ScheduleReleaseResult> {
   const result = await cancelScheduledDraftSend(apiFetch, accountId, schedule.id);
-  if (result.ok || result.status === 404) return { ok: true };
+  if (result.ok) return { ok: true };
+  if (result.status === 404) return { ok: true, alreadyGone: true };
   return { ok: false, reason: result.status === 409 ? "busy" : "failed" };
 }
 

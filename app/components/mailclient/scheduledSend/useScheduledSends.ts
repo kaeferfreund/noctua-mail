@@ -97,7 +97,9 @@ export function useScheduledSendControls(input: {
     const result = await cancel(schedule);
     if (!result.ok) reportError(result.reason === "busy" ? t("busy") : t("unscheduleFailed"));
     else if (notify) pushNotice({ type: "success", title: t("unscheduled") });
-    return result.ok;
+    // An old toast whose id is already gone must not reopen compose: opening for edit
+    // deliberately releases the current plan and would cancel a newer schedule indirectly.
+    return result.ok && !result.alreadyGone;
   }, [cancel, pushNotice, reportError, t]);
 
   /** „Rückgängig“ cancels the schedule; a draft planned from compose reopens there. */
