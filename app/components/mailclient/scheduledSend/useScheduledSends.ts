@@ -90,7 +90,7 @@ export function useScheduledSendControls(input: {
   sendDraft: (draft: Message) => Promise<void>;
 }) {
   const t = useTranslations("Compose.schedule");
-  const { accountId, enabled, locale, apiFetch, pushNotice, reportError, readErrorMessage, loadDraft, editDraft, sendDraft } = input;
+  const { accountId, enabled, locale, apiFetch, pushNotice, reportError, loadDraft, editDraft, sendDraft } = input;
   const { byDraftId, refresh, cancel, releaseForEdit } = useScheduledSends({ accountId, enabled, apiFetch });
 
   const unschedule = useCallback(async (schedule: ScheduledSendView, notify = true) => {
@@ -144,15 +144,13 @@ export function useScheduledSendControls(input: {
     if (!draft || !accountId || draft.accountId !== accountId) return false;
     const result = await scheduleDraftSend(apiFetch, accountId, draft.id, sendAt);
     if (!result.ok) {
-      const refusal = result.response ? await readScheduledSendRefusal(result.response) : null;
-      reportError(refusal === "scheduled_send_invite" ? t("inviteUnsupported")
-        : (result.response && await readErrorMessage(result.response)) || t("failed"));
+      reportError(t(result.response ? await readScheduledSendRefusal(result.response) : "failed"));
       return false;
     }
     void refresh();
     announce(result.value, draft.subject ?? "", false);
     return true;
-  }, [accountId, announce, apiFetch, readErrorMessage, refresh, reportError, scheduleTarget, t]);
+  }, [accountId, announce, apiFetch, refresh, reportError, scheduleTarget, t]);
   const scheduleDialog = {
     open: Boolean(enabled && scheduleTarget && scheduleTarget.accountId === accountId),
     onOpenChange: (open: boolean) => { if (!open) setScheduleTarget(null); },

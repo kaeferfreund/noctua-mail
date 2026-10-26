@@ -1952,6 +1952,13 @@
       "failed": "Translation failed."
     },
     "schedule": {
+      "notInDrafts": "Only drafts in the Drafts folder can be scheduled.",
+      "draftInvalid": "This draft cannot be scheduled. Review recipients and content, then save it again.",
+      "draftMissing": "The draft was not found. Open Drafts again.",
+      "permissionDenied": "You cannot schedule sends for this mailbox.",
+      "identityUnavailable": "The sender details changed or are unavailable. Review From and save the draft again.",
+      "tooFar": "Choose a time within one year.",
+      "rateLimited": "Too many schedules. Wait a minute and try again.",
       "moreOptions": "More send options",
       "open": "Schedule send …",
       "title": "Schedule send",

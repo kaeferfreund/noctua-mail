@@ -1952,6 +1952,13 @@
       "failed": "Die Übersetzung ist fehlgeschlagen."
     },
     "schedule": {
+      "notInDrafts": "Nur Entwürfe im Ordner „Entwürfe“ können geplant werden.",
+      "draftInvalid": "Der Entwurf kann nicht geplant werden. Prüfe Empfänger und Inhalt und speichere ihn erneut.",
+      "draftMissing": "Der Entwurf wurde nicht gefunden. Öffne den Ordner „Entwürfe“ erneut.",
+      "permissionDenied": "Du darfst für dieses Postfach keine Sendung planen.",
+      "identityUnavailable": "Die Absenderdaten sind nicht mehr verfügbar oder haben sich geändert. Prüfe den Absender und speichere den Entwurf erneut.",
+      "tooFar": "Wähle einen Zeitpunkt innerhalb eines Jahres.",
+      "rateLimited": "Zu viele Planungen. Warte eine Minute und versuche es erneut.",
       "moreOptions": "Weitere Sendeoptionen",
       "open": "Senden planen …",
       "title": "Senden planen",

@@ -55,10 +55,30 @@ export async function releaseDraftScheduleForEdit(apiFetch: ApiFetch, accountId:
   return cancelDraftSchedule(apiFetch, accountId, schedule);
 }
 
-/** The `code` of a refused POST …/drafts/scheduled for a draft that can never be planned, or null. */
+const refusalKeys = {
+  scheduled_send_invite: "inviteUnsupported",
+  scheduled_send_draft_deleted: "notInDrafts",
+  scheduled_send_draft_missing: "draftMissing",
+  scheduled_send_draft_invalid: "draftInvalid",
+  scheduled_send_busy: "busy",
+  send_at_past: "errors.past",
+  send_at_too_soon: "errors.tooSoon",
+  send_at_too_far: "tooFar",
+  send_at_invalid: "errors.invalid",
+  identity_unavailable: "identityUnavailable",
+  identity_not_found: "identityUnavailable",
+  draft_identity_changed: "identityUnavailable"
+} as const;
+
+/** Catalogue key only: scheduling never surfaces raw (English or upstream) server text. */
 export async function readScheduledSendRefusal(response: Response) {
   const body = (await response.clone().json().catch(() => null)) as { code?: unknown } | null;
-  return body?.code === "scheduled_send_invite" ? body.code : null;
+  const key = typeof body?.code === "string" ? refusalKeys[body.code as keyof typeof refusalKeys] : undefined;
+  if (key) return key;
+  if (response.status === 404) return "draftMissing";
+  if (response.status === 403 || response.status === 401) return "permissionDenied";
+  if (response.status === 429) return "rateLimited";
+  return "failed";
 }
 
 /** The `code` of a 409 from a send route racing the draft's schedule, or null. */

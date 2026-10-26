@@ -52,7 +52,8 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     const sendAt = validateScheduledSendAt(body?.sendAt);
     if (!sendAt.ok) {
       return NextResponse.json({ ok: false, code: `send_at_${sendAt.reason}`, message: sendAt.reason === "past"
-        ? "The send time must be in the future." : sendAt.reason === "too_far"
+        ? "The send time must be in the future." : sendAt.reason === "too_soon"
+          ? "The send time must be at least one minute in the future." : sendAt.reason === "too_far"
           ? "The send time must be within one year." : "Invalid send time." }, { status: 400 });
     }
     const resolvedAccountId = accountContext.accountId;
@@ -67,10 +68,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       if (error instanceof OutboundAuthorizationError) return error.response;
       if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
       if (error instanceof DraftSendError) {
-        return error.code ? NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status })
-          : errorResponse(error.message, error.status);
+        return NextResponse.json({ ok: false, code: error.code ?? (error.status === 404 ? "scheduled_send_draft_missing" : "scheduled_send_draft_invalid"), message: error.message }, { status: error.status });
       }
-      if (error instanceof ScheduledSendBusyError) return errorResponse("This draft is being sent by its schedule right now.", 409);
+      if (error instanceof ScheduledSendBusyError) return NextResponse.json({ ok: false, code: "scheduled_send_busy", message: "This draft is being sent by its schedule right now." }, { status: 409 });
       throw error;
     }
   });

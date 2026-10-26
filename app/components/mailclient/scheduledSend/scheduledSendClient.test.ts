@@ -25,3 +25,11 @@ test("opening a draft reads and cancels its current schedule; busy prevents open
     if (status === "queued") expect(calls[1]).toBe("POST /api/accounts/synthetic-account/drafts/scheduled/new/cancel");
   }
 });
+
+test("scheduling refusals map to catalogue keys, including unknown server errors", async () => {
+  const { readScheduledSendRefusal } = await import("./scheduledSendClient");
+  for (const [status, code, key] of [[409, "scheduled_send_draft_deleted", "notInDrafts"], [400, "send_at_too_soon", "errors.tooSoon"],
+    [409, "scheduled_send_invite", "inviteUnsupported"], [404, undefined, "draftMissing"], [500, undefined, "failed"]] as const) {
+    expect(await readScheduledSendRefusal(Response.json({ code, message: "English server detail" }, { status }))).toBe(key);
+  }
+});
