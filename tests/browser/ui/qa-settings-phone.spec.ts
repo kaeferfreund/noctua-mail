@@ -103,7 +103,7 @@ async function nativeSelects(scope: ReturnType<Page["locator"]>) {
     .filter(element => (element as HTMLElement).offsetParent)
     .map(element => ({ label: element.getAttribute("aria-label") ?? element.closest("label")?.textContent?.slice(0, 40) ?? "",
       // Desktop native controls have intrinsic line-height, p-2 and a border; no 36px minimum.
-      desktopMin: Number.parseFloat(getComputedStyle(element).fontSize)
+      desktopMin: (Number.parseFloat(getComputedStyle(element).lineHeight) || Number.parseFloat(getComputedStyle(element).fontSize))
         + Number.parseFloat(getComputedStyle(element).paddingTop) + Number.parseFloat(getComputedStyle(element).paddingBottom)
         + Number.parseFloat(getComputedStyle(element).borderTopWidth) + Number.parseFloat(getComputedStyle(element).borderBottomWidth),
       height: (element as HTMLElement).offsetHeight, radius: getComputedStyle(element).borderTopLeftRadius, padding: getComputedStyle(element).paddingLeft })));
@@ -136,7 +136,7 @@ test("admin selects are styled and the admin members table sits on a card in bot
       const inviteSelects = await nativeSelects(admin);
       expectStyledSelects(inviteSelects, width);
       await admin.getByRole("button", { name: "Postfächer", exact: true }).click();
-      await admin.locator("div.rounded-md.border").filter({ has: admin.getByText("QA Shared", { exact: true }) })
+      await admin.locator("div.rounded-md.border").filter({ has: page.getByText("QA Shared", { exact: true }) })
         .getByRole("button", { name: "Mitglieder verwalten", exact: true }).click();
       const members = page.getByRole("dialog", { name: "Mitglieder von demo@monkeydent.test", exact: true });
       const table = members.locator("[data-members-table]");
