@@ -90,31 +90,27 @@ export default function TopicsTabContent({
     }
   }, [t]);
 
-  const loadTopics = useCallback(async () => {
-    if (!accountId) return [];
-    setLoading(true);
-    try {
-      const [topicsRes, statsRes] = await Promise.all([
-        request(buildAccountTopicsPath(accountId)),
-        request(buildAccountTopicStatsPath(accountId))
-      ]);
-      const topicsData = await topicsRes.json();
-      const statsData = await statsRes.json();
-      const nextTopics = topicsData.ok && Array.isArray(topicsData.topics) ? topicsData.topics : [];
-      setTopics(nextTopics);
-      if (statsData.ok && Array.isArray(statsData.stats)) {
-        setStatsById(new Map((statsData.stats as TopicStat[]).map((s) => [s.topicId, s])));
-      } else {
-        setStatsById(new Map());
-      }
-      return nextTopics as Topic[];
-    } catch {
-      return [];
-    } finally {
-      setLoading(false);
-    }
+  const loadTopics = useCallback((): Promise<Topic[]> => {
+    if (!accountId) return Promise.resolve([]);
+    return Promise.all([request(buildAccountTopicsPath(accountId)), request(buildAccountTopicStatsPath(accountId))])
+      .then(async ([topicsRes, statsRes]) => {
+        const topicsData = await topicsRes.json();
+        const statsData = await statsRes.json();
+        const nextTopics = topicsData.ok && Array.isArray(topicsData.topics) ? topicsData.topics : [];
+        setTopics(nextTopics);
+        setStatsById(statsData.ok && Array.isArray(statsData.stats)
+          ? new Map((statsData.stats as TopicStat[]).map(stat => [stat.topicId, stat])) : new Map());
+        return nextTopics as Topic[];
+      })
+      .catch(() => [])
+      .finally(() => { setLoading(false); });
   }, [accountId, request]);
 
+  const [previousLoadInputs, setPreviousLoadInputs] = useState<readonly unknown[] | null>(null);
+  if (previousLoadInputs === null || previousLoadInputs[0] !== isActive || previousLoadInputs[1] !== isExistingAccount || previousLoadInputs[2] !== loadTopics) {
+    setPreviousLoadInputs([isActive, isExistingAccount, loadTopics]);
+    if (isActive && isExistingAccount && accountId) setLoading(true);
+  }
   useEffect(() => {
     if (isActive && isExistingAccount) loadTopics();
   }, [isActive, isExistingAccount, loadTopics]);
@@ -263,6 +259,7 @@ export default function TopicsTabContent({
         setError(await readError(res));
         return;
       }
+      setLoading(true);
       await loadTopics();
       setNotice(t("topics.signalRemoved"));
     } catch {
@@ -302,6 +299,7 @@ export default function TopicsTabContent({
         setError(data?.message ?? t("topics.importFailed"));
         return;
       }
+      setLoading(true);
       const nextTopics = await loadTopics();
       onTopicsChanged?.(nextTopics);
       setNotice(t("topics.imported", {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
 import { Button, Callout, Dialog, Flex, Text, TextField } from "@radix-ui/themes";
 import Field from "@/app/components/account-settings/Field";
@@ -36,13 +36,16 @@ export default function AccountReloginDialog({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (!open || !account || !canRepair) return;
-    setImapUser(account.imap.user || account.email || "");
-    setImapPassword("");
-    setError("");
-    setSubmitting(false);
-  }, [account, canRepair, open]);
+  const [previousAccountInputs, setPreviousAccountInputs] = useState<readonly unknown[] | null>(null);
+  if (previousAccountInputs === null || previousAccountInputs[0] !== account || previousAccountInputs[1] !== canRepair || previousAccountInputs[2] !== open) {
+    setPreviousAccountInputs([account, canRepair, open]);
+    if (open && account && canRepair) {
+      setImapUser(account.imap.user || account.email || "");
+      setImapPassword("");
+      setError("");
+      setSubmitting(false);
+    }
+  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { Button, Card, Flex, Text, TextArea, TextField } from "@radix-ui/themes";
@@ -48,32 +48,27 @@ export default function RecipientAliasManager({
     [aliases, initialAliasId]
   );
 
-  useEffect(() => {
-    if (initialAliasId) {
-      const alias = initialAlias;
-      if (alias) {
-        setFormMode("edit");
-        setEditingAliasId(alias.id);
-        setName(alias.name);
-        setRecipients(alias.recipients);
-        setError("");
-        return;
-      }
-    }
-    if (initialRecipients.trim()) {
+  const [previousAliasInputs, setPreviousAliasInputs] = useState<readonly unknown[] | null>(null);
+  if (previousAliasInputs === null || previousAliasInputs[0] !== initialAlias || previousAliasInputs[1] !== initialAliasId || previousAliasInputs[2] !== initialRecipients || previousAliasInputs[3] !== resetKey) {
+    setPreviousAliasInputs([initialAlias, initialAliasId, initialRecipients, resetKey]);
+    if (initialAliasId && initialAlias) {
+      setFormMode("edit");
+      setEditingAliasId(initialAlias.id);
+      setName(initialAlias.name);
+      setRecipients(initialAlias.recipients);
+    } else if (initialRecipients.trim()) {
       setFormMode("create");
       setEditingAliasId(null);
       setName("");
       setRecipients(initialRecipients.trim());
-      setError("");
-      return;
+    } else {
+      setFormMode(null);
+      setEditingAliasId(null);
+      setName("");
+      setRecipients("");
     }
-    setFormMode(null);
-    setEditingAliasId(null);
-    setName("");
-    setRecipients("");
     setError("");
-  }, [initialAlias, initialAliasId, initialRecipients, resetKey]);
+  }
 
   const startCreate = () => {
     setFormMode("create");

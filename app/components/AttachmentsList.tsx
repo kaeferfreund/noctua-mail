@@ -237,11 +237,13 @@ function AttachmentImagePreviewPortal({
         visibility: style?.anchorEl === preview.anchorEl ? "visible" : "hidden"
       }}
     >
+      <picture>
       <img
         src={preview.src}
         alt={preview.alt}
         onLoad={() => updatePositionRef.current?.()}
       />
+      </picture>
     </div>,
     document.body
   );

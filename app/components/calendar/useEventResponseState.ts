@@ -94,15 +94,19 @@ export function useEventResponseState({
   const [sendReply, setSendReply] = useState(replyRequested !== false);
   const [submittingResponse, setSubmittingResponse] = useState(false);
 
-  useEffect(() => {
+  const [previousParticipationInputs, setPreviousParticipationInputs] = useState<readonly unknown[] | null>(null);
+  if (previousParticipationInputs === null || previousParticipationInputs[0] !== eventId || previousParticipationInputs[1] !== resolvedStartMs || previousParticipationInputs[2] !== myPartstat || previousParticipationInputs[3] !== recurrenceRule || previousParticipationInputs[4] !== forceOccurrenceResponse) {
+    setPreviousParticipationInputs([eventId, resolvedStartMs, myPartstat, recurrenceRule, forceOccurrenceResponse]);
     setCurrentMyPartstat(myPartstat);
     setCurrentParticipationScope(forceOccurrenceResponse ? "occurrence" : "series");
     setIsRecurringParticipation(Boolean(recurrenceRule?.trim()));
-  }, [eventId, resolvedStartMs, myPartstat, recurrenceRule, forceOccurrenceResponse]);
+  }
 
-  useEffect(() => {
+  const [previousReplyInputs, setPreviousReplyInputs] = useState<readonly unknown[] | null>(null);
+  if (previousReplyInputs === null || previousReplyInputs[0] !== replyRequested) {
+    setPreviousReplyInputs([replyRequested]);
     setSendReply(replyRequested !== false);
-  }, [replyRequested]);
+  }
 
   useEffect(() => {
     let active = true;

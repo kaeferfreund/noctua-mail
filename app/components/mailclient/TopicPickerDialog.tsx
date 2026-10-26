@@ -59,7 +59,9 @@ export default function TopicPickerDialog({
   const [saving, setSaving] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
 
-  useEffect(() => {
+  const [previousOpenInputs, setPreviousOpenInputs] = useState<readonly unknown[] | null>(null);
+  if (previousOpenInputs === null || previousOpenInputs[0] !== open) {
+    setPreviousOpenInputs([open]);
     if (open) {
       setSelected(new Set(messageTopics.map((t) => t.id)));
       setNewName("");
@@ -67,8 +69,7 @@ export default function TopicPickerDialog({
       setShowCreate(false);
     }
     // messageTopics intentionally excluded: only reset when dialog opens
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }
 
   function toggleTopic(topicId: string) {
     setSelected((prev) => {

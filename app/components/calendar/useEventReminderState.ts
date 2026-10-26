@@ -109,30 +109,17 @@ export function useEventReminderState({
     return Boolean(next && next.eventStartAtMs > nowMs);
   })();
 
-  const refreshReminder = useCallback(async () => {
-    if (
-      !accountId ||
-      typeof canonicalStartMs !== "number" ||
-      !Number.isFinite(canonicalStartMs)
-    ) {
-      return;
-    }
-    try {
-      const reminders = await fetchCalendarReminders(accountId);
-      const found = findActiveCalendarReminderForEvent(reminders, {
-        eventUid,
-        eventTitle: title,
-        eventStartAtMs: canonicalStartMs
-      });
+  const refreshReminder = useCallback(() => {
+    if (!accountId || typeof canonicalStartMs !== "number" || !Number.isFinite(canonicalStartMs)) return Promise.resolve();
+    return fetchCalendarReminders(accountId).then(reminders => {
+      const found = findActiveCalendarReminderForEvent(reminders, { eventUid, eventTitle: title, eventStartAtMs: canonicalStartMs });
       setExistingReminder(found);
       if (found) {
         const val = String(found.leadMinutes);
-        const has = CALENDAR_REMINDER_LEAD_OPTIONS.some((o) => o.value === val);
+        const has = CALENDAR_REMINDER_LEAD_OPTIONS.some(option => option.value === val);
         setLeadOptionValue(has ? val : (CALENDAR_REMINDER_LEAD_OPTIONS[3]?.value ?? "15"));
       }
-    } catch {
-      // ignore
-    }
+    }).catch(() => { /* Discovery failures leave the previous reminder intact. */ });
   }, [accountId, eventUid, title, canonicalStartMs]);
 
   useEffect(() => { void refreshReminder(); }, [refreshReminder]);

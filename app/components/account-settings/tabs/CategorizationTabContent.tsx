@@ -83,29 +83,17 @@ export default function CategorizationTabContent({
     "transactional"
   ];
 
-  const loadCategorizationDebug = useCallback(async () => {
-    if (!accountId) return;
-    setLoading(true);
-    setError("");
-    try {
-      const res = await request(
-        buildAccountCategoriesDebugPath(accountId, new URLSearchParams({ limit: "20" }))
-      );
-      if (!res.ok) {
-        setError(await readError(res));
-        return;
-      }
-      const data = (await res.json()) as CategoryDebugResponse;
-      if (!data?.ok || !data.snapshot) {
-        setError(data?.message || t("categorization.invalidResponse"));
-        return;
-      }
-      setSnapshot(data.snapshot);
-    } catch {
-      setError(t("categorization.loadFailed"));
-    } finally {
-      setLoading(false);
-    }
+  const loadCategorizationDebug = useCallback(() => {
+    if (!accountId) return Promise.resolve();
+    return request(buildAccountCategoriesDebugPath(accountId, new URLSearchParams({ limit: "20" })))
+      .then(async res => {
+        if (!res.ok) { setError(await readError(res)); return; }
+        const data = (await res.json()) as CategoryDebugResponse;
+        if (!data?.ok || !data.snapshot) { setError(data?.message || t("categorization.invalidResponse")); return; }
+        setSnapshot(data.snapshot);
+      })
+      .catch(() => { setError(t("categorization.loadFailed")); })
+      .finally(() => { setLoading(false); });
   }, [accountId, readError, request, t]);
 
   const resetCategorizationModel = useCallback(async () => {
@@ -128,6 +116,7 @@ export default function CategorizationTabContent({
         return;
       }
       onModelResetSuccess?.();
+      setLoading(true); setError("");
       await loadCategorizationDebug();
     } catch {
       setError(t("categorization.resetFailed"));
@@ -136,6 +125,14 @@ export default function CategorizationTabContent({
     }
   }, [accountId, loadCategorizationDebug, onModelResetSuccess, readError, request, t]);
 
+  const [previousLoadInputs, setPreviousLoadInputs] = useState<readonly unknown[] | null>(null);
+  if (previousLoadInputs === null || previousLoadInputs[0] !== accountId || previousLoadInputs[1] !== isActive || previousLoadInputs[2] !== isExistingAccount || previousLoadInputs[3] !== loadCategorizationDebug) {
+    setPreviousLoadInputs([accountId, isActive, isExistingAccount, loadCategorizationDebug]);
+    if (isActive && accountId && isExistingAccount) {
+      setLoading(true);
+      setError("");
+    }
+  }
   useEffect(() => {
     if (!isActive || !accountId || !isExistingAccount) return;
     void loadCategorizationDebug();
@@ -162,7 +159,7 @@ export default function CategorizationTabContent({
               <Button
                 size="1"
                 variant="soft"
-                onClick={() => void loadCategorizationDebug()}
+                onClick={() => { setLoading(true); setError(""); void loadCategorizationDebug(); }}
                 disabled={loading || resetting || !accountId}
               >
                 {loading ? t("categorization.refreshing") : t("categorization.refresh")}

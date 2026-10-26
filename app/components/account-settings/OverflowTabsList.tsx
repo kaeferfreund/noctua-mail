@@ -51,7 +51,6 @@ export default function OverflowTabsList({ tabs, activeValue, onSelect, overflow
 
     // Measuring the DOM and storing the result is the point of this effect; the
     // identity check below keeps it from looping when nothing actually changed.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setWidths((current) => {
       const next = { ...current, ...measured };
       const changed = Object.keys(next).some((value) => next[value] !== current[value]);

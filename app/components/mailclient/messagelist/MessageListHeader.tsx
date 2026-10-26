@@ -1,5 +1,5 @@
 import { useTranslations } from "next-intl";
-import { startTransition, useEffect, useId, useRef, useState } from "react";
+import { startTransition, useId, useRef, useState } from "react";
 import type React from "react";
 import {
   ArrowDownWideNarrow,
@@ -183,21 +183,29 @@ export default function MessageListHeader({ state, actions }: MessageListHeaderP
   const sortFrameRef = useRef<number | null>(null);
   const threadDateFrameRef = useRef<number | null>(null);
 
-  useEffect(() => {
+  const [previousView, setPreviousView] = useState(messageView);
+  if (previousView !== messageView) {
+    setPreviousView(messageView);
     setLocalView(messageView);
-  }, [messageView]);
+  }
 
-  useEffect(() => {
+  const [previousGroup, setPreviousGroup] = useState(groupBy);
+  if (previousGroup !== groupBy) {
+    setPreviousGroup(groupBy);
     setLocalGroupBy(groupBy);
-  }, [groupBy]);
+  }
 
-  useEffect(() => {
+  const [previousSort, setPreviousSort] = useState(messageSort);
+  if (previousSort !== messageSort) {
+    setPreviousSort(messageSort);
     setLocalSort(messageSort);
-  }, [messageSort]);
+  }
 
-  useEffect(() => {
+  const [previousThreadDate, setPreviousThreadDate] = useState(threadDateSource);
+  if (previousThreadDate !== threadDateSource) {
+    setPreviousThreadDate(threadDateSource);
     setLocalThreadDateSource(threadDateSource);
-  }, [threadDateSource]);
+  }
 
   const scheduleCommit = (ref: React.MutableRefObject<number | null>, fn: () => void) => {
     if (ref.current) window.cancelAnimationFrame(ref.current);

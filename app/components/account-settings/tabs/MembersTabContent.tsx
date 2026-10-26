@@ -29,7 +29,7 @@ export default function MembersTabContent({ accountId, accessRole, apiFetch = fe
   const [actor, setActor] = useState(currentUserId ?? "");
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
-  const [directoryLoading, setDirectoryLoading] = useState(false);
+  const [loadedDirectoryRequest, setLoadedDirectoryRequest] = useState<{ load: unknown } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [cleanupPending, setCleanupPending] = useState(false);
@@ -76,12 +76,12 @@ export default function MembersTabContent({ accountId, accessRole, apiFetch = fe
   useEffect(() => {
     if (!allowed || admin) return;
     let active = true;
-    setDirectoryLoading(true);
     void loadCandidates().then(candidates => { if (active) setDirectory(candidates); })
       .catch(error => { if (active) { setDirectory([]); setError(error); } })
-      .finally(() => { if (active) setDirectoryLoading(false); });
+      .finally(() => { if (active) setLoadedDirectoryRequest({ load: loadCandidates }); });
     return () => { active = false; };
   }, [allowed, admin, loadCandidates]);
+  const directoryLoading = allowed && !admin && loadedDirectoryRequest?.load !== loadCandidates;
   if (!allowed) return null;
   const enabledManagers = members.filter(member => !member.disabled && (member.isOwner || member.role === "manager")).length;
   const available = directory.filter(user => !user.disabled && !members.some(member => member.userId === user.id));
