@@ -1967,6 +1967,7 @@
       "timeLabel": "Time",
       "timePlaceholder": "Time",
       "errors": {
+        "tooSoon": "Choose a time at least one minute in the future.",
         "invalid": "Choose a date and a time.",
         "past": "This time is in the past.",
         "nonexistent": "This time does not exist on that day because of the clock change.",

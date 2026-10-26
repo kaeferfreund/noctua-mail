@@ -89,3 +89,13 @@ describe("ScheduleSendDialog", () => {
     expect(closed).toEqual([false]);
   });
 });
+
+it("explains the one-minute minimum when the selected preset is about to start", () => {
+  const clock = { now: utc(10, 24, 5, 58) };
+  const planned: number[] = [];
+  const { page } = open(clock, async value => { planned.push(value); return true; });
+  clock.now = utc(10, 24, 5, 59) + 1;
+  fireEvent.click(page.getByRole("button", { name: "Planen" }));
+  expect(page.getByRole("alert").textContent).toBe("Wähle einen Zeitpunkt mindestens eine Minute in der Zukunft.");
+  expect(planned).toEqual([]);
+});

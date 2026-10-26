@@ -1967,6 +1967,7 @@
       "timeLabel": "Uhrzeit",
       "timePlaceholder": "Uhrzeit",
       "errors": {
+        "tooSoon": "Wähle einen Zeitpunkt mindestens eine Minute in der Zukunft.",
         "invalid": "Wähle ein Datum und eine Uhrzeit.",
         "past": "Dieser Zeitpunkt liegt in der Vergangenheit.",
         "nonexistent": "Diese Uhrzeit gibt es an diesem Tag wegen der Zeitumstellung nicht.",

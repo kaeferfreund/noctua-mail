@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
 import { nativeControlBaseClass } from "@/app/components/account-settings/Field";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import {
-  browserTimeZone, computeSchedulePresets, customTimeOptions, formatLocalDate, formatScheduledSendTime, localDateOf,
+  SCHEDULED_SEND_MIN_AHEAD_MS, browserTimeZone, computeSchedulePresets, customTimeOptions, formatLocalDate, formatScheduledSendTime, localDateOf,
   parseLocalDate, resolveCustomTime, type SchedulePresetKind
 } from "@/lib/scheduleSendTime";
 import styles from "./ScheduleSendDialog.module.css";
@@ -24,7 +24,7 @@ type ScheduleSendDialogProps = {
 };
 
 type Selection = SchedulePresetKind | "custom";
-type CustomError = "invalid" | "past" | "nonexistent" | null;
+type CustomError = "invalid" | "past" | "nonexistent" | "tooSoon" | null;
 
 /** „Senden planen“: presets in the browser's zone plus a custom date and quarter-hour time. */
 export default function ScheduleSendDialog({ open, onOpenChange, ...props }: ScheduleSendDialogProps) {
@@ -102,6 +102,7 @@ function ScheduleSendForm({ onSchedule, onCancel, now: clock = Date.now, timeZon
         ?? presets.find(preset => preset.kind === selection)!.sendAt;
       if (sendAt <= now) { setError("past"); return; }
     }
+    if (sendAt < now + SCHEDULED_SEND_MIN_AHEAD_MS) { setError("tooSoon"); return; }
     setSubmitting(true);
     try {
       if (await onSchedule(sendAt)) onCancel();

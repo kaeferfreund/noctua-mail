@@ -144,7 +144,8 @@ describe("scheduled_sends store", () => {
 
 describe("scheduled send rules", () => {
   test("sendAt must be a future integer within one year", () => {
-    expect(validateScheduledSendAt(T0 + 1, T0)).toEqual({ ok: true, sendAt: T0 + 1 });
+    expect(validateScheduledSendAt(T0 + 60_000, T0)).toEqual({ ok: true, sendAt: T0 + 60_000 });
+    expect(validateScheduledSendAt(T0 + 59_999, T0)).toEqual({ ok: false, reason: "too_soon" });
     expect(validateScheduledSendAt(T0, T0)).toEqual({ ok: false, reason: "past" });
     expect(validateScheduledSendAt(T0 - 60_000, T0)).toEqual({ ok: false, reason: "past" });
     expect(validateScheduledSendAt(T0 + SCHEDULED_SEND_MAX_AHEAD_MS, T0).ok).toBe(true);

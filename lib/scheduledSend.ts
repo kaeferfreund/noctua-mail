@@ -1,3 +1,4 @@
+import { SCHEDULED_SEND_MIN_AHEAD_MS } from "./scheduleSendTime";
 import { scheduledDraftFingerprint } from "./scheduledSendFingerprint";
 import type { Account } from "@/lib/data";
 import { DraftSendError, loadSendableDraft, sendDraftForAccount } from "@/lib/drafts";
@@ -47,9 +48,10 @@ export function presentScheduledSend(row: ScheduledSend): ScheduledSendView {
     lastError: row.lastError, scheduledByUserId: row.userId };
 }
 
-export function validateScheduledSendAt(sendAt: unknown, now = Date.now()): { ok: true; sendAt: number } | { ok: false; reason: "invalid" | "past" | "too_far" } {
+export function validateScheduledSendAt(sendAt: unknown, now = Date.now()): { ok: true; sendAt: number } | { ok: false; reason: "invalid" | "past" | "too_soon" | "too_far" } {
   if (typeof sendAt !== "number" || !Number.isSafeInteger(sendAt)) return { ok: false, reason: "invalid" };
   if (sendAt <= now) return { ok: false, reason: "past" };
+  if (sendAt < now + SCHEDULED_SEND_MIN_AHEAD_MS) return { ok: false, reason: "too_soon" };
   if (sendAt > now + SCHEDULED_SEND_MAX_AHEAD_MS) return { ok: false, reason: "too_far" };
   return { ok: true, sendAt };
 }
