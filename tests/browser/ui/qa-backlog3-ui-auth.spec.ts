@@ -2,11 +2,16 @@ import { test, expect } from "@playwright/test";
 import { signInQa, evidencePath, recordQa } from "./qaRound2Session";
 
 // Run with the isolated synthetic shell harness and QA_SHELL_PORT on an unused port.
-test.use({ locale: "de-DE" });
+test.use({ locale: "de-DE", hasTouch: true });
 test("reader, mailbox defaults, members and long mailbox names at desktop and phone widths", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await signInQa(page);
   expect((await page.request.put("/api/auth/preferences", { data: { uiLocale: "de" }, headers: { origin: new URL(page.url()).origin } })).ok()).toBe(true);
+  // The isolated fixture's first sync starts with an empty folder table.
+  await expect.poll(async () => {
+    const response = await page.request.get("/api/accounts/qa-shared/folders");
+    return response.ok() && (await response.json() as unknown[]).length > 0;
+  }).toBe(true);
   await page.goto("/?a=~qa-shared&f=INBOX");
   const rows = page.locator('[data-message-list-row="true"]');
   await expect(rows.first()).toBeVisible();
@@ -14,6 +19,7 @@ test("reader, mailbox defaults, members and long mailbox names at desktop and ph
   const row = rows.first();
   await row.hover();
   await row.locator('[data-message-action="menu"]').click();
+  await page.screenshot({ path: evidencePath("ui-auth-menu-1280.png") });
   await page.getByRole("menuitem", { name: /Als (un)?gelesen markieren/, exact: true }).click();
   expect(new URL(page.url()).searchParams.get("m")).toBeNull();
   await row.dblclick();
@@ -31,9 +37,30 @@ test("reader, mailbox defaults, members and long mailbox names at desktop and ph
   const measurements = [];
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 900 });
+    if (width === 390) {
+      await page.goto("/?a=~qa-shared&f=INBOX");
+      await expect(rows.first()).toBeVisible();
+      await page.screenshot({ path: evidencePath("ui-auth-list-390.png") });
+      const box = (await rows.first().boundingBox())!;
+      const cdp = await page.context().newCDPSession(page);
+      const y = box.y + box.height / 2;
+      const x0 = box.x + box.width * 0.8, x1 = box.x + box.width * 0.45;
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: x0, y }] });
+      for (let step = 1; step <= 12; step++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: x0 + (x1 - x0) * step / 12, y }] });
+      await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await cdp.detach();
+      await page.locator('[data-swipe-action="more"]').click();
+      await expect(page.getByRole("menu")).toBeVisible();
+      await page.screenshot({ path: evidencePath("ui-auth-menu-390.png") });
+      await page.getByRole("menuitem", { name: /Als (un)?gelesen markieren/, exact: true }).click();
+      expect(new URL(page.url()).searchParams.get("m")).toBeNull();
+      await rows.first().click();
+      await expect(page.locator("#noctua-panes")).toHaveAttribute("data-mobile-view", "thread");
+      await page.screenshot({ path: evidencePath("ui-auth-reader-390.png") });
+    }
     await page.goto("/?a=~qa-shared&settings=account");
     const settings = page.getByRole("dialog", { name: "Postfacheinstellungen", exact: true });
-    const defaultSelect = settings.getByLabel("Vorgabe für alle Mitglieder", { exact: true });
+    const defaultSelect = settings.getByRole("combobox", { name: "Vorgabe für alle Mitglieder", exact: true });
     await expect(defaultSelect).toBeVisible();
     await defaultSelect.selectOption(width === 1280 ? "after3s" : "after1s");
     await settings.getByRole("button", { name: "Postfachvorgabe speichern", exact: true }).click();
