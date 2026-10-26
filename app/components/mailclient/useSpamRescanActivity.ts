@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { adminRequest, type AdminFetch } from "@/app/hooks/useAdminApi";
 import { SPAM_RESCAN_EVENT, type SpamRescanActivity } from "@/lib/mail/spam/rescanTypes";
 
 const POLL_MS = 2_000;
+const MAX_POLL_FAILURES = 3;
 
 /**
  * Admin INBOX rescans (doc/SPAM-DETECTION.md) for the activity panel. One read on mount restores activity after a reload; an open panel polls
@@ -14,19 +15,20 @@ const POLL_MS = 2_000;
  */
 export function useSpamRescanActivity(apiFetch: AdminFetch, enabled: boolean, panelOpen: boolean) {
   const [jobs, setJobs] = useState<SpamRescanActivity[]>([]);
-  // Whether the last read found running jobs: polling then outlives a closed panel.
-  const running = useRef(false);
   useEffect(() => {
     if (!enabled) return;
     let active = true;
+    let running = false;
+    let failures = 0;
     let timer: number | undefined;
     const refresh = async () => {
       window.clearTimeout(timer);
       let next: SpamRescanActivity[] | null;
       try { next = (await adminRequest<{ jobs: SpamRescanActivity[] }>(apiFetch, "/api/admin/spam-rescan")).jobs; } catch { next = null; }
       if (!active) return;
-      if (next) { running.current = next.length > 0; setJobs(next); }
-      if (panelOpen || running.current) timer = window.setTimeout(() => void refresh(), POLL_MS);
+      if (next) { failures = 0; running = next.length > 0; setJobs(next); }
+      else if (++failures >= MAX_POLL_FAILURES) running = false;
+      if (failures < MAX_POLL_FAILURES && (panelOpen || running)) timer = window.setTimeout(() => void refresh(), POLL_MS);
     };
     const onEvent = () => { void refresh(); };
     void refresh();

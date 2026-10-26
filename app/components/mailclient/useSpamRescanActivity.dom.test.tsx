@@ -49,3 +49,74 @@ it("discovers another admin's job while the panel remains open", async () => {
   await waitFor(() => expect(reads).toBe(1));
   await waitFor(() => expect(view.result.current.jobs).toEqual([job] as never), { timeout: 3000 });
 });
+
+
+function capturePolls() {
+  const polls = new Map<number, TimerHandler>();
+  let nextId = 1_000_000;
+  const realSet = window.setTimeout, realClear = window.clearTimeout;
+  window.setTimeout = ((handler: TimerHandler, timeout?: number) => {
+    if (timeout !== 2000) return Reflect.apply(realSet, window, [handler, timeout]);
+    const id = nextId++;
+    polls.set(id, handler);
+    return id;
+  }) as typeof window.setTimeout;
+  window.clearTimeout = (id) => { polls.delete(Number(id)); Reflect.apply(realClear, window, [id]); };
+  return {
+    polls,
+    async tick() {
+      const pending = [...polls.values()];
+      polls.clear();
+      await act(async () => { for (const handler of pending) if (typeof handler === "function") handler(); });
+    },
+    restore() { window.setTimeout = realSet; window.clearTimeout = realClear; }
+  };
+}
+
+it.each([false, true])("stops after three consecutive polling failures (panel open: %s), then recovers on an event", async panelOpen => {
+  const timers = capturePolls();
+  let reads = 0, fail = false;
+  const apiFetch: AdminFetch = async () => {
+    reads++;
+    if (fail) throw new Error("synthetic fetch failure");
+    return Response.json({ ok: true, jobs: [job] });
+  };
+  const view = renderHook(() => useSpamRescanActivity(apiFetch, true, panelOpen));
+  try {
+    await waitFor(() => expect(view.result.current.jobs).toEqual([job] as never));
+    fail = true;
+    for (let index = 0; index < 3; index++) {
+      expect(timers.polls.size).toBe(1);
+      await timers.tick();
+    }
+    expect(reads).toBe(4);
+    expect(timers.polls.size).toBe(0);
+    await timers.tick();
+    expect(reads).toBe(4);
+    fail = false;
+    await act(async () => { window.dispatchEvent(new CustomEvent(SPAM_RESCAN_EVENT)); });
+    expect(reads).toBe(5);
+    expect(timers.polls.size).toBe(1);
+  } finally { view.unmount(); timers.restore(); }
+});
+
+it("disabling activity clears its timer and ignores an in-flight response", async () => {
+  const timers = capturePolls();
+  let reads = 0;
+  let release!: (response: Response) => void;
+  const apiFetch: AdminFetch = async () => {
+    if (++reads === 1) return Response.json({ ok: true, jobs: [job] });
+    return new Promise<Response>(resolve => { release = resolve; });
+  };
+  const view = renderHook(({ enabled }) => useSpamRescanActivity(apiFetch, enabled, false), { initialProps: { enabled: true } });
+  try {
+    await waitFor(() => expect(view.result.current.jobs).toEqual([job] as never));
+    await timers.tick();
+    view.rerender({ enabled: false });
+    await act(async () => { release(Response.json({ ok: true, jobs: [job] })); });
+    expect(view.result.current.jobs).toEqual([]);
+    expect(timers.polls.size).toBe(0);
+    await act(async () => { window.dispatchEvent(new CustomEvent(SPAM_RESCAN_EVENT)); });
+    expect(reads).toBe(2);
+  } finally { view.unmount(); timers.restore(); }
+});
