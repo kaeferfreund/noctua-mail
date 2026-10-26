@@ -30,10 +30,14 @@ export {
 export type {
   ImapSyncBatch,
   NewSyncFolderDecision,
-  StoredMailboxCopyCandidate
+  StoredMailboxCopyCandidate,
+  StoredMailboxCopyState
 } from "./sync";
 export {
   findMissingStoredMailboxCopies,
+  ImapUidValidityChangedError,
+  inspectStoredMailboxCopies,
+  isImapFallbackMessageId,
   planImapNewSyncFolders,
   syncImapAccountBatched,
   syncImapMessage

@@ -67,7 +67,11 @@ function searchPredicate(args: string[], box: Mailbox) {
   while (i < args.length) predicates.push(expression());
   return (m: FixtureMessage, seq: number) => predicates.every(test => test(m, seq));
 }
-export type ImapOptions = { host?: string; port?: number; user?: string; pass?: string; store?: MailStore; controlPort?: number; seed?: string; date?: Date };
+export type ImapOptions = {
+  host?: string; port?: number; user?: string; pass?: string; store?: MailStore; controlPort?: number; seed?: string; date?: Date;
+  /** Observes every authenticated command (upper-case name and its arguments), for tests. */
+  onCommand?: (command: string, args: string[]) => void;
+};
 export async function startImapServer(config: ImapOptions = {}) {
   const host = config.host ?? "127.0.0.1";
   const user = config.user ?? demoUser;
@@ -141,6 +145,7 @@ export async function startImapServer(config: ImapOptions = {}) {
           return;
         }
         if (!authenticated) { send(`${tag} NO Authenticate first`); return; }
+        config.onCommand?.(cmd, args);
         if (cmd === "NAMESPACE") { send('* NAMESPACE (("" "/")) NIL NIL'); ok(); return; }
         if (cmd === "ENABLE") { send("* ENABLED"); ok(); return; }
         if (cmd === "LIST" || cmd === "LSUB") {

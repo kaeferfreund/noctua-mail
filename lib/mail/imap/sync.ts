@@ -8,6 +8,7 @@ import { parseDeliveryMetadata } from "./parser";
 //   - syncImapAccountBatched + ImapSyncBatch
 //   - syncImapMessage
 //   - findMissingStoredMailboxCopies + StoredMailboxCopyCandidate
+//   - inspectStoredMailboxCopies + StoredMailboxCopyState
 // The remaining private helpers (range resolution, lightweight/full message
 // parsing, category classification, watermark maintenance) stay co-located
 // with their callers in this file.
@@ -62,6 +63,7 @@ import {
   parseHeaderMessageIdList,
   resolveEnvelopeAddressEmail,
   resolveMessageAddresses,
+  resolveMessageSenderKey,
   resolveEnvelopeInReplyTo,
   resolveHeaderDate,
   resolveHeaderInReplyTo
@@ -342,7 +344,7 @@ function buildLightweightImapMessage(params: {
     linearModel
   } = params;
   const flagList = Array.isArray(flags) ? flags : flags ? Array.from(flags) : [];
-  const messageId = normalizeEnvelopeHeaderId(envelope?.messageId) ?? `imap-msg-${uid}`;
+  const messageId = normalizeEnvelopeHeaderId(envelope?.messageId) ?? `${IMAP_FALLBACK_MESSAGE_ID_PREFIX}${uid}`;
   const inReplyTo = resolveEnvelopeInReplyTo(envelope);
   const envelopeDateMs =
     envelope?.date instanceof Date && Number.isFinite(envelope.date.getTime())
@@ -429,6 +431,40 @@ function buildLightweightImapMessage(params: {
     listId: listIdVal ?? null,
     calendarEventUids
   } as Message;
+}
+
+/** Stored instead of a Message-ID when the message has none: it names only the UID. */
+const IMAP_FALLBACK_MESSAGE_ID_PREFIX = "imap-msg-";
+
+/** Whether a stored `messages.messageId` is the UID fallback rather than a header value. */
+export function isImapFallbackMessageId(messageId: string | null | undefined) {
+  return !messageId || messageId.startsWith(IMAP_FALLBACK_MESSAGE_ID_PREFIX);
+}
+
+/** The stored `messages.messageId` of a fully parsed IMAP message. */
+function resolveImapMessageId(envelope: ImapEnvelope | undefined, headers: Map<string, string[]>, uid: number) {
+  return normalizeEnvelopeHeaderId(envelope?.messageId)
+    ?? normalizeEnvelopeHeaderId(getHeaderValue(headers, "message-id"))
+    ?? `${IMAP_FALLBACK_MESSAGE_ID_PREFIX}${uid}`;
+}
+
+/**
+ * The mailbox's UIDVALIDITY differs from the one the caller verified: its UIDs
+ * may now name other messages.
+ */
+export class ImapUidValidityChangedError extends Error {
+  constructor(readonly mailboxPath: string, readonly expected: string, readonly actual: string | null) {
+    super(`UIDVALIDITY of ${mailboxPath} changed (expected ${expected}, server ${actual ?? "none"})`);
+    this.name = "ImapUidValidityChangedError";
+  }
+}
+
+/** Throws ImapUidValidityChangedError unless the opened mailbox has `expected`. */
+function assertMailboxUidValidity(mailboxPath: string, mailbox: unknown, expected: string | undefined) {
+  if (expected === undefined) return;
+  const actual = (mailbox as { uidValidity?: unknown } | null | undefined)?.uidValidity;
+  const value = actual == null ? null : String(actual);
+  if (value !== expected) throw new ImapUidValidityChangedError(mailboxPath, expected, value);
 }
 
 export async function parseImapMessage(
@@ -532,10 +568,7 @@ export async function parseImapMessage(
   const envelopeInReplyTo = resolveEnvelopeInReplyTo(envelope);
   const headerInReplyTo = resolveHeaderInReplyTo(headers);
   const inReplyTo = envelopeInReplyTo ?? headerInReplyTo;
-  const envelopeMessageId = normalizeEnvelopeHeaderId(envelope?.messageId);
-  const headerMessageId = normalizeEnvelopeHeaderId(headerValue("message-id"));
-  const internalMessageId = `imap-msg-${message.uid}`;
-  const messageId = envelopeMessageId ?? headerMessageId ?? internalMessageId;
+  const messageId = resolveImapMessageId(envelope, headers, message.uid);
   const messageFlags = withCalendarInviteFlag(flags, {
     attachments,
     textBody: body,
@@ -1369,18 +1402,26 @@ export async function* syncImapAccountBatched(
   }
 }
 
+/**
+ * Fetches one message by UID and parses it like the regular sync. `readOnly`
+ * opens the mailbox with EXAMINE; `uidValidity` makes the fetch throw
+ * ImapUidValidityChangedError when the opened mailbox has another one.
+ */
 export async function syncImapMessage(
   account: Account,
   mailboxPath: string,
   uid: number,
-  clientId?: string
+  clientId?: string,
+  options: { readOnly?: boolean; uidValidity?: string } = {}
 ): Promise<Message | null> {
   const logContext = buildLogContext(account, clientId);
   const linearModel = await getCategoryLinearModel(account.id);
   return withPooledImapClient(account, logContext, async (client) => {
-    await logImapOp("mailboxOpen", { mailbox: mailboxPath, ...logContext }, () =>
-      client.mailboxOpen(mailboxPath)
+    const readOnly = options.readOnly ? { readOnly: true } : undefined;
+    const mailbox = await logImapOp("mailboxOpen", { mailbox: mailboxPath, ...readOnly, ...logContext }, () =>
+      client.mailboxOpen(mailboxPath, readOnly)
     );
+    assertMailboxUidValidity(mailboxPath, mailbox, options.uidValidity);
     const item = await logImapOp(
       "fetchOne",
       { mailbox: mailboxPath, uid, ...logContext },
@@ -1475,4 +1516,58 @@ export async function findMissingStoredMailboxCopies(
   });
 
   return missingIds;
+}
+
+export type StoredMailboxCopyState =
+  | { state: "present"; senderKey: string | null }
+  | { state: "gone" | "mismatch" };
+
+/**
+ * Read-only check of stored copies in one mailbox (EXAMINE, then UID FETCH of
+ * envelope and header in batches): whether each UID still holds the message
+ * with the stored Message-ID, derived as `syncImapMessage` would, and the
+ * sender key a resync would store. "mismatch" means another message now owns
+ * the UID. Throws ImapUidValidityChangedError before any FETCH when the
+ * mailbox's UIDVALIDITY is not `uidValidity`; other errors propagate too.
+ */
+export async function inspectStoredMailboxCopies(
+  account: Account,
+  mailboxPath: string,
+  candidates: Array<{ id: string; messageId: string | null; imapUid: number }>,
+  options: { uidValidity: string; batch?: number; clientId?: string }
+) {
+  const states = new Map<string, StoredMailboxCopyState>();
+  if (candidates.length === 0) return states;
+  const logContext = buildLogContext(account, options.clientId);
+  const batch = options.batch ?? 50;
+  await withPooledImapClient(account, logContext, async (client) => {
+    const mailbox = await logImapOp("mailboxOpen", { mailbox: mailboxPath, readOnly: true, ...logContext }, () =>
+      client.mailboxOpen(mailboxPath, { readOnly: true })
+    );
+    assertMailboxUidValidity(mailboxPath, mailbox, options.uidValidity);
+    const uids = [...new Set(candidates.map((candidate) => candidate.imapUid))].sort((a, b) => a - b);
+    const fetched = new Map<number, { envelope?: ImapEnvelope; headers: Map<string, string[]> }>();
+    for (let start = 0; start < uids.length; start += batch) {
+      const range = uids.slice(start, start + batch).join(",");
+      const items = await logImapOp("fetchAll", { mailbox: mailboxPath, uids: range, ...logContext }, () =>
+        client.fetchAll(range, { uid: true, envelope: true, headers: true }, { uid: true })
+      );
+      for (const item of items) {
+        fetched.set(item.uid, {
+          envelope: item.envelope as ImapEnvelope | undefined,
+          headers: parseHeaderMap(item.headers ?? Buffer.alloc(0))
+        });
+      }
+    }
+    for (const candidate of candidates) {
+      const item = fetched.get(candidate.imapUid);
+      if (!item) states.set(candidate.id, { state: "gone" });
+      else if (resolveImapMessageId(item.envelope, item.headers, candidate.imapUid) !== candidate.messageId) {
+        states.set(candidate.id, { state: "mismatch" });
+      } else {
+        states.set(candidate.id, { state: "present", senderKey: resolveMessageSenderKey(item.envelope, item.headers) });
+      }
+    }
+  });
+  return states;
 }
