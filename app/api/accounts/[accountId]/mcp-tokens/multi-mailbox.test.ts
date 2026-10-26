@@ -1,4 +1,4 @@
-import { beforeAll, expect, test } from "bun:test";
+import { beforeEach, expect, test } from "bun:test";
 import { dbModulePromise } from "@/lib/testDbHarness";
 import { createAuthenticatedTestSession, issueTestReauthGrant } from "@/lib/testAuthHarness";
 import { identityTestAccount } from "@/lib/testFixtures/senderIdentities";
@@ -6,10 +6,14 @@ import { deleteAccountControlPlane } from "@/lib/serverDb";
 import { GET, POST } from "./route";
 import { DELETE } from "./[tokenId]/route";
 
-const accountId = `mcp-route-scopes-${crypto.randomUUID()}`, sharedId = `${accountId}-shared`, foreignId = `${accountId}-foreign`;
+let accountId: string, sharedId: string, foreignId: string;
 let fixture: Awaited<ReturnType<typeof createAuthenticatedTestSession>>;
 let other: Awaited<ReturnType<typeof createAuthenticatedTestSession>>;
-beforeAll(async () => {
+// The cascade case deletes its mailboxes; no case may inherit another case's rows.
+beforeEach(async () => {
+  accountId = `mcp-route-scopes-${crypto.randomUUID()}`;
+  sharedId = `${accountId}-shared`;
+  foreignId = `${accountId}-foreign`;
   const db = await dbModulePromise;
   for (const id of [accountId, sharedId, foreignId]) await db.upsertAccount(identityTestAccount(id));
   fixture = await createAuthenticatedTestSession(accountId);

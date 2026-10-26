@@ -98,7 +98,11 @@ function pushApi({ configured = true, devices = [] as PushDevice[], failPut = fa
 }
 
 const wrapper = ({ children }: { children: ReactNode }) => <I18nTestProvider locale="de"><Theme>{children}</Theme></I18nTestProvider>;
-const mount = (apiFetch: ReturnType<typeof pushApi>["apiFetch"]) => render(<NotificationsTabContent mailboxes={mailboxes} apiFetch={apiFetch} />, { wrapper });
+async function mount(apiFetch: ReturnType<typeof pushApi>["apiFetch"]) {
+  let page!: ReturnType<typeof render>;
+  await act(async () => { page = render(<NotificationsTabContent mailboxes={mailboxes} apiFetch={apiFetch} />, { wrapper }); });
+  return page;
+}
 
 beforeEach(() => { browser.permission = "default"; browser.nextPermission = "granted"; browser.subscription = null; browser.subscribeKeys = []; browser.nextEndpoint = ENDPOINT; });
 afterEach(() => {
@@ -128,7 +132,7 @@ describe("Notifications settings tab", () => {
   it("shows the not-configured state when the server has no VAPID keys", async () => {
     installBrowser();
     const { apiFetch, calls } = pushApi({ configured: false });
-    const page = mount(apiFetch);
+    const page = await mount(apiFetch);
     await page.findByText("Push-Benachrichtigungen sind auf diesem Server nicht eingerichtet.");
     expect(page.queryByRole("switch")).toBeNull();
     expect(calls.map(call => call.url)).toEqual(["/api/push/vapid-public-key"]);
@@ -137,7 +141,7 @@ describe("Notifications settings tab", () => {
   it("explains unsupported browsers and still lists other devices", async () => {
     installBrowser({ push: false });
     const { apiFetch } = pushApi({ devices: [device("synthetic-phone", IPHONE_UA)] });
-    const page = mount(apiFetch);
+    const page = await mount(apiFetch);
     await page.findByText("Dieser Browser unterstützt keine Push-Benachrichtigungen.");
     expect(page.getByText("Safari · iPhone")).toBeTruthy();
     expect(page.queryByRole("switch", { name: "Benachrichtigungen auf diesem Gerät" })).toBeNull();
@@ -145,7 +149,7 @@ describe("Notifications settings tab", () => {
 
   it("shows the home screen install steps on iOS Safari outside the installed app", async () => {
     installBrowser({ userAgent: IPHONE_UA, push: false });
-    const page = mount(pushApi().apiFetch);
+    const page = await mount(pushApi().apiFetch);
     await page.findByText("Zuerst zum Home-Bildschirm hinzufügen");
     expect(page.getByText("Tippe in Safari auf „Teilen“ (Quadrat mit Pfeil nach oben).")).toBeTruthy();
     expect(page.getByText("Wähle „Zum Home-Bildschirm“ und tippe auf „Hinzufügen“.")).toBeTruthy();
@@ -154,14 +158,14 @@ describe("Notifications settings tab", () => {
 
   it("offers the switch on iOS once the app runs from the home screen", async () => {
     installBrowser({ userAgent: IPHONE_UA, standalone: true });
-    const page = mount(pushApi().apiFetch);
+    const page = await mount(pushApi().apiFetch);
     await page.findByRole("switch", { name: "Benachrichtigungen auf diesem Gerät" });
     expect(page.queryByText("Zuerst zum Home-Bildschirm hinzufügen")).toBeNull();
   });
 
   it("explains a blocked permission", async () => {
     installBrowser(); browser.permission = "denied";
-    const page = mount(pushApi().apiFetch);
+    const page = await mount(pushApi().apiFetch);
     await page.findByText(/Benachrichtigungen sind für diese Seite blockiert/);
     expect(page.queryByRole("switch")).toBeNull();
   });
@@ -169,7 +173,7 @@ describe("Notifications settings tab", () => {
   it("subscribes this device after the permission prompt and posts it to the API", async () => {
     installBrowser();
     const { apiFetch, calls } = pushApi({ devices: [device("synthetic-phone", IPHONE_UA)] });
-    const page = mount(apiFetch);
+    const page = await mount(apiFetch);
     const toggle = await page.findByRole("switch", { name: "Benachrichtigungen auf diesem Gerät" });
     expect(toggle.getAttribute("aria-checked")).toBe("false");
     fireEvent.click(toggle);
@@ -185,7 +189,7 @@ describe("Notifications settings tab", () => {
   it("keeps the switch off when the permission prompt is dismissed", async () => {
     installBrowser(); browser.nextPermission = "default";
     const { apiFetch, calls } = pushApi();
-    const page = mount(apiFetch);
+    const page = await mount(apiFetch);
     fireEvent.click(await page.findByRole("switch", { name: "Benachrichtigungen auf diesem Gerät" }));
     await page.findByText("Die Berechtigung wurde nicht erteilt. Versuche es erneut und wähle „Erlauben“.");
     expect(browser.subscribeKeys).toEqual([]);
@@ -195,7 +199,7 @@ describe("Notifications settings tab", () => {
   it("edits the current device live and sends a test", async () => {
     installBrowser(); browser.permission = "granted"; browser.subscription = fakeSubscription(base64UrlToBytes(PUBLIC_KEY));
     const { apiFetch, calls } = pushApi({ devices: [device("synthetic-current", DESKTOP_UA), device("synthetic-phone", IPHONE_UA)] });
-    const page = mount(apiFetch);
+    const page = await mount(apiFetch);
     const settings = within(await page.findByRole("group", { name: "Einstellungen für Chrome · Linux" }));
     expect(page.getByText("Dieses Gerät")).toBeTruthy();
     // The load re-posted the existing subscription without settings, so the server keeps them.
@@ -230,7 +234,7 @@ describe("Notifications settings tab", () => {
 
   it("restores the previous settings when saving fails", async () => {
     installBrowser(); browser.permission = "granted"; browser.subscription = fakeSubscription(base64UrlToBytes(PUBLIC_KEY));
-    const page = mount(pushApi({ devices: [device("synthetic-current", DESKTOP_UA)], failPut: true }).apiFetch);
+    const page = await mount(pushApi({ devices: [device("synthetic-current", DESKTOP_UA)], failPut: true }).apiFetch);
     const settings = within(await page.findByRole("group", { name: "Einstellungen für Chrome · Linux" }));
     fireEvent.click(settings.getByRole("switch", { name: "Anzahl ungelesener E-Mails am App-Symbol" }));
     await page.findByText("Die Änderung ist fehlgeschlagen. Bitte versuche es erneut.");
@@ -240,7 +244,9 @@ describe("Notifications settings tab", () => {
   it("removes another device by id and this device by endpoint", async () => {
     installBrowser(); browser.permission = "granted"; const subscription = fakeSubscription(base64UrlToBytes(PUBLIC_KEY)); browser.subscription = subscription;
     const { apiFetch, calls } = pushApi({ devices: [device("synthetic-current", DESKTOP_UA), device("synthetic-phone", IPHONE_UA)] });
-    const page = mount(apiFetch);
+    const page = await mount(apiFetch);
+    // The foreign device can appear before the current-device subscription reconciliation.
+    await page.findByText("Dieses Gerät");
     fireEvent.click(await page.findByRole("button", { name: "Safari · iPhone entfernen" }));
     await waitFor(() => expect(page.queryByText("Safari · iPhone")).toBeNull());
     expect(calls.some(call => call.method === "DELETE" && call.url === "/api/push/subscriptions/synthetic-phone")).toBe(true);
@@ -257,7 +263,7 @@ describe("Notifications settings tab: devices the server no longer knows", () =>
   it("does not re-register a device removed elsewhere or owned by another user of this browser", async () => {
     installBrowser(); browser.permission = "granted"; browser.subscription = fakeSubscription(base64UrlToBytes(PUBLIC_KEY));
     const { apiFetch, calls } = pushApi({ devices: [device("synthetic-phone", IPHONE_UA)] });
-    const page = mount(apiFetch);
+    const page = await mount(apiFetch);
     await page.findByText("Safari · iPhone");
     const toggle = page.getByRole("switch", { name: "Benachrichtigungen auf diesem Gerät" });
     expect(toggle.getAttribute("aria-checked")).toBe("false");
@@ -278,7 +284,7 @@ describe("Notifications settings tab: VAPID key change", () => {
     installBrowser(); browser.permission = "granted"; browser.subscription = fakeSubscription(OLD_KEY); browser.nextEndpoint = ROTATED_ENDPOINT;
     const old = browser.subscription;
     const { apiFetch, calls } = pushApi({ devices: [device("synthetic-current", DESKTOP_UA)] });
-    const page = mount(apiFetch);
+    const page = await mount(apiFetch);
     await page.findByText("Dieses Gerät");
     expect(old.unsubscribed).toBe(true);
     expect(browser.subscribeKeys).toEqual([[4, 1, 2, 3, 4]]);
@@ -291,7 +297,7 @@ describe("Notifications settings tab: VAPID key change", () => {
   it("also names the old endpoint when switching on with a stale subscription", async () => {
     installBrowser(); browser.permission = "granted"; browser.subscription = fakeSubscription(OLD_KEY); browser.nextEndpoint = ROTATED_ENDPOINT;
     const { apiFetch, calls } = pushApi();
-    const page = mount(apiFetch);
+    const page = await mount(apiFetch);
     fireEvent.click(await page.findByRole("switch", { name: "Benachrichtigungen auf diesem Gerät" }));
     await page.findByText("Dieses Gerät");
     expect(calls.filter(call => call.method === "POST").map(call => (call.body as { previousEndpoint?: string }).previousEndpoint)).toEqual([ENDPOINT]);
@@ -303,7 +309,7 @@ describe("Notifications settings tab: quiet hours", () => {
     installBrowser(); browser.permission = "granted"; browser.subscription = fakeSubscription(base64UrlToBytes(PUBLIC_KEY));
     const quietHours = { from: "22:00", to: "07:00", timeZone: "Europe/Berlin" };
     const { apiFetch, calls } = pushApi({ devices: [device("synthetic-current", DESKTOP_UA, { ...defaults, quietHours })] });
-    const page = mount(apiFetch);
+    const page = await mount(apiFetch);
     const settings = within(await page.findByRole("group", { name: "Einstellungen für Chrome · Linux" }));
     const puts = () => calls.filter(call => call.method === "PUT");
 
@@ -359,7 +365,7 @@ describe("current device push settings (app badge)", () => {
     const count = () => { announced += 1; };
     window.addEventListener(PUSH_DEVICE_CHANGED_EVENT, count);
     try {
-      const page = mount(pushApi({ devices: [device("synthetic-current", DESKTOP_UA), device("synthetic-phone", IPHONE_UA)] }).apiFetch);
+      const page = await mount(pushApi({ devices: [device("synthetic-current", DESKTOP_UA), device("synthetic-phone", IPHONE_UA)] }).apiFetch);
       const settings = within(await page.findByRole("group", { name: "Einstellungen für Chrome · Linux" }));
       fireEvent.click(settings.getByRole("switch", { name: "Anzahl ungelesener E-Mails am App-Symbol" }));
       await page.findByText("Gespeichert.");

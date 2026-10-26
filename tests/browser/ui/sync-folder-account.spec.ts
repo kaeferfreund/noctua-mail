@@ -2,10 +2,11 @@ import { expect, test } from "@playwright/test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { totpFromUri } from "../../helpers/totp";
 
-test("create, self-grant and switch never sync the previous account's folder", async ({ page }) => {
-  test.skip(!process.env.SYNC_FOLDER_SEED_FILE, "Requires an isolated enrolled synthetic admin and dev fixture");
-  const seed = JSON.parse(readFileSync(process.env.SYNC_FOLDER_SEED_FILE!, "utf8"));
-  const base = process.env.SYNC_FOLDER_BASE_URL ?? "http://127.0.0.1:3845";
+test("create, immutable owner and switch never sync the previous account's folder", async ({ page }) => {
+  test.skip(!process.env.SYNC_FOLDER_SEED_FILE && !process.env.QA_SHELL_SEED_FILE, "Requires an isolated enrolled synthetic admin and dev fixture");
+  const seeded = JSON.parse(readFileSync((process.env.SYNC_FOLDER_SEED_FILE ?? process.env.QA_SHELL_SEED_FILE)!, "utf8"));
+  const seed = Array.isArray(seeded) ? seeded[0] : seeded;
+  const base = process.env.SYNC_FOLDER_BASE_URL ?? process.env.QA_SHELL_BASE_URL ?? "http://127.0.0.1:3845";
   const headers = { origin: new URL(base).origin };
   const login = await page.request.post("/api/ba/sign-in/email", { headers, data: { email: seed.email, password: seed.password } });
   expect(login.status()).toBe(200);
@@ -16,11 +17,14 @@ test("create, self-grant and switch never sync the previous account's folder", a
     const endpoint = { host: "127.0.0.1", secure: false, user: "demo@monkeydent.test", password: "demo" };
     const response = await page.request.post("/api/admin/accounts", { headers, data: {
       name: `Synthetic ${label} ${suffix}`, email: `sync-${label.toLowerCase()}-${suffix}@example.test`, avatar: "",
-      imap: { ...endpoint, port: 3846 }, smtp: { ...endpoint, port: 3848 }
+      imap: { ...endpoint, port: Number(process.env.QA_SHELL_IMAP_PORT ?? 3846) }, smtp: { ...endpoint, port: Number(process.env.QA_SHELL_SMTP_PORT ?? 3848) }
     } });
     expect(response.status()).toBe(201);
     const { account } = await response.json();
-    expect((await page.request.put(`/api/admin/accounts/${account.id}/members/${me.user.id}`, { headers, data: { role: "manager" } })).status()).toBe(200);
+    expect(account).toMatchObject({ ownerUserId: me.user.id, isOwner: true });
+    const selfGrant = await page.request.put(`/api/admin/accounts/${account.id}/members/${me.user.id}`, { headers, data: { role: "manager" } });
+    expect(selfGrant.status()).toBe(403);
+    expect(await selfGrant.json()).toMatchObject({ code: "owner_immutable" });
     return account;
   }
   const jobs: Array<{ accountId: string; folderId?: string; mode?: string }> = [];

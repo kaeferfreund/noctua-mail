@@ -8,9 +8,23 @@ import { useMobileOverlayHistory } from "@/app/hooks/useMobileOverlayHistory";
 import type { Message } from "@/lib/data";
 import { useMobileNavigation } from "@/app/hooks/useMobileNavigation";
 
-beforeEach(() => { (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL("http://localhost:4000/"); });
+type TestWindow = Window & { happyDOM: { setURL: (url: string) => void; waitUntilComplete: () => Promise<void> } };
+beforeEach(() => {
+  (window as unknown as TestWindow).happyDOM.setURL("http://localhost:4000/");
+  // Start on an empty entry and discard Forward entries left by the previous case.
+  // setURL alone preserves both history.state and the Forward stack.
+  window.history.pushState(null, "", "/");
+});
 const restores: Array<() => void> = [];
-afterEach(() => { cleanup(); restores.splice(0).forEach(fn => fn()); window.history.replaceState(null, "", "/"); });
+afterEach(async () => {
+  restores.splice(0).forEach(fn => fn());
+  // Unmount may request Back for a sheet; finish its popstate/timers before the next case.
+  await act(async () => {
+    cleanup();
+    await (window as unknown as TestWindow).happyDOM.waitUntilComplete();
+  });
+  window.history.replaceState(null, "", "/");
+});
 const message = { id: "imap-one", accountId: "a", folderId: "a:INBOX" } as Message;
 function Harness({ switcher, resolver, resolution, expired, deferFolder = false, notice = () => {}, onTransaction, accountIds = ["a", "b"], onForbidden }: {
   switcher?: (id: string) => Promise<void>; resolver?: (account: string, id: string, signal: AbortSignal) => Promise<Message | null>;

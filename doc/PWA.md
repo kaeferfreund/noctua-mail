@@ -50,8 +50,8 @@ the browser without installing.
   fallback) and posts `noctua:notification-open`, which MailClient resolves as a
   deep link; with no window open it opens the link.
 - `pushsubscriptionchange`: subscribes again with the previous VAPID key (or the
-  one from `/api/push/vapid-public-key`), registers the new endpoint and removes
-  the old one. The new device entry starts with default settings.
+  one from `/api/push/vapid-public-key`), registers the new endpoint with
+  `previousEndpoint` and removes the old one. The server carries over the old device settings.
 
 ## App icon badge
 
@@ -63,8 +63,8 @@ installed apps on iOS 16.4+, Chromium desktop and some Android launchers.
 ## iOS details
 
 - `appleWebApp` metadata in `app/layout.tsx` marks the app as home-screen
-  capable with the opaque `default` status bar. A translucent status bar or
-  `viewport-fit=cover` would need safe-area insets throughout the shell first.
+  capable with the opaque `default` status bar. `viewport-fit=cover` is enabled;
+  the shell uses safe-area insets, including the home-indicator bottom inset.
 - The touch icon (`/icons/apple-touch`, linked from `app/layout.tsx`) uses
   opaque, full-bleed art (`public/icons/apple-touch-180.png`) because iOS
   paints transparency black.

@@ -66,7 +66,7 @@ Evidence: N/app/api/accounts/[accountId]/imap/stream/route.ts:43–51 checks acc
 No Better Auth library session check can retroactively cancel this application ReadableStream.
 
 Change: §5.1 defines authStreams registration, per-sensitive-enqueue live authorization, post-commit
-close events, <=5s idle liveness, absolute expiry and resource cleanup; future per-user SSE reuses it.
+close events, <=5s idle liveness, session expiry and resource cleanup; future per-user SSE reuses it.
 Tests revoke an open stream's session/membership/generation or ban user, then deny subsequent data.
 Slice 3, Stage 3 integration.
 
@@ -107,15 +107,16 @@ Change: §4.3 checks invite existence/expiry/capacity including active reservati
 bootstrap role BEFORE any IMAP/SMTP/DNS work, then retains atomic recheck/reservation after network
 verification. Test invalid/expired/exhausted/wrong-person invites make zero outbound calls. Slice 5.
 
-### S7 — absolute age must survive session replacement: accepted
+### S7 — authentication time survives session replacement; lifetime policy superseded
 
 Evidence: BA/api/routes/update-user.mjs:161–177 verifies password and optionally replaces the session;
 BA/db/internal-adapter.mjs:286 stamps a new createdAt. TOTP activation also replaces a session at
 BA/plugins/two-factor/totp/index.mjs:209–213. createdAt cannot represent original authentication age.
 
 Change: §3.1.2/§4.1 sidecar authenticatedAt is captured at complete login/first-factor ceremony and
-preserved across cookie refresh, password/TOTP rotations and reauth. Guards expire at min(library
-expiresAt, authenticatedAt+24h). New complete login alone can restart age. Slices 2/4.
+preserved across cookie refresh, password/TOTP rotations and reauth. The original absolute-age
+policy was superseded on 2026-10-25: guards use the sliding library expiresAt (three days idle),
+with no authenticatedAt age limit. See doc/AUTHENTICATION.md.
 
 ### S8 — backup-code login lacks TOTP replacement authority: accepted
 

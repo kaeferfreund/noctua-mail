@@ -39,9 +39,21 @@ test("QA-003/009: create a 180-day token, reveal it once, refresh metadata, dism
   await menu(page, "Settings");
   await page.getByRole("tab", { name: "MCP", exact: true }).click();
   await page.getByPlaceholder("My MCP client").fill("Synthetic QA token");
-  const created = page.waitForResponse(response => response.url().endsWith("/mcp-tokens") && response.request().method() === "POST");
   await page.getByRole("button", { name: "Create token", exact: true }).click();
+  // Like reauthQa, use a fresh TOTP step: token creation spends an mcp.create grant.
+  const confirm = page.getByRole("dialog", { name: "Verify your identity", exact: true });
+  await expect(confirm).toBeVisible();
+  await page.waitForTimeout(30_000 - (Date.now() % 30_000) + 1000);
+  await confirm.getByLabel("Current password", { exact: true }).fill(seeds[0].password);
+  await confirm.getByLabel("Authenticator code", { exact: true }).fill(totpFromUri(seeds[0].totpURI));
+  const created = page.waitForResponse(response => response.url().endsWith("/mcp-tokens") && response.request().method() === "POST");
+  const proofResponse = page.waitForResponse(response => new URL(response.url()).pathname === "/api/auth/reauth");
+  await confirm.getByRole("button", { name: "Verify and continue", exact: true }).click();
+  const proof = await proofResponse;
+  expect(proof.status()).toBe(200);
+  expect(proof.request().postDataJSON().purpose).toBe("mcp.create");
   const response = await created, data = await response.json();
+  expect(response.request().headers()["x-noctua-reauth"]).toBeTruthy();
   expect(response.status()).toBe(201);
   // Default scope: the open mailbox only, drafts mode (McpTabContent).
   expect(response.request().postDataJSON()).toEqual({ label: "Synthetic QA token", ttlSeconds: 15552000, accountIds: ["qa-shared"], mode: "drafts" });
@@ -61,7 +73,8 @@ test("QA-003/009: create a 180-day token, reveal it once, refresh metadata, dism
 test("QA-004/009: pointer-operated members and confirmations stack above Admin; Escape removes one layer", async ({ page }) => {
   await menu(page, "Admin");
   await page.getByRole("button", { name: "Mailboxes", exact: true }).click();
-  const manage = page.getByRole("button", { name: "Manage members", exact: true });
+  const manage = page.locator("div.rounded-md.border").filter({ has: page.getByText("QA Shared", { exact: true }) })
+    .getByRole("button", { name: "Manage members", exact: true });
   await manage.click();
   const members = page.getByRole("dialog", { name: "Members of demo@monkeydent.test", exact: true });
   await members.getByLabel("Add existing enabled user").selectOption(seeds[1].id);

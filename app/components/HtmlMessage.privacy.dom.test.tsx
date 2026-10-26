@@ -10,6 +10,12 @@ import type { UserAccountPrefs } from "@/lib/data";
 const originalFetch = globalThis.fetch;
 const originalOpen = window.open;
 afterEach(() => { cleanup(); globalThis.fetch = originalFetch; window.open = originalOpen; });
+// Resolve the initial preference read before testing edits or a failed save.
+async function renderLoaded(ui: Parameters<typeof render>[0]) {
+  let view!: ReturnType<typeof render>;
+  await act(async () => { view = render(ui); });
+  return view;
+}
 const html = '<img width="200" height="100" src="https://images.example.test/photo"><img src="cid:logo">';
 
 for (const from of legacyUnkeyedSenders) {
@@ -69,7 +75,7 @@ test("notice, load once, message change and persisted sender choice", async () =
   }) as typeof fetch;
   const accountId = crypto.randomUUID();
   const props = { html, darkMode: false, accountId, senderKey: "sender@example.test", messageId: "newsletter" };
-  const view = render(<HtmlMessage {...props} />);
+  const view = await renderLoaded(<HtmlMessage {...props} />);
   const frame = view.getByTitle("HTML message") as HTMLIFrameElement;
   expect(frame.getAttribute("sandbox")).toBe("allow-same-origin");
   expect(frame.getAttribute("referrerpolicy")).toBe("no-referrer");
@@ -77,25 +83,25 @@ test("notice, load once, message change and persisted sender choice", async () =
   expect(frame.srcdoc).toContain("data-remote-src=");
   expect(frame.srcdoc).toContain('src="cid:logo"');
   fireEvent.click(view.getByRole("button", { name: "Load once" }));
-  expect(view.queryByText("Remote content blocked")).toBeNull();
+  expect(view.queryByText("Remote content blocked") === null).toBe(true);
   expect(frame.srcdoc).toContain('src="https://images.example.test/photo"');
   expect(requests.filter(r => r.body)).toHaveLength(0);
   expect(withRemoteContentDecision("/html", accountId, "newsletter")).toBe("/html?remoteContent=allow");
   view.rerender(<HtmlMessage {...props} messageId="other" />);
   expect(withRemoteContentDecision("/html", accountId, "newsletter")).toBe("/html");
   expect(view.getByText("Remote content blocked")).toBeTruthy();
-  fireEvent.click(view.getByRole("button", { name: "Always load from this sender" }));
-  await waitFor(() => expect(view.queryByText("Remote content blocked")).toBeNull());
+  await act(async () => { fireEvent.click(view.getByRole("button", { name: "Always load from this sender" })); });
+  await waitFor(() => expect(view.queryByText("Remote content blocked") === null).toBe(true));
   expect(JSON.parse(requests.find(r => r.body)!.body!)).toEqual({ remoteContent: { allowedSenders: { "sender@example.test": true } } });
   view.unmount();
-  const reopened = render(<HtmlMessage {...props} messageId="third" />);
-  await waitFor(() => expect(reopened.queryByText("Remote content blocked")).toBeNull());
+  const reopened = await renderLoaded(<HtmlMessage {...props} messageId="third" />);
+  await waitFor(() => expect(reopened.queryByText("Remote content blocked") === null).toBe(true));
 }, 20_000);
 
 test("a failed preference save stays blocked and exposes a retry message", async () => {
   globalThis.fetch = (async (_url: unknown, init?: RequestInit) => init?.method === "PUT" ? new Response("", { status: 500 }) : Response.json({ prefs: {} })) as typeof fetch;
-  const view = render(<HtmlMessage html={html} darkMode={false} accountId={crypto.randomUUID()} senderKey="sender@example.test" />);
-  fireEvent.click(view.getByRole("button", { name: "Always load from this sender" }));
+  const view = await renderLoaded(<HtmlMessage html={html} darkMode={false} accountId={crypto.randomUUID()} senderKey="sender@example.test" />);
+  await act(async () => { fireEvent.click(view.getByRole("button", { name: "Always load from this sender" })); });
   await waitFor(() => expect(view.getByRole("alert").textContent).toContain("could not be saved"));
   expect(view.getByText("Remote content blocked")).toBeTruthy();
 });
@@ -106,9 +112,9 @@ test("sender permission reads and writes the real mailbox rather than quoted dis
     if (init?.method === "PUT") saved = JSON.parse(String(init.body));
     return Response.json({ prefs: { remoteContent: { allowedSenders: { "trusted@example.test": true } } } });
   }) as typeof fetch;
-  const view = render(<HtmlMessage html={html} darkMode={false} accountId={crypto.randomUUID()} senderKey="actual@example.test" />);
+  const view = await renderLoaded(<HtmlMessage html={html} darkMode={false} accountId={crypto.randomUUID()} senderKey="actual@example.test" />);
   await waitFor(() => expect(view.getByText("Remote content blocked")).toBeTruthy());
-  fireEvent.click(view.getByRole("button", { name: "Always load from this sender" }));
+  await act(async () => { fireEvent.click(view.getByRole("button", { name: "Always load from this sender" })); });
   await waitFor(() => expect(saved).toEqual({ remoteContent: { allowedSenders: { "actual@example.test": true } } }));
 });
 

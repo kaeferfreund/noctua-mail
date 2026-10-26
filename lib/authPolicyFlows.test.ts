@@ -187,8 +187,10 @@ describe("HTTP assurance and purpose-bound factors",()=>{
     await enroll(f,next);
     expect((await source(f,next)).assurance).toBe("mfa");
   });
-  test("each activation write/finalizer fault reconciles and permits fresh enrollment",async()=>{
-    for(const boundary of ["flag","session","verified","finalizer"]) {
+  // Each boundary performs a complete enrollment/recovery flow with real password hashing.
+  // Keep independent cases within the default test budget without reducing coverage.
+  for(const boundary of ["flag","session","verified","finalizer"]) {
+    test(`activation ${boundary} fault reconciles and permits fresh enrollment`,async()=>{
       const f=await fixture(),jar=await login(f,f.user.email);
       const grant=await proof(f,jar,{purpose:"totp.enroll",currentPassword:password});
       const enabled=await http(f,jar,"/two-factor/enable",{password},grant.grant);
@@ -215,8 +217,8 @@ describe("HTTP assurance and purpose-bound factors",()=>{
       } else expect((await source(f,next)).assurance).toBe("setup");
       await enroll(f,next);
       expect((await source(f,next)).assurance).toBe("mfa");
-    }
-  });
+    });
+  }
   test("backup regeneration binds session, expires and is consumed once; revokes old codes",async()=>{
     const f=await enrolled();
     const a=await source(f,f.jar),other=await login(f,f.user.email);

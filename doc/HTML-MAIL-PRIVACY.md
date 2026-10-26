@@ -27,7 +27,8 @@ normalization policy.
 
 The additive account-shard migration adds nullable `messages.senderKey TEXT`
 and `messages.sourceSha256 TEXT`
-without changing `PRAGMA user_version` or the shard v2 key/guard contract.
+without itself changing `PRAGMA user_version`. The current shard format is v3
+with composite ownership, stable FTS identities and v3 writer guards (see STORAGE.md).
 Existing rows start with NULL: no identity is recovered from legacy display
 strings, which may have lost quotes, spaces or special characters.
 Opening a message (including thread readers and standalone HTML) lazily fills

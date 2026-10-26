@@ -9,7 +9,7 @@ This document explains runtime storage from an operator/deployment perspective:
 
 - Base path: `NOCTUA_DATA_DIR` (if set), otherwise `../noctua-data` relative to repo root.
 - Main subpaths:
-  - `mail.db` (master SQLite DB)
+  - `db/main.db` (master SQLite DB)
   - `db/accounts/<accountId>.db` (per-account SQLite shards)
   - `sources/<accountId>/<messageId>.eml` (raw message source cache)
   - `attachments/<accountId>/<messageId>/<attachmentId>.bin` (attachment binary cache)
@@ -19,27 +19,27 @@ Path segments are `encodeURIComponent(...)` encoded.
 
 ## What Is Stored Where
 
-### `mail.db` (master DB, critical)
+### `db/main.db` (master DB, critical)
 
 Contains control-plane and identity data:
 - `accounts` (account definitions, IMAP/SMTP connection config, `dbPath`)
-- `users`
-- `user_accounts`
+- `users` (application profiles), `auth_*` (Better Auth credentials, factors, sessions and policy state)
+- `user_accounts`, `user_account_prefs`, `admin_audit`, `mcp_tokens`, `mcp_token_accounts`
 - `invite_codes`
 - `domain_icons` (one row per domain with an uploaded icon: byte hash, size, updatedAt, updatedByUserId;
   the PNG itself lives in `domain-icons/`. Back both up together. A row without its file falls
   back to the favicon; a file without its row is never served. The sender-icon route serves an
   upload only for domains of mailboxes the caller can open.)
 
-Depending on `IMAP_CREDENTIALS_STORAGE`, encrypted IMAP/SMTP passwords may also be stored here:
-- `db`: credentials in DB
-- `both`: credentials in DB and session cookie
-- `cookie`: credentials not persisted in DB
+Encrypted IMAP/SMTP passwords are stored here. `IMAP_CREDENTIALS_STORAGE=db` is the default;
+`both` is a deprecated DB-only alias. `cookie` is rejected at startup. Sessions and MCP tokens
+carry no mailbox passwords. Back up the independent `IMAP_SECRET_KEY` and `BETTER_AUTH_SECRET`
+with the databases.
 
 ### `db/accounts/<accountId>.db` (account shard DB, important)
 
 Contains per-account operational and user-facing mail state:
-- `folders`, `messages`, `threads`, `mailbox_state`, `message_fts_v2`
+- `folders`, `messages`, `threads`, `mailbox_state`, `message_fts_v3`
 - attachment metadata (`attachments`)
 - reminder definitions (`calendar_reminders`)
 - categorization state and learning:
@@ -50,22 +50,23 @@ Contains per-account operational and user-facing mail state:
 Several accounts may map to one physical shard via `accounts.dbPath`. Message
 and thread identities include `accountId`; attachments, translations and calendar
 message links use the same composite ownership. Source and attachment cache paths
-remain account scoped. Format 2 (`PRAGMA user_version = 2`) is migrated at first
+remain account scoped. Format 3 (`PRAGMA user_version = 3`) is migrated at first
 open in one immediate transaction with the composite-key/FTS rebuild and writer
 guards. It preserves surviving data, indexes and custom triggers, checks foreign
 keys, and rolls back on failure. Repeated initialization is idempotent.
 
 BEFORE INSERT/UPDATE/DELETE triggers on every ordinary account-scoped table
-require `noctua_writer_v2()`, registered per connection by `configureAccountDb`
+require `noctua_writer_v3()`, registered per connection by `configureAccountDb`
 before writes (also by explicit schema initialization). A legacy connection fails
-at statement preparation with `no such function: noctua_writer_v2`. SQLite does
+at statement preparation with `no such function: noctua_writer_v3`. SQLite does
 not allow persistent triggers to refer to TEMP tables or triggers on virtual/FTS
-shadow tables. Accordingly, the physical FTS table is `message_fts_v2`, and the
-old `message_fts` name is reserved as a read-only view: legacy FTS mutations fail
+shadow tables. Accordingly, the physical FTS table is `message_fts_v3`, and the
+old `message_fts` and `message_fts_v2` names are reserved as read-only views: legacy FTS mutations fail
 with `cannot modify message_fts because it is a view`. Old reads may work or fail.
 The current binary rejects shard versions newer than its supported format before
 configuration/schema writes. Raw maintenance writers must use the common shard
-connection configuration and the current FTS name.
+connection configuration and the current FTS name. `message_fts_identity` supplies stable integer
+rowids for `(accountId, messageId)`; a plain `REPLACE` of FTS rows must not allocate a new identity.
 
 Upgrade procedure:
 
@@ -118,11 +119,12 @@ These files are performance/availability cache for message rendering and downloa
 
 ## Loss Impact (What Users Lose)
 
-### If `mail.db` is lost
+### If `db/main.db` is lost
 
 Users lose:
 - account definitions and account-to-user assignments
-- application users and invite codes
+- application users, invite codes, credentials, MFA factors, sessions and MCP tokens
+- personal mailbox preferences and administration audit history
 - IMAP/SMTP passwords stored in DB (`IMAP_CREDENTIALS_STORAGE=db|both`)
 
 Operational impact:
@@ -136,6 +138,7 @@ Users lose local state for that account:
 - folder/mailbox sync cursors (`mailbox_state`)
 - reminders (`calendar_reminders`)
 - all categorization values and learned categorization model/feedback
+- topics/learning, thread collaboration, notes/activity, sender attribution and local calendar state
 
 Not lost:
 - canonical mailbox content on the upstream IMAP server
@@ -174,7 +177,7 @@ Canonical IMAP mailbox content is not deleted by this, but full re-onboarding an
 ## Backup Priority
 
 Recommended backup priority:
-1. `mail.db` (highest)
+1. `db/main.db` (highest)
 2. `db/accounts/*.db` (high)
 3. `sources/` and `attachments/` (optional cache, lower priority)
 

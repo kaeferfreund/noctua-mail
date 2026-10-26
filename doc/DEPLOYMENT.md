@@ -335,6 +335,12 @@ reclaiming a stopped worker lease and resuming the same interrupted durable iden
 
 ## Storage Requirements & Architecture
 
+Account shards use format 3 (`PRAGMA user_version=3`), `message_fts_v3` and the
+`message_fts_identity` map. Before upgrading older shards, stop every writer and
+take a coordinated backup of master, shards, files and keys; see [Storage](STORAGE.md).
+Opening a shard performs the atomic upgrade. An older binary requires restoring
+the complete backup; dropping guards or lowering user_version is unsupported.
+
 ### Database Architecture
 
 Noctua Mail uses a **master + sharded database architecture**:
