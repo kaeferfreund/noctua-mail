@@ -56,6 +56,8 @@ import {
   removeThreadTopic
 } from "@/lib/topics";
 import { listRecipientAliases } from "@/lib/recipientAliases";
+import { readAuthEnv } from "@/lib/betterAuth";
+import { appDeepLink, messageDeepLink, type DeepLinkState } from "@/lib/navigation/deepLinks";
 import {
   AI_MODIFIED_FLAG,
   DONE_FLAG,
@@ -113,6 +115,8 @@ type MessageListResult = {
 const ACCOUNT_ID_ARG = {
   accountId: z.string().trim().optional()
 };
+
+const URL_OUTPUT = z.string().describe("Absolute Noctua Mail link that opens this item for the user.");
 
 const LIST_MESSAGES_BY_FOLDER_SCHEMA = {
   ...ACCOUNT_ID_ARG,
@@ -270,7 +274,7 @@ const FOLDER_SCHEMA = {
 
 const LIST_FOLDERS_OUTPUT_SCHEMA = {
   ok: z.boolean(),
-  folders: z.array(z.object(FOLDER_SCHEMA))
+  folders: z.array(z.object({ ...FOLDER_SCHEMA, url: URL_OUTPUT }))
 };
 
 const ACCOUNT_SUMMARY_SCHEMA = {
@@ -278,7 +282,8 @@ const ACCOUNT_SUMMARY_SCHEMA = {
   name: z.string(),
   email: z.string(),
   avatar: z.string(),
-  accessRole: z.enum(["viewer", "editor", "manager"])
+  accessRole: z.enum(["viewer", "editor", "manager"]),
+  url: URL_OUTPUT
 };
 
 const LIST_ACCOUNTS_OUTPUT_SCHEMA = {
@@ -304,7 +309,8 @@ const MAILING_LIST_ALIAS_SCHEMA = {
 
 const LIST_MAILING_LIST_ALIASES_OUTPUT_SCHEMA = {
   ok: z.boolean(),
-  aliases: z.array(z.object(MAILING_LIST_ALIAS_SCHEMA))
+  aliases: z.array(z.object(MAILING_LIST_ALIAS_SCHEMA)),
+  url: URL_OUTPUT
 };
 
 const SEARCH_RESULT_TOPIC_SCHEMA = {
@@ -359,7 +365,8 @@ const SEARCH_RESULT_MESSAGE_SCHEMA = {
   threadSortDateValue: z.number().optional(),
   topics: z.array(z.object(SEARCH_RESULT_TOPIC_SCHEMA)).optional(),
   topicSuggestions: z.array(z.object(SEARCH_RESULT_TOPIC_SCHEMA)).optional(),
-  collab: z.object({ status: z.enum(["open", "in_progress", "waiting", "closed"]), assigneeUserId: z.string().nullable(), commentCount: z.number(), updatedAt: z.number() }).optional()
+  collab: z.object({ status: z.enum(["open", "in_progress", "waiting", "closed"]), assigneeUserId: z.string().nullable(), commentCount: z.number(), updatedAt: z.number() }).optional(),
+  url: URL_OUTPUT.optional()
 };
 
 const SEARCH_RESULT_GROUP_SCHEMA = {
@@ -477,7 +484,67 @@ function buildToolResult(summary: string, structuredContent: Record<string, unkn
   };
 }
 
-function formatFolderListContent(folders: Folder[]) {
+/** Result links use the canonical auth origin: the only origin at which the user can sign in. */
+function appUrl(state: Partial<DeepLinkState>) {
+  return appDeepLink(state, readAuthEnv().baseURL);
+}
+
+/** Opens the message (and its thread) in the reader; a draft opens from the Drafts folder. */
+function messageUrl(message: { accountId: string; id: string; folderId: string }) {
+  return messageDeepLink(message, readAuthEnv().baseURL);
+}
+
+function settingsUrl(accountId: string, settings: DeepLinkState["settings"]) {
+  return appUrl({ accountId, settings });
+}
+
+/** Thread links open the given message, otherwise the thread's newest message. */
+async function threadUrl(accountId: string, target: { threadId: string; messageId?: string }) {
+  const message = target.messageId
+    ? await getMessageById(accountId, target.messageId)
+    : (await listThreadMessages({ accountId, threadIds: [target.threadId], groupBy: "date" })).items
+      .reduce<Message | null>((newest, item) => !newest || item.dateValue > newest.dateValue ? item : newest, null);
+  return message ? messageUrl(message) : appUrl({ accountId });
+}
+
+function withLink(summary: string, url: string | null | undefined) {
+  return url ? `${summary}\nOpen in Noctua Mail: ${url}` : summary;
+}
+
+function withMessageUrls<T extends Message>(items: T[]) {
+  return items.map(item => ({ ...item, url: messageUrl(item) }));
+}
+
+function formatMessageListContent(result: Omit<MessageListResult, "items"> & { items: (Message & { url: string })[] }) {
+  return [buildSummary(result), ...result.items.map(item => `- ${JSON.stringify(item.subject)} id=${item.id}: ${item.url}`)].join("\n");
+}
+
+const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true } as const;
+const IDEMPOTENT_CHANGE = { readOnlyHint: false, destructiveHint: false, idempotentHint: true } as const;
+const ADDITIVE_CHANGE = { readOnlyHint: false, destructiveHint: false, idempotentHint: false } as const;
+const DESTRUCTIVE_CHANGE = { readOnlyHint: false, destructiveHint: true, idempotentHint: false } as const;
+
+export const MCP_SERVER_INFO = {
+  name: "noctua-mail",
+  title: "Noctua Mail",
+  version: "1.1.0",
+  description: "The user's e-mail: personal and shared mailboxes in Noctua Mail."
+};
+
+export const MCP_SERVER_INSTRUCTIONS = [
+  "Noctua Mail is the user's own e-mail client. These tools act on the user's personal and shared mailboxes:",
+  "read, search and list messages, write drafts (new mail, replies, forwards), flag messages and track to-dos/done,",
+  "collaborate on threads (status, assignee, internal comments), and manage sender identities and signatures.",
+  "Use these tools whenever the user asks to write, answer, forward, find, summarise, organise or triage e-mail,",
+  "or mentions a mailbox, folder, sender, message or thread. Use the real mailbox data instead of answering from memory.",
+  "Typical flow: list_accounts -> search_messages or list_messages_by_folder -> get details -> create_draft_message",
+  "(mode reply/forward with messageId) or update_draft_message to revise an existing draft in place.",
+  "Drafts are never sent by these tools: the user reviews and sends them in Noctua Mail.",
+  "Every created, changed or listed item comes back with a `url`; give that link to the user so they can open it directly.",
+  "accountId selects the mailbox; omit it to use the token's own mailbox, and take other ids from list_accounts."
+].join("\n");
+
+function formatFolderListContent(folders: (Folder & { url: string })[]) {
   if (folders.length === 0) {
     return "Returned 0 folders.";
   }
@@ -491,7 +558,7 @@ function formatFolderListContent(folders: Folder[]) {
     if (folder.parentId) parts.push(`parentId=${folder.parentId}`);
     if (typeof folder.unreadCount === "number") parts.push(`unread=${folder.unreadCount}`);
     parts.push(`count=${folder.count}`);
-    return `- ${parts.join(" ")}`;
+    return `- ${parts.join(" ")}: ${folder.url}`;
   });
 
   return [`Returned ${folders.length} folders:`, ...lines].join("\n");
@@ -692,7 +759,8 @@ async function updateTodoState(
     messageId,
     flags: finalFlags,
     changed,
-    state: targetState
+    state: targetState,
+    url: messageUrl(message)
   };
 }
 
@@ -911,7 +979,8 @@ async function createDraftMessage(
     referenceMessageId: args.messageId?.trim() || null,
     identityId: result.identityId,
     draftId: result.draftId,
-    message
+    message,
+    url: message ? messageUrl(message) : null
   };
 }
 
@@ -937,7 +1006,8 @@ async function updateDraftMessage(context: McpAccountContext, args: DraftUpdateP
     draftId: result.draftId,
     previousDraftId: existing.id,
     draftIdChanged: result.draftId !== existing.id,
-    message
+    message,
+    url: message ? messageUrl(message) : null
   };
 }
 
@@ -956,7 +1026,7 @@ async function listDraftMessages(context: McpAccountContext, args: { page?: numb
     groupBy: "date"
   });
   const drafts = data.items.map(item => ({ draftId: item.id, subject: item.subject, to: item.to ?? "", cc: item.cc ?? "",
-    updatedAt: item.dateValue, editable: hasMessageFlag(item.flags, "\\Draft") }));
+    updatedAt: item.dateValue, editable: hasMessageFlag(item.flags, "\\Draft"), url: messageUrl(item) }));
   return { ok: true, folderId: draftsFolder.id, drafts, total: data.total ?? drafts.length, hasMore: data.hasMore ?? false, page, pageSize };
 }
 
@@ -1084,30 +1154,24 @@ export async function executeMcpHttpRequest(params: {
     requestInfo: params.requestInfo
   };
 
-  const server = new McpServer(
-    {
-      name: "mywebmail-mcp",
-      version: "1.0.1"
-    },
-    {
-      capabilities: {
-        tools: {}
-      }
-    }
-  );
+  const server = new McpServer(MCP_SERVER_INFO, { capabilities: { tools: {} }, instructions: MCP_SERVER_INSTRUCTIONS });
 
   server.registerTool(
     "list_accounts",
     {
-      description: "List only mailboxes covered by this token with current mailbox roles.",
+      title: "List mailboxes",
+      description:
+        "List the user's e-mail mailboxes (personal and shared) that this connection can use, with the user's role in each. Start here to get the accountId of a mailbox; each entry links to its inbox.",
       inputSchema: ACCOUNT_ID_ARG,
+      annotations: READ_ONLY,
       outputSchema: LIST_ACCOUNTS_OUTPUT_SCHEMA
     },
     async ({ accountId }) => {
       if (accountId) await resolveAccountContext(context, accountId);
       const accounts = await listMcpTokenAccounts(context.tokenRecord.id);
-      const summaries = accounts.map(({ account: { id, name, email, avatar }, role }) => ({ id, name, email, avatar, accessRole: role }));
-      return buildToolResult(`Returned ${summaries.length} accounts.`, {
+      const summaries = accounts.map(({ account: { id, name, email, avatar }, role }) => ({ id, name, email, avatar, accessRole: role, url: appUrl({ accountId: id }) }));
+      return buildToolResult([`Returned ${summaries.length} accounts.`,
+        ...summaries.map(item => `- ${JSON.stringify(item.name)} <${item.email}> id=${item.id} role=${item.accessRole}: ${item.url}`)].join("\n"), {
         ok: true,
         accounts: summaries
       });
@@ -1117,14 +1181,17 @@ export async function executeMcpHttpRequest(params: {
   server.registerTool(
     "list_mailbox_summary",
     {
-      description: "Read unread, assigned-to-me and unassigned-open counts for the token's accessible mailbox. Counts use the token creator as viewer.",
+      title: "Mailbox overview",
+      description:
+        "Show how much needs attention in a mailbox: unread messages, threads assigned to the user and unassigned open threads. Counts are for the user who created this connection.",
       inputSchema: ACCOUNT_ID_ARG,
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+      annotations: READ_ONLY,
       outputSchema: {
         ok: z.literal(true), generatedAt: z.number(), mailboxes: z.array(z.object({
           accountId: z.string(), name: z.string(), email: z.string(), accessRole: z.enum(["viewer", "editor", "manager"]),
           isOwner: z.boolean(), shared: z.boolean(), unread: z.number().nullable(), assignedToMe: z.number(), unassignedOpen: z.number(),
-          watcher: z.object({ state: z.enum(["disabled", "starting", "idling", "backoff", "auth_failed", "stopped"]), lastEventAt: z.number().optional() })
+          watcher: z.object({ state: z.enum(["disabled", "starting", "idling", "backoff", "auth_failed", "stopped"]), lastEventAt: z.number().optional() }),
+          url: URL_OUTPUT
         }))
       }
     },
@@ -1132,20 +1199,25 @@ export async function executeMcpHttpRequest(params: {
       const live = await resolveAccountContext(context, accountId);
       const summary = await getUserMailboxSummary(live.tokenRecord.createdByUserId, [live.accountId]);
       await resolveAccountContext(context, accountId);
-      return buildToolResult(`Returned ${summary.mailboxes.length} mailbox summaries.`, summary);
+      const mailboxes = summary.mailboxes.map(mailbox => ({ ...mailbox, url: appUrl({ accountId: mailbox.accountId }) }));
+      return buildToolResult([`Returned ${mailboxes.length} mailbox summaries.`, ...mailboxes.map(item => `- ${item.email}: ${item.url}`)].join("\n"),
+        { ...summary, mailboxes });
     }
   );
 
   server.registerTool(
     "list_folders",
     {
-      description: "List folders for the authenticated account.",
+      title: "List folders",
+      description:
+        "List the folders of a mailbox (Inbox, Sent, Drafts, Archive, custom folders) with message and unread counts. Use a folder id with list_messages_by_folder or search_messages.",
       inputSchema: ACCOUNT_ID_ARG,
+      annotations: READ_ONLY,
       outputSchema: LIST_FOLDERS_OUTPUT_SCHEMA
     },
     async ({ accountId: requestedAccountId }) => {
       const ctx = await resolveAccountContext(context, requestedAccountId);
-      const folders = await getFolders(ctx.accountId);
+      const folders = (await getFolders(ctx.accountId)).map(folder => ({ ...folder, url: appUrl({ accountId: ctx.accountId, folderId: folder.id }) }));
       return buildToolResult(formatFolderListContent(folders), {
         ok: true,
         folders
@@ -1153,16 +1225,22 @@ export async function executeMcpHttpRequest(params: {
     }
   );
 
-  server.tool(
+  server.registerTool(
     "list_topics",
-    "List topics for the authenticated account.",
-    ACCOUNT_ID_ARG,
+    {
+      title: "List topics",
+      description: "List the topics (labels) defined in a mailbox. Use topic ids or names with search_messages, assign_topics and unassign_topics.",
+      inputSchema: ACCOUNT_ID_ARG,
+      annotations: READ_ONLY
+    },
     async ({ accountId: requestedAccountId }) => {
       const ctx = await resolveAccountContext(context, requestedAccountId);
       const topics = await listTopics(ctx.accountId);
-      return buildToolResult(`Returned ${topics.length} topics.`, {
+      const url = settingsUrl(ctx.accountId, "topics");
+      return buildToolResult(withLink(`Returned ${topics.length} topics.`, url), {
         ok: true,
-        topics
+        topics,
+        url
       });
     }
   );
@@ -1170,25 +1248,34 @@ export async function executeMcpHttpRequest(params: {
   server.registerTool(
     "list_mailing_list_aliases",
     {
+      title: "List recipient aliases",
       description:
-        "List saved mailing list aliases for the authenticated account. Each alias includes its display name and the expanded recipient list that will be inserted during compose.",
+        "List the saved recipient aliases (mailing lists) of a mailbox. Each alias has a display name and the recipient list it expands to when writing an e-mail.",
       inputSchema: LIST_MAILING_LIST_ALIASES_SCHEMA,
+      annotations: READ_ONLY,
       outputSchema: LIST_MAILING_LIST_ALIASES_OUTPUT_SCHEMA
     },
     async ({ accountId: requestedAccountId }) => {
       const ctx = await resolveAccountContext(context, requestedAccountId);
       const aliases = await listRecipientAliases(ctx.accountId);
-      return buildToolResult(`Returned ${aliases.length} mailing list aliases.`, {
+      const url = settingsUrl(ctx.accountId, "recipient-aliases");
+      return buildToolResult(withLink(`Returned ${aliases.length} mailing list aliases.`, url), {
         ok: true,
-        aliases
+        aliases,
+        url
       });
     }
   );
 
-  server.tool(
+  server.registerTool(
     "check_new_mail",
-    "Check for new mail and sync any folders with new messages. Waits for sync to complete before returning.",
-    ACCOUNT_ID_ARG,
+    {
+      title: "Check for new mail",
+      description:
+        "Fetch new e-mail from the mail server now and wait until the affected folders are synced. Use before searching when the user expects a message that just arrived.",
+      inputSchema: ACCOUNT_ID_ARG,
+      annotations: { ...READ_ONLY, openWorldHint: true }
+    },
     async ({ accountId: requestedAccountId }) => {
       const ctx = await resolveAccountContext(context, requestedAccountId);
       const result = await runNewMailCheck(ctx.account, ctx.accountId, `mcp:${ctx.tokenRecord.id}`);
@@ -1196,176 +1283,211 @@ export async function executeMcpHttpRequest(params: {
         result.foldersWithNewMail > 0
           ? `Synced ${result.foldersWithNewMail} folder(s) with new mail (checked ${result.foldersChecked}).${result.timedOut ? " Warning: timed out before all jobs completed." : ""}`
           : `No new mail found (checked ${result.foldersChecked} folder(s)).`;
-      return buildToolResult(summary, result as unknown as Record<string, unknown>);
+      const url = appUrl({ accountId: ctx.accountId });
+      return buildToolResult(withLink(summary, url), { ...result, url } as unknown as Record<string, unknown>);
     }
   );
 
-  server.tool(
+  server.registerTool(
     "list_messages_by_folder",
-    "List lightweight message rows for one folder.",
-    LIST_MESSAGES_BY_FOLDER_SCHEMA,
-    async (args: {
-      accountId?: string;
-      folderId: string;
-      page?: number;
-      pageSize?: number;
-      groupBy?: string;
-      badges?: string[];
-      attachmentsOnly?: boolean;
-      excludedFolderIds?: string[];
-    }) => {
+    {
+      title: "List messages in a folder",
+      description:
+        "List the e-mails in one folder of a mailbox, newest first, e.g. the inbox or the sent folder. Each message comes with a link that opens it. Use search_messages to find specific mail.",
+      inputSchema: LIST_MESSAGES_BY_FOLDER_SCHEMA,
+      annotations: READ_ONLY
+    },
+    async (args) => {
       const ctx = await resolveAccountContext(context, args.accountId);
-      const result = await listMessagesForFolder(ctx, args);
-      return buildToolResult(buildSummary(result), result as unknown as Record<string, unknown>);
+      const listed = await listMessagesForFolder(ctx, args);
+      const result = { ...listed, items: withMessageUrls(listed.items) };
+      return buildToolResult(formatMessageListContent(result), result as unknown as Record<string, unknown>);
     }
   );
 
   server.registerTool(
     "search_messages",
     {
+      title: "Find e-mails",
       description:
-        "Search messages using standard, related, or thread-related modes. Standard mode supports query, topic, sender, recipient, participant, folder, badge, attachment, pagination, and grouping filters.",
+        "Find e-mails by text, sender, recipient, subject, date, topic, folder or badge (unread, flagged, to-do, attachments …) in a mailbox. Also finds related messages or all messages of a thread. Each result comes with a link that opens the message.",
       inputSchema: SEARCH_MESSAGES_SCHEMA,
+      annotations: READ_ONLY,
       outputSchema: SEARCH_MESSAGES_OUTPUT_SCHEMA
     },
     async (args) => {
       const ctx = await resolveAccountContext(context, args.accountId);
-      const result = await searchMessages(ctx, args);
-      return buildToolResult(buildSummary(result), result as unknown as Record<string, unknown>);
+      const found = await searchMessages(ctx, args);
+      const result = { ...found, items: withMessageUrls(found.items) };
+      return buildToolResult(formatMessageListContent(result), result as unknown as Record<string, unknown>);
     }
   );
 
-  server.tool(
+  server.registerTool(
     "assign_topics",
-    "Assign one or more topics to a thread, resolved by threadId or messageId.",
-    TOPIC_MUTATION_SCHEMA,
-    async (args: { accountId?: string; threadId?: string; messageId?: string; topics: string[] }) => {
+    {
+      title: "Add topics to a thread",
+      description: "Label an e-mail conversation with one or more topics. The thread is selected by threadId or by one of its messageIds.",
+      inputSchema: TOPIC_MUTATION_SCHEMA,
+      annotations: IDEMPOTENT_CHANGE
+    },
+    async (args) => {
       const ctx = await resolveAccountContext(context, args.accountId, "editor");
       const result = await updateThreadTopics(ctx, args, "assign");
-      return buildToolResult(`Assigned ${args.topics.length} topics to thread ${result.threadId}.`, result);
+      const url = await threadUrl(ctx.accountId, { threadId: result.threadId, messageId: args.messageId?.trim() || undefined });
+      return buildToolResult(withLink(`Assigned ${args.topics.length} topics to thread ${result.threadId}.`, url), { ...result, url });
     }
   );
 
-  server.tool(
+  server.registerTool(
     "unassign_topics",
-    "Remove one or more topics from a thread, resolved by threadId or messageId.",
-    TOPIC_MUTATION_SCHEMA,
-    async (args: { accountId?: string; threadId?: string; messageId?: string; topics: string[] }) => {
+    {
+      title: "Remove topics from a thread",
+      description: "Remove one or more topic labels from an e-mail conversation. The thread is selected by threadId or by one of its messageIds.",
+      inputSchema: TOPIC_MUTATION_SCHEMA,
+      annotations: IDEMPOTENT_CHANGE
+    },
+    async (args) => {
       const ctx = await resolveAccountContext(context, args.accountId, "editor");
       const result = await updateThreadTopics(ctx, args, "unassign");
-      return buildToolResult(`Removed ${args.topics.length} topics from thread ${result.threadId}.`, result);
+      const url = await threadUrl(ctx.accountId, { threadId: result.threadId, messageId: args.messageId?.trim() || undefined });
+      return buildToolResult(withLink(`Removed ${args.topics.length} topics from thread ${result.threadId}.`, url), { ...result, url });
     }
   );
 
   server.registerTool("create_draft_message", {
-    description: `Create a draft message. Supports new drafts, replies, and forwards. identityId selects an enabled sender in this mailbox. To change an existing draft use update_draft_message. ${DRAFT_EDIT_HINT}`,
+    title: "Write an e-mail (draft)",
+    description: `Write an e-mail: create a draft (new message, reply or forward) in the user's mailbox. For a reply or forward pass mode and the messageId of the original. The user reviews and sends the draft in Noctua Mail; nothing is sent by this tool. The result includes a link that opens the draft. identityId selects an enabled sender identity of this mailbox. To change an existing draft use update_draft_message. ${DRAFT_EDIT_HINT}`,
     inputSchema: z.object(CREATE_DRAFT_MESSAGE_SCHEMA).strict(),
+    annotations: ADDITIVE_CHANGE,
     outputSchema: senderToolOutput({ mode: z.enum(["new", "reply", "forward"]), referenceMessageId: z.string().nullable(),
-      identityId: z.string(), draftId: z.string().nullable(), message: z.object(SEARCH_RESULT_MESSAGE_SCHEMA).passthrough().nullable() })
+      identityId: z.string(), draftId: z.string().nullable(), message: z.object(SEARCH_RESULT_MESSAGE_SCHEMA).passthrough().nullable(),
+      url: URL_OUTPUT.nullable() })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId, "editor");
     return senderToolCall(async () => {
       const result = await createDraftMessage(ctx, args);
-      return buildToolResult(`Created ${result.mode} draft${result.draftId ? ` ${result.draftId}` : ""}.`, result);
+      return buildToolResult(withLink(`Created ${result.mode} draft${result.draftId ? ` ${result.draftId}` : ""}.`, result.url), result);
     });
   });
 
   server.registerTool("list_draft_messages", {
-    description: `List drafts in this mailbox's Drafts folder (newest first). editable=false marks messages without the \\Draft flag. ${DRAFT_EDIT_HINT}`,
+    title: "List drafts",
+    description: `List the unsent drafts in this mailbox's Drafts folder, newest first, each with a link that opens it. editable=false marks messages without the \\Draft flag. ${DRAFT_EDIT_HINT}`,
     inputSchema: z.object({ ...ACCOUNT_ID_ARG, page: z.number().int().min(1).optional(),
       pageSize: z.number().int().min(1).max(MCP_MAX_PAGE_SIZE).optional() }).strict(),
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
+    annotations: READ_ONLY,
     outputSchema: senderToolOutput({ folderId: z.string(), drafts: z.array(z.object({ draftId: z.string(), subject: z.string(), to: z.string(),
-      cc: z.string(), updatedAt: z.number(), editable: z.boolean() })), total: z.number(), hasMore: z.boolean(), page: z.number(), pageSize: z.number() })
+      cc: z.string(), updatedAt: z.number(), editable: z.boolean(), url: URL_OUTPUT })), total: z.number(), hasMore: z.boolean(), page: z.number(), pageSize: z.number() })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId);
     return senderToolCall(async () => {
       const result = await listDraftMessages(ctx, args);
-      return buildToolResult(`Returned ${result.drafts.length} drafts (${result.total} total).`, result);
+      return buildToolResult([`Returned ${result.drafts.length} drafts (${result.total} total).`,
+        ...result.drafts.map(draft => `- ${JSON.stringify(draft.subject)} id=${draft.draftId}: ${draft.url}`)].join("\n"), result);
     });
   });
 
   server.registerTool("get_draft_message", {
-    description: `Read an existing draft with everything needed to edit it: sender identity, recipients, subject, body (text and, if stored, html/markdown), reply/forward references and attachment names/sizes. ${DRAFT_EDIT_HINT}`,
+    title: "Read a draft",
+    description: `Read an existing draft with everything needed to revise it: sender identity, recipients, subject, body (text and, if stored, html/markdown), reply/forward references and attachment names/sizes, plus a link that opens it. ${DRAFT_EDIT_HINT}`,
     inputSchema: z.object({ ...ACCOUNT_ID_ARG, ...DRAFT_ID_ARG }).strict(),
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
-    outputSchema: senderToolOutput({ draft: EDITABLE_DRAFT_SCHEMA })
+    annotations: READ_ONLY,
+    outputSchema: senderToolOutput({ draft: EDITABLE_DRAFT_SCHEMA, url: URL_OUTPUT })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId);
     return senderToolCall(async () => {
-      const draft = await toEditableDraft(ctx.accountId, await getStoredDraft(ctx.accountId, args.draftId));
-      return buildToolResult(`Draft ${draft.draftId}: ${JSON.stringify(draft.subject)}.`, { ok: true, draft });
+      const stored = await getStoredDraft(ctx.accountId, args.draftId);
+      const draft = await toEditableDraft(ctx.accountId, stored);
+      const url = messageUrl(stored);
+      return buildToolResult(withLink(`Draft ${draft.draftId}: ${JSON.stringify(draft.subject)}.`, url), { ok: true, draft, url });
     });
   });
 
   server.registerTool("update_draft_message", {
-    description: `Edit an existing draft in place. Only the fields you pass change; everything else (sender, recipients, subject, body, reply/forward headers, attachments) is kept. Use appendBody to add a sentence or paragraph, or text/html/markdown to replace the whole body (read it first with get_draft_message). Saving may assign a new draft id: always continue with the returned draftId (draftIdChanged tells you). ${DRAFT_EDIT_HINT}`,
+    title: "Revise a draft",
+    description: `Revise an existing draft in place (recipients, subject, sender or text). Only the fields you pass change; everything else (sender, recipients, subject, body, reply/forward headers, attachments) is kept. Use appendBody to add a sentence or paragraph, or text/html/markdown to replace the whole body (read it first with get_draft_message). Saving may assign a new draft id: always continue with the returned draftId (draftIdChanged tells you). The result includes a link that opens the draft. ${DRAFT_EDIT_HINT}`,
     inputSchema: z.object(UPDATE_DRAFT_MESSAGE_SCHEMA).strict(),
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
+    annotations: ADDITIVE_CHANGE,
     outputSchema: senderToolOutput({ mode: z.enum(["new", "reply", "forward"]), identityId: z.string(), draftId: z.string().nullable(),
-      previousDraftId: z.string(), draftIdChanged: z.boolean(), message: z.object(SEARCH_RESULT_MESSAGE_SCHEMA).passthrough().nullable() })
+      previousDraftId: z.string(), draftIdChanged: z.boolean(), message: z.object(SEARCH_RESULT_MESSAGE_SCHEMA).passthrough().nullable(),
+      url: URL_OUTPUT.nullable() })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId, "editor");
     return senderToolCall(async () => {
       const { accountId: _accountId, ...input } = args; void _accountId;
       const result = await updateDraftMessage(ctx, input);
-      return buildToolResult(`Updated draft ${result.previousDraftId}${result.draftIdChanged ? `; its new id is ${result.draftId}` : ""}.`, result);
+      return buildToolResult(withLink(`Updated draft ${result.previousDraftId}${result.draftIdChanged ? `; its new id is ${result.draftId}` : ""}.`, result.url), result);
     });
   });
 
   server.registerTool("list_sender_identities", {
-    description: "List this mailbox's configured sender identities and the token creator's effective default.",
+    title: "List sender identities",
+    description: "List the sender addresses (identities) the user can write from in this mailbox, and which one is used by default.",
     inputSchema: z.object(ACCOUNT_ID_ARG).strict(),
+    annotations: READ_ONLY,
     outputSchema: senderToolOutput({ identities: z.array(SENDER_IDENTITY_SCHEMA), defaultIdentityId: z.string().optional(),
-      effectiveDefaultIdentityId: z.string().optional(), ownAddresses: z.array(z.string()), warnings: z.array(z.string()), recomputeJob: IDENTITY_JOB_SCHEMA })
+      effectiveDefaultIdentityId: z.string().optional(), ownAddresses: z.array(z.string()), warnings: z.array(z.string()), recomputeJob: IDENTITY_JOB_SCHEMA,
+      url: URL_OUTPUT })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId);
     const identities = await listSenderIdentities(ctx.accountId);
     const prefs = await getUserAccountPrefs(ctx.tokenRecord.createdByUserId, ctx.accountId);
     const resolved = resolveComposeIdentity({ accountId: ctx.accountId, identities, prefs });
-    return buildToolResult("Sender identities.", { ok: true, identities,
+    const url = settingsUrl(ctx.accountId, "identities");
+    return buildToolResult(withLink("Sender identities.", url), { ok: true, identities,
       defaultIdentityId: identities.find(item => item.isDefault)?.id,
       effectiveDefaultIdentityId: resolved.identity?.id, ownAddresses: getOwnAddresses(ctx.account, identities),
-      warnings: resolved.warnings, recomputeJob: getIdentityRecomputeJob(ctx.accountId) });
+      warnings: resolved.warnings, recomputeJob: getIdentityRecomputeJob(ctx.accountId), url });
   });
   server.registerTool("create_sender_identity", {
-    description: "Configure a sender identity in this mailbox (manager). Does not verify provider send-as permission.",
+    title: "Add a sender identity",
+    description: "Add a sender address (identity) the mailbox can write from, with display name, optional reply-to and signature (mailbox managers only). Does not verify the mail provider's send-as permission. The result links to the identity settings.",
     inputSchema: z.object({ ...ACCOUNT_ID_ARG, email: z.string().max(254), displayName: z.string().max(256),
       replyTo: z.string().max(254).optional(), signatureId: z.string().min(1).max(256).optional(),
       isDefault: z.boolean().optional(), enabled: z.boolean().optional() }).strict(),
-    outputSchema: senderToolOutput({ identity: SENDER_IDENTITY_SCHEMA, recomputeJob: IDENTITY_JOB_SCHEMA })
+    annotations: ADDITIVE_CHANGE,
+    outputSchema: senderToolOutput({ identity: SENDER_IDENTITY_SCHEMA, recomputeJob: IDENTITY_JOB_SCHEMA, url: URL_OUTPUT })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId, "manager");
     return senderToolCall(async () => {
       const { accountId: _accountId, ...input } = args; void _accountId;
-      return buildToolResult("Sender identity created.", { ok: true, ...await createSenderIdentityWithRecompute(ctx.accountId, input, { ...mcpActor(ctx),
-        beforeWrite: () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "manager", purpose: "identity-management" }) }) });
+      const url = settingsUrl(ctx.accountId, "identities");
+      return buildToolResult(withLink("Sender identity created.", url), { ok: true, ...await createSenderIdentityWithRecompute(ctx.accountId, input, { ...mcpActor(ctx),
+        beforeWrite: () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "manager", purpose: "identity-management" }) }), url });
     });
   });
   server.registerTool("update_sender_identity", {
-    description: "Update or soft-disable a sender identity in this mailbox (manager). Address is immutable.",
+    title: "Change a sender identity",
+    description: "Change a sender identity's display name, reply-to, signature or default flag, or disable it (mailbox managers only). The address itself cannot be changed. The result links to the identity settings.",
     inputSchema: z.object({ ...ACCOUNT_ID_ARG, identityId: z.string().min(1).max(256), patch: z.object({
       displayName: z.string().max(256).optional(), replyTo: z.string().max(254).nullable().optional(),
       signatureId: z.string().min(1).max(256).nullable().optional(), isDefault: z.boolean().optional(), enabled: z.boolean().optional()
     }).strict() }).strict(),
-    outputSchema: senderToolOutput({ identity: SENDER_IDENTITY_SCHEMA })
+    annotations: IDEMPOTENT_CHANGE,
+    outputSchema: senderToolOutput({ identity: SENDER_IDENTITY_SCHEMA, url: URL_OUTPUT })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId, "manager");
-    return senderToolCall(async () => buildToolResult("Sender identity updated.", { ok: true,
+    const url = settingsUrl(ctx.accountId, "identities");
+    return senderToolCall(async () => buildToolResult(withLink("Sender identity updated.", url), { ok: true,
       identity: await updateSenderIdentity(ctx.accountId, args.identityId, args.patch, { ...mcpActor(ctx),
-        beforeWrite: () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "manager", purpose: "identity-management" }) }) }));
+        beforeWrite: () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "manager", purpose: "identity-management" }) }), url }));
   });
   server.registerTool("get_sender_preferences", {
-    description: "Read the token creator's own sender preferences for this mailbox.",
-    inputSchema: z.object(ACCOUNT_ID_ARG).strict(), outputSchema: senderToolOutput({ prefs: SENDER_PREFS_SCHEMA })
+    title: "Read my sender preferences",
+    description: "Read which sender identity and signature the user writes with by default in this mailbox (the user's own preferences).",
+    inputSchema: z.object(ACCOUNT_ID_ARG).strict(), annotations: READ_ONLY, outputSchema: senderToolOutput({ prefs: SENDER_PREFS_SCHEMA, url: URL_OUTPUT })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId);
-    return buildToolResult("Sender preferences.", { ok: true, prefs: senderPrefs(await getUserAccountPrefs(ctx.tokenRecord.createdByUserId, ctx.accountId)) });
+    const url = settingsUrl(ctx.accountId, "preferences");
+    return buildToolResult(withLink("Sender preferences.", url), { ok: true, prefs: senderPrefs(await getUserAccountPrefs(ctx.tokenRecord.createdByUserId, ctx.accountId)), url });
   });
   server.registerTool("set_sender_preferences", {
-    description: "Patch the token creator's own sender preferences. Null restores inheritance; empty signature means none.",
+    title: "Change my sender preferences",
+    description: "Change which sender identity and signature the user writes with by default in this mailbox (the user's own preferences). Null restores the mailbox default; an empty signature means none.",
     inputSchema: z.object({ ...ACCOUNT_ID_ARG, patch: accountPrefsPatchSchema.pick({ defaultIdentityId: true, defaultSignatureId: true, signatureOverride: true }) }).strict(),
-    outputSchema: senderToolOutput({ prefs: SENDER_PREFS_SCHEMA })
+    annotations: IDEMPOTENT_CHANGE,
+    outputSchema: senderToolOutput({ prefs: SENDER_PREFS_SCHEMA, url: URL_OUTPUT })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId);
     return senderToolCall(async () => {
@@ -1377,141 +1499,129 @@ export async function executeMcpHttpRequest(params: {
       }
       const prefs = await mergeUserAccountPrefs(ctx.tokenRecord.createdByUserId, ctx.accountId, args.patch,
         () => authorizeOutbound({ tokenId: ctx.tokenRecord.id }, { accountId: ctx.accountId, minRole: "viewer", purpose: "identity-management", identity: args.patch.defaultIdentityId ?? undefined }));
-      return buildToolResult("Sender preferences saved.", { ok: true, prefs: senderPrefs(prefs) });
+      const url = settingsUrl(ctx.accountId, "preferences");
+      return buildToolResult(withLink("Sender preferences saved.", url), { ok: true, prefs: senderPrefs(prefs), url });
     });
   });
 
   server.registerTool("list_signature_templates", {
-    description: `Read this mailbox's signature templates (with body) and the mailbox default. Placeholders: ${SIGNATURE_PLACEHOLDERS}.`,
+    title: "List signatures",
+    description: `List the e-mail signatures (templates with body) of this mailbox and the mailbox default. Placeholders: ${SIGNATURE_PLACEHOLDERS}.`,
     inputSchema: z.object(ACCOUNT_ID_ARG).strict(),
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true },
-    outputSchema: senderToolOutput(SIGNATURE_TEMPLATES_OUTPUT)
+    annotations: READ_ONLY,
+    outputSchema: senderToolOutput({ ...SIGNATURE_TEMPLATES_OUTPUT, url: URL_OUTPUT })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId);
     const result = listSignatureTemplates(ctx.account.settings);
-    return buildToolResult(`Returned ${result.signatures.length} signature templates.`, { ok: true, ...result });
+    const url = settingsUrl(ctx.accountId, "signatures");
+    return buildToolResult(withLink(`Returned ${result.signatures.length} signature templates.`, url), { ok: true, ...result, url });
   });
   server.registerTool("save_signature_template", {
-    description: `Create a mailbox signature template (omit signatureId) or replace name and body of an existing one (manager). Plain text, at most 8 KiB; placeholders: ${SIGNATURE_PLACEHOLDERS}.`,
+    title: "Create or edit a signature",
+    description: `Create an e-mail signature for this mailbox (omit signatureId) or replace the name and text of an existing one (mailbox managers only). Plain text, at most 8 KiB; placeholders: ${SIGNATURE_PLACEHOLDERS}. The result links to the signature settings.`,
     inputSchema: z.object({ ...ACCOUNT_ID_ARG, signatureId: SIGNATURE_ID_ARG.optional(), name: z.string().trim().min(1).max(256), body: z.string() }).strict(),
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
-    outputSchema: senderToolOutput({ signature: SIGNATURE_TEMPLATE_SCHEMA, ...SIGNATURE_TEMPLATES_OUTPUT })
+    annotations: ADDITIVE_CHANGE,
+    outputSchema: senderToolOutput({ signature: SIGNATURE_TEMPLATE_SCHEMA, ...SIGNATURE_TEMPLATES_OUTPUT, url: URL_OUTPUT })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId, "manager");
     return senderToolCall(async () => {
       const result = await saveSignatureTemplate(ctx.accountId, args, identityManagementActor(ctx));
-      return buildToolResult(`Saved signature template ${result.signature.id}.`, { ok: true, ...result });
+      const url = settingsUrl(ctx.accountId, "signatures");
+      return buildToolResult(withLink(`Saved signature template ${result.signature.id}.`, url), { ok: true, ...result, url });
     });
   });
   server.registerTool("delete_signature_template", {
-    description: "Delete a mailbox signature template (manager). Fails with signature_in_use while a sender identity uses it; clears the mailbox default if it was the default.",
+    title: "Delete a signature",
+    description: "Delete an e-mail signature of this mailbox (mailbox managers only). Fails with signature_in_use while a sender identity uses it; clears the mailbox default if it was the default.",
     inputSchema: z.object({ ...ACCOUNT_ID_ARG, signatureId: SIGNATURE_ID_ARG }).strict(),
-    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false },
-    outputSchema: senderToolOutput(SIGNATURE_TEMPLATES_OUTPUT)
+    annotations: DESTRUCTIVE_CHANGE,
+    outputSchema: senderToolOutput({ ...SIGNATURE_TEMPLATES_OUTPUT, url: URL_OUTPUT })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId, "manager");
-    return senderToolCall(async () => buildToolResult(`Deleted signature template ${args.signatureId}.`, { ok: true,
-      ...await deleteSignatureTemplate(ctx.accountId, args.signatureId, identityManagementActor(ctx)) }));
+    const url = settingsUrl(ctx.accountId, "signatures");
+    return senderToolCall(async () => buildToolResult(withLink(`Deleted signature template ${args.signatureId}.`, url), { ok: true,
+      ...await deleteSignatureTemplate(ctx.accountId, args.signatureId, identityManagementActor(ctx)), url }));
   });
   server.registerTool("set_default_signature_template", {
-    description: "Set the mailbox default signature template (manager). Null or an empty id means no default. Members' own choices (set_sender_preferences) still take precedence.",
+    title: "Set the default signature",
+    description: "Choose the signature this mailbox uses by default (mailbox managers only). Null or an empty id means no default. Members' own choices (set_sender_preferences) still take precedence.",
     inputSchema: z.object({ ...ACCOUNT_ID_ARG, signatureId: z.string().trim().max(256).nullable() }).strict(),
-    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
-    outputSchema: senderToolOutput(SIGNATURE_TEMPLATES_OUTPUT)
+    annotations: IDEMPOTENT_CHANGE,
+    outputSchema: senderToolOutput({ ...SIGNATURE_TEMPLATES_OUTPUT, url: URL_OUTPUT })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId, "manager");
     return senderToolCall(async () => {
       const result = await setDefaultSignatureTemplate(ctx.accountId, args.signatureId || null, identityManagementActor(ctx));
-      return buildToolResult(result.defaultSignatureId ? `Default signature template is ${result.defaultSignatureId}.` : "No default signature template.", { ok: true, ...result });
+      const url = settingsUrl(ctx.accountId, "signatures");
+      return buildToolResult(withLink(result.defaultSignatureId ? `Default signature template is ${result.defaultSignatureId}.` : "No default signature template.", url),
+        { ok: true, ...result, url });
     });
   });
 
-  server.tool(
+  const setFlagged = async (requestedAccountId: string | undefined, messageId: string, value: boolean) => {
+    const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
+    const message = await getMessageById(ctx.accountId, messageId);
+    if (!message) {
+      throw new Error("Message not found");
+    }
+    const nextFlags = await applyFlagMutationsToMessage({
+      accountId: ctx.accountId,
+      account: ctx.account,
+      messageId,
+      message,
+      flag: "flagged",
+      value,
+      clientId: `mcp:${ctx.tokenRecord.id}`
+    });
+    const finalFlags = await markMessageAiModified(ctx.accountId, messageId);
+    const url = messageUrl(message);
+    return buildToolResult(withLink(`${value ? "Flagged" : "Unflagged"} message ${messageId}.`, url), {
+      ok: true,
+      messageId,
+      flags: finalFlags.length > 0 ? finalFlags : nextFlags,
+      url
+    });
+  };
+
+  server.registerTool(
     "flag_message",
-    "Add the IMAP flagged marker to one message.",
-    MESSAGE_ID_SCHEMA,
-    async ({ accountId: requestedAccountId, messageId }) => {
-      const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
-      const message = await getMessageById(ctx.accountId, messageId);
-      if (!message) {
-        throw new Error("Message not found");
-      }
-      const nextFlags = await applyFlagMutationsToMessage({
-        accountId: ctx.accountId,
-        account: ctx.account,
-        messageId,
-        message,
-        flag: "flagged",
-        value: true,
-        clientId: `mcp:${ctx.tokenRecord.id}`
-      });
-      const finalFlags = await markMessageAiModified(ctx.accountId, messageId);
-      return buildToolResult(`Flagged message ${messageId}.`, {
-        ok: true,
-        messageId,
-        flags: finalFlags.length > 0 ? finalFlags : nextFlags
-      });
-    }
+    { title: "Flag an e-mail", description: "Flag (star) an e-mail so it stands out for follow-up.", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
+    async ({ accountId: requestedAccountId, messageId }) => setFlagged(requestedAccountId, messageId, true)
   );
 
-  server.tool(
+  server.registerTool(
     "unflag_message",
-    "Remove the IMAP flagged marker from one message.",
-    MESSAGE_ID_SCHEMA,
-    async ({ accountId: requestedAccountId, messageId }) => {
-      const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
-      const message = await getMessageById(ctx.accountId, messageId);
-      if (!message) {
-        throw new Error("Message not found");
-      }
-      const nextFlags = await applyFlagMutationsToMessage({
-        accountId: ctx.accountId,
-        account: ctx.account,
-        messageId,
-        message,
-        flag: "flagged",
-        value: false,
-        clientId: `mcp:${ctx.tokenRecord.id}`
-      });
-      const finalFlags = await markMessageAiModified(ctx.accountId, messageId);
-      return buildToolResult(`Unflagged message ${messageId}.`, {
-        ok: true,
-        messageId,
-        flags: finalFlags.length > 0 ? finalFlags : nextFlags
-      });
-    }
+    { title: "Unflag an e-mail", description: "Remove the flag (star) from an e-mail.", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
+    async ({ accountId: requestedAccountId, messageId }) => setFlagged(requestedAccountId, messageId, false)
   );
 
-  server.tool(
+  server.registerTool(
     "mark_message_todo",
-    "Mark a message as To-Do.",
-    MESSAGE_ID_SCHEMA,
+    { title: "Mark an e-mail as to-do", description: "Put an e-mail on the user's to-do list (clears a done mark).", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
     async ({ accountId: requestedAccountId, messageId }) => {
       const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
       const result = await updateTodoState(ctx, messageId, "todo");
-      return buildToolResult(`Marked message ${messageId} as To-Do.`, result);
+      return buildToolResult(withLink(`Marked message ${messageId} as To-Do.`, result.url), result);
     }
   );
 
-  server.tool(
+  server.registerTool(
     "mark_message_done",
-    "Mark a message as Done.",
-    MESSAGE_ID_SCHEMA,
+    { title: "Mark an e-mail as done", description: "Mark an e-mail as done (clears a to-do mark).", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
     async ({ accountId: requestedAccountId, messageId }) => {
       const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
       const result = await updateTodoState(ctx, messageId, "done");
-      return buildToolResult(`Marked message ${messageId} as Done.`, result);
+      return buildToolResult(withLink(`Marked message ${messageId} as Done.`, result.url), result);
     }
   );
 
-  server.tool(
+  server.registerTool(
     "clear_message_todo",
-    "Clear To-Do and Done state from a message.",
-    MESSAGE_ID_SCHEMA,
+    { title: "Clear to-do and done", description: "Remove both the to-do and the done mark from an e-mail.", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
     async ({ accountId: requestedAccountId, messageId }) => {
       const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
       const result = await updateTodoState(ctx, messageId, "clear");
-      return buildToolResult(`Cleared To-Do state from message ${messageId}.`, result);
+      return buildToolResult(withLink(`Cleared To-Do state from message ${messageId}.`, result.url), result);
     }
   );
 
@@ -1525,35 +1635,51 @@ export async function executeMcpHttpRequest(params: {
     body: z.string(), createdAt: z.number(), updatedAt: z.number(), deletedAt: z.number().nullable() });
   const activitySchema = z.object({ id: z.string(), accountId: z.string(), threadId: z.string(), type: z.string(),
     actorUserId: z.string().nullable(), actorClientId: z.string(), payload: z.record(z.string(), z.unknown()), createdAt: z.number() });
-  server.registerTool("list_mailbox_members", { description: "List mailbox members; disabled members are visible to managers only.", inputSchema: ACCOUNT_ID_ARG,
-    outputSchema: { ok: z.boolean(), members: z.array(z.object({ userId: z.string(), name: z.string().nullable(), email: z.string(), role: z.enum(["viewer", "editor", "manager"]), isOwner: z.boolean(), disabled: z.boolean().optional() })) } },
-    async args => { const ctx = await resolveAccountContext(context, args.accountId);
-      return buildToolResult("Mailbox members.", { ok: true, members: await listAccountMembersForRole(ctx.accountId, ctx.role) }); });
-  server.registerTool("get_thread_collaboration", { description: "Read thread state, internal comments and activity.", inputSchema: targetSchema,
-    outputSchema: { ok: z.boolean(), threadId: z.string(), state: stateSchema, comments: z.array(commentSchema), activity: z.array(activitySchema) } },
-    async args => { const ctx = await resolveAccountContext(context, args.accountId); const { threadId } = await resolveThreadTarget(ctx, args);
-      const [state, comments, activity] = await Promise.all([getThreadCollabState(ctx.accountId, threadId), listThreadComments(ctx.accountId, threadId), listThreadActivity(ctx.accountId, threadId)]);
-      return buildToolResult("Thread collaboration.", { ok: true, threadId, state, comments, activity }); });
-  server.registerTool("set_thread_status", { description: "Set thread status without changing message flags.", inputSchema: { ...targetSchema, status: statusSchema },
-    outputSchema: { ok: z.boolean(), state: stateSchema } }, async args => {
-      const ctx = await resolveAccountContext(context, args.accountId, "editor"); const { threadId } = await resolveThreadTarget(ctx, args);
-      const state = await updateThreadCollabState(ctx.accountId, threadId, { status: args.status }, mcpActor(ctx));
-      if (!state) throw new Error("Thread not found"); return buildToolResult("Thread status updated.", { ok: true, state }); });
-  server.registerTool("assign_thread", { description: "Assign an enabled mailbox member; 'me' selects the token creator; null unassigns.",
-    inputSchema: { ...targetSchema, assigneeUserId: z.string().min(1).nullable() }, outputSchema: { ok: z.boolean(), state: stateSchema } }, async args => {
-      const ctx = await resolveAccountContext(context, args.accountId, "editor"); const { threadId } = await resolveThreadTarget(ctx, args);
+  server.registerTool("list_mailbox_members", { title: "List mailbox members",
+    description: "List the people who share this mailbox and their roles (e.g. to pick an assignee for assign_thread). Disabled members are visible to managers only.",
+    inputSchema: ACCOUNT_ID_ARG, annotations: READ_ONLY,
+    outputSchema: { ok: z.boolean(), members: z.array(z.object({ userId: z.string(), name: z.string().nullable(), email: z.string(), role: z.enum(["viewer", "editor", "manager"]), isOwner: z.boolean(), disabled: z.boolean().optional() })), url: URL_OUTPUT } },
+    async args => { const ctx = await resolveAccountContext(context, args.accountId); const url = settingsUrl(ctx.accountId, "members");
+      return buildToolResult(withLink("Mailbox members.", url), { ok: true, members: await listAccountMembersForRole(ctx.accountId, ctx.role), url }); });
+  server.registerTool("get_thread_collaboration", { title: "Read team notes on a thread",
+    description: "Read how the team handles an e-mail conversation in a shared mailbox: status, assignee, internal comments and activity. Select the thread by threadId or messageId.",
+    inputSchema: targetSchema, annotations: READ_ONLY,
+    outputSchema: { ok: z.boolean(), threadId: z.string(), state: stateSchema, comments: z.array(commentSchema), activity: z.array(activitySchema), url: URL_OUTPUT } },
+    async args => { const ctx = await resolveAccountContext(context, args.accountId); const target = await resolveThreadTarget(ctx, args); const { threadId } = target;
+      const [state, comments, activity, url] = await Promise.all([getThreadCollabState(ctx.accountId, threadId), listThreadComments(ctx.accountId, threadId), listThreadActivity(ctx.accountId, threadId), threadUrl(ctx.accountId, target)]);
+      return buildToolResult(withLink("Thread collaboration.", url), { ok: true, threadId, state, comments, activity, url }); });
+  server.registerTool("set_thread_status", { title: "Set thread status",
+    description: "Set the team status of an e-mail conversation (open, in progress, waiting, closed) without changing message flags. The result links to the thread.",
+    inputSchema: { ...targetSchema, status: statusSchema }, annotations: IDEMPOTENT_CHANGE,
+    outputSchema: { ok: z.boolean(), state: stateSchema, url: URL_OUTPUT } }, async args => {
+      const ctx = await resolveAccountContext(context, args.accountId, "editor"); const target = await resolveThreadTarget(ctx, args);
+      const state = await updateThreadCollabState(ctx.accountId, target.threadId, { status: args.status }, mcpActor(ctx));
+      if (!state) throw new Error("Thread not found"); const url = await threadUrl(ctx.accountId, target);
+      return buildToolResult(withLink("Thread status updated.", url), { ok: true, state, url }); });
+  server.registerTool("assign_thread", { title: "Assign a thread",
+    description: "Assign an e-mail conversation to a mailbox member who should handle it; 'me' selects the user, null unassigns. The result links to the thread.",
+    inputSchema: { ...targetSchema, assigneeUserId: z.string().min(1).nullable() }, annotations: IDEMPOTENT_CHANGE,
+    outputSchema: { ok: z.boolean(), state: stateSchema, url: URL_OUTPUT } }, async args => {
+      const ctx = await resolveAccountContext(context, args.accountId, "editor"); const target = await resolveThreadTarget(ctx, args);
       const assigneeUserId = args.assigneeUserId === "me" ? ctx.tokenRecord.createdByUserId : args.assigneeUserId;
-      const state = await updateThreadCollabState(ctx.accountId, threadId, { assigneeUserId }, mcpActor(ctx));
-      if (!state) throw new Error("Thread not found"); return buildToolResult("Thread assignment updated.", { ok: true, state }); });
-  server.registerTool("add_internal_comment", { description: "Add an internal Markdown comment.", inputSchema: { ...targetSchema, body: z.string().min(1).max(20000) },
-    outputSchema: { ok: z.boolean(), comment: commentSchema, state: stateSchema } }, async args => {
-      const ctx = await resolveAccountContext(context, args.accountId, "editor"); const { threadId } = await resolveThreadTarget(ctx, args);
-      const result = await addThreadComment(ctx.accountId, threadId, args.body, mcpActor(ctx));
-      if (!result) throw new Error("Thread not found"); return buildToolResult("Internal comment added.", { ok: true, ...result }); });
-  server.registerTool("list_thread_activity", { description: "List recent thread activity, newest first.",
-    inputSchema: { ...targetSchema, limit: z.number().int().min(1).max(500).optional() }, outputSchema: { ok: z.boolean(), activity: z.array(activitySchema) } }, async args => {
-      const ctx = await resolveAccountContext(context, args.accountId); const { threadId } = await resolveThreadTarget(ctx, args);
-      return buildToolResult("Thread activity.", { ok: true, activity: await listThreadActivity(ctx.accountId, threadId, { limit: args.limit }) }); });
+      const state = await updateThreadCollabState(ctx.accountId, target.threadId, { assigneeUserId }, mcpActor(ctx));
+      if (!state) throw new Error("Thread not found"); const url = await threadUrl(ctx.accountId, target);
+      return buildToolResult(withLink("Thread assignment updated.", url), { ok: true, state, url }); });
+  server.registerTool("add_internal_comment", { title: "Add an internal note",
+    description: "Add an internal Markdown note to an e-mail conversation for the mailbox team; it is never sent to the correspondents. The result links to the thread.",
+    inputSchema: { ...targetSchema, body: z.string().min(1).max(20000) }, annotations: ADDITIVE_CHANGE,
+    outputSchema: { ok: z.boolean(), comment: commentSchema, state: stateSchema, url: URL_OUTPUT } }, async args => {
+      const ctx = await resolveAccountContext(context, args.accountId, "editor"); const target = await resolveThreadTarget(ctx, args);
+      const result = await addThreadComment(ctx.accountId, target.threadId, args.body, mcpActor(ctx));
+      if (!result) throw new Error("Thread not found"); const url = await threadUrl(ctx.accountId, target);
+      return buildToolResult(withLink("Internal comment added.", url), { ok: true, ...result, url }); });
+  server.registerTool("list_thread_activity", { title: "List thread activity",
+    description: "List what happened in an e-mail conversation in a shared mailbox (status changes, assignments, comments), newest first.",
+    inputSchema: { ...targetSchema, limit: z.number().int().min(1).max(500).optional() }, annotations: READ_ONLY,
+    outputSchema: { ok: z.boolean(), activity: z.array(activitySchema), url: URL_OUTPUT } }, async args => {
+      const ctx = await resolveAccountContext(context, args.accountId); const target = await resolveThreadTarget(ctx, args);
+      const [activity, url] = await Promise.all([listThreadActivity(ctx.accountId, target.threadId, { limit: args.limit }), threadUrl(ctx.accountId, target)]);
+      return buildToolResult(withLink("Thread activity.", url), { ok: true, activity, url }); });
 
   const transport = new StatelessJsonResponseTransport({
     authInfo: params.authInfo,

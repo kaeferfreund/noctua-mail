@@ -8,6 +8,7 @@ import { dbModulePromise } from "@/lib/testDbHarness";
 import { createTopic, setThreadTopics } from "@/lib/topics";
 import { createRecipientAlias } from "@/lib/recipientAliases";
 import { AI_MODIFIED_FLAG, hasAiModifiedFlag } from "@/lib/messageFlags";
+import { parseDeepLink } from "@/lib/navigation/deepLinks";
 
 type BuiltDraftMail = {
   to?: string;
@@ -327,9 +328,14 @@ describe("/api/mcp", () => {
     );
     expect(initializeResponse.status).toBe(200);
     const initializeBody = (await initializeResponse.json()) as {
-      result?: { serverInfo?: { name?: string } };
+      result?: { serverInfo?: { name?: string; title?: string; description?: string }; instructions?: string };
     };
-    expect(initializeBody.result?.serverInfo?.name).toBe("mywebmail-mcp");
+    expect(initializeBody.result?.serverInfo).toMatchObject({ name: "noctua-mail", title: "Noctua Mail", description: expect.stringContaining("e-mail") });
+    // Clients add the instructions to the model's context: they say what the server is for, when to use it and that results carry links.
+    expect(initializeBody.result?.instructions).toContain("the user's personal and shared mailboxes");
+    expect(initializeBody.result?.instructions).toContain("whenever the user asks to write, answer, forward, find");
+    expect(initializeBody.result?.instructions).toContain("Drafts are never sent by these tools");
+    expect(initializeBody.result?.instructions).toContain("`url`");
 
 
 
@@ -346,6 +352,9 @@ describe("/api/mcp", () => {
       result?: {
         tools?: Array<{
           name: string;
+          title?: string;
+          description?: string;
+          annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean };
           inputSchema?: {
             properties?: Record<string, { description?: string }>;
           };
@@ -373,6 +382,15 @@ describe("/api/mcp", () => {
         "clear_message_todo"
       ])
     );
+    for (const tool of toolsBody.result?.tools ?? []) {
+      expect({ name: tool.name, title: typeof tool.title, readOnlyHint: typeof tool.annotations?.readOnlyHint,
+        destructiveHint: typeof tool.annotations?.destructiveHint, idempotentHint: typeof tool.annotations?.idempotentHint })
+        .toEqual({ name: tool.name, title: "string", readOnlyHint: "boolean", destructiveHint: "boolean", idempotentHint: "boolean" });
+    }
+    const createDraftTool = toolsBody.result?.tools?.find((tool) => tool.name === "create_draft_message");
+    expect(createDraftTool?.description).toStartWith("Write an e-mail");
+    expect(createDraftTool?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: false });
+    expect(toolsBody.result?.tools?.find((tool) => tool.name === "search_messages")?.annotations).toMatchObject({ readOnlyHint: true });
     expect(
       toolsBody.result?.tools?.find((tool) => tool.name === "list_folders")?.outputSchema?.properties
     ).toMatchObject({
@@ -490,9 +508,13 @@ describe("/api/mcp", () => {
       rawToken
     );
     const listBody = (await listResponse.json()) as {
-      result?: { structuredContent?: { items?: Array<{ id: string }>; mode?: string } };
+      result?: { content?: Array<{ text: string }>; structuredContent?: { items?: Array<{ id: string; url?: string }>; mode?: string } };
     };
     expect(listBody.result?.structuredContent?.mode).toBe("folder");
+    const firstListed = listBody.result?.structuredContent?.items?.[0];
+    expect(parseDeepLink(new URL(firstListed?.url ?? "").search)).toMatchObject({ accountId, folderId: folder.id, messageId: `${accountId}-msg-3` });
+    expect(firstListed?.url).toStartWith("http://localhost:3000/?");
+    expect(listBody.result?.content?.[0]?.text).toContain(firstListed?.url ?? "missing");
     expect(listBody.result?.structuredContent?.items?.map((item) => item.id)).toEqual([
       `${accountId}-msg-3`,
       `${accountId}-msg-2`,
@@ -959,6 +981,11 @@ describe("/api/mcp", () => {
       bcc: "hidden@example.test", subject: "Angebot", text: "Guten Tag,\n\nanbei das Angebot." });
     const createdId = created.result.structuredContent.draftId as string;
     expect(createdId).toBe(`${accountId}-draft-9001`);
+    // The link opens the draft from the Drafts folder at the canonical app origin, and the model sees it in the text too.
+    const createdUrl = created.result.structuredContent.url as string;
+    expect(createdUrl).toStartWith("http://localhost:3000/?");
+    expect(parseDeepLink(new URL(createdUrl).search)).toMatchObject({ accountId, folderId: `${accountId}:Drafts`, messageId: createdId });
+    expect(created.result.content[0]?.text).toContain(`Open in Noctua Mail: ${createdUrl}`);
 
     const read = await callTool(token, "get_draft_message", { draftId: createdId }, 2);
     expect(read.result.isError).toBeUndefined();
@@ -975,6 +1002,7 @@ describe("/api/mcp", () => {
     expect(updated.result.structuredContent).toMatchObject({ ok: true, mode: "new", draftId: `${accountId}-draft-9002`,
       previousDraftId: createdId, draftIdChanged: true, identityId: created.result.structuredContent.identityId });
     expect(updated.result.content[0]?.text).toContain(`new id is ${accountId}-draft-9002`);
+    expect(parseDeepLink(new URL(updated.result.structuredContent.url).search).messageId).toBe(`${accountId}-draft-9002`);
     expect(lastBuiltDraftMail).toMatchObject({ to: "draft-target@example.test", cc: "copy@example.test", bcc: "hidden@example.test",
       subject: "Angebot", text: "Guten Tag,\n\nanbei das Angebot.\n\nBitte bis Freitag bestätigen.", html: undefined });
     // The old IMAP message is removed and the old row replaced: the old id no longer resolves to a draft.
@@ -986,10 +1014,12 @@ describe("/api/mcp", () => {
     expect(stale.result.structuredContent).toMatchObject({ ok: false, code: "invalid_draft", message: "Draft not found" });
     const reread = await callTool(token, "get_draft_message", { draftId: `${accountId}-draft-9002` }, 5);
     expect(reread.result.structuredContent.draft.text).toBe("Guten Tag,\n\nanbei das Angebot.\n\nBitte bis Freitag bestätigen.");
+    expect(reread.result.structuredContent.url).toBe(updated.result.structuredContent.url);
 
     const listed = await callTool(token, "list_draft_messages", {}, 6);
     expect(listed.result.structuredContent).toMatchObject({ ok: true, folderId: `${accountId}:Drafts`, total: 1,
-      drafts: [{ draftId: `${accountId}-draft-9002`, subject: "Angebot", to: "draft-target@example.test", editable: true }] });
+      drafts: [{ draftId: `${accountId}-draft-9002`, subject: "Angebot", to: "draft-target@example.test", editable: true,
+        url: updated.result.structuredContent.url }] });
   });
 
   test("update_draft_message replaces only the passed fields and keeps reply headers, identity and attachments", async () => {

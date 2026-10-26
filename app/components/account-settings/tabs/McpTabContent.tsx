@@ -319,6 +319,7 @@ function McpTokenSettings({
                 {copiedValue === serverUrl ? <Check size={14} /> : <Copy size={14} />}
               </TooltipIconButton>
             </Flex>
+            <Text size="2" color="gray">{t("mcp.assistantHint")}</Text>
           </Flex>
         </Card>
 

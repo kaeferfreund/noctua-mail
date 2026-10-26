@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
-import { authorizeDeepLink, notificationDeepLink, deepLinkHistoryMode, emptyDeepLink, parseDeepLink, serializeDeepLink, encodeDeepLinkId } from "./deepLinks";
+import { appDeepLink, authorizeDeepLink, notificationDeepLink, deepLinkHistoryMode, emptyDeepLink, parseDeepLink, serializeDeepLink, encodeDeepLinkId } from "./deepLinks";
 
 describe("mail URL state", () => {
   const accountId = "acc-0357e6dc07a93be003c3321b";
@@ -12,6 +12,10 @@ describe("mail URL state", () => {
     expect(url).toBe("/?a=A1fm3AepO-ADwzIb&f=INBOX&m=TS77tpY9aCUFO6LV");
     expect(parseDeepLink(url.slice(1))).toEqual(state);
     expect(serializeDeepLink(state, "/?a=old&f=old&m=old&s=all&g=sender")).toBe(url);
+  });
+  it("builds absolute links for a mailbox or one of its settings sections", () => {
+    expect(appDeepLink({ accountId }, "https://mail.example.test")).toBe("https://mail.example.test/?a=A1fm3AepO-ADwzIb");
+    expect(appDeepLink({ accountId, settings: "identities" }, "https://mail.example.test")).toBe("https://mail.example.test/?a=A1fm3AepO-ADwzIb&settings=identities");
   });
   it("never carries a one-time invite code into a new URL but keeps other fragments", () => {
     const state = { ...emptyDeepLink(), accountId, folderId: `${accountId}:INBOX` };

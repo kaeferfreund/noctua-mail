@@ -21,6 +21,16 @@ export async function signInQa(page: Page) {
   await expect(page.locator('[data-slot="shell-header"]')).toBeVisible();
 }
 
+/** A single-use fresh-factor grant (e.g. mcp.create). Waits for the next TOTP step so the sign-in code is not replayed. */
+export async function reauthQa(page: Page, purpose: string) {
+  const [seed] = JSON.parse(readFileSync(process.env.QA_SHELL_SEED_FILE!, "utf8"));
+  await page.waitForTimeout(30_000 - (Date.now() % 30_000) + 1000);
+  const result = await page.request.post("/api/auth/reauth", { headers: { origin: new URL(page.url()).origin },
+    data: { purpose, currentPassword: seed.password, totpCode: totpFromUri(seed.totpURI) } });
+  expect(result.status()).toBe(200);
+  return (await result.json() as { grant: string }).grant;
+}
+
 export async function openQaMenu(page: Page, item: "Settings" | "Admin") {
   await expect(page.locator('[data-slot="shell-header"]')).toBeVisible();
   const user = page.getByRole("button", { name: "User menu", exact: true });

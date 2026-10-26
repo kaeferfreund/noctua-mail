@@ -137,6 +137,36 @@ in one mailbox does not disable the token's other mailboxes. `list_accounts` ret
 only covered mailboxes with a current membership and `accessRole`; it derives the
 creator from the stored token, never client-supplied identity metadata.
 
+### MCP server identity, tool metadata and links
+
+`initialize` returns `serverInfo` `{name:"noctua-mail",title:"Noctua Mail",description}` and
+server `instructions` (`MCP_SERVER_INSTRUCTIONS` in `lib/mcpServer.ts`). Clients add the
+instructions to the model context: the server is the user's personal and shared e-mail; use it
+whenever the user asks to write, answer, forward, find, organise or triage e-mail; typical flow
+`list_accounts` → `search_messages`/`list_messages_by_folder` → `create_draft_message`; drafts are
+never sent by MCP; every created, changed or listed item carries a `url`. Every tool has a
+task-first description, a `title` and `annotations` (`readOnlyHint`, `destructiveHint`,
+`idempotentHint`; `check_new_mail` also `openWorldHint`). Tool names and input schemas are stable.
+
+Results carry absolute app links built from the canonical `BETTER_AUTH_URL` origin (the only
+origin users sign in at; no request headers are used) and the [shell URL format](DEEP-LINKS.md).
+The text content repeats them (`Open in Noctua Mail: <url>`, or one line per listed item):
+
+| Tool | `url` |
+| --- | --- |
+| `create_draft_message`, `update_draft_message`, `get_draft_message`, `list_draft_messages` (per draft) | draft in the Drafts folder (`a`,`f`,`m`), opens in the reader |
+| `search_messages`, `list_messages_by_folder` (per item) | the message (`a`,`f`,`m`) |
+| `flag_message`, `unflag_message`, `mark_message_todo`, `mark_message_done`, `clear_message_todo` | the message |
+| `assign_topics`, `unassign_topics`, `get_thread_collaboration`, `set_thread_status`, `assign_thread`, `add_internal_comment`, `list_thread_activity` | the given message, else the thread's newest message |
+| `list_accounts`, `list_mailbox_summary` (per mailbox), `check_new_mail` | the mailbox (`a`) |
+| `list_folders` (per folder) | the folder (`a`,`f`) |
+| `list_sender_identities`, `create_sender_identity`, `update_sender_identity` | `settings=identities` |
+| `get_sender_preferences`, `set_sender_preferences` | `settings=preferences` |
+| signature template tools | `settings=signatures` |
+| `list_topics`, `list_mailing_list_aliases`, `list_mailbox_members` | `settings=topics`, `recipient-aliases`, `members` |
+
+Links contain ids only, never subjects, recipients, bodies or search text.
+
 `GET /api/accounts/{accountId}/mcp-tokens` returns `tokens` plus selectable `mailboxes`
 from the creator's accessible own/shared mailboxes. Managers see all tokens covering
 that mailbox; editors see their own. Token rows list only `accountIds` the requester can
@@ -206,10 +236,10 @@ old one. The tool descriptions say so, so AI clients stop proposing that workaro
 
 | Tool | Scope / role | Input | Structured success |
 | --- | --- | --- | --- |
-| `list_draft_messages` | `read` / viewer | `{accountId?,page?,pageSize?}` | `{ok:true,folderId,drafts:[{draftId,subject,to,cc,updatedAt,editable}],total,hasMore,page,pageSize}` |
-| `get_draft_message` | `read` / viewer | `{accountId?,draftId}` | `{ok:true,draft:{draftId,identityId,from,to,cc,bcc,subject,composeFormat,text,html,markdown,inReplyTo,references,forwardedMessageId,attachments:[{id,filename,contentType,size,inline}],updatedAt}}` |
-| `create_draft_message` | `drafts` / editor | see [MCP sender tools](#mcp-sender-tools) | `{ok:true,mode,referenceMessageId,identityId,draftId,message}` |
-| `update_draft_message` | `drafts` / editor | `{accountId?,draftId,identityId?,to?,cc?,bcc?,subject?,text?,markdown?,html?,composeFormat?,appendBody?}` | `{ok:true,mode,identityId,draftId,previousDraftId,draftIdChanged,message}` |
+| `list_draft_messages` | `read` / viewer | `{accountId?,page?,pageSize?}` | `{ok:true,folderId,drafts:[{draftId,subject,to,cc,updatedAt,editable,url}],total,hasMore,page,pageSize}` |
+| `get_draft_message` | `read` / viewer | `{accountId?,draftId}` | `{ok:true,draft:{draftId,identityId,from,to,cc,bcc,subject,composeFormat,text,html,markdown,inReplyTo,references,forwardedMessageId,attachments:[{id,filename,contentType,size,inline}],updatedAt},url}` |
+| `create_draft_message` | `drafts` / editor | see [MCP sender tools](#mcp-sender-tools) | `{ok:true,mode,referenceMessageId,identityId,draftId,message,url}` |
+| `update_draft_message` | `drafts` / editor | `{accountId?,draftId,identityId?,to?,cc?,bcc?,subject?,text?,markdown?,html?,composeFormat?,appendBody?}` | `{ok:true,mode,identityId,draftId,previousDraftId,draftIdChanged,message,url}` |
 
 - Only messages in the mailbox's Drafts folder with the IMAP `\Draft` flag count as drafts
   (the draft-send guard); any other id returns `{ok:false,code:"invalid_draft"}` with
