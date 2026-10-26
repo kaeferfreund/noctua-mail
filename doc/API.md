@@ -171,6 +171,8 @@ Links contain ids only, never subjects, recipients, bodies or search text.
 from the creator's accessible own/shared mailboxes. Managers see all tokens covering
 that mailbox; editors see their own. Token rows list only `accountIds` the requester can
 access plus `hiddenMailboxCount` for the others; the primary `accountId` is not returned. `POST` accepts `{label, ttlSeconds?, accountIds?, mode?}`.
+Token creation requires a fresh, single-use `mcp.create` grant in `x-noctua-reauth`,
+obtained from `/api/auth/reauth`; listing and deletion need no grant.
 `accountIds` must be a nonempty set of current memberships including the route mailbox
 (the primary); omission means primary only. `mode` defaults to `drafts`:
 

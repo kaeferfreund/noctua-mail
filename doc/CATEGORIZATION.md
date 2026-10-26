@@ -14,18 +14,18 @@ Primary implementation files:
 
 - `lib/mail/categorization/classifier.ts`
 - `lib/mail/categorization/config.ts`
-- `lib/mail/imap.ts`
+- `lib/mail/imap/sync.ts`
 - `lib/db.ts`
 
 ## Runtime Flow
 
-1. IMAP sync fetches message source and parses it in `parseImapMessage(...)` (`lib/mail/imap.ts`).
+1. IMAP sync fetches message source and parses it in `parseImapMessage(...)` (`lib/mail/imap/sync.ts`).
 2. `classifyEmail(parsed, headers, config)` is called for each parsed message (`lib/mail/categorization/classifier.ts`).
 3. Classification result is stored on the message object:
    - `message.category = classification.category`
    - `message.categoryScore = classification.confidence`
 4. `upsertMessages(...)` persists both values into SQLite `messages.category` and `messages.categoryScore` (`lib/db.ts`).
-5. Search badge filters use `m.category = ?` in SQL (`lib/db.ts`, `applyBadgeFilters(...)`).
+5. Search badge filters use `m.category = ?` in SQL (`lib/db/messages/query.ts`, `applyBadgeFilters(...)`).
 
 ## Configuration
 
@@ -170,7 +170,7 @@ The classifier now supports a lightweight per-account linear calibration model:
 
 - Feature extraction + linear model utilities: `lib/mail/categorization/linearModel.ts`
 - Model inference is applied inside `classifyEmail(...)` when a model is available.
-- Sync path loads account model and applies it during parsing/classification (`lib/mail/imap.ts`).
+- Sync path loads account model and applies it during parsing/classification (`lib/mail/imap/sync.ts`).
 - Recompute path also applies the account model (`recomputeCategoriesForAccount(...)` in `lib/db.ts`).
 
 Manual category actions update both message state and model:
