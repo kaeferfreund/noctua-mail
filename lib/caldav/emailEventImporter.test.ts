@@ -1,5 +1,6 @@
-import { describe, expect, mock, test } from "bun:test";
-import "../testDbHarness";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { dbModulePromise } from "../testDbHarness";
+import { identityTestAccount } from "../testFixtures/senderIdentities";
 
 type UpsertCalendarFields = Parameters<typeof import("../db").upsertCalendarEventByUid>[1];
 
@@ -18,6 +19,11 @@ mock.module("@/lib/db", () => ({
 const { importEmailCalendarEvents } = await import("./emailEventImporter");
 
 mock.restore();
+
+beforeEach(async () => {
+  const api = await dbModulePromise;
+  await api.upsertAccount(identityTestAccount("acc-1"));
+});
 
 function makeIcs(lines: string[]) {
   return ["BEGIN:VCALENDAR", ...lines, "END:VCALENDAR"].join("\r\n");

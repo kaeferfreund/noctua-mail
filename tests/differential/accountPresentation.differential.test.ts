@@ -23,6 +23,7 @@ type Hook = { pattern: RegExp; shard: boolean; fn: () => void; fired: boolean };
 let hooks: Hook[] = [];
 let suspended = 0;
 let executions: number | null = null;
+let dataVersionExecutions = 0;
 let masterHandle: object | undefined;
 const proto = Database.prototype as any;
 const originals = { prepare: proto.prepare, query: proto.query };
@@ -38,7 +39,10 @@ function wrapStatement(db: object, stmt: any, sql: string) {
     if (typeof original !== "function") continue;
     stmt[method] = (...args: unknown[]) => {
       const result = original.apply(stmt, args);
-      if (executions !== null) executions++;
+      if (executions !== null) {
+        executions++;
+        if (/^PRAGMA data_version$/i.test(sql)) dataVersionExecutions++;
+      }
       if (!suspended) for (const hook of hooks) {
         if (hook.fired || !hook.pattern.test(sql) || hook.shard === (db === masterHandle || (db as any).filename === (masterHandle as any)?.filename)) continue;
         hook.fired = true; suspended++; try { hook.fn(); } finally { suspended--; }
@@ -49,9 +53,17 @@ function wrapStatement(db: object, stmt: any, sql: string) {
   return stmt;
 }
 /** Executed statements (all handles) of one call; the budgets below keep per-account reads from coming back. */
-async function countExecutions(run: () => Promise<unknown>) {
+async function countExecutions(run: () => Promise<unknown>, expectedDataVersionChecks?: number) {
   executions = 0;
-  try { await run(); return executions; } finally { executions = null; }
+  dataVersionExecutions = 0;
+  try {
+    await run();
+    if (expectedDataVersionChecks === undefined) return executions;
+    // The deletion guard adds one cross-connection version check per visible mailbox.
+    // Check that overhead exactly while retaining the existing query budget below.
+    expect(dataVersionExecutions).toBe(expectedDataVersionChecks);
+    return executions - dataVersionExecutions;
+  } finally { executions = null; }
 }
 /**
  * Earlier test files in the same process may leave an own `prepare`/`query` property on a shared handle
@@ -348,11 +360,11 @@ describe("statement budget", () => {
     const v = viewers["12"];
     // Warm the shard-path cache (getAccountDb re-resolves paths after master writes of earlier cases).
     await getUserMailboxSummary(v.user.id);
-    const scoped = await countExecutions(() => getUserMailboxSummary(v.user.id, [ACCOUNTS[4]]));
-    const foreign = await countExecutions(() => getUserMailboxSummary(viewers["2"].user.id, [ACCOUNTS[0]]));
-    const full = await countExecutions(() => getUserMailboxSummary(v.user.id));
+    const scoped = await countExecutions(() => getUserMailboxSummary(v.user.id, [ACCOUNTS[4]]), 1);
+    const foreign = await countExecutions(() => getUserMailboxSummary(viewers["2"].user.id, [ACCOUNTS[0]]), 0);
+    const full = await countExecutions(() => getUserMailboxSummary(v.user.id), ACCOUNTS.length);
     // Metadata: candidates, roles, member counts; final authorization: one batched role read.
-    // Per mailbox (unchanged here): warm getAccountDb (3 master, phase 2) plus 3 shard reads.
+    // Per mailbox, excluding the separately asserted data_version check: 3 master plus 3 shard reads.
     expect({ scoped, foreign, full }).toEqual({ scoped: 3 + 6 + 1, foreign: 1, full: 3 + 6 * ACCOUNTS.length + 1 });
   });
   test("/api/auth/me: session guard, user, selection pre-read, selection write, one access read", async () => {

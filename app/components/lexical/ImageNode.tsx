@@ -386,6 +386,7 @@ function ImageComponent({
         maxWidth: "100%"
       }}
     >
+      <picture>
       <img
         ref={imageRef}
         src={src}
@@ -403,6 +404,7 @@ function ImageComponent({
           outlineOffset: "1px"
         }}
       />
+      </picture>
       {isSelected &&
         RESIZE_CORNERS.map((corner) => {
           const style: React.CSSProperties = {

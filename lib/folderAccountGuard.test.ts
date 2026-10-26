@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { dbModulePromise } from "./testDbHarness";
+import { identityTestAccount } from "./testFixtures/senderIdentities";
 import { assertAccountFolder } from "./folderAccountGuard";
 import { runSyncOperation } from "./syncOperation";
 
@@ -9,6 +10,7 @@ const db = await dbModulePromise;
 test("validates literal mailbox paths containing colons against the correct shard", async () => {
   const accountId = `synthetic-folder-${randomUUID()}`;
   const folderId = `${accountId}:Projects:2026`;
+  await db.upsertAccount(identityTestAccount(accountId));
   await db.saveFoldersForAccount(accountId, [{ id: folderId, accountId, name: "Projects:2026", count: 0 }]);
   await assertAccountFolder(accountId, folderId);
   await expect(assertAccountFolder("synthetic-other", folderId)).rejects.toMatchObject({ code: "folder_account_mismatch" });

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import "@/lib/testDbHarness";
+import { dbModulePromise } from "@/lib/testDbHarness";
+import { identityTestAccount } from "./testFixtures/senderIdentities";
 import type { CalendarEvent, Message } from "@/lib/data";
 import type { CalendarEventEmailSnapshot } from "@/lib/calendarEventEmailSnapshot";
 import { saveMessageSource } from "@/lib/storage";
@@ -113,7 +114,9 @@ const { processCalendarInviteForMessage, processStandaloneCalendarInvite } = awa
 // installed by one test must not leak into the next. `mockClear()`
 // only resets call history — it does NOT restore the implementation —
 // so we re-arm the defaults here.
-beforeEach(() => {
+beforeEach(async () => {
+  const api = await dbModulePromise;
+  await api.upsertAccount(identityTestAccount("acc-1"));
   getCalendarEventByUid.mockClear();
   getCalendarEventByUid.mockResolvedValue(null);
   listSiblingCalendarEventsByUidKey.mockClear();

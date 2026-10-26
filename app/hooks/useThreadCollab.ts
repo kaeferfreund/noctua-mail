@@ -13,7 +13,7 @@
  * Pending: one mutation per scope key; other keys run independently and their finalizers cannot clear this key. Test: "R5-pending: overlapping account mutations keep pending on the originating key after navigation".
  * Limits: post-commit refresh may fail, leaving partial lists; mutation remains committed and the next successful admissible read repairs them. Test: "R6-repair: failed post-commit refresh is repaired by the next successful read".
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useLayoutEffect, useState } from "react";
 import type {
   CollabMember,
   ThreadCollabState,
@@ -87,22 +87,24 @@ export function useThreadCollab(
 ) {
   const apiFetch = options.apiFetch ?? defaultFetch;
   const onCommit = useRef(options.onCommit);
-  onCommit.current = options.onCommit;
+  useLayoutEffect(() => { onCommit.current = options.onCommit; });
   const sessionKey = options.sessionKey;
   const onReadDenied = useRef(options.onReadDenied);
-  onReadDenied.current = options.onReadDenied;
+  useLayoutEffect(() => { onReadDenied.current = options.onReadDenied; });
   const sessionRef = useRef(sessionKey);
-  sessionRef.current = sessionKey;
+  useLayoutEffect(() => { sessionRef.current = sessionKey; });
   const [deniedScopes, setDeniedScopes] = useState(new Set<string>());
   const denied = useRef(new Set<string>());
   const onUpdate = useRef(options.onUpdate);
-  onUpdate.current = options.onUpdate;
+  useLayoutEffect(() => { onUpdate.current = options.onUpdate; });
   const cache = useRef(new Map<string, CachedSnapshot>());
+  const [cachedEntries, setCachedEntries] = useState<ReadonlyMap<string, CachedSnapshot>>(new Map());
+  const [cachedMembers, setCachedMembers] = useState<ReadonlyMap<string, CollabMember[]>>(new Map());
   const membersCache = useRef(new Map<string, CollabMember[]>());
   const key = JSON.stringify([sessionKey, accountId, threadId]);
   const memberScope = JSON.stringify([sessionKey, accountId]);
   const currentKey = useRef(key);
-  currentKey.current = key;
+  useLayoutEffect(() => { currentKey.current = key; });
   const [entry, setEntry] = useState<{ key: string; data: Snapshot } | null>(
     null,
   );
@@ -132,6 +134,7 @@ export function useThreadCollab(
     const [requestSession, requestAccount] = JSON.parse(requestKey);
     if (!mounted.current || requestSession !== (sessionRef.current ?? null) || denied.current.has(JSON.stringify([requestSession, requestAccount]))) return;
     cache.current.set(requestKey, data);
+    setCachedEntries(new Map(cache.current));
     onUpdate.current?.(data.state);
     if (currentKey.current === requestKey) setEntry({ key: requestKey, data });
   }, []);
@@ -142,6 +145,7 @@ export function useThreadCollab(
     if (!mounted.current || JSON.parse(scope)[0] !== (sessionRef.current ?? null) ||
       denied.current.has(scope) || !acceptIfLatest(scope, "members", sequence)) return;
     membersCache.current.set(scope, members);
+    setCachedMembers(new Map(membersCache.current));
     setMemberEntry({ scope, members });
   }, [acceptIfLatest]);
   useEffect(() => {
@@ -185,7 +189,9 @@ export function useThreadCollab(
         const [cachedSession, cachedAccount] = JSON.parse(cachedKey);
         if (cachedSession === (sessionKey ?? null) && cachedAccount === accountId) cache.current.delete(cachedKey);
       }
+      setCachedEntries(new Map(cache.current));
       membersCache.current.delete(memberScope);
+      setCachedMembers(new Map(membersCache.current));
       denied.current.add(memberScope);
       if (mounted.current) {
         setDeniedScopes(new Set(denied.current));
@@ -298,7 +304,7 @@ export function useThreadCollab(
     [threadId, key, path, apiFetch, accept, publish, reload, memberScope, sessionKey, accountId],
   );
   const readDenied = deniedScopes.has(memberScope);
-  const data = readDenied ? undefined : entry?.key === key ? entry.data : cache.current.get(key);
+  const data = readDenied ? undefined : entry?.key === key ? entry.data : cachedEntries.get(key);
   return {
     readDenied,
     state: data?.state,
@@ -307,7 +313,7 @@ export function useThreadCollab(
     members: readDenied ? [] :
       memberEntry?.scope === memberScope
         ? memberEntry.members
-        : (membersCache.current.get(memberScope) ?? []),
+        : (cachedMembers.get(memberScope) ?? []),
     me: options.currentUserId ?? null,
     loading: Boolean(threadId && !data && errorEntry?.key !== key),
     pending: pendingKeys.has(key),

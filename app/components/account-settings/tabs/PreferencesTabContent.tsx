@@ -55,9 +55,13 @@ export default function PreferencesTabContent({ editingAccount, onClose, apiFetc
   const [error, setError] = useState<unknown>(null);
   const [saved, setSaved] = useState(false);
   const url = `/api/accounts/${encodeURIComponent(editingAccount.id)}/prefs`;
+  const [previousRequest, setPreviousRequest] = useState({ apiFetch, url });
+  if (previousRequest.apiFetch !== apiFetch || previousRequest.url !== url) {
+    setPreviousRequest({ apiFetch, url });
+    setLoading(true); setError(null); setSaved(false); setPatch({});
+  }
   useEffect(() => {
     let active = true;
-    setLoading(true); setError(null); setSaved(false); setPatch({});
     void adminRequest<{ prefs: UserAccountPrefs }>(apiFetch, url).then(data => {
       if (active) { setPrefs(data.prefs); setPatch({}); setLoading(false); }
     }).catch(error => { if (active) { setError(error); setLoading(false); } });

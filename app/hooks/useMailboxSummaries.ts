@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useLayoutEffect, useState } from "react";
 import type { UserMailboxSummary, MailboxSummaryResult } from "@/lib/mailboxSummary";
 import type { MailboxState } from "@/lib/authClient";
 import type { UserEvent } from "@/lib/userEvents";
@@ -22,7 +22,7 @@ export function useMailboxSummaries(options: Options) {
   const authenticated = options.authState === undefined || (options.authState !== null && options.authState !== "enrollment");
   const deniedKey = useRef<string | null>(null);
   const callbacks = useRef(options);
-  callbacks.current = options;
+  useLayoutEffect(() => { callbacks.current = options; });
   const [entry, setEntry] = useState<{ key: string; mailboxes: UserMailboxSummary[] } | null>(null);
   useEffect(() => {
     if (deniedKey.current !== sessionKey) deniedKey.current = null;

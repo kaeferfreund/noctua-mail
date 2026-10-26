@@ -229,17 +229,15 @@ export default function ComposeFields({
   const [recipientFocus, setRecipientFocus] = useState<RecipientFocus>(null);
   const [recipientActiveIndex, setRecipientActiveIndex] = useState(0);
 
-  useEffect(() => {
+  const [recipientInputs, setRecipientInputs] = useState({ activeAccountId, recipientFocus, recipientQuery, loadRecipientOptions });
+  if (recipientInputs.activeAccountId !== activeAccountId || recipientInputs.recipientFocus !== recipientFocus || recipientInputs.recipientQuery !== recipientQuery || recipientInputs.loadRecipientOptions !== loadRecipientOptions) {
+    setRecipientInputs({ activeAccountId, recipientFocus, recipientQuery, loadRecipientOptions });
     if (!activeAccountId) {
-      setRecipientOptions([]);
-      setRecipientLoading(false);
-      setRecipientActiveIndex(0);
-      return;
-    }
-    if (!recipientFocus) {
-      setRecipientLoading(false);
-      return;
-    }
+      setRecipientOptions([]); setRecipientLoading(false); setRecipientActiveIndex(0);
+    } else if (!recipientFocus) setRecipientLoading(false);
+  }
+  useEffect(() => {
+    if (!activeAccountId || !recipientFocus) return;
     let active = true;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {

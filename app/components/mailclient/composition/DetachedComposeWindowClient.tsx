@@ -29,7 +29,7 @@ import {
   type DetachedComposeHandoff,
   type DetachedComposeOutcome
 } from "@/lib/ui/detachedComposeHandoff";
-import ComposeOrchestrator, {
+import ComposeOrchestrator, { ComposeInlineHost,
   type ComposeMirror,
   type ComposeOrchestratorHandle
 } from "./ComposeOrchestrator";
@@ -108,7 +108,7 @@ export default function DetachedComposeWindowClient({
   // next-themes applies the stored or system theme to this window's <html>;
   // the editor follows that class instead of re-reading storage.
   const darkMode = useDarkMode();
-  const clientId = useMemo(() => {
+  const [clientId] = useState(() => {
     if (typeof window === "undefined") return "";
     const key = "noctuaClientId";
     const existing = window.localStorage.getItem(key);
@@ -116,7 +116,7 @@ export default function DetachedComposeWindowClient({
     const next = window.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
     window.localStorage.setItem(key, next);
     return next;
-  }, []);
+  });
 
   const apiFetch = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
     const headers = new Headers(init?.headers);
@@ -509,7 +509,7 @@ export default function DetachedComposeWindowClient({
           onDetachedComposeOutcome={finishDetachedCompose}
         />
         {composeMirror.composeOpen && composeMirror.composeView === "inline"
-          ? composeHandleRef.current?.renderInlineCard("detached-compose-card-slot")
+          ? <ComposeInlineHost handleRef={composeHandleRef} wrapperClassName="detached-compose-card-slot" />
           : null}
       </div>
     </AccountDateFormatProvider>
