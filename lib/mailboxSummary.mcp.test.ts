@@ -6,6 +6,7 @@ import { mintMcpToken } from "./mcpAuth";
 import { executeMcpHttpRequest } from "./mcpServer";
 import { getUserMailboxSummary } from "./mailboxSummary";
 import { updateThreadCollabState } from "./threadCollab";
+import { appDeepLink } from "./navigation/deepLinks";
 
 let principal: Awaited<ReturnType<typeof createAuthenticatedTestSession>>;
 beforeAll(async () => { principal = await createAuthenticatedTestSession(); });
@@ -32,7 +33,8 @@ test("list_mailbox_summary reads canonical viewer counts, narrows to token scope
   };
   const result = await invoke();
   expect(result.isError).not.toBe(true);
-  expect(result.structuredContent.mailboxes).toEqual((await getUserMailboxSummary(principal.user.id, [f.accountId])).mailboxes);
+  expect(result.structuredContent.mailboxes).toEqual((await getUserMailboxSummary(principal.user.id, [f.accountId])).mailboxes
+    .map(mailbox => ({ ...mailbox, url: appDeepLink({ accountId: mailbox.accountId }, "http://localhost:3000") })));
   expect(result.structuredContent.mailboxes).toHaveLength(1);
   expect(result.structuredContent.mailboxes[0]).toMatchObject({ accountId: f.accountId, accessRole: "viewer", unread: null, assignedToMe: 1, unassignedOpen: 1 });
   principal.master.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(principal.user.id, f.accountId);

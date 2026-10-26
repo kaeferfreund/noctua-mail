@@ -103,9 +103,14 @@ export function authorizeDeepLink(target: DeepLinkState, accountIds: string[], f
   return { state: { ...emptyDeepLink(), accountId: fallback }, forbidden: true };
 }
 
+/** Absolute shell URL for a partial state, e.g. a mailbox (`accountId`) or one of its settings sections. */
+export function appDeepLink(state: Partial<DeepLinkState>, origin: string): string {
+  return new URL(serializeDeepLink({ ...emptyDeepLink(), ...state }), origin).href;
+}
+
 /** Uses the message's own identity even in a detached reader or a different list. */
 export function messageDeepLink(message: { accountId: string; id: string; folderId: string }, origin: string): string {
-  return new URL(serializeDeepLink({ ...emptyDeepLink(), accountId: message.accountId, folderId: message.folderId, messageId: message.id }), origin).href;
+  return appDeepLink({ accountId: message.accountId, folderId: message.folderId, messageId: message.id }, origin);
 }
 
 /** Warm service-worker clicks carry the same compact URL as cold notification opens. */

@@ -64,7 +64,10 @@ migration or production acceptance. The package version is `1.0.1`.
 - **MCP:** authenticated HTTP endpoint at `/api/mcp` with mailbox-scoped tokens
   for search, retrieval, drafts, topics, flags and collaboration. Tokens can
   cover several accessible mailboxes and narrow permissions with read/drafts/full
-  modes. There is currently **no MCP send tool**, including in full mode.
+  modes. There is currently **no MCP send tool**, including in full mode. The
+  server introduces itself as "Noctua Mail" with instructions that tell AI clients
+  such as Claude to use it for the user's e-mail, and results link to the created or
+  changed item in the app (see [API](doc/API.md#mcp-server-identity-tool-metadata-and-links)).
 
 See the [documentation index](#documentation-index) for contracts and limitations.
 
