@@ -355,6 +355,51 @@ describe("saveDraftForAccount", () => {
       });
     }
   });
+
+  test("a failed old-UID deletion keeps save success and retries cleanup exactly once", async () => {
+    for (const retrySucceeds of [true, false]) {
+      const accountId = `draft-cleanup-${crypto.randomUUID()}`;
+      const account = buildAccount(accountId);
+      const drafts = buildDraftsFolder(accountId);
+      await upsertAccount(account);
+      await saveFoldersForAccount(accountId, [drafts]);
+      const initial = await saveDraftForAccount({ account, accountId, clientId: "synthetic", payload: {
+        to: "peer@example.test", subject: "Initial", text: "Original"
+      } });
+      deleteImapMessage.mockClear();
+      deleteImapMessage.mockImplementationOnce(async () => { throw new Error("Synthetic delete failure"); });
+      if (!retrySucceeds) deleteImapMessage.mockImplementationOnce(async () => { throw new Error("Synthetic retry failure"); });
+      const result = await saveDraftForAccount({ account, accountId, clientId: "synthetic", payload: {
+        draftId: initial.draftId, to: "peer@example.test", subject: "Updated", text: "Saved body"
+      } });
+      expect(deleteImapMessage).toHaveBeenCalledTimes(2);
+      expect(result.warning).toContain("Draft saved");
+      expect(result.warning).toContain(retrySucceeds ? "retried once" : "duplicate may remain");
+      expect(result.message?.body).toBe("Saved body");
+      expect((await getMessageById(accountId, result.draftId!))?.body).toBe("Saved body");
+    }
+  });
+
+  test("stale expectedUpdatedAt refuses the save before APPEND", async () => {
+    const accountId = `draft-version-${crypto.randomUUID()}`;
+    const account = buildAccount(accountId);
+    await upsertAccount(account);
+    await saveFoldersForAccount(accountId, [buildDraftsFolder(accountId)]);
+    const initial = await saveDraftForAccount({ account, accountId, clientId: "synthetic", payload: {
+      to: "peer@example.test", subject: "Initial", text: "Original"
+    } });
+    appendImapMessage.mockClear();
+    await expect(saveDraftForAccount({ account, accountId, clientId: "synthetic", payload: {
+      draftId: initial.draftId, expectedUpdatedAt: initial.message!.dateValue - 1,
+      to: "peer@example.test", subject: "Stale", text: "Changed"
+    } })).rejects.toMatchObject({ status: 409, code: "draft_changed" });
+    expect(appendImapMessage).not.toHaveBeenCalled();
+    const updated = await saveDraftForAccount({ account, accountId, clientId: "synthetic", payload: {
+      draftId: initial.draftId, expectedUpdatedAt: initial.message!.dateValue,
+      to: "peer@example.test", subject: "Fresh", text: "Changed"
+    } });
+    expect(updated.message!.dateValue).toBeGreaterThan(initial.message!.dateValue);
+  });
 });
 
 describe("saveDraftForAccount calendar attachments", () => {

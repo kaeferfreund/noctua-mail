@@ -16,6 +16,7 @@ import { resolveStoredMessageContentState } from "../../messageContentState";
 import { getAccountDb } from "../connection";
 import { buildMessageRowIdLookupCandidates } from "../../messageIds";
 import {
+  escapeLikePattern,
   getMessageCalendarInviteDataByMessageId,
   hydrateAttachment,
   parseReferences,
@@ -47,9 +48,9 @@ export async function getMessageById(accountId: string, messageId: string) {
     if (trimmed && trimmed !== normalizedLookup) {
       row = db
         .query(
-          `SELECT * FROM messages WHERE accountId = ? AND lower(messageId) LIKE ? ORDER BY dateValue DESC LIMIT 1`
+          `SELECT * FROM messages WHERE accountId = ? AND lower(messageId) LIKE ? ESCAPE '\\' ORDER BY dateValue DESC LIMIT 1`
         )
-        .get(accountId, `%${trimmed.toLowerCase()}%`) as any;
+        .get(accountId, `%${escapeLikePattern(trimmed.toLowerCase())}%`) as any;
     }
   }
   if (!row) return null;

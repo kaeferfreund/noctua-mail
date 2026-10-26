@@ -12,6 +12,8 @@ import { drainImapConnectionPool } from "@/lib/mail/imap/connectionPool";
 import { startImapServer } from "@/scripts/dev-fixture/imap-server";
 import { demoPass, demoUser } from "@/scripts/dev-fixture/seed";
 import { simpleParser } from "mailparser";
+import { saveDraftForAccount } from "@/lib/drafts";
+import { COMPOSE_INVITE_HEADER, decodeComposeInviteHeader } from "@/lib/composeInviteMetadata";
 
 const fixtureTest = (name: string, run: () => Promise<void>) =>
   isolatedImapTest(import.meta.url, "NOCTUA_MCP_DRAFT_EDIT_FIXTURE", name, run);
@@ -45,7 +47,7 @@ fixtureTest("MCP drafts over the HTTP route against the dev fixture: create, get
     };
     const drafts = () => server.store.get("Drafts")!.messages;
     const uids = () => drafts().map(message => message.uid);
-    const parsed = (uid: number) => simpleParser(drafts().find(message => message.uid === uid)!.mime.raw);
+    const parsed = (uid: number) => simpleParser(drafts().find(message => message.uid === uid)!.mime.raw, { skipImageLinks: true });
     const seededDraftUids = uids();
 
     // create → the fixture's Drafts mailbox holds the new message with its attachment
@@ -99,6 +101,47 @@ fixtureTest("MCP drafts over the HTTP route against the dev fixture: create, get
     expect(seededMail.from?.value[0]?.address).toBe(demoUser);
     expect((await call("get_draft_message", { draftId: seeded.draftId })).draft).toMatchObject({ subject: "Entwurf: Angebot geprüft",
       text: expect.stringContaining("synthetische Praxisnotiz") });
+
+    // Markdown source follows the same append semantics as the UI editor.
+    const markdown = await call("create_draft_message", { to: "peer@example.test", subject: "Markdown", markdown: "**Original**" });
+    const markdownRead = (await call("get_draft_message", { draftId: markdown.draftId })).draft;
+    const markdownUpdated = await call("update_draft_message", { draftId: markdown.draftId,
+      expectedUpdatedAt: markdownRead.updatedAt, appendBody: "*Addition*" });
+    const markdownMail = await parsed(markdownUpdated.message.imapUid);
+    expect(markdownMail.text).toContain("**Original**\n\n*Addition*");
+    expect(markdownMail.html).toContain("<em>Addition</em>");
+
+    // A UI-created text reply retains its invitation, quoted original and inline image.
+    // This image deliberately has no Content-ID until the MCP re-save repairs it.
+    const invite = { start: "2026-11-01T10:00:00Z", end: "2026-11-01T11:00:00Z", allDay: false, location: "Synthetic room" };
+    const reply = await saveDraftForAccount({ account, accountId, clientId: "synthetic-ui", actor: { userId: fixture.user.id, clientId: "synthetic-ui" }, payload: {
+      to: "peer@example.test", subject: "Reply", text: "Authored\n\nOn Monday, Sender wrote:\n> Original", composeFormat: "text",
+      html: '<p>Authored</p><div id="noctua-quoted-html"><blockquote>Original</blockquote></div>',
+      inReplyTo: "<original@example.test>", references: ["<original@example.test>"], invite,
+      attachments: [{ filename: "inline.png", contentType: "image/png", inline: true, dataUrl: `data:image/png;base64,${Buffer.from("synthetic image").toString("base64")}` }]
+    } });
+    expect(reply.message!.htmlBody).toContain("/attachments/");
+    const replyUpdated = await call("update_draft_message", { draftId: reply.draftId, appendBody: "Addition" });
+    const replyMail = await parsed(replyUpdated.message.imapUid);
+    expect(replyMail.text).toContain("Authored\n\nAddition\n\nOn Monday, Sender wrote:\n> Original");
+    expect(replyMail.inReplyTo).toBe("<original@example.test>");
+    expect(decodeComposeInviteHeader(String(replyMail.headers.get(COMPOSE_INVITE_HEADER)))).toEqual(invite);
+    expect(replyMail.attachments[0]!.cid).toBeTruthy();
+    expect(replyMail.attachments[0]!.content.toString()).toBe("synthetic image");
+
+    const inline = await saveDraftForAccount({ account, accountId, clientId: "synthetic-ui", payload: {
+      to: "peer@example.test", subject: "HTML image", text: "Authored", composeFormat: "html", html: "<p>Authored</p>",
+      attachments: [{ filename: "inline.png", contentType: "image/png", inline: true,
+        dataUrl: `data:image/png;base64,${Buffer.from("synthetic image").toString("base64")}` }]
+    } });
+    const oldUrl = inline.message!.attachments![0]!.url!;
+    expect(inline.message!.htmlBody).toContain(oldUrl);
+    const inlineUpdated = await call("update_draft_message", { draftId: inline.draftId, subject: "Image kept" });
+    const inlineMail = await parsed(inlineUpdated.message.imapUid);
+    expect(inlineMail.html).toContain(`cid:${inlineMail.attachments[0]!.cid}`);
+    expect(inlineMail.html).not.toContain(oldUrl);
+    expect(inlineUpdated.message.htmlBody).toContain(inlineUpdated.message.attachments[0].url);
+    expect(inlineUpdated.message.attachments[0].url).not.toBe(oldUrl);
   } finally {
     await drainImapConnectionPool();
     await server.stop();

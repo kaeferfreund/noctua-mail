@@ -30,7 +30,7 @@ import {
 import { prefixSubject } from "@/lib/mail/subjectPrefix";
 import { stripHtmlToText, stripStyleTags } from "@/lib/html";
 import { htmlToMarkdown } from "@/lib/markdownConverters";
-import { normalizeHtmlDerivedText } from "@/app/components/mailclient/composition/composeTextNormalization";
+import { normalizeHtmlDerivedText } from "@/lib/composeTextNormalization";
 import { appendImapMessage, deleteImapMessage, syncImapMessage } from "./serverImap";
 import { buildRawMessage, sendRawSmtpMessage } from "./serverSmtp";
 import { appendMessageFlags, hasMessageFlag } from "@/lib/messageFlags";
@@ -70,6 +70,7 @@ export type DraftAttachmentInput = {
 };
 
 export type SaveDraftInput = {
+  expectedUpdatedAt?: number;
   identityId?: string;
   draftId?: string | null;
   to: string;
@@ -108,6 +109,7 @@ export type CreateDraftMessageInput = {
 };
 
 export type SaveDraftResult = {
+  warning?: string;
   identityId: string;
   draftId: string | null;
   message: Message | null;
@@ -115,11 +117,13 @@ export type SaveDraftResult = {
 
 export class DraftSaveError extends Error {
   readonly status: number;
+  readonly code?: string;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.name = "DraftSaveError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -446,6 +450,12 @@ export async function saveDraftForAccount(params: {
   const { account, accountId, clientId, payload } = params;
   const existingDraft = payload.draftId ? await getMessageById(accountId, payload.draftId) : null;
   if (payload.draftId && !existingDraft) throw new DraftSaveError(404, "Draft not found");
+  const assertDraftVersion = (draft: Message | null) => {
+    if (payload.expectedUpdatedAt !== undefined && draft?.dateValue !== payload.expectedUpdatedAt) {
+      throw new DraftSaveError(409, "The draft has changed. Read it again before saving.", "draft_changed");
+    }
+  };
+  assertDraftVersion(existingDraft);
   let identityId = payload.identityId;
   if (existingDraft && identityId === undefined) {
     const from = parseAddressEmails(existingDraft.from);
@@ -509,6 +519,9 @@ export async function saveDraftForAccount(params: {
   }
   let uid: number | null | undefined;
   try {
+    if (existingDraft && payload.expectedUpdatedAt !== undefined) {
+      assertDraftVersion(await getMessageById(accountId, existingDraft.id));
+    }
     uid = await appendImapMessage(account, draftsMailbox, raw, APPENDED_DRAFT_FLAGS, clientId, undefined, { beforeAppend: assertCurrent });
   } catch (error) {
     await scheduleHold?.abort(error);
@@ -543,6 +556,8 @@ export async function saveDraftForAccount(params: {
       sanitized.quotedHtmlEdited = payload.quotedHtmlEdited;
     }
     sanitized.draftInvite = payload.invite ?? null;
+    // MIME dates have second precision; edits within the same second still need a new revision.
+    if (existingDraft) sanitized.dateValue = Math.max(Date.now(), existingDraft.dateValue + 1);
     if (params.localFlags) sanitized.flags = appendMessageFlags(sanitized.flags, params.localFlags);
     const stored = await upsertMessages(account.id, null, [sanitized], false, { beforeWrite, replaceDraftId: existingDraft?.id });
     draftId = stored.messageRowIds.get(sanitized.id) ?? sanitized.id;
@@ -555,12 +570,24 @@ export async function saveDraftForAccount(params: {
     } : null;
   }
 
+  let warning: string | undefined;
   if (existingDraft?.imapUid && existingDraft.mailboxPath) {
-    assertCurrent();
-    await deleteImapMessage(account, existingDraft.mailboxPath, existingDraft.imapUid, clientId, assertCurrent);
+    const cleanup = async () => {
+      assertCurrent();
+      await deleteImapMessage(account, existingDraft.mailboxPath!, existingDraft.imapUid!, clientId, assertCurrent);
+    };
+    try {
+      await cleanup();
+    } catch (error) {
+      if (!savedMessage) throw error;
+      warning = "Draft saved. Removing the previous IMAP copy failed; cleanup was retried once. Do not save again to retry cleanup.";
+      try { await cleanup(); } catch {
+        warning = "Draft saved, but the previous IMAP copy could not be removed after two attempts. A duplicate may remain on the server. Do not save again to retry cleanup.";
+      }
+    }
   }
 
-  return { draftId, message: savedMessage, identityId: identity.id };
+  return { draftId, message: savedMessage, identityId: identity.id, ...(warning ? { warning } : {}) };
 }
 
 /**

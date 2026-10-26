@@ -35,7 +35,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
         payload,
         actor: collabActorFromSession(accountContext.session, accountContext.clientId)
       });
-      return NextResponse.json({ ok: true, identityId: result.identityId, draftId: result.draftId, message: result.message });
+      return NextResponse.json({ ok: true, ...result });
     } catch (error) {
       if (error instanceof OutboundAuthorizationError) return error.response;
       if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
