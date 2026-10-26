@@ -30,7 +30,7 @@ import {
 import { prefixSubject } from "@/lib/mail/subjectPrefix";
 import { stripHtmlToText, stripStyleTags } from "@/lib/html";
 import { htmlToMarkdown } from "@/lib/markdownConverters";
-import { normalizeHtmlDerivedText } from "@/app/components/mailclient/composition/composeTextNormalization";
+import { normalizeHtmlDerivedText } from "@/lib/composeTextNormalization";
 import { appendImapMessage, deleteImapMessage, syncImapMessage } from "./serverImap";
 import { buildRawMessage, sendRawSmtpMessage } from "./serverSmtp";
 import { appendMessageFlags, hasMessageFlag } from "@/lib/messageFlags";
