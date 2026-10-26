@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import type { Message } from "@/lib/data";
 import { inspectSenderKeyLegacyRows, type SenderKeyLegacyCounts } from "@/lib/db";
 import {
   drainImapConnectionPool,
@@ -219,8 +220,13 @@ export async function runSenderKeyResync(options: {
             }
             // A concurrent sync may have refreshed, moved or removed the row
             // meanwhile: the write re-checks it under the shard's write lock.
-            const existing = await getMessageById(stats.accountId, row.id);
-            const result = existing?.id === row.id
+            // The live row must still be the candidate (same folder, UID and Message-ID):
+            // a moved or renumbered row is never resynced under the candidate's UID, so
+            // the guarded resync never has to rewrite the stored UID before its checks.
+            const existing = await getMessageById(stats.accountId, row.id) as (Message & { mailboxPath?: string | null }) | null;
+            const unchanged = existing?.id === row.id && existing.imapUid === row.imapUid
+              && existing.mailboxPath?.trim() === mailboxPath && existing.messageId === row.messageId;
+            const result = unchanged
               ? await resyncImapMessageGuarded(account, existing, row.imapUid, {
                 readOnly: true,
                 uidValidity,
@@ -235,8 +241,8 @@ export async function runSenderKeyResync(options: {
                 log(`${stats.accountId}: UIDVALIDITY of a mailbox changed during the resync, its remaining rows are left unchanged`);
                 renumbered = true;
                 stats.uidValidityChanged += 1;
-              } else if (result.outcome === "gone") stats.gone += 1;
-              else if (result.outcome === "message-id-mismatch") stats.uidMismatch += 1;
+              } else if (result.outcome === "gone") { stats.gone += 1; stats.present -= 1; }
+              else if (result.outcome === "message-id-mismatch") { stats.uidMismatch += 1; stats.present -= 1; }
               else stats.changed += 1;
               report(row, result.outcome === "message-id-mismatch" ? "uid-mismatch" : result.outcome);
               continue;

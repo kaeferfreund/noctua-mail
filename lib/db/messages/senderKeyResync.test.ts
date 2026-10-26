@@ -242,7 +242,7 @@ isolatedImapTest(import.meta.url, "NOCTUA_REAL_SENDER_KEY_RESYNC",
           return message;
         } }
       } });
-      expect(result.accounts[0]).toMatchObject({ legacy: 6, examined: 6, uidValidityChanged: 3, present: 5, gone: 1, changed: 1,
+      expect(result.accounts[0]).toMatchObject({ legacy: 6, examined: 6, uidValidityChanged: 3, present: 4, gone: 1, changed: 1,
         resynced: 1, stampedSenderKey: 1 });
       const row = (id: string, outcome: string, mailboxPath: string, imapUid: number) =>
         ({ accountId: account.id, id, outcome, mailboxPath, imapUid });
