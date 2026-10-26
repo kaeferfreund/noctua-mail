@@ -2,6 +2,8 @@
 
 import { useContext, useEffect, useLayoutEffect, useRef } from "react";
 
+import { recordOverlayBackFallback } from "@/lib/ui/clientErrorReporter";
+
 import { UrlHistoryContext } from "./UrlHistoryContext";
 
 type Overlay = { id: number; close: () => void; pushed: boolean };
@@ -33,7 +35,7 @@ function finishReturn() {
 function beginReturn() {
   returning = true;
   if (returnTimer !== undefined) window.clearTimeout(returnTimer);
-  returnTimer = window.setTimeout(() => { returnTimer = undefined; if (returning) { finishReturn(); updateListener(); } }, MOBILE_OVERLAY_BACK_TIMEOUT_MS);
+  returnTimer = window.setTimeout(() => { returnTimer = undefined; if (returning) { recordOverlayBackFallback(); finishReturn(); updateListener(); } }, MOBILE_OVERLAY_BACK_TIMEOUT_MS);
 }
 
 /** Classify from current state too: a window listener may run before onPop. */
