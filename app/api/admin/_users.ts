@@ -17,6 +17,15 @@ const {recoveryAttempts,mutationAttempts,mutationIpAttempts}=shared[limitsKey]??
   mutationIpAttempts:createRateLimiter({windowMs:60000,max:30})
 };
 
+/** Shared budget for admin mutations, including invite cleanup and revocation. */
+export function checkAdminMutationRateLimit(request: Request, userId: string) {
+  const actorLimited = mutationAttempts.isLimited(userId);
+  const ipLimited = mutationIpAttempts.isLimited(getRequestIp(request));
+  return actorLimited || ipLimited
+    ? NextResponse.json({ ok: false, code: "admin_rate_limited" }, { status: 429, headers: { "retry-after": "60" } })
+    : null;
+}
+
 export async function handleAdminUser(request:Request,action:"invite"|"generic-invite"|"update"|"delete"|"recovery"|AdminSecurityAction,userId="",passkeyId?:string) {
   const bodyless=action==="passkey-remove"||action==="sessions-revoke";
   const origin=bodyless?await requireBodylessSameOrigin(request):requireJsonSameOrigin(request);if(origin)return origin;
@@ -24,8 +33,8 @@ export async function handleAdminUser(request:Request,action:"invite"|"generic-i
   const headers=source.responseHeaders;headers.set("cache-control","no-store");headers.set("referrer-policy","no-referrer");
   try {
     if(["recovery","mfa-reset","passkey-remove","sessions-revoke"].includes(action) && recoveryAttempts.isLimited(source.userId))return forwardAuthHeaders(NextResponse.json({ok:false,code:"recovery_rate_limited"},{status:429,headers:{"retry-after":"60"}}),headers);
-    const actorLimited=mutationAttempts.isLimited(source.userId),ipLimited=mutationIpAttempts.isLimited(getRequestIp(request));
-    if(actorLimited || ipLimited)return forwardAuthHeaders(NextResponse.json({ok:false,code:"admin_rate_limited"},{status:429,headers:{"retry-after":"60"}}),headers);
+    const limited=checkAdminMutationRateLimit(request,source.userId);
+    if(limited)return forwardAuthHeaders(limited,headers);
     const auth=await getAuth(),db=await getDb();
     const text=bodyless?"":await request.text();
     const body:unknown=bodyless || action==="generic-invite" && !text?{}:JSON.parse(text);

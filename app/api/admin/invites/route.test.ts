@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { DELETE, GET, POST } from "./route";
 import { POST as REVOKE } from "./[id]/revoke/route";
-import { createAuthenticatedTestSession } from "@/lib/testAuthHarness";
+import { createAuthenticatedTestSession, syntheticRequestIp } from "@/lib/testAuthHarness";
 import { inviteHistoryId } from "@/lib/db";
 
 const ORIGIN = "http://localhost:3000";
@@ -105,4 +105,31 @@ describe("admin invite history", () => {
     expect(audit.actorUserId).toBe(user.id);
     expect(JSON.parse(audit.payload)).toMatchObject({ reason: "admin_revoked", email: `revoke-${tag}@example.test` });
   });
+});
+
+
+test("invite mutations share the per-admin budget and apply privacy headers even when limited", async () => {
+  const f = await createAuthenticatedTestSession(undefined, "admin");
+  const ip = syntheticRequestIp();
+  for (let i = 0; i < 11; i++) {
+    const headers = { cookie: f.jar.header(), origin: ORIGIN, "x-forwarded-for": ip };
+    const response = i % 2 === 0
+      ? await DELETE(new Request(url, { method: "DELETE", headers }))
+      : await REVOKE(new Request(`${url}/unknown/revoke`, { method: "POST", headers }), { params: Promise.resolve({ id: "unknown" }) });
+    expect(response.status).toBe(i === 10 ? 429 : i % 2 === 0 ? 200 : 409);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("referrer-policy")).toBe("no-referrer");
+    if (i === 10) expect(response.headers.get("retry-after")).toBe("60");
+  }
+});
+
+test("invite cleanup limits a shared IP across different admins", async () => {
+  const ip = syntheticRequestIp();
+  const admins = await Promise.all(Array.from({ length: 4 }, () => createAuthenticatedTestSession(undefined, "admin")));
+  for (let i = 0; i < 31; i++) {
+    const response = await DELETE(new Request(url, { method: "DELETE", headers: {
+      cookie: admins[i % admins.length].jar.header(), origin: ORIGIN, "x-forwarded-for": ip
+    } }));
+    expect(response.status).toBe(i === 30 ? 429 : 200);
+  }
 });
