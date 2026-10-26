@@ -370,7 +370,7 @@ function ThreadMessageCard({
   };
 
   const renderTextPanel = (body: string | undefined) => (
-    <div className={styles.textView} style={{ fontSize: `${14 * fontScale}px` }}>
+    <div className={styles.textView} style={{ fontSize: `${15 * fontScale}px` }}>
       <QuoteRenderer body={body ?? ""} />
     </div>
   );

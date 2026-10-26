@@ -9,7 +9,7 @@
 .container :global(.w-md-editor) {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  --md-editor-font-family: var(--font-mono);
+  --md-editor-font-family: var(--font-sans);
 }
 
 .container :global(.w-md-editor-toolbar) {
@@ -35,14 +35,21 @@
   tab-size: 2 !important;
 }
 
-/* Force pixel-perfect font synchronization across ALL inner syntax highlight spans and the textarea */
+/* Force pixel-perfect font synchronization across ALL inner syntax highlight spans and the textarea.
+   The mail is written in the app font, the same font the reader shows it in. */
 .container :global(.w-md-editor-text-pre) *,
 .container :global(.w-md-editor-text-pre),
 .container :global(.w-md-editor-text-input) {
-  font-family: var(--font-mono) !important;
+  font-family: var(--font-sans) !important;
   font-size: 15px !important;
   line-height: 22px !important;
   letter-spacing: normal !important;
+}
+
+/* The preview pane renders like the sent mail (lib/markdownEmail.ts). */
+.container :global(.wmde-markdown) {
+  font-family: var(--font-sans);
+  font-size: 15px;
 }
 
 /* MARKDOWN DEBUGGING: Uncomment to visualize alignment: the textarea text will turn semi-transparent red */

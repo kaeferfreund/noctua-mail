@@ -288,11 +288,13 @@ describe("app chrome typography", () => {
 
   test("app code names fonts only through the tokens", () => {
     // The e-mail iframe (HtmlMessage) and SVG images rendered outside the
-    // document (logo route, sender icons) cannot load the app's font face.
+    // document (logo route, sender icons) cannot load the app's font face,
+    // and neither can the HTML of sent markdown mails (markdownEmail).
     const exempt = new Set([
       path.join("app", "globals.test.ts"),
       path.join("app", "components", "HtmlMessage.tsx"),
       path.join("app", "icons", "logo.svg", "route.ts"),
+      path.join("lib", "markdownEmail.ts"),
       path.join("lib", "senderIcons.ts"),
       path.join("lib", "ui", "fonts.ts")
     ]);
