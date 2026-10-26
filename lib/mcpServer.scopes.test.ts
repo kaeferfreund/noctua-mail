@@ -44,6 +44,12 @@ test("draft edit tools: reading a draft needs read, editing it needs drafts", ()
     .toEqual(["read", "read", "drafts", "drafts"]);
 });
 
+test("signature template tools: listing needs read, changing templates needs manage like identity management", () => {
+  expect(["list_signature_templates", "save_signature_template", "delete_signature_template", "set_default_signature_template"].map(mcpToolScope))
+    .toEqual(["read", "manage", "manage", "manage"]);
+  expect(mcpToolScope("update_sender_identity")).toBe("manage");
+});
+
 test("tools/list advertises only the tools the token's stored scopes allow", async () => {
   expect(await listedTools(minted.tokenRecord)).toEqual(toolsFor(["read"]));
   const drafts = await mintMode("drafts");

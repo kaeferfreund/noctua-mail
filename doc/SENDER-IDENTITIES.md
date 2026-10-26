@@ -131,6 +131,14 @@ MCP's internal own-address context uses the same scope, never foreign identities
 personal overrides or credentials. Slice 2 adds the actor-aware identity MCP tools
 documented below.
 
+Mailbox signature templates (`settings.signatures`, `settings.defaultSignatureId`)
+can also be edited over MCP with `list_signature_templates` (viewer, includes the
+body), `save_signature_template`, `delete_signature_template` and
+`set_default_signature_template` (manager, token scope `manage`). These tools write
+through the same mailbox settings service as the settings tab, so validation,
+`signature_in_use`, conflict detection and audit are identical; deleting the mailbox
+default clears it, as the settings tab does. See `doc/API.md` for the shapes.
+
 Save identities through POST/PATCH/DELETE and personal changes through PUT prefs,
 separately from `/settings`; never post a whole identities array or personal
 fields in account.settings/effectiveSettings. After identity saves, reload the

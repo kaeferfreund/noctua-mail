@@ -27,10 +27,14 @@ const defaultVerification: CredentialVerification = { imap: verifyImapCredential
 const endpointKeys = ["host", "port", "secure", "user"] as const;
 const normalized = (value: string) => value.trim().toLowerCase();
 
-/** Sole repair/write-back service: relogin, PUT, POST-existing and optional IMAP login. */
-export async function updateMailboxCredentials(accountId: string, patch: MailboxPatch, actor: CredentialActor,
-  verification: CredentialVerification = defaultVerification, database?: Database): Promise<Account> {
+/**
+ * Sole repair/write-back service: relogin, PUT, POST-existing, optional IMAP login and MCP signature templates.
+ * A patch function derives the change from the same row the commit-time conflict check compares against.
+ */
+export async function updateMailboxCredentials(accountId: string, patchInput: MailboxPatch | ((original: Account) => MailboxPatch), actor: CredentialActor,
+  verificationInput: Partial<CredentialVerification> = defaultVerification, database?: Database): Promise<Account> {
   const db = database ?? await getDb();
+  const verification = { ...defaultVerification, ...verificationInput };
   const originalRow = db.prepare("SELECT * FROM accounts WHERE id=?").get(accountId);
   if (!originalRow) throw new MailboxCredentialError("Account not found", 404);
   const original = mapAccountRow(originalRow);
@@ -38,6 +42,7 @@ export async function updateMailboxCredentials(accountId: string, patch: Mailbox
     if (!roleAtLeast(resolveAccountRoleRow(db, actor.userId, accountId), "manager")) throw new MailboxCredentialError("Insufficient mailbox role", 403);
   };
   assertActor(); verification.authorize?.();
+  const patch = typeof patchInput === "function" ? patchInput(original) : patchInput;
   for (const key of ["id", "email", "dbPath", "ownerUserId"] as const) {
     if (key in patch && (patch as Record<string, unknown>)[key] !== (originalRow as Record<string, unknown>)[key]) throw new MailboxCredentialError(`${key} is immutable`);
   }
