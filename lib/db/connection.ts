@@ -51,6 +51,7 @@ const accountDbInitialized = new Set<string>();
 const accountDbIdleTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const accountDbPathByAccountId = new Map<string, string>();
 let accountDbPathMasterChanges = -1;
+let accountDbPathMasterVersion = -1;
 // Empty accounts keep probing until their first data has been backfilled.
 // Readiness belongs to an account within a shard, and ends when that shard closes.
 const runtimeProbeReadyKeys = new Set<string>();
@@ -331,14 +332,21 @@ export async function initializeMasterDb() {
   await getDb();
 }
 
+/** A stale background task must never create a new shard after account deletion. */
+export class AccountNotFoundError extends Error {
+  constructor() { super("Account not found"); this.name = "AccountNotFoundError"; }
+}
+
 async function resolveAccountDbPath(accountId: string) {
   const master = await getDb();
   // The control plane can reassign shard paths on this live connection.
-  // Checking its write counter avoids stale paths without repeating account lookups.
+  // The write counter covers this connection; data_version covers other workers/processes.
   const { changes } = master.query(`SELECT total_changes() AS changes`).get() as { changes: number };
-  if (changes !== accountDbPathMasterChanges) {
+  const { data_version: version } = master.query("PRAGMA data_version").get() as { data_version: number };
+  if (changes !== accountDbPathMasterChanges || version !== accountDbPathMasterVersion) {
     accountDbPathByAccountId.clear();
     accountDbPathMasterChanges = changes;
+    accountDbPathMasterVersion = version;
   }
   const cached = accountDbPathByAccountId.get(accountId);
   if (cached) return cached;
@@ -347,9 +355,7 @@ async function resolveAccountDbPath(accountId: string) {
     .prepare(`SELECT id, dbPath FROM accounts WHERE id = ?`)
     .get(accountId) as { id?: string; dbPath?: string | null } | undefined;
   const defaultPath = getDefaultAccountDbPath(accountId);
-  if (!row?.id) {
-    return defaultPath;
-  }
+  if (!row?.id) throw new AccountNotFoundError();
   if (row.dbPath && row.dbPath.trim().length > 0) {
     accountDbPathByAccountId.set(accountId, row.dbPath);
     return row.dbPath;
@@ -359,7 +365,8 @@ async function resolveAccountDbPath(accountId: string) {
       .run(defaultPath, accountId);
     const current = master.prepare(`SELECT dbPath FROM accounts WHERE id = ?`).get(accountId) as
       { dbPath?: string | null } | undefined;
-    return current?.dbPath?.trim() ? current.dbPath : defaultPath;
+    if (!current) throw new AccountNotFoundError();
+    return current.dbPath?.trim() ? current.dbPath : defaultPath;
   }).immediate());
   accountDbPathByAccountId.set(accountId, resolved);
   return resolved;
@@ -369,6 +376,8 @@ export async function getAccountDb(accountId: string) {
   const dbPath = await resolveAccountDbPath(accountId);
   if (!accountDbInstances.has(dbPath)) {
     await ensureDatabaseCtor();
+    // Recheck after the await immediately before opening/creating a file.
+    if (!masterDbInstance?.prepare("SELECT 1 FROM accounts WHERE id=?").get(accountId)) throw new AccountNotFoundError();
     ensureDbParentDir(dbPath);
     const accountDb = new DatabaseCtor(dbPath);
     try {
