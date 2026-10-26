@@ -10,6 +10,7 @@ import { getMessageSource } from "@/lib/storage";
 import { readStoredAttachmentData } from "@/lib/mail/storedAttachmentData";
 import { parseAddressEmails } from "@/lib/ownAddresses";
 import { buildAccountAttachmentPath } from "@/lib/accountApiPaths";
+import { randomUUID } from "node:crypto";
 
 export type DraftComposeFormat = "text" | "html" | "markdown";
 
@@ -35,6 +36,7 @@ export type EditableDraft = {
 
 /** Fields an edit may replace; omitted fields keep the stored draft's value. */
 export type DraftUpdatePatch = {
+  expectedUpdatedAt?: number;
   identityId?: string;
   to?: string;
   cc?: string;
@@ -161,26 +163,34 @@ function storedBody(message: Message, appendBody?: string): DraftBody {
  * back at their Content-ID. A missing attachment fails the edit instead of
  * silently dropping it.
  */
-async function storedAttachments(accountId: string, message: Message, html: string | undefined) {
-  let nextHtml = html;
+async function storedAttachments(accountId: string, message: Message, body: DraftBody) {
+  const nextBody = { ...body };
   const attachments: DraftAttachmentInput[] = [];
   for (const attachment of message.attachments ?? []) {
     const data = await readStoredAttachmentData(accountId, message.id, attachment);
     if (!data) {
       throw new DraftSaveError(409, `Attachment "${attachment.filename}" of this draft is not available locally. Open the draft in Noctua to edit it.`);
     }
+    const cid = attachment.cid || (attachment.inline ? `draft-inline-${randomUUID()}@example.test` : undefined);
     attachments.push({ filename: attachment.filename, contentType: attachment.contentType, inline: attachment.inline,
-      cid: attachment.cid, dataUrl: `data:application/octet-stream;base64,${data.toString("base64")}` });
-    if (nextHtml && attachment.inline && attachment.cid) {
+      cid, dataUrl: `data:application/octet-stream;base64,${data.toString("base64")}` });
+    if (attachment.inline && cid) {
       const url = attachment.url ?? buildAccountAttachmentPath(accountId, message.id, attachment.id);
-      nextHtml = nextHtml.split(url).join(`cid:${attachment.cid}`);
+      nextBody.html = nextBody.html?.split(url).join(`cid:${cid}`);
+      if (nextBody.markdown !== undefined) {
+        nextBody.markdown = nextBody.markdown.split(url).join(`cid:${cid}`);
+        nextBody.text = nextBody.markdown;
+      }
     }
   }
-  return { attachments, html: nextHtml };
+  return { attachments, body: nextBody };
 }
 
 /** SaveDraftInput that rewrites `message` in place with only the patched fields changed. */
 export async function buildDraftUpdateInput(accountId: string, message: Message, patch: DraftUpdatePatch): Promise<SaveDraftInput> {
+  if (patch.expectedUpdatedAt !== undefined && patch.expectedUpdatedAt !== message.dateValue) {
+    throw new DraftSaveError(409, "The draft has changed. Read it again before saving.", "draft_changed");
+  }
   const replacesBody = patch.text !== undefined || patch.html !== undefined || patch.markdown !== undefined;
   if (replacesBody && patch.appendBody !== undefined) {
     throw new DraftSaveError(400, 'Use either "appendBody" or "text"/"html"/"markdown", not both.');
@@ -194,18 +204,18 @@ export async function buildDraftUpdateInput(accountId: string, message: Message,
   const appendBody = patch.appendBody?.trim();
   if (patch.appendBody !== undefined && !appendBody) throw new DraftSaveError(400, '"appendBody" must not be empty.');
   const body: DraftBody = replacesBody ? resolveDraftBody(patch) : storedBody(message, appendBody);
-  const { attachments, html } = await storedAttachments(accountId, message, body.html);
+  const { attachments, body: restoredBody } = await storedAttachments(accountId, message, body);
   const source = await getMessageSource(accountId, message.id);
   const invite = source ? extractComposeInviteDraftFromSource(source) : null;
   return {
     draftId: message.id,
+    expectedUpdatedAt: patch.expectedUpdatedAt,
     identityId: patch.identityId,
     to: patch.to?.trim() ?? message.to ?? "",
     cc: patch.cc?.trim() ?? message.cc ?? "",
     bcc: patch.bcc?.trim() ?? message.bcc ?? "",
     subject: patch.subject?.trim() ?? message.subject ?? "",
-    ...body,
-    html,
+    ...restoredBody,
     inReplyTo: message.inReplyTo,
     references: message.references,
     xForwardedMessageId: message.xForwardedMessageId,

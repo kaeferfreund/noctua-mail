@@ -230,6 +230,7 @@ const DRAFT_EDIT_HINT =
 const UPDATE_DRAFT_MESSAGE_SCHEMA = {
   ...ACCOUNT_ID_ARG,
   ...DRAFT_ID_ARG,
+  expectedUpdatedAt: z.number().int().nonnegative().optional().describe("updatedAt from get_draft_message; rejects a changed draft with draft_changed (409). Omit for unconditional editing."),
   identityId: z.string().min(1).max(256).optional().describe("Enabled sender identity. Omit to keep the draft's sender."),
   to: z.string().optional().describe("Replaces the whole To list. Omit to keep it; empty string clears it."),
   cc: z.string().optional().describe("Replaces the whole Cc list. Omit to keep it; empty string clears it."),
@@ -240,7 +241,7 @@ const UPDATE_DRAFT_MESSAGE_SCHEMA = {
   html: z.string().optional().describe("Replaces the whole body as HTML."),
   composeFormat: z.enum(["text", "html", "markdown"]).optional().describe("Body format; only together with text, html or markdown."),
   appendBody: z.string().optional().describe(
-    "Plain-text paragraph appended to the existing body, after the authored text and before a quoted original. Keeps the draft's format. Cannot be combined with text/html/markdown."
+    "Paragraph appended after the authored text and before a quoted original. Uses Markdown source for Markdown drafts (matching the UI editor), plain text for text/HTML drafts. Keeps the draft's format. Cannot be combined with text/html/markdown."
   )
 };
 
@@ -401,11 +402,11 @@ function senderPrefs(prefs: import("./data").UserAccountPrefs) {
 }
 function senderToolOutput(shape: Record<string, z.ZodType>) {
   const variants = z.discriminatedUnion("ok", [z.object({ ok: z.literal(true), ...shape }),
-    z.object({ ok: z.literal(false), code: z.string(), message: z.string() })]);
+    z.object({ ok: z.literal(false), code: z.string(), message: z.string(), status: z.number().optional() })]);
   // The MCP SDK advertises only object roots. Keep that root while publishing
   // and validating the same discriminated variants in JSON Schema and Zod.
   const optionalShape = Object.fromEntries(Object.entries(shape).map(([key, schema]) => [key, schema.optional()]));
-  return z.object({ ok: z.boolean(), ...optionalShape, code: z.string().optional(),
+  return z.object({ ok: z.boolean(), ...optionalShape, code: z.string().optional(), status: z.number().optional(),
     message: shape.message ? z.union([shape.message, z.string()]).optional() : z.string().optional() })
     .superRefine((value, context) => {
       const parsed = variants.safeParse(value);
@@ -423,8 +424,9 @@ async function senderToolCall(run: () => Promise<ReturnType<typeof buildToolResu
     if (error instanceof SenderIdentityError || error instanceof SignatureTemplateError || error instanceof MailboxCredentialError ||
         error instanceof InvalidAccountPreferencesError || error instanceof DraftSaveError) {
       const code = error instanceof SenderIdentityError || error instanceof SignatureTemplateError ? error.code
-        : error instanceof MailboxCredentialError ? mailboxErrorCode(error.status) : error instanceof InvalidAccountPreferencesError ? "invalid_preferences" : "invalid_draft";
-      return { ...buildToolResult(error.message, { ok: false, code, message: error.message }), isError: true };
+        : error instanceof MailboxCredentialError ? mailboxErrorCode(error.status) : error instanceof InvalidAccountPreferencesError ? "invalid_preferences" : error.code ?? "invalid_draft";
+      return { ...buildToolResult(error.message, { ok: false, code, message: error.message,
+        ...(error instanceof DraftSaveError ? { status: error.status } : {}) }), isError: true };
     }
     throw error;
   }
@@ -977,6 +979,7 @@ async function createDraftMessage(
     ok: true,
     mode: args.mode ?? "new",
     referenceMessageId: args.messageId?.trim() || null,
+    ...(result.warning ? { warning: result.warning } : {}),
     identityId: result.identityId,
     draftId: result.draftId,
     message,
@@ -1005,6 +1008,7 @@ async function updateDraftMessage(context: McpAccountContext, args: DraftUpdateP
     identityId: result.identityId,
     draftId: result.draftId,
     previousDraftId: existing.id,
+    ...(result.warning ? { warning: result.warning } : {}),
     draftIdChanged: result.draftId !== existing.id,
     message,
     url: message ? messageUrl(message) : null
@@ -1362,7 +1366,7 @@ export async function executeMcpHttpRequest(params: {
     annotations: ADDITIVE_CHANGE,
     outputSchema: senderToolOutput({ mode: z.enum(["new", "reply", "forward"]), referenceMessageId: z.string().nullable(),
       identityId: z.string(), draftId: z.string().nullable(), message: z.object(SEARCH_RESULT_MESSAGE_SCHEMA).passthrough().nullable(),
-      url: URL_OUTPUT.nullable() })
+      url: URL_OUTPUT.nullable(), warning: z.string().optional() })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId, "editor");
     return senderToolCall(async () => {
@@ -1411,7 +1415,7 @@ export async function executeMcpHttpRequest(params: {
     annotations: ADDITIVE_CHANGE,
     outputSchema: senderToolOutput({ mode: z.enum(["new", "reply", "forward"]), identityId: z.string(), draftId: z.string().nullable(),
       previousDraftId: z.string(), draftIdChanged: z.boolean(), message: z.object(SEARCH_RESULT_MESSAGE_SCHEMA).passthrough().nullable(),
-      url: URL_OUTPUT.nullable() })
+      url: URL_OUTPUT.nullable(), warning: z.string().optional() })
   }, async args => {
     const ctx = await resolveAccountContext(context, args.accountId, "editor");
     return senderToolCall(async () => {
