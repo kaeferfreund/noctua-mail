@@ -12,7 +12,11 @@ import { claimDueScheduledSends, getScheduledSend } from "@/lib/db";
 import { cancelDraftSchedule, releaseDraftScheduleForEdit } from "@/app/components/mailclient/scheduledSend/scheduledSendClient";
 import { ScheduledSendScheduler } from "@/lib/scheduledSendJob";
 import { defaultScheduledSendDeps } from "@/lib/scheduledSend";
-import type { Account } from "@/lib/data";
+import type { Account, Message } from "@/lib/data";
+import { getMessageSource } from "@/lib/storage";
+import { resyncImapMessageIntoDb } from "@/lib/mail/resyncMessage";
+import { drainImapConnectionPool } from "@/lib/mail/imap/connectionPool";
+import { startImapServer } from "../../../../../../scripts/dev-fixture/imap-server";
 import { POST as smtpSend } from "./route";
 import { POST as sendNow } from "../../drafts/[draftId]/send/route";
 import { POST as saveDraft } from "../../drafts/save/route";
@@ -217,4 +221,48 @@ realMailTest("the real job relays the fingerprinted draft exactly once across re
     expect(await getScheduledSend(s.scheduleId)).toMatchObject({ status: "sent", lastError: null });
     expect((await s.compose()).status).toBe(409);
   } finally { await scheduler.stop(); }
+});
+
+for (const changed of [false, true]) realMailTest(`saved and scheduled draft after real IMAP resync: ${changed ? "changed content cancels" : "unchanged content sends exactly once"}`, async () => {
+  const imap = await startImapServer({ port: 0, user: demoUser, pass: demoPass });
+  let scheduler: ScheduledSendScheduler | undefined;
+  try {
+    const f = await createScheduledSendFixture({ ...local(sink.port),
+      imap: { host: "127.0.0.1", port: imap.port, secure: false, user: demoUser, password: demoPass } });
+    f.master.prepare("UPDATE sender_identities SET displayName=? WHERE id=?").run("Synthetic Sender", f.identity.id);
+    const subject = "Synthetic resynced schedule";
+    const saved = await saveDraft(f.request("POST", { identityId: f.identity.id,
+      to: "recipient@example.test", subject, text: "Synthetic body" }, {}, f, "/drafts/save"), f.params());
+    expect(saved.status).toBe(200);
+    const { draftId, message } = await saved.json() as { draftId: string; message: Message };
+    expect(message.from).toBe(`"Synthetic Sender" <${f.identity.email}>`);
+    expect(message.cc).toBeUndefined();
+    expect(message.bcc).toBeUndefined();
+    const raw = (await getMessageSource(f.accountId, draftId, { exact: true }))!;
+    const sendAt = Date.now() + 3_600_000;
+    const planned = await schedule(f.request("POST", { draftId, sendAt }), f.params());
+    expect(planned.status).toBe(201);
+    const { scheduledSend } = await planned.json();
+    // An external edit replaces the IMAP copy but preserves Message-ID. Otherwise re-fetch
+    // the very same saved MIME bytes through the real IMAP parser and ingestion path.
+    const uid = changed ? imap.store.append("Drafts", Buffer.from(`${raw}\r\nChanged synthetic content`), ["\\Draft"]).uid
+      : message.imapUid!;
+    const account = (await f.db.getAccountById(f.accountId))!;
+    const refreshed = await resyncImapMessageIntoDb(account, message, uid);
+    expect(refreshed?.from).toBe(`Synthetic Sender <${f.identity.email}>`);
+    expect(refreshed?.cc).toBe("");
+    expect(refreshed?.bcc).toBe("");
+    expect(await getMessageSource(f.accountId, draftId, { exact: true })).toBe(changed ? `${raw}\r\nChanged synthetic content` : raw);
+    const before = delivered(subject);
+    scheduler = new ScheduledSendScheduler({ ...defaultScheduledSendDeps, now: () => sendAt });
+    await scheduler.tick();
+    await scheduler.tick();
+    expect(delivered(subject)).toBe(before + (changed ? 0 : 1));
+    expect(await getScheduledSend(scheduledSend.id)).toMatchObject(changed
+      ? { status: "cancelled", lastError: "draft_changed" } : { status: "sent", lastError: null });
+  } finally {
+    await scheduler?.stop();
+    await drainImapConnectionPool();
+    await imap.stop();
+  }
 });

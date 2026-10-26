@@ -4,6 +4,26 @@ import { saveMessageSource, getMessageSource } from "./storage";
 import { assertSchedulableDraft, attemptScheduledSend } from "./scheduledSend";
 import { sendDraftForAccount } from "./drafts";
 import { claimDueScheduledSends, createScheduledSend, processScheduleOwner } from "./db/scheduledSends";
+import { scheduledDraftFingerprint } from "./scheduledSendFingerprint";
+
+test("fingerprint ignores address presentation, case, ordering and absent empty fields", () => {
+  const draft = { messageId: "<synthetic@example.test>", from: '"Synthetic Sender" <SENDER@example.test>',
+    to: '"Synthetic Two" <two@example.test>, One <ONE@example.test>', cc: undefined, bcc: undefined };
+  expect(scheduledDraftFingerprint(draft, "identical MIME source")).toBe(scheduledDraftFingerprint({
+    ...draft, from: "Synthetic Sender <sender@example.test>", to: "one@example.test, two@example.test", cc: "", bcc: ""
+  }, "identical MIME source"));
+  const withCopies = { ...draft, cc: "second@example.test, first@example.test", bcc: "hidden@example.test" };
+  expect(scheduledDraftFingerprint(withCopies, "source")).toBe(scheduledDraftFingerprint({
+    ...withCopies, cc: 'First <FIRST@example.test>, "Second" <SECOND@example.test>', bcc: "Hidden <HIDDEN@example.test>"
+  }, "source"));
+  for (const field of ["from", "to", "cc", "bcc"] as const) {
+    expect(scheduledDraftFingerprint({ ...withCopies, [field]: "changed@example.test" }, "source"))
+      .not.toBe(scheduledDraftFingerprint(withCopies, "source"));
+  }
+  expect(scheduledDraftFingerprint(draft, "changed source")).not.toBe(scheduledDraftFingerprint(draft, "source"));
+  expect(scheduledDraftFingerprint({ ...draft, messageId: "<changed@example.test>" }, "source"))
+    .not.toBe(scheduledDraftFingerprint(draft, "source"));
+});
 
 for (const changed of ["source", "envelope", "trash", "legacy"] as const) test(`scheduled ${changed} change aborts before SMTP with a visible reason`, async () => {
   const f = await createScheduledSendFixture({ smtp: { host: "127.0.0.1", port: 1, secure: false, user: "synthetic", password: "synthetic" } });
