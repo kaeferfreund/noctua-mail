@@ -7,7 +7,8 @@ import { closeAccountDbConnection, getDb } from "../connection";
 import { getDefaultAccountDbPath } from "../../runtimePaths";
 import { getMessageById } from "./retrieval";
 
-// Frozen getMessageById, copied verbatim from 620a785 (only its name changed).
+// Frozen getMessageById from 620a785, with the literal-ID LIKE fix applied.
+// The cache/backfill comparison must retain that corrected SQL and its bindings.
 import { parseDeliveryMetadata } from "../../mail/imap/parser";
 import { getMessageSource } from "../../storage";
 import { withDbWriteRetry } from "../../dbWriteRetry";
@@ -25,6 +26,7 @@ import { backfillMessageSenderKey } from "./senderKey";
 import { getAccountDb } from "../connection";
 import { buildMessageRowIdLookupCandidates } from "../../messageIds";
 import {
+  escapeLikePattern,
   getMessageCalendarInviteDataByMessageId,
   hydrateAttachment,
   parseReferences,
@@ -55,9 +57,9 @@ async function referenceGetMessageById(accountId: string, messageId: string) {
     if (trimmed && trimmed !== normalizedLookup) {
       row = db
         .prepare(
-          `SELECT * FROM messages WHERE accountId = ? AND lower(messageId) LIKE ? ORDER BY dateValue DESC LIMIT 1`
+          `SELECT * FROM messages WHERE accountId = ? AND lower(messageId) LIKE ? ESCAPE '\\' ORDER BY dateValue DESC LIMIT 1`
         )
-        .get(accountId, `%${trimmed.toLowerCase()}%`) as any;
+        .get(accountId, `%${escapeLikePattern(trimmed.toLowerCase())}%`) as any;
     }
   }
   if (!row) return null;
