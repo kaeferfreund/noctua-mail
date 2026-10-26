@@ -34,26 +34,11 @@ export function listScheduledDraftSends(apiFetch: ApiFetch, accountId: string, d
 
 export type ScheduleReleaseResult = { ok: true } | { ok: false; reason: "busy" | "failed" };
 
-/**
- * Cancels the draft's schedule. A 404 counts as „already gone“ only when a fresh read of the
- * draft's schedules agrees; a newer schedule of the same draft (another tab or member) is
- * cancelled instead.
- */
+/** Cancels only the requested id: an old undo toast must never cancel a replacement schedule. */
 export async function cancelDraftSchedule(apiFetch: ApiFetch, accountId: string, schedule: Pick<ScheduledSendView, "id" | "draftId">): Promise<ScheduleReleaseResult> {
-  let target = schedule.id;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const result = await cancelScheduledDraftSend(apiFetch, accountId, target);
-    if (result.ok) return { ok: true };
-    if (result.status === 409) return { ok: false, reason: "busy" };
-    if (result.status !== 404) return { ok: false, reason: "failed" };
-    const fresh = await listScheduledDraftSends(apiFetch, accountId, schedule.draftId);
-    if (!fresh.ok) return { ok: false, reason: "failed" };
-    const open = fresh.value.find(row => row.id !== target);
-    if (!open) return { ok: true };
-    if (open.status === "sending") return { ok: false, reason: "busy" };
-    target = open.id;
-  }
-  return { ok: false, reason: "failed" };
+  const result = await cancelScheduledDraftSend(apiFetch, accountId, schedule.id);
+  if (result.ok || result.status === 404) return { ok: true };
+  return { ok: false, reason: result.status === 409 ? "busy" : "failed" };
 }
 
 /**

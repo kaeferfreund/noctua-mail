@@ -168,10 +168,10 @@ realMailTest("opening a draft scheduled by another member reads the schedule fre
   expect(await releaseDraftScheduleForEdit(apiFetch, s.f.accountId, s.draftId)).toEqual({ ok: true });
   expect(await getScheduledSend(s.scheduleId)).toMatchObject({ status: "cancelled", lastError: "cancelled" });
 
-  // A stale schedule id (A re-planned in another tab): the 404 is re-checked and the new one cancelled.
+  // An old undo toast must leave the replacement schedule alone.
   const replanned = await (await schedule(s.f.request("POST", { draftId: s.draftId, sendAt: s.sendAt }), s.f.params())).json();
   expect(await cancelDraftSchedule(apiFetch, s.f.accountId, { id: s.scheduleId, draftId: s.draftId })).toEqual({ ok: true });
-  expect(await getScheduledSend(replanned.scheduledSend.id)).toMatchObject({ status: "cancelled" });
+  expect(await getScheduledSend(replanned.scheduledSend.id)).toMatchObject({ status: "queued" });
 
   // While the job sends it, the draft does not open.
   const busy = await (await schedule(s.f.request("POST", { draftId: s.draftId, sendAt: s.sendAt }), s.f.params())).json();
