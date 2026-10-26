@@ -448,6 +448,10 @@ Every tool publishes input/output schemas. Optional `accountId` can only repeat 
 token mailbox. Identity mutations reuse REST services, manager authorization, signature
 reference validation and audit attribution (`clientId:mcp:<tokenId>`). There is no MCP
 send tool; clients create drafts and use the existing application send paths.
+Signature template writes go through the same mailbox settings service as
+`PUT /api/accounts/{accountId}/settings` (manager role, `signature_template_invalid`
+for unsupported placeholders or bodies over 8 KiB, `signature_in_use`, conflict
+detection, `account.update` audit); their token needs the `manage` scope.
 
 | Tool | Input | Structured success / minimum role |
 | --- | --- | --- |
@@ -456,6 +460,10 @@ send tool; clients create drafts and use the existing application send paths.
 | `update_sender_identity` | `{accountId?,identityId,patch:{displayName?,replyTo?:string\|null,signatureId?:string\|null,isDefault?,enabled?}}` | `{ok:true,identity}`; manager; disable using `enabled:false` |
 | `get_sender_preferences` | `{accountId?}` | `{ok:true,prefs:{defaultIdentityId?,defaultSignatureId?,signatureOverride?}}`; viewer, creator's own sparse row |
 | `set_sender_preferences` | `{accountId?,patch:{defaultIdentityId?:string\|null,defaultSignatureId?:string\|null,signatureOverride?:string\|null}}` | Same own sparse subset after merge; viewer; null restores inheritance, empty signature means none |
+| `list_signature_templates` | `{accountId?}` | `{ok:true,signatures:[{id,name,body}],defaultSignatureId?}`; viewer |
+| `save_signature_template` | `{accountId?,signatureId?,name,body}` | `{ok:true,signature,signatures,defaultSignatureId?}`; manager; without `signatureId` creates a template, otherwise replaces its name/body (`signature_not_found` if absent) |
+| `delete_signature_template` | `{accountId?,signatureId}` | `{ok:true,signatures,defaultSignatureId?}`; manager; `signature_in_use` while an identity references it; clears the mailbox default if it pointed there |
+| `set_default_signature_template` | `{accountId?,signatureId:string\|null}` | `{ok:true,signatures,defaultSignatureId?}`; manager; null or `""` means no mailbox default |
 | `create_draft_message` | Existing new/reply/forward/body/attachment/reference fields plus `identityId?` | `{ok:true,mode,referenceMessageId,identityId,draftId,message}`; editor |
 | `update_draft_message` | `{accountId?,draftId,identityId?,…}`, see [MCP draft tools](#mcp-draft-tools) | `{ok:true,mode,identityId,draftId,previousDraftId,draftIdChanged,message}`; editor |
 
