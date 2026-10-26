@@ -396,10 +396,12 @@
   justify-content: center;
 }
 
+/* Plain-text mails read in the app font; pre-wrap keeps line breaks and
+   indentation. */
 .textView {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.5;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.55;
   color: var(--mail-view-fg);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
