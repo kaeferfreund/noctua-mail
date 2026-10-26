@@ -38,9 +38,9 @@ import { buildSenderIconSrc } from "@/app/components/mailclient/SenderIcon";
 import type { BuildIdentity } from "@/lib/buildVersion";
 import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxLabel, sortMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
 import { useStableHandlers } from "@/app/hooks/useStableHandlers";
-import { useCollapsedDomains, type MailboxSection } from "@/lib/ui/collapsedDomains";
+import { useCollapsedDomains } from "@/lib/ui/collapsedDomains";
 import { versionedIconUrl } from "@/lib/appBranding";
-import type { DomainIconVersions } from "@/app/hooks/useDomainIconVersions";
+import { domainIconVersionFor, type DomainIconVersions } from "@/app/hooks/useDomainIconVersions";
 
 export type ShellSidebarProps = {
   onNavigate?: () => void;
@@ -241,20 +241,17 @@ export function MailboxRows({
   onSwitch,
   summaries,
   userId,
-  section,
   domainIcons
 }: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "summaries" | "userId" | "domainIcons"> & {
   pendingAccountId?: string | null;
   onSwitch: (accountId: string) => void;
-  /** Keys the collapsed domain groups together with the domain. */
-  section: MailboxSection;
 }) {
   const t = useTranslations("Shell");
   const listId = useId();
   const summaryById = useMemo(() => new Map(summaries?.map(summary => [summary.accountId, summary])), [summaries]);
   const groups = useMemo(() => groupMailboxes(accounts), [accounts]);
   const grouped = accounts.length >= MAILBOX_GROUPING_MIN;
-  const { collapsed, toggle } = useCollapsedDomains(userId, section);
+  const { collapsed, toggle } = useCollapsedDomains(userId);
   // Headings and row lists are siblings: no wrapper per group adds padding
   // or margins of its own; a heading after the first opens with the gap
   // between groups.
@@ -282,7 +279,7 @@ export function MailboxRows({
                 {/* The slot keeps the heading text in line with the rows'
                     names while the icon loads, and when there is none. */}
                 <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
-                  {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} version={domainIcons?.[group.domain]} /> : null}
+                  {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} version={domainIconVersionFor(domainIcons ?? {}, group.domain)} /> : null}
                 </span>
                 {/* A long domain ellipsizes before the counters, which never
                     shrink; the full name stays available as a tooltip. */}
@@ -429,7 +426,6 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
               <SidebarGroupContent>
                 {accounts.length > 0 ? (
                   <MailboxRows
-                    section="mine"
                     accounts={accounts}
                     summaries={mailboxes.summaries}
                     activeAccountId={mailboxes.activeAccountId}

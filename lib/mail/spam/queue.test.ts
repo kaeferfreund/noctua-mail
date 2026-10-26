@@ -1,4 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { AccountNotFoundError } from "@/lib/db";
+import { createCollabFixture } from "@/lib/testThreadCollabHarness";
+import { existsSync } from "node:fs";
+import { getDefaultAccountDbPath } from "@/lib/runtimePaths";
 import { APICallError } from "ai";
 import { isRetryableSpamError } from "./classifySpam";
 import { createSpamClaims, createSpamFailureLogger, createSpamQueue, pickSweepJobs, spamErrorLogFields, SPAM_MAX_ATTEMPTS, type SpamCheckJob } from "./queue";
@@ -163,4 +167,41 @@ describe("spam failure logger", () => {
     expect(log("a", "no key")).toBe(true);
     expect(lines).toEqual(["a:[spam] no key", "b:[spam] no key", "a:[spam] no key"]);
   });
+});
+
+
+test("deleted mailbox jobs fail once, failure recording cannot recreate a shard, and the queue continues", async () => {
+  const f = await createCollabFixture();
+  await f.api.deleteAccountControlPlane(f.accountId);
+  let attempts = 0;
+  let recorded = 0;
+  const recordingErrors: unknown[] = [];
+  const failures: unknown[] = [];
+  const completed: string[] = [];
+  const queue = createSpamQueue({
+    concurrency: 1,
+    isRetryable: isRetryableSpamError,
+    check: async (entry) => {
+      if (entry.accountId !== f.accountId) { completed.push(entry.messageId); return; }
+      attempts++;
+      await f.api.getMessageById(entry.accountId, entry.messageId);
+    },
+    onAttemptFailed: async (entry, failed) => {
+      recorded++;
+      try { await f.api.recordSpamCheckFailure(entry.accountId, entry.messageId, failed); }
+      catch (error) { recordingErrors.push(error); }
+    },
+    onFailure: (_entry, error) => { failures.push(error); },
+    sleep: async () => { throw new Error("deleted accounts must not wait for a retry"); }
+  });
+  queue.enqueue([{ accountId: f.accountId, messageId: "deleted-message" }, job("next")]);
+  await queue.onIdle();
+  expect(attempts).toBe(1);
+  expect(recorded).toBe(1);
+  expect(recordingErrors).toHaveLength(1);
+  expect(recordingErrors[0]).toBeInstanceOf(AccountNotFoundError);
+  expect(failures).toHaveLength(1);
+  expect(failures[0]).toBeInstanceOf(AccountNotFoundError);
+  expect(completed).toEqual(["next"]);
+  expect(existsSync(getDefaultAccountDbPath(f.accountId))).toBe(false);
 });

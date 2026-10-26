@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import type { Account } from "@/lib/data";
 import { createAuthenticatedTestSession, syntheticRequestIp } from "@/lib/testAuthHarness";
 import { dbModulePromise } from "@/lib/testDbHarness";
@@ -86,6 +86,23 @@ describe("admin routes are limited to the admin's own mailboxes", () => {
     expect((await deleteAccount(request(f.user, "admin/accounts", "DELETE"), accountParams(f.own.id))).status).toBe(403);
   });
 
+  test("membership lost after the delete pre-check still answers 404", async () => {
+    const f = await fixture();
+    const original = f.admin.master.prepare.bind(f.admin.master);
+    const probe = spyOn(f.admin.master, "prepare").mockImplementation((sql: string) => {
+      if (sql.includes("SELECT id, dbPath FROM accounts WHERE id = ?")) {
+        original("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(f.admin.user.id, f.own.id);
+      }
+      return original(sql);
+    });
+    try {
+      const response = await deleteAccount(request(f.admin, "admin/accounts", "DELETE"), accountParams(f.own.id));
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ code: "account_not_found" });
+      expect(original("SELECT 1 FROM accounts WHERE id=?").get(f.own.id)).not.toBeNull();
+    } finally { probe.mockRestore(); }
+  });
+
   test("Benutzer: users stay global, their mailbox column shows only the admin's mailboxes", async () => {
     const f = await fixture();
     const response = await listUsers(request(f.admin, "admin/users"));
@@ -106,10 +123,12 @@ describe("admin routes are limited to the admin's own mailboxes", () => {
     expect(f.admin.master.prepare("SELECT 1 FROM admin_audit WHERE action='user.delete' AND targetUserId=?").get(f.member.id)).toBeNull();
     // A user whose memberships are all visible can be deleted.
     await f.admin.master.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(f.member.id, f.foreign.id);
+    f.admin.master.prepare("INSERT INTO user_provisioning(id,userId,normalizedEmail,kind,state,createdAt,updatedAt) VALUES(?,?,?,'migration','complete',1,1)").run(crypto.randomUUID(), f.member.id, f.member.email);
     expect((await deleteUser(request(f.admin, "admin/users", "DELETE", {}), params)).status).toBe(200);
+    expect(f.admin.master.prepare("SELECT 1 FROM user_provisioning WHERE userId=?").get(f.member.id)).toBeNull();
   });
 
-  test("Protokoll hides entries of foreign mailboxes; entries without a mailbox and own actions stay", async () => {
+  test("Protokoll hides entries of foreign mailboxes; own actions also require membership", async () => {
     const f = await fixture(), createdAt = Date.now() + 2_000_000;
     const rows = [["foreign", f.owner.id, f.foreign.id], ["own", f.owner.id, f.own.id], ["none", f.owner.id, null], ["self", f.admin.user.id, f.foreign.id]] as const;
     const ids = rows.map(([name]) => `${f.own.id}-${name}`);
@@ -118,8 +137,15 @@ describe("admin routes are limited to the admin's own mailboxes", () => {
     try {
       const page = await listAudit(request(f.admin, "admin/audit?limit=3"));
       expect(page.status).toBe(200);
-      // Filtered before the limit: three visible entries, newest first, the foreign one never.
-      expect((await page.json()).entries.map((entry: { id: string }) => entry.id)).toEqual([ids[3], ids[2], ids[1]]);
+      // Filtering also hides the viewer's own actions in a foreign mailbox.
+      const body = await page.json();
+      expect(body.entries.find((entry: { id: string }) => entry.id === ids[1])).toMatchObject({ actorLabel: f.owner.name || f.owner.email, targetAccountLabel: f.own.name });
+      const entries = body.entries.map((entry: { id: string }) => entry.id);
+      expect(entries.slice(0, 2)).toEqual([ids[2], ids[1]]);
+      expect(entries).not.toContain(ids[0]); expect(entries).not.toContain(ids[3]);
+      f.admin.master.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(f.admin.user.id, f.own.id);
+      const afterLeaving = (await (await listAudit(request(f.admin, "admin/audit?limit=10"))).json()).entries;
+      expect(afterLeaving.some((entry: { targetAccountId: string }) => entry.targetAccountId === f.own.id)).toBe(false);
       const outsider = await createAuthenticatedTestSession(undefined, "admin");
       const seen = (await (await listAudit(request(outsider, "admin/audit?limit=10"))).json()).entries.map((entry: { id: string }) => entry.id);
       expect(seen).toContain(ids[2]); expect(seen).not.toContain(ids[0]); expect(seen).not.toContain(ids[1]); expect(seen).not.toContain(ids[3]);

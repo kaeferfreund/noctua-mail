@@ -59,3 +59,14 @@ describe("admin mailbox creation and membership scope", () => {
     expect(dialog.contains(theme!)).toBe(true);
   });
 });
+
+
+it("shows loading without an empty-membership notice while the first request is pending", async () => {
+  let resolve!: (response: Response) => void;
+  const apiFetch: AdminFetch = () => new Promise<Response>(done => { resolve = done; });
+  const page = render(<Theme><AdminMailboxes apiFetch={apiFetch} users={[]} /></Theme>);
+  expect(page.getByRole("status").textContent).toContain("Loading");
+  expect(page.queryByText(/Only mailboxes you are a member of/)).toBeNull();
+  await act(async () => { resolve(Response.json({ ok: true, accounts: [] })); });
+  expect(await page.findByText(/Only mailboxes you are a member of/)).toBeTruthy();
+});

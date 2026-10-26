@@ -13,7 +13,7 @@ export async function DELETE(request: Request, { params }: AccountRouteParams) {
     if (!accountId) return adminAccountNotFound();
     let deleted: boolean;
     try { deleted = await deleteAccountControlPlane(accountId, session.userId); }
-    catch (error) { if (error instanceof AccountDeletionForbiddenError) return NextResponse.json({ ok: false, message: error.message }, { status: 403 }); throw error; }
+    catch (error) { if (error instanceof AccountDeletionForbiddenError) return adminAccountNotFound(); throw error; }
     if (!deleted) return adminAccountNotFound();
     return NextResponse.json({ ok: true });
   });

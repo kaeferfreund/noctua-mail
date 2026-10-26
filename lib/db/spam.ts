@@ -75,11 +75,15 @@ export type MarkedSpamRow = {
 };
 
 /** Rows of the folder in the range with the „Verdächtig“ mark (spamVerdict 'spam'), newest first. */
-export async function listMarkedSpamMessages(accountId: string, folderId: string, sinceDateValue: number, limit: number) {
+export async function listMarkedSpamMessages(accountId: string, folderId: string, sinceDateValue: number, limit: number,
+  before?: { dateValue: number; id: string }) {
   const db = await getAccountDb(accountId);
+  const cursor = before ? " AND (dateValue < ? OR (dateValue = ? AND id < ?))" : "";
   return db.prepare(`SELECT id, messageId, fromAddr, subject, date, dateValue, flags, answered, flagged, spamConfidence, spamReasons FROM messages
     WHERE accountId = ? AND spamVerdict = 'spam' AND folderId = ? AND dateValue >= ? AND COALESCE(deleted, 0) = 0
-    ORDER BY dateValue DESC LIMIT ?`).all(accountId, folderId, sinceDateValue, limit) as MarkedSpamRow[];
+    ${cursor}
+    ORDER BY dateValue DESC, id DESC LIMIT ?`).all(accountId, folderId, sinceDateValue,
+      ...(before ? [before.dateValue, before.dateValue, before.id] : []), limit) as MarkedSpamRow[];
 }
 
 /** Stores the failed attempts of a row that is still unchecked (a verdict written meanwhile is kept). */

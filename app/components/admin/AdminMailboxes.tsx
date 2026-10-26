@@ -61,7 +61,7 @@ export default function AdminMailboxes({ apiFetch = fetch, users, onAccessChange
   const locale = useLocale();
   const [accounts, setAccounts] = useState<AdminAccount[]>([]);
   const [error, setError] = useState<unknown>(null);
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(true);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<AdminAccount | null>(null);
   const [members, setMembers] = useState<AdminAccount | null>(null);
@@ -71,6 +71,8 @@ export default function AdminMailboxes({ apiFetch = fetch, users, onAccessChange
     catch (error) { setError(error); }
     finally { setBusy(false); }
   }, [apiFetch]);
+  // Initial load and explicit refresh share the same loading/error transition.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentionally show loading while the async admin request runs.
   useEffect(() => { void load(); }, [load]);
   const remove = async () => {
     if (!deleting) return;

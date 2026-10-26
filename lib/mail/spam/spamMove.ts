@@ -25,7 +25,13 @@ export async function moveMessageToJunkAsSpam(params: {
   const account = await getAccountById(accountId);
   if (!account) throw new Error("account not found");
   const moved = await (params.moveToJunk ?? moveMessageToJunk)({ account, accountId, message: { ...message, imapUid: message.imapUid, mailboxPath: message.mailboxPath } });
-  await recordSpamDecision({ accountId, message, label: "spam", source: params.source, userId: params.userId,
-    createdAt: params.datedAtArrival && Number.isFinite(message.dateValue) ? message.dateValue : undefined });
+  try {
+    await recordSpamDecision({ accountId, message, label: "spam", source: params.source, userId: params.userId,
+      createdAt: params.datedAtArrival && Number.isFinite(message.dateValue) ? message.dateValue : undefined });
+  } catch (error) {
+    // The IMAP/local move already succeeded. Do not offer an unsafe move retry for a failed learning write.
+    console.warn("[spam] example write failed after move", { accountId, messageId: message.id, source: params.source,
+      error: error instanceof Error ? error.name : "Error" });
+  }
   return moved;
 }

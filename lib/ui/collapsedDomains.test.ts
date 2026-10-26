@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { collapsedDomainsInSection, collapsedDomainsKey, parseCollapsedDomains, toggleCollapsedDomain } from "./collapsedDomains";
+import { migrateCollapsedDomains, collapsedDomainsKey, parseCollapsedDomains, toggleCollapsedDomain } from "./collapsedDomains";
 
 describe("collapsed sidebar domains", () => {
   it("keys the state per user", () => {
@@ -16,26 +16,19 @@ describe("collapsed sidebar domains", () => {
     }
   });
 
-  it("toggles one section's domain and serialises sorted", () => {
-    const once = toggleCollapsedDomain(new Set(["mine:b.example.test"]), "mine", "a.example.test");
-    expect(once).toBe('["mine:a.example.test","mine:b.example.test"]');
-    expect(toggleCollapsedDomain(parseCollapsedDomains(once), "mine", "b.example.test")).toBe('["mine:a.example.test"]');
-    expect(toggleCollapsedDomain(new Set(), "shared", "")).toBe('["shared:"]');
+  it("toggles one domain and serialises sorted", () => {
+    const once = toggleCollapsedDomain(new Set(["b.example.test"]), "a.example.test");
+    expect(once).toBe('["a.example.test","b.example.test"]');
+    expect(toggleCollapsedDomain(parseCollapsedDomains(once), "b.example.test")).toBe('["a.example.test"]');
+    expect(toggleCollapsedDomain(new Set(), "")).toBe('[""]');
   });
 
-  it("keeps the same domain in Eigene and Geteilte apart", () => {
-    const entries = parseCollapsedDomains(toggleCollapsedDomain(new Set(), "shared", "a.example.test"));
-    expect([...collapsedDomainsInSection(entries, "shared")]).toEqual(["a.example.test"]);
-    expect(collapsedDomainsInSection(entries, "mine").size).toBe(0);
-  });
-
-  it("treats a legacy bare domain as collapsed in both sections until one is toggled", () => {
-    const legacy = parseCollapsedDomains('["a.example.test",""]');
-    expect([...collapsedDomainsInSection(legacy, "mine")]).toEqual(["a.example.test", ""]);
-    expect([...collapsedDomainsInSection(legacy, "shared")]).toEqual(["a.example.test", ""]);
-    const expanded = parseCollapsedDomains(toggleCollapsedDomain(legacy, "mine", "a.example.test"));
-    expect([...expanded]).toEqual(["mine:", "shared:", "shared:a.example.test"]);
-    expect([...collapsedDomainsInSection(expanded, "mine")]).toEqual([""]);
-    expect([...collapsedDomainsInSection(expanded, "shared")]).toEqual(["", "a.example.test"]);
+  it("migrates section entries once, preserving collapsed domains without duplicates", () => {
+    const raw = '["mine:a.example.test","shared:b.example.test","shared:a.example.test",""]';
+    const migrated = migrateCollapsedDomains(raw);
+    expect(migrated).toBe('["","a.example.test","b.example.test"]');
+    expect(migrateCollapsedDomains(migrated)).toBeNull();
+    expect([...parseCollapsedDomains(raw)]).toEqual(["a.example.test", "b.example.test", ""]);
+    expect(toggleCollapsedDomain(parseCollapsedDomains(raw), "a.example.test")).toBe('["","b.example.test"]');
   });
 });

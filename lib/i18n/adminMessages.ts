@@ -44,3 +44,11 @@ export function formatAdminError(error: unknown, t: Translator, locale: "de" | "
   }
   return error instanceof Error ? error.message : t("errors.request");
 }
+
+
+/** Stored actions can outlive the catalogue version; unknown actions keep their original key. */
+export function formatAdminAuditAction(action: string, t: Translator): string {
+  type ActionKey = keyof typeof import("@/messages/de.json")["Admin"]["audit"]["actions"];
+  const key = `audit.actions.${action.replaceAll(".", "_")}` as `audit.actions.${ActionKey}`;
+  return t.has(key) ? t(key) : action;
+}

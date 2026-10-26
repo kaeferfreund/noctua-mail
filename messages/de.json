@@ -1071,7 +1071,38 @@
       "actor": "Ausgeführt von",
       "target": "Zielbenutzer / Postfach",
       "empty": "Keine Protokolleinträge.",
-      "older": "Ältere Einträge laden"
+      "older": "Ältere Einträge laden",
+      "actions": {
+        "invite_revoke": "Einladung widerrufen",
+        "invite_cleanup": "Einladungsverlauf bereinigt",
+        "operator_lock_override": "Verwaltungssperre aufgehoben",
+        "identity_create": "Absenderidentität erstellt",
+        "identity_update": "Absenderidentität geändert",
+        "identity_disable": "Absenderidentität deaktiviert",
+        "identity_enable": "Absenderidentität aktiviert",
+        "identity_default_changed": "Standardabsender geändert",
+        "user_recovery_issue": "Wiederherstellungslink erstellt",
+        "user_mfa_reset": "Zwei-Faktor-Anmeldung zurückgesetzt",
+        "user_passkey_remove": "Passkey entfernt",
+        "user_sessions_revoke": "Sitzungen beendet",
+        "user_create": "Benutzer erstellt",
+        "user_update": "Benutzer geändert",
+        "user_disable": "Benutzer deaktiviert",
+        "user_enable": "Benutzer aktiviert",
+        "user_delete": "Benutzer gelöscht",
+        "user_password_reset": "Passwort zurückgesetzt",
+        "account_create": "Postfach erstellt",
+        "account_delete": "Postfach gelöscht",
+        "account_update": "Postfach geändert",
+        "member_grant": "Mitglied hinzugefügt",
+        "member_update": "Mitgliedsrolle geändert",
+        "member_revoke": "Mitglied entfernt",
+        "spam_settings_update": "Spam-Einstellungen geändert",
+        "spam_rescan_start": "Posteingangsprüfung gestartet",
+        "spam_rescan_move": "Spam-Verschiebung gestartet",
+        "domain_icon_upload": "Domain-Symbol hochgeladen",
+        "domain_icon_reset": "Domain-Symbol zurückgesetzt"
+      }
     },
     "mailboxes": {
       "create": "Postfach erstellen",
@@ -1294,7 +1325,10 @@
         "noSubject": "(kein Betreff)",
         "running": "Prüfung läuft",
         "latest": "Letzte Prüfung: {items, plural, =0 {keine Treffer} one {# Treffer} other {# Treffer}}",
-        "noMailboxes": "Du bist in keinem Postfach Mitglied. Geprüft werden können nur Postfächer, in denen du Mitglied bist."
+        "noMailboxes": "Du bist in keinem Postfach Mitglied. Geprüft werden können nur Postfächer, in denen du Mitglied bist.",
+        "withRules": "Auch Filter-Prüfung ohne Modell",
+        "staticOnly": "Kein Modell verfügbar. Es greifen nur die Allowlist und feste Regeln; übrige Mails bleiben ungeprüft.",
+        "classifierPhase": "Filter-Prüfung"
       }
     },
     "domainIcons": {

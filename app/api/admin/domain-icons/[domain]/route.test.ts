@@ -167,3 +167,17 @@ describe("admin domain icon routes", () => {
     expect(statuses[10]).toBe(429);
   });
 });
+
+
+test("overlapping saves and resets leave the final icon and row consistent", async () => {
+  const { saveDomainIcon, resetDomainIcon, readDomainIconOverride, domainIconVersion } = await import("@/lib/domainIcons");
+  const { getDomainIconRow } = await import("@/lib/db");
+  const png = await logo();
+  await Promise.all([saveDomainIcon(domain, png, admin.user.id), resetDomainIcon(domain, admin.user.id)]);
+  expect(await getDomainIconRow(domain)).toBeNull();
+  expect(await readDomainIconOverride(domain)).toBeNull();
+  const [, saved] = await Promise.all([resetDomainIcon(domain, admin.user.id), saveDomainIcon(domain, png, admin.user.id)]);
+  expect((await readDomainIconOverride(domain))?.body).toEqual(png);
+  expect(domainIconVersion((await getDomainIconRow(domain))!.hash)).toBe(saved.version);
+  await resetDomainIcon(domain, admin.user.id);
+});

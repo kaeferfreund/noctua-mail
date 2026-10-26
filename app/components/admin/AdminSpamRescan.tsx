@@ -8,6 +8,7 @@ import type { UiLocale } from "@/lib/i18n/config";
 import { formatDate, formatTime } from "@/lib/i18n/format";
 import {
   SPAM_RESCAN_EVENT,
+  spamRescanDetectionBlocked,
   SPAM_RESCAN_PERIODS,
   type SpamRescanItem,
   type SpamRescanJob,
@@ -98,7 +99,8 @@ function SpamRescanPanel({ apiFetch, accountId }: { apiFetch: AdminFetch; accoun
     void act(() => load(value));
   };
   const preview = state?.preview;
-  const modelOn = withModel && !preview?.modelBlocked && (preview?.modelLimit ?? 0) > 0;
+  const staticOnly = !!preview?.modelBlocked && !spamRescanDetectionBlocked(preview.modelBlocked);
+  const modelOn = withModel && !spamRescanDetectionBlocked(preview?.modelBlocked) && (preview?.modelLimit ?? 0) > 0;
   const start = () => act(async () => {
     await adminRequest(apiFetch, base, jsonMutation("POST", { period, withModel: modelOn, modelLimit: modelOn ? preview!.modelLimit : 0 }));
     setSetup(false); setDeselected(new Set()); announce();
@@ -113,7 +115,7 @@ function SpamRescanPanel({ apiFetch, accountId }: { apiFetch: AdminFetch; accoun
   const selection = items.filter((item) => movable(item) && !deselected.has(item.id)).map((item) => item.id);
   const move = () => act(async () => {
     await adminRequest(apiFetch, `${base}/move`, jsonMutation("POST", { jobId: job!.id, ids: selection }));
-    announce();
+    setDeselected(new Set()); announce();
     await load(period);
   });
   const toggle = (id: string, checked: boolean) => setDeselected((current) => {
@@ -127,7 +129,7 @@ function SpamRescanPanel({ apiFetch, accountId }: { apiFetch: AdminFetch; accoun
 
   if (running && job) {
     return <div ref={root} className="space-y-2" role="status" aria-live="polite">
-      <p>{job.phase ? t(`phase.${job.phase}`) : t("running")}</p>
+      <p>{job.phase === "classifier" ? t("classifierPhase") : job.phase ? t(`phase.${job.phase}`) : t("running")}</p>
       <progress className="w-full" max={Math.max(1, job.total)} value={Math.min(job.processed, Math.max(1, job.total))} aria-label={t("running")} />
       <p className="text-sm text-muted-foreground">{t("progress", { processed: job.processed, total: job.total })}</p>
       {errorText}
@@ -150,10 +152,10 @@ function SpamRescanPanel({ apiFetch, accountId }: { apiFetch: AdminFetch; accoun
       {preview && <>
         <p className="text-sm">{t("inboxCount", { count: preview.inboxRows })}</p>
         <label className="flex min-h-11 items-center gap-2 sm:min-h-0">
-          <input type="checkbox" checked={modelOn} disabled={busy || !!preview.modelBlocked || preview.modelLimit === 0}
-            onChange={(event) => setWithModel(event.target.checked)} />{t("withModel")}
+          <input type="checkbox" checked={modelOn} disabled={busy || spamRescanDetectionBlocked(preview.modelBlocked) || preview.modelLimit === 0}
+            onChange={(event) => setWithModel(event.target.checked)} />{t(staticOnly ? "withRules" : "withModel")}
         </label>
-        {preview.modelBlocked
+        {staticOnly ? <p className="text-sm text-muted-foreground">{t("staticOnly")}</p> : preview.modelBlocked
           ? <p className="text-sm text-muted-foreground">{t(`modelBlocked.${preview.modelBlocked}`)}</p>
           : modelOn && <p className="text-sm text-muted-foreground">{t("modelCount", { count: preview.modelLimit })}
             {preview.unchecked > preview.modelLimit ? ` ${t("modelCapped", { unchecked: preview.unchecked, max: preview.modelLimit })}` : ""}</p>}
@@ -177,7 +179,8 @@ function SpamRescanPanel({ apiFetch, accountId }: { apiFetch: AdminFetch; accoun
     {notice && <p className="text-sm">{notice}</p>}
     {counts.serverFlagged !== undefined && <p className="text-sm text-muted-foreground">
       {t("serverLine", { flagged: counts.serverFlagged, kept: counts.serverFlagged - (counts.serverFlagSelected ?? 0) })}</p>}
-    {job.withModel && <p className="text-sm text-muted-foreground">{counts.modelBlocked ? t(`modelBlocked.${counts.modelBlocked}`)
+    {job.withModel && <p className="text-sm text-muted-foreground">{counts.modelBlocked ? spamRescanDetectionBlocked(counts.modelBlocked)
+      ? t(`modelBlocked.${counts.modelBlocked}`) : t("staticOnly")
       : counts.classifierMarked === undefined ? t("modelSkipped")
         : t("modelLine", { checked: counts.modelChecked ?? 0, calls: counts.modelCalls ?? 0, marked: counts.classifierMarked })}</p>}
     {counts.moved !== undefined && <p className="text-sm" role="status">
@@ -209,10 +212,12 @@ function SpamRescanRow({ item, locale, checked, disabled, onToggle }: {
   const subject = item.subject || t("noSubject");
   const score = item.score === null ? null : item.stage === "server-flag" ? t("serverScore", { score: item.score }) : t("confidence", { confidence: item.score });
   return <li className="flex gap-3 p-2">
+    <span className="mt-1 flex size-5 shrink-0 items-center justify-center sm:size-4" aria-hidden={movable(item) ? undefined : true}>
     {movable(item)
-      ? <input type="checkbox" className="mt-1 size-5 shrink-0 sm:size-4" checked={checked} disabled={disabled} aria-label={t("selectItem", { subject })}
+      ? <input type="checkbox" className="m-0 size-full" checked={checked} disabled={disabled} aria-label={t("selectItem", { subject })}
         onChange={(event) => onToggle(event.target.checked)} />
-      : <span className="size-5 shrink-0 sm:size-4" aria-hidden />}
+      : null}
+    </span>
     <div className="min-w-0 flex-1 space-y-0.5 text-sm">
       <p className="break-words font-medium">{subject}</p>
       <p className="break-words text-muted-foreground">{item.from} · {formatDate(item.dateValue, locale)}</p>

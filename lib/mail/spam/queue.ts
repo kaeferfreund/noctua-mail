@@ -12,6 +12,8 @@ export type SpamCheckJob = {
   failedAttempts?: number;
   /** Admin rescan (rescan.ts): store the verdict only, never auto-move; its model usage is summed under this key. */
   rescanJobId?: string;
+  /** A rescan without a usable provider runs only decisions that need no model. */
+  staticOnly?: boolean;
 };
 
 export type SpamQueueOptions = {

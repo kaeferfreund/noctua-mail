@@ -14,11 +14,11 @@ export async function getInviteCodes() {
 
 export type InviteStatus = "issued" | "redeemed" | "revoked" | "expired";
 /** History status; only "issued" codes can still be redeemed. */
-export function inviteStatus(invite: Pick<InviteCode, "uses" | "revokedAt" | "expiresAt">, now: number): InviteStatus {
-  return invite.uses > 0 ? "redeemed" : invite.revokedAt != null ? "revoked" : invite.expiresAt != null && invite.expiresAt <= now ? "expired" : "issued";
+export function inviteStatus(invite: Pick<InviteCode, "uses" | "maxUses" | "revokedAt" | "expiresAt">, now: number): InviteStatus {
+  return invite.maxUses !== null && invite.uses >= invite.maxUses ? "redeemed" : invite.revokedAt != null ? "revoked" : invite.expiresAt != null && invite.expiresAt <= now ? "expired" : "issued";
 }
 // SQL twin of inviteStatus(...) === "issued"; the parameter is "now".
-const ISSUED_SQL = "COALESCE(uses,0)=0 AND revokedAt IS NULL AND (expiresAt IS NULL OR expiresAt>?)";
+const ISSUED_SQL = "(maxUses IS NULL OR COALESCE(uses,0)<maxUses) AND revokedAt IS NULL AND (expiresAt IS NULL OR expiresAt>?)";
 
 // Stable history identity, deliberately unrelated to the redeemable capability's format.
 export function inviteHistoryId(code: string) {

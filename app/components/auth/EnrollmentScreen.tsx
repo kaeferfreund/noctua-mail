@@ -2,10 +2,11 @@
 
 import { useTranslations } from "next-intl";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { authClient, type NoctuaAuthClient, type Proof, type TotpSetup } from "@/lib/authClient";
 import { AuthError, AuthField, AuthFrame, BackupCodes, useAuthAction } from "./AuthPrimitives";
+import { QrCode } from "@/app/components/ui/qr-code";
 import ReauthDialog from "./ReauthDialog";
 
 export default function EnrollmentScreen({ onComplete, onLogout, client = authClient, continuation }: {
@@ -19,20 +20,13 @@ export default function EnrollmentScreen({ onComplete, onLogout, client = authCl
   const [proof, setProof] = useState<Proof | null>(continuation?.proof ?? null);
   const [verified, setVerified] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [qr, setQr] = useState("");
   const [addingKey, setAddingKey] = useState(false);
   const action = useAuthAction(onLogout);
   const begin = async (nextProof: Proof, password: string) => {
-    setSetup(null); setVerified(false); setSaved(false); setQr("");
+    setSetup(null); setVerified(false); setSaved(false);
     const nextSetup = await client.enableTotp(password, nextProof);
     setProof(nextProof); setSetup(nextSetup);
   };
-  useEffect(() => {
-    if (!setup?.totpURI || verified) return;
-    let active = true;
-    void import("qrcode").then(qrcode => qrcode.toDataURL(setup.totpURI, { margin: 4, width: 240 })).then(url => { if (active) setQr(url); }).catch(() => { /* Manual secret remains available. */ });
-    return () => { active = false; };
-  }, [setup?.totpURI, verified]);
   const secret = setup && !verified ? new URL(setup.totpURI).searchParams.get("secret") : null;
   return <AuthFrame title={saved ? t("enroll.ready") : verified ? t("enroll.saveCodes") : t("enroll.title")} description={t("enroll.help")}>
     {!setup && !saved && <form className="space-y-4" onSubmit={event => {
@@ -52,17 +46,15 @@ export default function EnrollmentScreen({ onComplete, onLogout, client = authCl
       event.preventDefault(); const form = event.currentTarget; const code = String(new FormData(form).get("code"));
       void action.run(async () => {
         if (!proof) return;
-        await client.verifyTotp(code, proof); setProof(null); setVerified(true); setQr(""); setSetup({ ...setup, totpURI: "" }); form.reset();
+        await client.verifyTotp(code, proof); setProof(null); setVerified(true); setSetup({ ...setup, totpURI: "" }); form.reset();
       });
     }}>
       <p>{t("enroll.scanHelp")}</p>
-      {/* A local data URL keeps the seed off third-party image/QR services. */}
-      {/* eslint-disable-next-line @next/next/no-img-element -- private local QR data URL */}
-      {qr && <img src={qr} alt={t("enroll.qrAlt")} width={240} height={240} />}
+      <QrCode value={setup.totpURI} label={t("enroll.qrAlt")} className="size-60" />
       <AuthField label={t("enroll.secret")} value={secret ?? ""} readOnly autoComplete="off" />
       <AuthField name="code" label={t("authenticatorCode")} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" required />
       <Button disabled={action.disabled}>{t("enroll.verify")}</Button>
-      <Button type="button" variant="ghost" disabled={action.disabled} onClick={() => { setSetup(null); setProof(null); setQr(""); }}>{t("enroll.restart")}</Button>
+      <Button type="button" variant="ghost" disabled={action.disabled} onClick={() => { setSetup(null); setProof(null); }}>{t("enroll.restart")}</Button>
     </form>}
     {setup && verified && !saved && <BackupCodes codes={setup.backupCodes} onDone={() => { setSetup(null); setSaved(true); }} />}
     {saved && <div className="space-y-3">
