@@ -90,7 +90,7 @@ export function decodeAdminAuditCursor(cursor: string): { createdAt: number; id:
 /**
  * Newest (createdAt,rowid) first. Numeric `before` remains a legacy storage API. `visibleTo` limits the
  * entries to what one admin may see: entries without a mailbox, entries of the given mailboxes (the
- * admin's memberships). Filtering happens before LIMIT, so pages stay full.
+ * admin's memberships), and deleted mailboxes (id only). Filtering happens before LIMIT, so pages stay full.
  */
 export async function listAdminAudit(
   options: { limit?: number; before?: number | string | null; visibleTo?: { userId: string; accountIds: Iterable<string> } } = {}
@@ -100,10 +100,20 @@ export async function listAdminAudit(
   const cursor = typeof options.before === "string" ? decodeAdminAuditCursor(options.before) : null;
   const before = typeof options.before === "number" && Number.isFinite(options.before) ? options.before : null;
   const where: string[] = [], args: Array<string | number> = [];
-  if (cursor) { where.push("(createdAt < ? OR (createdAt = ? AND rowid < (SELECT rowid FROM admin_audit WHERE id = ?)))"); args.push(cursor.createdAt, cursor.createdAt, cursor.id); }
+  if (cursor) {
+    const row = db.prepare("SELECT rowid FROM admin_audit WHERE id = ?").get(cursor.id) as { rowid: number } | null;
+    if (row) {
+      where.push("(createdAt < ? OR (createdAt = ? AND rowid < ?))");
+      args.push(cursor.createdAt, cursor.createdAt, row.rowid);
+    } else {
+      // A removed/unknown cursor has no insertion order; resume at the older millisecond.
+      where.push("createdAt < ?");
+      args.push(cursor.createdAt);
+    }
+  }
   else if (before !== null) { where.push("createdAt < ?"); args.push(before); }
   if (options.visibleTo) {
-    where.push("(targetAccountId IS NULL OR targetAccountId IN (SELECT value FROM json_each(?)))");
+    where.push("(targetAccountId IS NULL OR targetAccountId IN (SELECT value FROM json_each(?)) OR NOT EXISTS (SELECT 1 FROM accounts WHERE accounts.id = admin_audit.targetAccountId))");
     args.push(JSON.stringify([...options.visibleTo.accountIds]));
   }
   const rows = db
