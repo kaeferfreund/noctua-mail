@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { cancelWatcherSyncJobs, getSyncJob, startSyncJob } from "./syncJobs";
 import { replacePushNotifier } from "./push/send";
 import { dbModulePromise } from "./testDbHarness";
-const { saveFoldersForAccount } = await dbModulePromise;
+const { saveFoldersForAccount, upsertAccount } = await dbModulePromise;
+import { identityTestAccount } from "./testFixtures/senderIdentities";
 import type { SyncPayload } from "./syncOperation";
 
 type SpawnedWorker = {
@@ -23,6 +24,7 @@ let accountSeq = 0;
 const nextAccountId = async (label: string) => {
   accountSeq += 1;
   const accountId = `acc-${label}-${accountSeq}`;
+  await upsertAccount(identityTestAccount(accountId));
   await saveFoldersForAccount(accountId,
     ["INBOX", "Archive", "Sent", "initial", ...Array.from({ length: 10 }, (_, i) => `interactive-${i}`)]
       .map(name => ({ id: `${accountId}:${name}`, accountId, name, count: 0 })));
