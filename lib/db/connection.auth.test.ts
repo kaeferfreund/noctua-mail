@@ -144,6 +144,10 @@ async function checkShardConfiguration(cacheOverride: string, expectedCacheKib: 
         const auth = await getAuthDb();
         assert.deepEqual(pragmas(master), masterDefaults);
         assert.deepEqual(pragmas(auth), masterDefaults);
+        const { persistAccountRow } = await import("./lib/db/rowParsers.ts");
+        persistAccountRow(master, { id: "synthetic-performance-account", name: "Synthetic performance mailbox", email: "performance@example.test", avatar: "",
+          imap: { host: "imap.example.test", port: 993, secure: true, user: "performance@example.test", password: "synthetic" },
+          smtp: { host: "smtp.example.test", port: 465, secure: true, user: "performance@example.test", password: "synthetic" } });
         const shard = await getAccountDb("synthetic-performance-account");
         const shardDefaults = {
           ...masterDefaults, synchronous: 1, busy_timeout: 15000,

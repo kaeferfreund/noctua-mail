@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import type { Message } from "@/lib/data";
 import { saveMessageSource } from "@/lib/storage";
 import { createCollabFixture } from "../../testThreadCollabHarness";
@@ -284,4 +284,85 @@ describe("admin INBOX rescan", () => {
     expect(state.job?.counts).toMatchObject({ moved: 0, changed: 2 });
     expect(state.items.map((item) => item.moveStatus)).toEqual(["changed", "changed"]);
   });
+});
+
+
+test("protected hits before the cap do not hide older movable hits or truncation", async () => {
+  const f = await fixture();
+  const now = Date.now();
+  const insert = f.db.prepare(`INSERT INTO messages(id,accountId,folderId,threadId,subject,fromAddr,toAddr,preview,body,date,dateValue,spamVerdict,spamCheckedAt,flagged,flags)
+    VALUES(?,?,?,'synthetic-thread','','','','','','',?,'spam',?, ?, ?)`);
+  f.db.transaction(() => {
+    for (let index = 0; index < 5001; index++) insert.run(`protected-${index}`, f.accountId, f.folderId, now, now, 1, '["NONJUNK"]');
+    for (let index = 0; index < 5001; index++) insert.run(`movable-${index}`, f.accountId, f.folderId, now - 1000, now, 0, '[]');
+  })();
+  await f.run(() => rescan.startSpamRescan({ accountId: f.accountId, period: "all", withModel: true, modelLimit: 0, userId: ADMIN }));
+  const state = await rescan.loadSpamRescanState(f.accountId);
+  expect(state.items).toHaveLength(5000);
+  expect(state.items.every(item => item.id.startsWith("movable-"))).toBe(true);
+  expect(state.job?.counts.truncated).toBe(true);
+});
+
+
+test("a failed example write after a successful move leaves the item moved", async () => {
+  const f = await fixture();
+  const [message] = await f.seed(f.mail());
+  const job = await f.run(() => rescan.startSpamRescan({ accountId: f.accountId, period: "all", withModel: true, modelLimit: 1, userId: ADMIN }));
+  f.db.exec("CREATE TRIGGER synthetic_example_failure BEFORE INSERT ON spam_examples BEGIN SELECT RAISE(ABORT,'synthetic example failure'); END");
+  try {
+    await f.run(() => rescan.startSpamRescanMove({ accountId: f.accountId, jobId: job.id, ids: [message.id], userId: ADMIN }));
+    const state = await rescan.loadSpamRescanState(f.accountId);
+    expect(state.items.find(item => item.id === message.id)?.moveStatus).toBe("moved");
+    expect(state.job?.counts).toMatchObject({ moved: 1, errors: 0 });
+    expect(await f.run(() => rescan.startSpamRescanMove({ accountId: f.accountId, jobId: job.id, ids: [message.id], userId: ADMIN }))).toBe(0);
+    expect(f.moved).toEqual([message.id]);
+  } finally { f.db.exec("DROP TRIGGER synthetic_example_failure"); }
+});
+
+
+test("stage B applies static rules without a model and leaves other mail unchecked", async () => {
+  const f = await fixture();
+  const [denied, undecided] = await f.seed(f.mail({ from: "Blocked <blocked@lottery.invalid>" }), f.mail({ from: "Unknown <unknown@lottery.invalid>" }));
+  const previous = process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
+  const restoreService = replaceSpamServiceDeps({ languageModel: () => { throw new Error("static-only must not load a model"); } });
+  const restoreRescan = rescan.replaceSpamRescanDeps({ loadStaticRules: async () => EMPTY_STATIC_RULES });
+  try {
+    const restoreRules = replaceSpamServiceDeps({ loadStaticRules: async () => ({ ...EMPTY_STATIC_RULES,
+      deny: [{ type: "address", value: "blocked@lottery.invalid", safe: true }] }) });
+    try {
+      await rescan.startSpamRescan({ accountId: f.accountId, period: "all", withModel: true, modelLimit: 2, userId: ADMIN });
+      await rescan.spamRescansIdle();
+      const state = await rescan.loadSpamRescanState(f.accountId);
+      expect(state.job?.counts).toMatchObject({ modelBlocked: "missing-key", modelChecked: 2, modelCalls: 0 });
+      expect(state.items.map(item => item.id)).toEqual([denied.id]);
+      expect((await f.api.getMessageById(f.accountId, undecided.id))?.spamVerdict).toBeUndefined();
+    } finally { restoreRules(); }
+  } finally {
+    restoreRescan(); restoreService();
+    if (previous === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = previous;
+  }
+});
+
+
+test("stage B pages only to the remaining room after stage A, with one truncation lookahead", async () => {
+  const f = await fixture();
+  await f.flagged("first@lottery.invalid");
+  await f.flagged("second@lottery.invalid");
+  const now = Date.now();
+  const insert = f.db.prepare(`INSERT INTO messages(id,accountId,folderId,threadId,subject,fromAddr,toAddr,preview,body,date,dateValue,spamVerdict,spamCheckedAt,flags)
+    VALUES(?,?,?,'synthetic-thread','','','','','','',?,'spam',?,'[]')`);
+  f.db.transaction(() => {
+    for (let index = 0; index < 5001; index++) insert.run(`marked-${index}`, f.accountId, f.folderId, now, now);
+  })();
+  const prepare = spyOn(f.db, "prepare");
+  try {
+    await f.run(() => rescan.startSpamRescan({ accountId: f.accountId, period: "all", withModel: true, modelLimit: 0, userId: ADMIN }));
+    const state = await rescan.loadSpamRescanState(f.accountId);
+    expect(state.items).toHaveLength(5000);
+    expect(state.job?.counts).toMatchObject({ serverFlagSelected: 2, classifierMarked: 4998, items: 5000, truncated: true });
+    const pages = prepare.mock.calls.filter(([sql]) => String(sql).includes("spamVerdict = 'spam' AND folderId"));
+    expect(pages).toHaveLength(10);
+    expect(state.items.filter(item => item.stage === "classifier")).toHaveLength(4998);
+  } finally { prepare.mockRestore(); }
 });

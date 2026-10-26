@@ -15,12 +15,16 @@ async function runContentionProbe(mode: "read" | "create") {
       import assert from "node:assert/strict";
       import { Database } from "bun:sqlite";
       import { createV2FtsShard } from "./lib/testFixtures/v2FtsShard.ts";
-      import { closeAllDbConnections, configureDb, getAccountDb } from "./lib/db/connection.ts";
+      import { closeAllDbConnections, configureDb, getAccountDb, getDb } from "./lib/db/connection.ts";
       const exec = Database.prototype.exec;
       Database.prototype.exec = function(sql) {
         return exec.call(this, /^PRAGMA busy_timeout = /.test(sql) ? "PRAGMA busy_timeout=0" : sql);
       };
       const accountId = "synthetic-collab-account";
+      const { persistAccountRow } = await import("./lib/db/rowParsers.ts");
+      persistAccountRow(await getDb(), { id: accountId, name: "Synthetic connection mailbox", email: "connection@example.test", avatar: "",
+        imap: { host: "imap.example.test", port: 993, secure: true, user: "connection@example.test", password: "synthetic" },
+        smtp: { host: "smtp.example.test", port: 465, secure: true, user: "connection@example.test", password: "synthetic" } });
       const initialized = await getAccountDb(accountId);
       const dbPath = initialized.prepare("PRAGMA database_list").get().file;
       closeAllDbConnections();

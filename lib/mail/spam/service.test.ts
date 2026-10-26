@@ -7,12 +7,18 @@ import { createCollabFixture } from "../../testThreadCollabHarness";
 import { recordSpamDecision } from "./examples";
 import { SPAM_MAX_ATTEMPTS } from "./queue";
 import { loadSpamAdminSettings, saveMailboxSpamSettings, saveSpamAdminSettings } from "./settings";
+import { isTrustCanary, evaluateSenderTrust } from "./senderProfile";
+import { DAY, START, trustedInput, trustedProfile } from "./testProfiles";
+import { assessSenderTrust } from "./anomaly";
+import { EMPTY_STATIC_RULES } from "./staticRules";
+import { existsSync } from "node:fs";
+import { getDefaultAccountDbPath } from "@/lib/runtimePaths";
 import { mockSpamModel } from "./testModel";
 import type { SpamAdminSettings } from "./config";
 import type { SpamServiceDeps } from "./service";
 
 // The service with a mocked model and a recorded Junk move: no API call, no IMAP.
-const { replaceSpamServiceDeps, runSpamSweep, spamChecksIdle } = await import("./service");
+const { replaceSpamServiceDeps, runSpamSweep, runRescanSpamChecks, spamChecksIdle } = await import("./service");
 
 const ADMIN = "spam-service-test";
 const answer = (verdict: string, confidence: number) => JSON.stringify({ verdict, confidence, reasons: ["Synthetischer Grund"] });
@@ -160,4 +166,90 @@ describe("spam service \"Kein Spam\" roles", () => {
     expect(model.doGenerateCalls).toHaveLength(1);
     expect(await f.api.getMessageById(f.accountId, third.id)).toMatchObject({ spamVerdict: "ham", spamReasons: ["Absender wurde als „Kein Spam“ markiert"] });
   });
+});
+
+
+test("a queued rescan skips mail judged by the sweep meanwhile", async () => {
+  const f = await fixture();
+  const [message] = await f.seed(f.mail());
+  await f.api.saveSpamVerdict(f.accountId, message.id, { verdict: "ham", confidence: 1, reasons: ["Synthetic sweep verdict"] });
+  const model = mockSpamModel(answer("spam", 0.99));
+  const restore = replaceSpamServiceDeps({ languageModel: () => model, sleep: async () => {} });
+  try {
+    await runRescanSpamChecks(f.accountId, [{ id: message.id }], { rescanJobId: crypto.randomUUID(), isCancelled: () => false, onProgress: () => {} });
+    expect(model.doGenerateCalls).toHaveLength(0);
+    expect(f.row(message.id).spamVerdict).toBe("ham");
+  } finally { restore(); }
+});
+
+
+test("a deleted mailbox rescan drops its jobs without retry sleeps or recreating the shard", async () => {
+  const f = await fixture();
+  const [message] = await f.seed(f.mail());
+  await f.api.deleteAccountControlPlane(f.accountId);
+  const sleeps: number[] = [];
+  const restore = replaceSpamServiceDeps({ sleep: async ms => { sleeps.push(ms); } });
+  try {
+    await runRescanSpamChecks(f.accountId, [{ id: message.id }], {
+      rescanJobId: crypto.randomUUID(), isCancelled: () => false, onProgress: () => {}
+    });
+    expect(sleeps).toEqual([]);
+    expect(existsSync(getDefaultAccountDbPath(f.accountId))).toBe(false);
+  } finally { restore(); }
+});
+
+test("rules-only rescans persist only allowlist/static decisions and leave trusted/canary profiles unchanged", async () => {
+  const f = await fixture();
+  const now = Date.now();
+  const offset = now - (START + 61 * DAY);
+  const profile = trustedProfile(25, 60, {
+    senderKey: "notify@service.example.invalid", fromDomain: "service.example.invalid",
+    dkimDomains: ["service.example.invalid"], linkHosts: ["app.service.example.invalid"], messageIdDomain: "example.invalid"
+  });
+  profile.firstSeenAt += offset;
+  profile.lastSeenAt += offset;
+  expect(evaluateSenderTrust(profile, now).trusted).toBe(true);
+  // Use the fixture's own recipient while retaining all other known sender features.
+  const input: typeof trustedInput = {
+    ...trustedInput, from: "Service <notify@service.example.invalid>", fromEmail: "notify@service.example.invalid", to: f.account.email,
+    messageId: "<abc@mail.service.example.invalid>", listId: "<builds.service.example.invalid>", linkDomains: ["app.service.example.invalid"],
+    authenticationResults: ["mx.example.test; spf=pass smtp.mailfrom=bounce.service.example.invalid; dkim=pass header.d=service.example.invalid"]
+  };
+  expect(await assessSenderTrust(input, { ownAddresses: new Set([f.account.email]), loadProfile: async () => profile, canaryKey: "plain", now }))
+    .toMatchObject({ kind: "skip" });
+  await f.api.replaceSenderProfiles(f.accountId, [profile]);
+  const ids = Array.from({ length: 2000 }, (_, index) => `${f.accountId}-trusted-${index}`);
+  const plainId = ids.find(id => !isTrustCanary(id))!;
+  const canaryId = ids.find(id => isTrustCanary(id))!;
+  const [plain, canary, allowed, denied, own] = await f.seed(
+    f.mail({ id: plainId, from: input.from, to: input.to, subject: input.subject, messageId: input.messageId ?? undefined }),
+    f.mail({ id: canaryId, from: input.from, to: input.to, subject: input.subject, messageId: input.messageId ?? undefined }),
+    f.mail({ from: "allowed@rules.invalid" }), f.mail({ from: "denied@rules.invalid" }), f.mail({ from: f.account.email })
+  );
+  const before = await f.api.getSenderProfile(f.accountId, profile.senderKey);
+  const model = mockSpamModel(answer("ham", 0.99));
+  const restore = replaceSpamServiceDeps({
+    languageModel: () => model, sleep: async () => {},
+    readSource: async (_accountId, id) => [plainId, canaryId].includes(id) ? Buffer.from(
+      `From: ${input.from}\r\nTo: ${input.to}\r\nSubject: ${input.subject}\r\nMessage-ID: ${input.messageId}\r\n`
+      + `List-Id: ${input.listId}\r\nAuthentication-Results: ${input.authenticationResults[0]}\r\n\r\n${input.text}`) : id === own.id
+        ? Buffer.from(`From: ${f.account.email}\r\nTo: ${f.account.email}\r\nAuthentication-Results: mx.example.test; dkim=pass header.d=example.test\r\n\r\nSynthetic message`) : null,
+    loadStaticRules: async () => ({ ...EMPTY_STATIC_RULES,
+      allow: [{ type: "address", value: "allowed@rules.invalid", safe: true }],
+      deny: [{ type: "address", value: "denied@rules.invalid", safe: true }] })
+  });
+  try {
+    const options = { rescanJobId: crypto.randomUUID(), isCancelled: () => false, onProgress: () => {} };
+    await runRescanSpamChecks(f.accountId, [plain, canary, allowed, denied, own], { ...options, staticOnly: true });
+    for (const mail of [plain, canary]) expect(f.row(mail.id)).toMatchObject({ spamVerdict: null, spamCheckedAt: null });
+    expect(await f.api.getSenderProfile(f.accountId, profile.senderKey)).toEqual(before);
+    expect(f.row(allowed.id).spamVerdict).toBe("ham");
+    expect(f.row(denied.id).spamVerdict).toBe("spam");
+    expect(f.row(own.id).spamVerdict).toBe("ham");
+    expect(model.doGenerateCalls).toHaveLength(0);
+    await runRescanSpamChecks(f.accountId, [plain, canary], options);
+    expect(f.row(plain.id).spamVerdict).toBe("ham");
+    expect(f.row(canary.id).spamVerdict).toBe("ham");
+    expect(model.doGenerateCalls).toHaveLength(1);
+  } finally { restore(); }
 });

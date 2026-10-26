@@ -6,7 +6,7 @@ import { formatDate } from "@/lib/i18n/format";
 import { useCallback, useEffect, useState } from "react";
 import type { AdminAuditEntry } from "@/lib/data";
 import { Button } from "@/app/components/ui/button";
-import { formatAdminError } from "@/lib/i18n/adminMessages";
+import { formatAdminError, formatAdminAuditAction } from "@/lib/i18n/adminMessages";
 import { adminRequest, type AdminFetch } from "@/app/hooks/useAdminApi";
 import tableStyles from "@/app/components/account-settings/SettingsTable.module.css";
 import { adminHeaderRow, adminSectionTitle } from "./adminLayout";
@@ -28,11 +28,13 @@ export default function AdminAuditLog({ apiFetch = fetch }: { apiFetch?: AdminFe
     } catch (error) { setError(error); }
     finally { setBusy(false); }
   }, [apiFetch]);
+  // Initial load and explicit refresh share the same loading/error transition.
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Intentionally show loading while the async admin request runs.
   useEffect(() => { void load(); }, [load]);
   return <section className="space-y-4" aria-label={t("audit.title")}><div className={adminHeaderRow}><h3 className={adminSectionTitle}>{t("audit.title")}</h3><Button variant="outline" disabled={busy} onClick={() => void load()}>{t("audit.refresh")}</Button></div>
     {Boolean(error) && <p role="alert">{formatAdminError(error, t, locale)}</p>}
     {entries.length > 0 && <div className={tableStyles.tableScroll}><table><thead><tr><th>{t("audit.time")}</th><th>{t("audit.action")}</th><th>{t("audit.actor")}</th><th>{t("audit.target")}</th></tr></thead>
-      <tbody>{entries.map(entry => <tr key={entry.id}><td className="whitespace-nowrap">{dateTime(entry.createdAt)}</td><td>{entry.action}</td><td className="break-all">{entry.actorUserId}</td><td className="break-all">{entry.targetUserId ?? "—"} / {entry.targetAccountId ?? "—"}</td></tr>)}</tbody></table></div>}
+      <tbody>{entries.map(entry => <tr key={entry.id}><td className="whitespace-nowrap">{dateTime(entry.createdAt)}</td><td>{formatAdminAuditAction(entry.action, t)}</td><td className="break-all">{entry.actorLabel ?? entry.actorUserId}</td><td className="break-all">{entry.targetUserLabel ?? entry.targetUserId ?? "—"} / {entry.targetAccountLabel ?? entry.targetAccountId ?? "—"}</td></tr>)}</tbody></table></div>}
     {!busy && !entries.length && <p>{t("audit.empty")}</p>}
     <Button variant="outline" disabled={busy || !nextCursor || !entries.length} onClick={() => void load(nextCursor ?? undefined)}>{busy ? t("loading") : t("audit.older")}</Button>
   </section>;

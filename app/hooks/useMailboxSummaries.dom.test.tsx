@@ -48,7 +48,7 @@ function harness() {
     const rows = useMailboxSummaries({ sessionKey, authState, apiFetch, onSummaryChanged: id => summaryChanges.push(id), onMailboxesChanged: () => { mailboxChanges++; }, onThreadChanged: id => threadChanges.push(id) });
     observedRows.push(rows);
     return <Theme><TooltipProvider><SidebarProvider><output>{JSON.stringify(rows)}</output>
-      <MailboxRows section="mine" accounts={[personal, mailbox].map(row => ({ id: row.accountId, name: row.name, email: row.email, shared: row.shared }) as ShellAccount)} summaries={rows} activeAccountId={personal.accountId} onSwitch={() => {}} />
+      <MailboxRows accounts={[personal, mailbox].map(row => ({ id: row.accountId, name: row.name, email: row.email, shared: row.shared }) as ShellAccount)} summaries={rows} activeAccountId={personal.accountId} onSwitch={() => {}} />
       <ul>{COLLAB_FOLDERS.map(folder => {
         const count = collaborationViewCount(folder.id, rows.find(row => row.accountId === mailbox.accountId));
         return <ViewRow key={folder.id} view={{ ...folder, ...getVirtualFolderLabels(folder, t), icon: null, count, countAriaLabel: `${count ?? 0} threads`, active: false, onSelect: () => {} }} />;
@@ -346,7 +346,7 @@ for (const heartbeat of [false, true]) test(`summary 401 ${heartbeat ? "with ini
 
 function renderMailboxRows(rows: UserMailboxSummary[]) {
   return render(<Theme><TooltipProvider><SidebarProvider>
-    <MailboxRows section="mine" accounts={rows.map(row => ({ id: row.accountId, name: row.name, email: row.email, shared: row.shared }) as ShellAccount)} summaries={rows} activeAccountId={rows[0].accountId} onSwitch={() => {}} />
+    <MailboxRows accounts={rows.map(row => ({ id: row.accountId, name: row.name, email: row.email, shared: row.shared }) as ShellAccount)} summaries={rows} activeAccountId={rows[0].accountId} onSwitch={() => {}} />
   </SidebarProvider></TooltipProvider></Theme>);
 }
 

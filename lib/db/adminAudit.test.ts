@@ -1,5 +1,9 @@
 import { randomUUID } from "crypto";
 import { describe, expect, test } from "bun:test";
+import { createAuthenticatedTestSession } from "../testAuthHarness";
+import { createCollabFixture } from "../testThreadCollabHarness";
+import { getDb } from "./connection";
+import { encodeAdminAuditCursor } from "./adminAudit";
 import { dbModulePromise } from "../testDbHarness";
 
 const { ADMIN_AUDIT_MAX_LIMIT, listAdminAudit, recordAdminAudit } = await dbModulePromise;
@@ -113,4 +117,36 @@ describe("listAdminAudit", () => {
     expect((await listAdminAudit({ limit: Number.POSITIVE_INFINITY })).length).toBeGreaterThanOrEqual(2);
     expect((await listAdminAudit({ limit: 10_000 })).length).toBeLessThanOrEqual(ADMIN_AUDIT_MAX_LIMIT);
   });
+});
+
+
+test("deleted mailbox audit is visible to all admins; existing mailboxes still require membership", async () => {
+  await createAuthenticatedTestSession(undefined, "admin");
+  const f = await createCollabFixture();
+  const member = crypto.randomUUID(), outsider = crypto.randomUUID();
+  const audit = await recordAdminAudit({ actorUserId: outsider, action: "account.delete", targetAccountId: f.accountId });
+  const visible = async (userId: string, accountIds: string[]) => (await listAdminAudit({
+    visibleTo: { userId, accountIds }, limit: ADMIN_AUDIT_MAX_LIMIT
+  })).find(entry => entry.id === audit.id);
+  expect(await visible(member, [f.accountId])).toMatchObject({ id: audit.id });
+  // An actor's own entry is still hidden when they have no membership in an existing mailbox.
+  expect(await visible(outsider, [])).toBeUndefined();
+  await f.api.deleteAccountControlPlane(f.accountId);
+  for (const userId of [member, outsider, crypto.randomUUID()]) {
+    expect(await visible(userId, [])).toMatchObject({ id: audit.id, targetAccountId: f.accountId, targetAccountLabel: null });
+  }
+});
+
+test("an unknown audit cursor falls back to strictly older timestamps", async () => {
+  const db = await getDb();
+  const createdAt = Date.now() + 1_000_000;
+  const actor = crypto.randomUUID();
+  const ids = [crypto.randomUUID(), crypto.randomUUID()];
+  try {
+    for (const [index, id] of ids.entries()) db.prepare(
+      "INSERT INTO admin_audit(id,actorUserId,action,createdAt) VALUES(?,?,'user.update',?)"
+    ).run(id, actor, createdAt - index);
+    const cursor = encodeAdminAuditCursor({ createdAt, id: "unknown-cursor" });
+    expect((await listAdminAudit({ before: cursor, limit: 1 })).map(entry => entry.id)).toEqual([ids[1]]);
+  } finally { for (const id of ids) db.prepare("DELETE FROM admin_audit WHERE id=?").run(id); }
 });

@@ -128,7 +128,7 @@ test("G3 admin passkey DTO targets opaque resource; removal checks ownership and
 
 test("G4 audit cursor pages three equal timestamps without skipped or duplicate entries", async () => {
   const f = await fixture(), createdAt = Date.now() + 1_000_000;
-  const ids = ["a","b","c"].map(id => `${f.id}-${id}`);
+  const ids = ["c","a","b"].map(id => `${f.id}-${id}`);
   for (const id of ids) f.master.prepare(`INSERT INTO admin_audit(id,actorUserId,action,createdAt) VALUES(?,?,'user.update',?)`).run(id,f.user.id,createdAt);
   try {
     const first = await audit(request(f,"admin/audit?limit=2")), body = await first.json();

@@ -1071,7 +1071,38 @@
       "actor": "Actor",
       "target": "Target user / mailbox",
       "empty": "No audit entries.",
-      "older": "Load older entries"
+      "older": "Load older entries",
+      "actions": {
+        "invite_revoke": "Invite revoked",
+        "invite_cleanup": "Invite history cleared",
+        "operator_lock_override": "Administration lock overridden",
+        "identity_create": "Sender identity created",
+        "identity_update": "Sender identity updated",
+        "identity_disable": "Sender identity disabled",
+        "identity_enable": "Sender identity enabled",
+        "identity_default_changed": "Default sender changed",
+        "user_recovery_issue": "Recovery link issued",
+        "user_mfa_reset": "Two-factor authentication reset",
+        "user_passkey_remove": "Passkey removed",
+        "user_sessions_revoke": "Sessions revoked",
+        "user_create": "User created",
+        "user_update": "User updated",
+        "user_disable": "User disabled",
+        "user_enable": "User enabled",
+        "user_delete": "User deleted",
+        "user_password_reset": "Password reset",
+        "account_create": "Mailbox created",
+        "account_delete": "Mailbox deleted",
+        "account_update": "Mailbox updated",
+        "member_grant": "Member added",
+        "member_update": "Member role updated",
+        "member_revoke": "Member removed",
+        "spam_settings_update": "Spam settings updated",
+        "spam_rescan_start": "Inbox check started",
+        "spam_rescan_move": "Spam move started",
+        "domain_icon_upload": "Domain icon uploaded",
+        "domain_icon_reset": "Domain icon reset"
+      }
     },
     "mailboxes": {
       "create": "Create mailbox",
@@ -1294,7 +1325,10 @@
         "noSubject": "(no subject)",
         "running": "Check running",
         "latest": "Last check: {items, plural, =0 {no hits} one {# hit} other {# hits}}",
-        "noMailboxes": "You are not a member of any mailbox. Only mailboxes you are a member of can be checked."
+        "noMailboxes": "You are not a member of any mailbox. Only mailboxes you are a member of can be checked.",
+        "withRules": "Also check with rules only",
+        "staticOnly": "No model available. Only the allowlist and fixed rules apply; other messages remain unchecked.",
+        "classifierPhase": "Filter check"
       }
     },
     "domainIcons": {

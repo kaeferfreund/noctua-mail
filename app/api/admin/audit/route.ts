@@ -3,7 +3,7 @@ import { requireAdminSessionOr403 } from "../_auth";
 import { withAuthResponse } from "@/lib/auth";
 import { listAdminAudit, clampAuditLimit, decodeAdminAuditCursor, encodeAdminAuditCursor } from "@/lib/serverDb";
 import { listMemberAccountIds } from "@/lib/accountAccess";
-/** Entries of mailboxes the admin is not a member of are hidden (own actions and entries without a mailbox stay). */
+/** Entries of mailboxes the admin is not a member of are hidden (entries without a mailbox stay). */
 export async function GET(request:Request) {
   const source=await requireAdminSessionOr403(request);if(source instanceof NextResponse)return source;
   return withAuthResponse(source,async()=>{

@@ -1,6 +1,7 @@
 import type { LanguageModel } from "ai";
 import { simpleParser } from "mailparser";
 import {
+  AccountNotFoundError,
   getAccountById,
   getAccounts,
   getFolders,
@@ -68,6 +69,7 @@ const REVOKE_WINDOW_MS = 7 * 24 * 60 * 60_000;
 /** What the service reaches outside the database; tests replace them (no model API, no IMAP). */
 export type SpamServiceDeps = {
   languageModel: (config: SpamConfig) => LanguageModel | null;
+  loadStaticRules: typeof loadStaticRules;
   /** The raw source bytes: the parser decodes each part by its MIME charset. */
   readSource: (accountId: string, messageId: string) => Promise<Buffer | null>;
   moveToJunk: typeof moveMessageToJunk;
@@ -78,6 +80,7 @@ export type SpamServiceDeps = {
 const DEFAULT_DEPS: SpamServiceDeps = {
   languageModel: getSpamLanguageModel,
   readSource: getMessageSourceBuffer,
+  loadStaticRules,
   moveToJunk: moveMessageToJunk,
   accountRole: resolveAccountRole,
   sleep: (ms) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -105,7 +108,8 @@ const state: SpamServiceState = runtime.__noctuaSpamService ??= (() => {
     queue: createSpamQueue({
       check: (job) => checkMessage(job),
       isRetryable: isRetryableSpamError,
-      onAttemptFailed: (job, failedAttempts) => recordSpamCheckFailure(job.accountId, job.messageId, failedAttempts),
+      onAttemptFailed: (job, failedAttempts, error) => error instanceof AccountNotFoundError
+        ? undefined : recordSpamCheckFailure(job.accountId, job.messageId, failedAttempts),
       onFailure: (job, error) => logFailure(job.accountId, "classification failed; message left unmarked", spamErrorLogFields(error)),
       sleep: (ms) => deps().sleep(ms)
     })
@@ -118,8 +122,11 @@ const rescanUsage = () => state.rescanUsage ??= new Map();
 /** Tests: replaces outside dependencies until the returned function restores them. */
 export function replaceSpamServiceDeps(overrides: Partial<SpamServiceDeps>) {
   const previous = state.deps;
+  const previousIdentity = state.identity;
   state.deps = { ...deps(), ...overrides };
-  return () => { state.deps = previous; };
+  // Each synthetic household must discover its own mailboxes instead of a previous test's cached IDs.
+  state.identity = undefined;
+  return () => { state.deps = previous; state.identity = previousIdentity; };
 }
 
 /** Resolves once every queued check has finished. */
@@ -174,6 +181,7 @@ function recordUsage(job: SpamCheckJob, usage: SpamTokenUsage) {
  */
 export async function runRescanSpamChecks(accountId: string, candidates: Array<{ id: string; failedAttempts?: number }>, options: {
   rescanJobId: string;
+  staticOnly?: boolean;
   isCancelled: () => boolean;
   onProgress: (checked: number, usage: SpamTokenUsage) => void;
 }) {
@@ -181,7 +189,7 @@ export async function runRescanSpamChecks(accountId: string, candidates: Array<{
   try {
     for (let start = 0; start < candidates.length && !options.isCancelled(); start += SPAM_QUEUE_CONCURRENCY) {
       const jobs: SpamCheckJob[] = candidates.slice(start, start + SPAM_QUEUE_CONCURRENCY).map((candidate) => ({
-        accountId, messageId: candidate.id, failedAttempts: candidate.failedAttempts ?? 0, rescanJobId: options.rescanJobId
+        accountId, messageId: candidate.id, failedAttempts: candidate.failedAttempts ?? 0, rescanJobId: options.rescanJobId, staticOnly: options.staticOnly
       }));
       jobs.forEach((job) => state.claims.claim(job));
       state.queue.enqueue(jobs);
@@ -226,7 +234,8 @@ async function checkMessage(job: SpamCheckJob) {
   const mailbox = await loadMailboxSpamSettings(job.accountId);
   if (!isSpamDetectionOn(config, mailbox)) return;
   const message = await getMessageById(job.accountId, job.messageId);
-  if (!message) return;
+  // A sweep or rescan may have judged this row while this job waited in the queue.
+  if (!message || message.spamVerdict !== undefined) return;
   const folders = await getFolders(job.accountId);
   // Moved meanwhile (Junk, Trash, Sent, Drafts …): only INBOX mail is checked.
   if (message.folderId !== findInboxFolder(folders, job.accountId)?.id) return;
@@ -248,9 +257,9 @@ async function checkMessage(job: SpamCheckJob) {
   const decision = await classifySpam({
     input,
     allowlist,
-    staticRules: await loadStaticRules(),
+    staticRules: await deps().loadStaticRules(),
     getExamples: () => findSpamExamples(job.accountId, { senderEmail: input.fromEmail, subject: input.subject }),
-    model: deps().languageModel(config),
+    model: job.staticOnly ? null : deps().languageModel(config),
     providerOptions: getSpamProviderOptions(config),
     onUsage: (usage) => recordUsage(job, usage),
     trust
