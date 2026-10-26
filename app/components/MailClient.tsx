@@ -4360,7 +4360,7 @@ export default function MailClient({
       } catch {
         // ignore refresh errors
       }
-  }, [apiFetch, mailboxState, activeAccountId, authSecurity?.enrollmentRequired, authSecurity?.reauthRequired, loadInitialData]);
+  }, [apiFetch, mailboxState, activeAccountId, authSecurity, loadInitialData]);
   useVisibleInterval(refreshVisibleSession, authState === "ok" && sessionTtlSeconds
     ? Math.max(60_000, Math.min(30 * 60_000, Math.floor((sessionTtlSeconds * 1000) / 3))) : null);
 
