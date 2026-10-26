@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { render } from "@/lib/i18n/testRender";
+import { qrCodePath } from "@/app/components/ui/qr-code";
 import EnrollmentScreen from "./EnrollmentScreen";
 import { clientFixture, proof, setup } from "./authTestHelpers";
 
@@ -18,6 +19,9 @@ describe("EnrollmentScreen", () => {
     const { client, calls } = clientFixture(path => Response.json(path.endsWith("/reauth") ? proof : path.endsWith("/enable") ? setup : { ok: true }));
     let view = render(<EnrollmentScreen client={client} onComplete={() => { done++; }} onLogout={() => {}} />);
     start(view); await view.findByLabelText("Setup secret");
+    const qr = view.getByRole("img");
+    expect(qr.tagName.toLowerCase()).toBe("svg");
+    expect(qr.querySelector("path")?.getAttribute("d")).toBe(qrCodePath(setup.totpURI).d);
     expect(view.queryByText("synthetic-code-a")).toBeNull();
     view.unmount();
     view = render(<EnrollmentScreen client={client} onComplete={() => { done++; }} onLogout={() => {}} />);
