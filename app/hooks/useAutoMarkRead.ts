@@ -80,9 +80,10 @@ export function createAutoReadCoordinator() {
   const autoRequests = new Map<string, Promise<unknown>>();
   return {
     manualSeenVersion: (message: Pick<Message, "accountId" | "id">) => versions.get(messageKey(message)) ?? 0,
-    autoRead: (message: Message, request: () => Promise<unknown>) => {
+    autoRead: (message: Message, request: (shouldRetry: () => boolean) => Promise<unknown>) => {
       const key = messageKey(message);
-      const pending: Promise<unknown> = request().catch(() => {}).finally(() => {
+      const version = versions.get(key) ?? 0;
+      const pending: Promise<unknown> = request(() => (versions.get(key) ?? 0) === version).catch(() => {}).finally(() => {
         if (autoRequests.get(key) === pending) autoRequests.delete(key);
       });
       autoRequests.set(key, pending);
@@ -117,8 +118,8 @@ const periodKey = messageKey;
  * card) or a hidden page cancels its timer. Each open period marks a message
  * at most once, and not at all once its read state changed or the user took a
  * read/unread action on it (`manualSeenVersion` moved) while it was open:
- * opening it again starts a new period. A failed mark-read request is
- * therefore not retried until the message is opened again.
+ * opening it again starts a new period. The request layer retries a failed automatic mark once;
+ * the coordinator cancels that retry when a manual action wins.
  */
 export function useAutoMarkRead({ messages, delayMs, onMarkRead, manualSeenVersion }: {
   messages: Message[];

@@ -18,11 +18,13 @@ const FLAGS = "/api/accounts/account-a/messages/open-message/flags";
 
 let flagBodies: { flag: string; value: boolean }[];
 let holdAutoRead: Promise<void> | null;
+let failures = 0;
 const originals = { fetch: globalThis.fetch, eventSource: globalThis.EventSource };
 
 function setup(role: AccountRole, mode: AutoMarkReadMode) {
   flagBodies = [];
   holdAutoRead = null;
+  failures = 0;
   const account = {
     id: "account-a", name: "Synthetic Alpha", email: "account-a@example.test", avatar: "", accessRole: role, settings: {},
     imap: { host: "", port: 993, secure: true, user: "", password: "" }, smtp: { host: "", port: 465, secure: true, user: "", password: "" }
@@ -51,6 +53,7 @@ function setup(role: AccountRole, mode: AutoMarkReadMode) {
       const body = JSON.parse(String(init?.body)) as { flag: string; value: boolean };
       flagBodies.push(body);
       if (role === "viewer") return Response.json({ ok: false, message: "Insufficient mailbox role" }, { status: 403 });
+      if (body.value && failures > 0) { failures--; return Response.json({ message: "Synthetic flag failure" }, { status: 500 }); }
       if (body.value && holdAutoRead) await holdAutoRead;
       return Response.json({ ok: true, flags: body.value ? ["\\Seen"] : [] });
     }
@@ -115,4 +118,36 @@ describe("auto-read in the mail client", () => {
     await wait(200);
     expect(view.container.querySelector('[data-message-list-row="true"]')?.textContent).toContain("Unread");
   });
+});
+
+it("retries a failed automatic mark once before showing its error", async () => {
+  setup("editor", "immediate");
+  failures = 2;
+  const view = await openClient();
+  await waitFor(() => expect(flagBodies).toHaveLength(1));
+  expect(view.queryByText("Synthetic flag failure")).toBeNull();
+  await wait(1200);
+  await waitFor(() => expect(flagBodies).toHaveLength(2));
+  await view.findByText("Synthetic flag failure");
+  await wait(1200);
+  expect(flagBodies).toHaveLength(2);
+});
+
+it("recovers from one failed automatic mark without showing an error", async () => {
+  setup("editor", "immediate");
+  failures = 1;
+  const view = await openClient();
+  await wait(1200);
+  await waitFor(() => expect(flagBodies).toHaveLength(2));
+  expect(view.queryByText("Synthetic flag failure")).toBeNull();
+});
+
+it("manual unread cancels the automatic retry during its delay", async () => {
+  setup("editor", "immediate");
+  failures = 1;
+  await openClient();
+  await waitFor(() => expect(flagBodies).toHaveLength(1));
+  fireEvent.keyDown(window, { key: "u" });
+  await wait(1200);
+  await waitFor(() => expect(flagBodies).toEqual([{ flag: "seen", value: true }, { flag: "seen", value: false }]));
 });

@@ -1,5 +1,7 @@
 "use client";
 
+import { retryAutoReadOnce } from "@/lib/autoMarkRead";
+
 import { useLocale } from "next-intl";
 import { getFolderDisplayPath } from "@/lib/i18n/folderNames";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
@@ -177,25 +179,27 @@ export default function MessageWindowPage() {
   }, []);
 
   const runMessageFlagRequest = useCallback(
-    async (target: Message, payload: Record<string, unknown>) => {
+    async (target: Message, payload: Record<string, unknown>, shouldRetry?: () => boolean) => {
       setPendingMessageActions((prev) => new Set(prev).add(target.id));
       setActionError("");
       try {
-        const res = await fetch(buildAccountMessageActionPath(target.accountId, target.id, "flags"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) {
-          const body = (await res.json().catch(() => null)) as { message?: string } | null;
-          setActionError(body?.message || `Failed to update message (${res.status}).`);
-          return;
-        }
+        const request = async () => {
+          const response = await fetch(buildAccountMessageActionPath(target.accountId, target.id, "flags"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify(payload)
+          });
+          if (!response.ok) throw response;
+          return response;
+        };
+        const res = shouldRetry ? await retryAutoReadOnce(request, shouldRetry) : await request();
+        if (!res) return;
         const data = (await res.json()) as { flags?: string[] };
         applyFlagsToMessage(data.flags ?? []);
-      } catch {
-        setActionError("Failed to update message.");
+      } catch (error) {
+        const body = error instanceof Response ? await error.json().catch(() => null) as { message?: string } | null : null;
+        setActionError(body?.message || "Failed to update message.");
       } finally {
         setPendingMessageActions((prev) => {
           const next = new Set(prev);
@@ -228,7 +232,7 @@ export default function MessageWindowPage() {
     messages: status === "ready" && message ? [message] : [],
     delayMs: autoMarkReadDelayMs,
     manualSeenVersion: autoReadCoordinator.manualSeenVersion,
-    onMarkRead: (target) => autoReadCoordinator.autoRead(target, () => runMessageFlagRequest(target, { flag: "seen", value: true }))
+    onMarkRead: (target) => autoReadCoordinator.autoRead(target, shouldRetry => runMessageFlagRequest(target, { flag: "seen", value: true }, shouldRetry))
   });
 
   const handleDeleteMessage = useCallback(

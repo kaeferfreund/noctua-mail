@@ -3533,8 +3533,8 @@ export default function MailClient({
   );
   const autoMarkReadDelayMs = useAutoMarkReadDelay(currentAccount, Boolean(activeMessage), apiFetch);
   const handleAutoMarkRead = useCallback(
-    (message: Message) => autoReadCoordinator.autoRead(message, () =>
-      listHandleRef.current?.updateFlagState(message, "seen", true) ?? Promise.resolve()),
+    (message: Message) => autoReadCoordinator.autoRead(message, shouldRetry =>
+      listHandleRef.current?.updateFlagState(message, "seen", true, shouldRetry) ?? Promise.resolve()),
     [autoReadCoordinator]
   );
   const updateKeywordFlag = useCallback(
