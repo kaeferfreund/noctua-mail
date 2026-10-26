@@ -9,7 +9,7 @@ export type ScheduledSendStatus = "queued" | "sending" | "sent" | "failed" | "ca
 export type ScheduledSendReason =
   | "rescheduled" | "cancelled" | "edited" | "discarded" | "sent_now" | "manual_send"
   | "permission_revoked" | "identity_unavailable" | "draft_missing" | "draft_invalid"
-  | "draft_changed" | "draft_deleted" | "security_revoked" | "account_missing" | "smtp_rejected" | "send_failed" | "send_uncertain" | "interrupted";
+  | "manual_interrupted" | "draft_changed" | "draft_deleted" | "security_revoked" | "account_missing" | "smtp_rejected" | "send_failed" | "send_uncertain" | "interrupted";
 
 export type ScheduledSend = {
   id: string;
@@ -77,7 +77,7 @@ function expireStaleLeases(db: any, now: number, scope?: { accountId: string; dr
   if (scope) { filters.push("accountId=?"); values.push(scope.accountId); }
   if (scope?.draftId) { filters.push("draftId=?"); values.push(scope.draftId); }
   if (scope?.id) { filters.push("id=?"); values.push(scope.id); }
-  return db.query(`UPDATE scheduled_sends SET status='failed',lastError='interrupted',leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=?
+  return db.query(`UPDATE scheduled_sends SET status='failed',lastError=CASE WHEN instr(leaseOwner,'/manual:')>0 THEN 'manual_interrupted' ELSE 'interrupted' END,leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=?
     WHERE ${filters.join(" AND ")}`).run(now, ...values).changes as number;
 }
 
@@ -231,7 +231,7 @@ export function failInterruptedScheduledSends(ownerAlive: (leaseOwner: string) =
     const rows = db.query("SELECT id,leaseOwner FROM scheduled_sends WHERE status='sending'").all() as Array<{ id: string; leaseOwner: string | null }>;
     for (const row of rows) {
       if (row.leaseOwner && ownerAlive(row.leaseOwner)) continue;
-      failed += db.query(`UPDATE scheduled_sends SET status='failed',lastError='interrupted',leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=?
+      failed += db.query(`UPDATE scheduled_sends SET status='failed',lastError=CASE WHEN instr(leaseOwner,'/manual:')>0 THEN 'manual_interrupted' ELSE 'interrupted' END,leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=?
         WHERE id=? AND status='sending'`).run(now, row.id).changes as number;
     }
     return failed;

@@ -1977,6 +1977,7 @@
       "submit": "Planen",
       "submitting": "Wird geplant …",
       "scheduled": "Senden geplant für {time}",
+      "undoReopenFailed": "Die Planung wurde aufgehoben. Der Entwurf konnte nicht geöffnet werden. Öffne ihn im Ordner „Entwürfe“.",
       "undo": "Rückgängig",
       "failed": "Das Senden konnte nicht geplant werden.",
       "unscheduleFailed": "Die Planung konnte nicht aufgehoben werden.",
@@ -1994,6 +1995,7 @@
       "sendNow": "Jetzt senden",
       "unschedule": "Planung aufheben",
       "reasons": {
+        "manual_interrupted": "Die Bearbeitung, das Speichern oder das manuelle Senden wurde durch einen Serverabbruch unterbrochen. Prüfe den Entwurf und den Gesendet-Ordner, bevor du erneut planst.",
         "send_failed": "Der Mailserver war nach mehreren Versuchen nicht erreichbar.",
         "smtp_rejected": "Der Mailserver hat die Nachricht abgelehnt.",
         "send_uncertain": "Ob die Mail zugestellt wurde, ist unklar. Prüfe den Gesendet-Ordner, bevor du erneut sendest.",

@@ -1977,6 +1977,7 @@
       "submit": "Schedule",
       "submitting": "Scheduling …",
       "scheduled": "Send scheduled for {time}",
+      "undoReopenFailed": "The schedule was cancelled, but the draft could not be opened. Open it in Drafts.",
       "undo": "Undo",
       "failed": "The send could not be scheduled.",
       "unscheduleFailed": "The schedule could not be removed.",
@@ -1994,6 +1995,7 @@
       "sendNow": "Send now",
       "unschedule": "Remove schedule",
       "reasons": {
+        "manual_interrupted": "Editing, saving or manual sending was interrupted by a server failure. Check the draft and Sent folder before scheduling again.",
         "send_failed": "The mail server could not be reached after several attempts.",
         "smtp_rejected": "The mail server rejected the message.",
         "send_uncertain": "It is unclear whether the mail was delivered. Check the Sent folder before sending again.",

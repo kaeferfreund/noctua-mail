@@ -110,11 +110,12 @@ export function useScheduledSendControls(input: {
       actionLabel: t("undo"),
       onAction: async () => {
         if (!await unschedule(schedule, false) || !reopenOnUndo) return;
-        const draft = await loadDraft(schedule.draftId);
+        const draft = await loadDraft(schedule.draftId).catch(() => null);
         if (draft) editDraft(draft);
+        else reportError(t("undoReopenFailed"));
       }
     });
-  }, [editDraft, loadDraft, locale, pushNotice, t, unschedule]);
+  }, [editDraft, loadDraft, locale, pushNotice, reportError, t, unschedule]);
 
   /** Compose (inline/modal) planned a send. */
   const onScheduledSend = useCallback(({ scheduledSend, subject }: { scheduledSend: ScheduledSendView; subject: string }) => {

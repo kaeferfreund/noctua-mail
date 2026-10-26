@@ -125,6 +125,15 @@ describe("scheduled_sends store", () => {
     expect(await getScheduledSend(second.id)).toMatchObject({ status: "failed", lastError: "interrupted" });
   });
 
+  test("an abandoned manual hold explains the interrupted draft operation", async () => {
+    const accountId = mailbox();
+    const row = await queued(accountId);
+    await holdDraftSchedules(accountId, row.draftId, `${processScheduleOwner()}/manual:synthetic`, false, T0);
+    await failInterruptedScheduledSends(undefined, T0 + SCHEDULED_SEND_LEASE_MAX_MS);
+    expect(await getScheduledSend(row.id)).toMatchObject({ status: "failed", lastError: "manual_interrupted" });
+    expect((await claimDueScheduledSends(newLeaseOwner(), T0 + 3_600_000, 1000)).some(item => item.id === row.id)).toBe(false);
+  });
+
   test("an interrupted claim of a dead process fails and is never re-sent; a live owner keeps it", async () => {
     const accountId = mailbox();
     const row = await queued(accountId, T0 - 1);
