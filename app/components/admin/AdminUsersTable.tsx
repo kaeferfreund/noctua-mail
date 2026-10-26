@@ -34,8 +34,8 @@ function UserMailboxes({ accounts }: { accounts: NonNullable<AdminUser["accounts
   const shown = collapsible && !expanded ? accounts.slice(0, MAILBOX_PREVIEW - 1) : accounts;
   return <div className="grid w-60 gap-1 text-xs">
     <ul className="m-0 grid list-none gap-1 p-0">{shown.map(account => <li key={account.id} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-1.5">
-      <span className="min-w-0 truncate" title={account.name ? `${account.name} <${account.email}>` : account.email}>
-        <span data-user-text>{account.email}</span>{account.name && <span data-user-text className="text-muted-foreground"> · {account.name}</span>}
+      <span className="min-w-0 break-words" title={account.name ? `${account.name} <${account.email}>` : account.email}>
+        <span data-user-text className="block break-all">{account.email}</span>{account.name && <span data-user-text className="block text-muted-foreground">{account.name}</span>}
       </span>
       <Badge variant="outline" className="h-auto px-1.5 py-0 text-2xs font-normal text-muted-foreground" title={t("role")}>{t(`roles.${account.role}`)}</Badge>
       {account.isOwner === true ? <span className="inline-flex" title={t("owner")}><Crown aria-hidden="true" className="size-3.5 text-amber-600 dark:text-amber-400" /><span className="sr-only">{t("owner")}</span></span> : <span />}
