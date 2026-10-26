@@ -464,6 +464,8 @@ detection, `account.update` audit); their token needs the `manage` scope.
 | `save_signature_template` | `{accountId?,signatureId?,name,body}` | `{ok:true,signature,signatures,defaultSignatureId?}`; manager; without `signatureId` creates a template, otherwise replaces its name/body (`signature_not_found` if absent) |
 | `delete_signature_template` | `{accountId?,signatureId}` | `{ok:true,signatures,defaultSignatureId?}`; manager; `signature_in_use` while an identity references it; clears the mailbox default if it pointed there |
 | `set_default_signature_template` | `{accountId?,signatureId:string\|null}` | `{ok:true,signatures,defaultSignatureId?}`; manager; null or `""` means no mailbox default |
+
+Write tools report a mailbox conflict (the row changed between read and commit) as `mailbox_conflict`; retry the call. `account_not_found`, `forbidden` and `mailbox_update_rejected` cover the remaining mailbox-service failures.
 | `create_draft_message` | Existing new/reply/forward/body/attachment/reference fields plus `identityId?` | `{ok:true,mode,referenceMessageId,identityId,draftId,message}`; editor |
 | `update_draft_message` | `{accountId?,draftId,identityId?,…}`, see [MCP draft tools](#mcp-draft-tools) | `{ok:true,mode,identityId,draftId,previousDraftId,draftIdChanged,message}`; editor |
 

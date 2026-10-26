@@ -4,8 +4,10 @@ import { identityTestAccount } from "./testFixtures/senderIdentities";
 import { createAuthenticatedTestSession } from "./testAuthHarness";
 import { requireActiveUserSession } from "./auth";
 import { mintMcpToken } from "./mcpAuth";
-import { executeMcpHttpRequest } from "./mcpServer";
+import { executeMcpHttpRequest, mailboxErrorCode } from "./mcpServer";
 import { createSenderIdentity } from "./senderIdentities";
+import { MailboxCredentialError } from "./mailboxCredentials";
+import { saveSignatureTemplate } from "./signatureTemplateStore";
 import { GET } from "../app/api/accounts/route";
 
 const accountId = `mcp-signatures-${crypto.randomUUID()}`;
@@ -85,4 +87,18 @@ test("invalid placeholders and in-use templates surface as tool errors and chang
   expect(inUse.structuredContent).toMatchObject({ ok: false, code: "signature_in_use" });
   expect((await tool("list_signature_templates")).structuredContent!.signatures!.map(item => item.id)).toContain(id);
   expect((await uiSettings())?.signatures?.map(item => item.id)).toContain(id);
+}, 20000);
+
+test("a concurrent mailbox change is reported as a retryable conflict, not a rejection", async () => {
+  const before = (await tool("list_signature_templates")).structuredContent!.signatures!.length;
+  // The authorize hook runs after the row snapshot; changing the row there mimics a concurrent settings save.
+  const bump = { assertCurrent: () => { fixture.master.prepare("UPDATE accounts SET name=? WHERE id=?").run(`Renamed ${Date.now()}`, accountId); } };
+  const attempt = saveSignatureTemplate(accountId, { name: "Raced", body: "Hi" }, { userId: fixture.user.id, beforeWrite: async () => bump as never });
+  await expect(attempt).rejects.toBeInstanceOf(MailboxCredentialError);
+  await expect(attempt).rejects.toMatchObject({ status: 409 });
+  expect(mailboxErrorCode(409)).toBe("mailbox_conflict");
+  expect(mailboxErrorCode(404)).toBe("account_not_found");
+  expect(mailboxErrorCode(403)).toBe("forbidden");
+  expect(mailboxErrorCode(400)).toBe("mailbox_update_rejected");
+  expect((await tool("list_signature_templates")).structuredContent!.signatures!.length).toBe(before);
 }, 20000);

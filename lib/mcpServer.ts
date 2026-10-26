@@ -406,13 +406,17 @@ function senderToolOutput(shape: Record<string, z.ZodType>) {
     }).meta({ anyOf: z.toJSONSchema(variants).oneOf ?? z.toJSONSchema(variants).anyOf });
 }
 
+/** Keep the mailbox service's status visible so clients can retry a conflict instead of treating it as a rejection. */
+export function mailboxErrorCode(status: number) {
+  return status === 409 ? "mailbox_conflict" : status === 404 ? "account_not_found" : status === 403 ? "forbidden" : "mailbox_update_rejected";
+}
 async function senderToolCall(run: () => Promise<ReturnType<typeof buildToolResult>>) {
   try { return await run(); }
   catch (error) {
     if (error instanceof SenderIdentityError || error instanceof SignatureTemplateError || error instanceof MailboxCredentialError ||
         error instanceof InvalidAccountPreferencesError || error instanceof DraftSaveError) {
       const code = error instanceof SenderIdentityError || error instanceof SignatureTemplateError ? error.code
-        : error instanceof MailboxCredentialError ? "mailbox_update_rejected" : error instanceof InvalidAccountPreferencesError ? "invalid_preferences" : "invalid_draft";
+        : error instanceof MailboxCredentialError ? mailboxErrorCode(error.status) : error instanceof InvalidAccountPreferencesError ? "invalid_preferences" : "invalid_draft";
       return { ...buildToolResult(error.message, { ok: false, code, message: error.message }), isError: true };
     }
     throw error;
@@ -1411,7 +1415,7 @@ export async function executeMcpHttpRequest(params: {
   });
   server.registerTool("set_default_signature_template", {
     description: "Set the mailbox default signature template (manager). Null or an empty id means no default. Members' own choices (set_sender_preferences) still take precedence.",
-    inputSchema: z.object({ ...ACCOUNT_ID_ARG, signatureId: z.string().max(256).nullable() }).strict(),
+    inputSchema: z.object({ ...ACCOUNT_ID_ARG, signatureId: z.string().trim().max(256).nullable() }).strict(),
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
     outputSchema: senderToolOutput(SIGNATURE_TEMPLATES_OUTPUT)
   }, async args => {
