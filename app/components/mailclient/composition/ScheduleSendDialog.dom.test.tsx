@@ -99,3 +99,11 @@ it("explains the one-minute minimum when the selected preset is about to start",
   expect(page.getByRole("alert").textContent).toBe("Wähle einen Zeitpunkt mindestens eine Minute in der Zukunft.");
   expect(planned).toEqual([]);
 });
+
+it("shows the existing time before replacing a schedule", () => {
+  const page = render(<I18nTestProvider locale="de"><Theme>
+    <ScheduleSendDialog open onOpenChange={() => {}} onSchedule={async () => true}
+      existingSendAt={utc(10, 25, 7)} now={() => utc(10, 24, 8)} timeZone={TZ} />
+  </Theme></I18nTestProvider>);
+  expect(page.getByRole("status").textContent).toBe('Bereits geplant für 25. Okt., 08:00. „Planen“ ersetzt diesen Zeitpunkt.');
+});

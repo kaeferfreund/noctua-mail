@@ -1952,6 +1952,7 @@
       "failed": "Translation failed."
     },
     "schedule": {
+      "existing": "Already scheduled for {time}. Scheduling again replaces this time.",
       "notInDrafts": "Only drafts in the Drafts folder can be scheduled.",
       "draftInvalid": "This draft cannot be scheduled. Review recipients and content, then save it again.",
       "draftMissing": "The draft was not found. Open Drafts again.",

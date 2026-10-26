@@ -138,7 +138,11 @@ export function useScheduledSendControls(input: {
 
   // The saved draft „Senden planen“ was opened for from the list or the reader.
   const [scheduleTarget, setScheduleTarget] = useState<Message | null>(null);
-  const openSchedule = useCallback((draft: Message) => setScheduleTarget(draft), []);
+  const openSchedule = useCallback(async (draft: Message) => {
+    // Refresh before showing the previous time, including plans from another tab/member.
+    if (!await refresh()) { reportError(t("failed")); return; }
+    setScheduleTarget(draft);
+  }, [refresh, reportError, t]);
   const scheduleTargetDraft = useCallback(async (sendAt: number) => {
     const draft = scheduleTarget;
     if (!draft || !accountId || draft.accountId !== accountId) return false;
@@ -151,7 +155,9 @@ export function useScheduledSendControls(input: {
     announce(result.value, draft.subject ?? "", false);
     return true;
   }, [accountId, announce, apiFetch, refresh, reportError, scheduleTarget, t]);
+  const existingSchedule = scheduleTarget ? byDraftId.get(scheduleTarget.id) : undefined;
   const scheduleDialog = {
+    existingSendAt: existingSchedule?.status === "queued" ? existingSchedule.sendAt : undefined,
     open: Boolean(enabled && scheduleTarget && scheduleTarget.accountId === accountId),
     onOpenChange: (open: boolean) => { if (!open) setScheduleTarget(null); },
     onSchedule: scheduleTargetDraft

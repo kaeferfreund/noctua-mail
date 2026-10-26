@@ -19,6 +19,7 @@ type ScheduleSendDialogProps = {
   onOpenChange: (open: boolean) => void;
   /** Resolves true when the send was scheduled (the dialog then closes). */
   onSchedule: (sendAt: number) => Promise<boolean>;
+  existingSendAt?: number;
   now?: () => number;
   timeZone?: string;
 };
@@ -55,7 +56,7 @@ export default function ScheduleSendDialog({ open, onOpenChange, ...props }: Sch
   );
 }
 
-function ScheduleSendForm({ onSchedule, onCancel, now: clock = Date.now, timeZone: zone }: Omit<ScheduleSendDialogProps, "open" | "onOpenChange"> & { onCancel: () => void }) {
+function ScheduleSendForm({ onSchedule, onCancel, existingSendAt, now: clock = Date.now, timeZone: zone }: Omit<ScheduleSendDialogProps, "open" | "onOpenChange"> & { onCancel: () => void }) {
   const t = useTranslations("Compose.schedule");
   const locale = useLocale();
   const timeZone = zone ?? browserTimeZone();
@@ -123,6 +124,7 @@ function ScheduleSendForm({ onSchedule, onCancel, now: clock = Date.now, timeZon
   return (
     // noValidate: the inline error replaces the browser's min/required bubbles.
     <form className={styles.form} noValidate onSubmit={event => { event.preventDefault(); void submit(); }}>
+      {existingSendAt !== undefined && <p className={styles.hint} role="status">{t("existing", { time: format(existingSendAt) })}</p>}
       <div className={styles.options} role="radiogroup" aria-label={t("title")}>
         {presets.map(preset => row(preset.kind, t(`presets.${preset.kind}`),
           <span className={styles.optionTime}>{format(preset.sendAt)}</span>))}

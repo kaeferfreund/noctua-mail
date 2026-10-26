@@ -1952,6 +1952,7 @@
       "failed": "Die Übersetzung ist fehlgeschlagen."
     },
     "schedule": {
+      "existing": "Bereits geplant für {time}. „Planen“ ersetzt diesen Zeitpunkt.",
       "notInDrafts": "Nur Entwürfe im Ordner „Entwürfe“ können geplant werden.",
       "draftInvalid": "Der Entwurf kann nicht geplant werden. Prüfe Empfänger und Inhalt und speichere ihn erneut.",
       "draftMissing": "Der Entwurf wurde nicht gefunden. Öffne den Ordner „Entwürfe“ erneut.",
