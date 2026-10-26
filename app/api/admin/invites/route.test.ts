@@ -28,10 +28,10 @@ describe("admin invite history", () => {
   const admin = createAuthenticatedTestSession(undefined, "admin");
   const list = async (cookie: string) => (await (await GET(new Request(url, { headers: { cookie } }))).json()).invites as
     { id: string; email: string | null; issuedBy: string | null; issuerDeleted: boolean; status: string }[];
-  const seed = async (rows: { code: string; uses?: number; expiresAt?: number | null; revokedAt?: number | null; issuedByUserId?: string | null; email?: string | null }[]) => {
+  const seed = async (rows: { code: string; uses?: number; maxUses?: number | null; expiresAt?: number | null; revokedAt?: number | null; issuedByUserId?: string | null; email?: string | null }[]) => {
     const { master } = await admin;
     for (const row of rows) master.prepare(`INSERT INTO invite_codes(code,role,maxUses,uses,expiresAt,createdAt,email,issuedByUserId,provenance,revokedAt)
-      VALUES(?, 'user', 1, ?, ?, ?, ?, ?, ?, ?)`).run(row.code, row.uses ?? 0, row.expiresAt ?? null, Date.now(), row.email ?? null,
+      VALUES(?, 'user', ?, ?, ?, ?, ?, ?, ?, ?)`).run(row.code, row.maxUses === undefined ? 1 : row.maxUses, row.uses ?? 0, row.expiresAt ?? null, Date.now(), row.email ?? null,
       row.issuedByUserId ?? null, row.issuedByUserId === undefined ? "operator" : "admin", row.revokedAt ?? null);
   };
   const codes = async () => new Set(((await admin).master.prepare(`SELECT code FROM invite_codes`).all() as { code: string }[]).map(row => row.code));
@@ -58,6 +58,7 @@ describe("admin invite history", () => {
     await seed([
       { code: `issued-${tag}`, expiresAt: now + 86400000, issuedByUserId: user.id, email: `issued-${tag}@example.test` },
       { code: `legacy-issued-${tag}` },
+      { code: `partial-${tag}`, uses: 1, maxUses: 3 }, { code: `unlimited-${tag}`, uses: 12, maxUses: null },
       { code: `redeemed-${tag}`, uses: 1 }, { code: `expired-${tag}`, expiresAt: now - 1 }, { code: `revoked-${tag}`, revokedAt: now - 1 },
       { code: `claiming-${tag}`, expiresAt: now - 1 }
     ]);
@@ -70,14 +71,14 @@ describe("admin invite history", () => {
     expect((await cleanup({ origin: ORIGIN })).status).toBe(401);
     expect((await codes()).has(`redeemed-${tag}`)).toBe(true);
 
-    const settled = (master.prepare(`SELECT count(*) n FROM invite_codes WHERE NOT (COALESCE(uses,0)=0 AND revokedAt IS NULL AND (expiresAt IS NULL OR expiresAt>?))
+    const settled = (master.prepare(`SELECT count(*) n FROM invite_codes WHERE NOT ((maxUses IS NULL OR COALESCE(uses,0)<maxUses) AND revokedAt IS NULL AND (expiresAt IS NULL OR expiresAt>?))
       AND code NOT IN (SELECT inviteCode FROM user_provisioning WHERE inviteCode IS NOT NULL AND state IN ('reserved','auth_created','cleanup_required'))`).get(Date.now()) as { n: number }).n;
     expect(settled).toBeGreaterThanOrEqual(3);
     const response = await cleanup({ cookie: jar.header(), origin: ORIGIN });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, deleted: settled });
     const left = await codes();
-    for (const code of [`issued-${tag}`, `legacy-issued-${tag}`, `claiming-${tag}`]) expect(left.has(code)).toBe(true);
+    for (const code of [`issued-${tag}`, `legacy-issued-${tag}`, `claiming-${tag}`, `partial-${tag}`, `unlimited-${tag}`]) expect(left.has(code)).toBe(true);
     for (const code of [`redeemed-${tag}`, `expired-${tag}`, `revoked-${tag}`]) expect(left.has(code)).toBe(false);
     const audit = master.prepare(`SELECT actorUserId,payload FROM admin_audit WHERE action='invite.cleanup' ORDER BY rowid DESC LIMIT 1`).get() as { actorUserId: string; payload: string };
     expect(audit.actorUserId).toBe(user.id);
