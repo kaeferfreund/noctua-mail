@@ -91,7 +91,7 @@ export async function requireActiveUserSession(request?: Request | null, options
   const expiresAt = security.assurance === "setup"
     ? Math.min(new Date(result.session.expiresAt).getTime(), createdAt + SETUP_SESSION_MAX_AGE_MS)
     : new Date(result.session.expiresAt).getTime();
-  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) return denied(401, undefined, headers);
+  if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) return denied(401, undefined, headers);
   const mfa = await isMfaEnrollmentComplete(user.id);
   const pendingSecurity = !!db.prepare(`SELECT 1 FROM admin_lifecycle_operations WHERE slot=?
     AND action NOT IN ('security.login','security.reauth','security.passkey.reauth','security.passkey.login')`).get(`security:${user.id}`);
@@ -124,7 +124,7 @@ function isSessionLive(db: Database, session: ActiveUserSession) {
     JOIN auth_session_security ss ON ss.sessionId=s.id AND ss.userId=s.userId
     JOIN auth_security_state st ON st.userId=s.userId
     WHERE s.id=? AND s.token=? AND s.userId=? AND ss.generation=? AND st.generation=ss.generation
-      AND julianday(s.expiresAt)>julianday('now')`).get(session.sessionId, session.sessionToken, session.userId, session.generation);
+      AND julianday(s.expiresAt)>=julianday('now')`).get(session.sessionId, session.sessionToken, session.userId, session.generation);
 }
 
 /** Clears the selection only while it is still `accountId` (compare-and-set): a switch committed since then stays. */

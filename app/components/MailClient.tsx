@@ -9,6 +9,7 @@ import ReaderToolbar, { ReaderFocusHint } from "./mailclient/message/ReaderToolb
 import { useReaderFocusPlacement } from "@/lib/ui/useReaderFocusPlacement";
 import { setClientErrorBuild } from "@/lib/ui/clientErrorReporter";
 import { useReaderFocus } from "@/lib/ui/useReaderFocus";
+import { useVisibleInterval } from "@/app/hooks/useVisibleInterval";
 import { useReaderNavigation } from "@/lib/ui/useReaderNavigation";
 import { readerShortcut } from "@/lib/ui/readerFocus";
 
@@ -4331,13 +4332,7 @@ export default function MailClient({
     };
   }, [clientId]);
 
-  useEffect(() => {
-    if (authState !== "ok" || !sessionTtlSeconds) return;
-    const intervalMs = Math.max(
-      60_000,
-      Math.min(30 * 60_000, Math.floor((sessionTtlSeconds * 1000) / 3))
-    );
-    const timer = window.setInterval(async () => {
+  const refreshVisibleSession = useCallback(async () => {
       try {
         const res = await apiFetch("/api/auth/me", {
           credentials: "include",
@@ -4363,9 +4358,9 @@ export default function MailClient({
       } catch {
         // ignore refresh errors
       }
-    }, intervalMs);
-    return () => window.clearInterval(timer);
-  }, [authState, sessionTtlSeconds, apiFetch, mailboxState, activeAccountId, authSecurity?.enrollmentRequired, authSecurity?.reauthRequired, loadInitialData]);
+  }, [apiFetch, mailboxState, activeAccountId, authSecurity?.enrollmentRequired, authSecurity?.reauthRequired, loadInitialData]);
+  useVisibleInterval(refreshVisibleSession, authState === "ok" && sessionTtlSeconds
+    ? Math.max(60_000, Math.min(30 * 60_000, Math.floor((sessionTtlSeconds * 1000) / 3))) : null);
 
   useEffect(() => {
     let active = true;
