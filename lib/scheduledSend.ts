@@ -10,6 +10,29 @@ import { resolveAccountRole, roleAtLeast } from "@/lib/accountAccess";
 import type { ScheduledSend, ScheduledSendReason } from "./db/scheduledSends";
 import type { ScheduledSendView } from "@/lib/scheduledSendView";
 
+// The constructor stays in the job's attempt module. A plain object or serialized token
+// cannot opt into session-less outbound authorization, even through an untyped caller.
+const jobAuthorizationBrand: unique symbol = Symbol("scheduled-send-job");
+export type ScheduledSendAuthorization = {
+  readonly scheduledByUserId: string;
+  readonly scheduleId: string;
+  readonly leaseOwner: string;
+  readonly [jobAuthorizationBrand]: true;
+};
+const jobAuthorizations = new WeakSet<object>();
+export function isScheduledSendAuthorization(value: unknown): value is ScheduledSendAuthorization {
+  return typeof value === "object" && value !== null && jobAuthorizations.has(value);
+}
+function jobAuthorization(row: ScheduledSend): ScheduledSendAuthorization {
+  if (row.status !== "sending" || !row.leaseOwner || row.leaseOwner.includes("/")) {
+    throw new DraftSendError(409, "No active scheduler claim.", "scheduled_send_claim_lost");
+  }
+  const token: ScheduledSendAuthorization = Object.freeze({ scheduledByUserId: row.userId,
+    scheduleId: row.id, leaseOwner: row.leaseOwner, [jobAuthorizationBrand]: true as const });
+  jobAuthorizations.add(token);
+  return token;
+}
+
 /** The latest accepted send time, measured from the request. */
 export const SCHEDULED_SEND_MAX_AHEAD_MS = 365 * 24 * 60 * 60_000;
 /** Delays before the 2nd, 3rd and 4th attempt; the 4th failure is final. */
@@ -76,6 +99,8 @@ export function classifyScheduledSendError(error: unknown, row: ScheduledSend, n
   if (error instanceof OutboundAuthorizationError) return { status: "cancelled", reason: "permission_revoked" };
   if (error instanceof SenderIdentityError) return { status: "cancelled", reason: "identity_unavailable" };
   if (error instanceof DraftSendError) {
+    if (error.code === "scheduled_send_claim_lost") return { status: "cancelled", reason: "interrupted" };
+    if (error.code === "scheduled_send_security_revoked") return { status: "cancelled", reason: "permission_revoked" };
     return error.status === 404 ? { status: "cancelled", reason: "draft_missing" } : { status: "failed", reason: "draft_invalid" };
   }
   if (isSmtpUpstreamFailure(error)) {
@@ -108,7 +133,7 @@ export async function attemptScheduledSend(row: ScheduledSend, deps: ScheduledSe
       clientId: "scheduled-send",
       draftId: row.draftId,
       actor: { userId: row.userId, clientId: "scheduled-send" },
-      authorization: { scheduledByUserId: row.userId }
+      authorization: jobAuthorization(row)
     });
     return { status: "sent", reason: null };
   } catch (error) {

@@ -11,7 +11,7 @@ import {
 } from "./db/scheduledSends";
 import {
   attemptScheduledSend, classifyScheduledSendError, SCHEDULED_SEND_MAX_AHEAD_MS, SCHEDULED_SEND_RETRY_DELAYS_MS,
-  validateScheduledSendAt, type ScheduledSendDeps
+  validateScheduledSendAt, type ScheduledSendDeps, type ScheduledSendAuthorization
 } from "./scheduledSend";
 import { ScheduledSendScheduler, SCHEDULED_SEND_TICK_MS } from "./scheduledSendJob";
 import { DraftSendError } from "./drafts";
@@ -220,15 +220,24 @@ describe("scheduled send rules", () => {
     await db.upsertAccount(identityTestAccount(accountId));
     const auth = await createAuthenticatedTestSession(accountId);
     const [identity] = await db.listSenderIdentities(accountId);
-    const actor = await authorizeOutbound({ scheduledByUserId: auth.user.id }, { accountId, minRole: "editor", identity });
+    const row = await createScheduledSend({ accountId, userId: auth.user.id, draftId: draft(), sendAt: T0 });
+    const claimed = (await claimDueScheduledSends(processScheduleOwner(), T0, 1000)).find(item => item.id === row.id)!;
+    let token: ScheduledSendAuthorization | undefined;
+    const { deps } = stubDeps({ send: async params => {
+      token = params.authorization as ScheduledSendAuthorization;
+      return {} as Awaited<ReturnType<ScheduledSendDeps["send"]>>;
+    } });
+    expect(await attemptScheduledSend(claimed, deps)).toEqual({ status: "sent", reason: null });
+    await expect(authorizeOutbound({ ...token! }, { accountId, minRole: "editor", identity })).rejects.toBeInstanceOf(OutboundAuthorizationError);
+    const actor = await authorizeOutbound(token!, { accountId, minRole: "editor", identity });
     expect(actor).toMatchObject({ userId: auth.user.id, clientId: "scheduled-send" });
     const master = await getDb();
     actor.assertCurrent(master);
     await db.setUserAccountRole(auth.user.id, accountId, "viewer", auth.user.id);
     expect(() => actor.assertCurrent(master)).toThrow(OutboundAuthorizationError);
-    await expect(authorizeOutbound({ scheduledByUserId: "unknown-user" }, { accountId, minRole: "editor" })).rejects.toBeInstanceOf(OutboundAuthorizationError);
+    await expect(authorizeOutbound({ scheduledByUserId: auth.user.id } as ScheduledSendAuthorization, { accountId, minRole: "editor" })).rejects.toBeInstanceOf(OutboundAuthorizationError);
     await db.setUserAccountRole(auth.user.id, accountId, "editor", auth.user.id);
-    await expect(authorizeOutbound({ scheduledByUserId: auth.user.id }, { accountId, minRole: "editor", identity: { ...identity, displayName: "Changed" } }))
+    await expect(authorizeOutbound(token!, { accountId, minRole: "editor", identity: { ...identity, displayName: "Changed" } }))
       .rejects.toMatchObject({ code: "draft_identity_changed" });
   });
 });
@@ -246,7 +255,7 @@ describe("scheduled send job", () => {
       send: async (params) => {
         if (![overdue.draftId, later.draftId, flaky.draftId].includes(params.draftId)) throw new DraftSendError(404, "foreign row");
         if (params.draftId === flaky.draftId && ++flakyCalls < 3) throw new Error("synthetic transient failure");
-        expect(params.authorization).toEqual({ scheduledByUserId: "synthetic-user" });
+        expect(params.authorization).toMatchObject({ scheduledByUserId: "synthetic-user", scheduleId: expect.any(String) });
         sent.push(params.draftId);
         return {} as Awaited<ReturnType<ScheduledSendDeps["send"]>>;
       }
