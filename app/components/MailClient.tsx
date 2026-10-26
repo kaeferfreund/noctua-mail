@@ -1,5 +1,7 @@
 "use client";
 
+import { readerNavigationActiveId } from "@/lib/ui/readerFocus";
+
 import { useSenderMessages } from "@/lib/i18n/useSenderMessages";
 import { useStartupSync } from "./mailclient/useStartupSync";
 import { useEmptyFolderRepair } from "./mailclient/useEmptyFolderRepair";
@@ -2848,7 +2850,7 @@ export default function MailClient({
   const loadReaderPage = useCallback(() => setMessagesPage(page => page + 1), [setMessagesPage]);
   const readerNavigation = useReaderNavigation({
     enabled: !isMobile && readerLayout === "focus",
-    rows: readerRows, activeId: activeMessage?.id ?? "", listKey: messagesKey,
+    rows: readerRows, activeId: readerNavigationActiveId(readerRows, activeMessage), listKey: messagesKey,
     hasMore: hasMoreMessages, loading: loadingMessages, revision: authoritativeRevision,
     error: messageListError, select: handleSelectMessage, loadNextPage: loadReaderPage
   });

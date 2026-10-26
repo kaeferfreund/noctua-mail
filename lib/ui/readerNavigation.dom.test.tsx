@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react
 import { useState } from "react";
 import type { Message } from "@/lib/data";
 import type { ListItem } from "@/app/components/mailclient/messagelist/listModel";
-import { readerNavigationRows, readerNavigation, readerPosition } from "./readerFocus";
+import { readerNavigationRows, readerNavigation, readerNavigationActiveId, readerPosition } from "./readerFocus";
 import { useReaderNavigation } from "./useReaderNavigation";
 const message = (id: string) => ({ id, subject: `Synthetic ${id}` }) as Message;
 afterEach(cleanup);
@@ -65,4 +65,15 @@ test("a failed page blocks the unloaded boundary while loaded rows remain naviga
   expect((view.getByText("Next") as HTMLButtonElement).disabled).toBe(false);
   fireEvent.click(view.getByText("Next"));
   expect(view.getByRole("status").textContent).toBe("b:2/2:0:false");
+});
+
+test("a synthetic reply opened from a collapsed row uses that conversation's visible position", () => {
+  const root = { ...message("root"), accountId: "synthetic", threadId: "conversation" };
+  const reply = { ...root, id: "synthetic-reply" };
+  const rows = [message("before"), root, message("after")];
+  const id = readerNavigationActiveId(rows, reply);
+  expect(readerPosition(rows, id, false)).toMatchObject({ position: 2, total: 3 });
+  expect(readerNavigation(rows, id, 1, false)).toEqual(message("after"));
+  expect(readerNavigationActiveId([...rows, reply], reply)).toBe(reply.id);
+  expect(readerNavigationActiveId(rows, { ...reply, accountId: "other" })).toBe(reply.id);
 });
