@@ -290,8 +290,8 @@ describe("admin INBOX rescan", () => {
 test("protected hits before the cap do not hide older movable hits or truncation", async () => {
   const f = await fixture();
   const now = Date.now();
-  const insert = f.db.prepare(`INSERT INTO messages(id,accountId,folderId,date,dateValue,spamVerdict,spamCheckedAt,flagged,flags)
-    VALUES(?,?,?,'',?,'spam',?, ?, ?)`);
+  const insert = f.db.prepare(`INSERT INTO messages(id,accountId,folderId,threadId,subject,fromAddr,toAddr,preview,body,date,dateValue,spamVerdict,spamCheckedAt,flagged,flags)
+    VALUES(?,?,?,'synthetic-thread','','','','','','',?,'spam',?, ?, ?)`);
   f.db.transaction(() => {
     for (let index = 0; index < 5001; index++) insert.run(`protected-${index}`, f.accountId, f.folderId, now, now, 1, '["NONJUNK"]');
     for (let index = 0; index < 5001; index++) insert.run(`movable-${index}`, f.accountId, f.folderId, now - 1000, now, 0, '[]');

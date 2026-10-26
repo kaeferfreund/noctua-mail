@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import type { Account } from "@/lib/data";
 import { createAuthenticatedTestSession, syntheticRequestIp } from "@/lib/testAuthHarness";
 import { dbModulePromise } from "@/lib/testDbHarness";
@@ -84,6 +84,23 @@ describe("admin routes are limited to the admin's own mailboxes", () => {
     expect((await deleteAccount(request(f.admin, "admin/accounts", "DELETE"), accountParams(f.foreign.id))).status).toBe(404);
     expect(f.admin.master.prepare("SELECT 1 FROM accounts WHERE id=?").get(f.foreign.id)).not.toBeNull();
     expect((await deleteAccount(request(f.user, "admin/accounts", "DELETE"), accountParams(f.own.id))).status).toBe(403);
+  });
+
+  test("membership lost after the delete pre-check still answers 404", async () => {
+    const f = await fixture();
+    const original = f.admin.master.prepare.bind(f.admin.master);
+    const probe = spyOn(f.admin.master, "prepare").mockImplementation((sql: string) => {
+      if (sql.includes("SELECT id, dbPath FROM accounts WHERE id = ?")) {
+        original("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(f.admin.user.id, f.own.id);
+      }
+      return original(sql);
+    });
+    try {
+      const response = await deleteAccount(request(f.admin, "admin/accounts", "DELETE"), accountParams(f.own.id));
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ code: "account_not_found" });
+      expect(original("SELECT 1 FROM accounts WHERE id=?").get(f.own.id)).not.toBeNull();
+    } finally { probe.mockRestore(); }
   });
 
   test("Benutzer: users stay global, their mailbox column shows only the admin's mailboxes", async () => {

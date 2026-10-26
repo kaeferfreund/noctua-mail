@@ -145,26 +145,26 @@ function mutateDomainIcon<T>(domain: string, work: () => Promise<T>): Promise<T>
 /** Stores an already normalised PNG (lib/domainIconImage.ts) and logs it. */
 export async function saveDomainIcon(domain: string, png: Buffer, userId: string) {
   return mutateDomainIcon(domain, async () => {
-  const file = domainIconPath(domain);
-  await mkdir(path.dirname(file), { recursive: true });
-  const temp = `${file}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(temp, png, { mode: 0o600 });
-    await rename(temp, file);
-  } finally {
-    await rm(temp, { force: true });
-  }
-  const hash = sha256(png);
-  await saveDomainIconRow({ domain, hash, size: png.byteLength, userId });
-  return { domain, version: domainIconVersion(hash) };
+    const file = domainIconPath(domain);
+    await mkdir(path.dirname(file), { recursive: true });
+    const temp = `${file}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temp, png, { mode: 0o600 });
+      await rename(temp, file);
+    } finally {
+      await rm(temp, { force: true });
+    }
+    const hash = sha256(png);
+    await saveDomainIconRow({ domain, hash, size: png.byteLength, userId });
+    return { domain, version: domainIconVersion(hash) };
   });
 }
 
 /** Drops the override (row, log entry, file); false when there was none. */
 export async function resetDomainIcon(domain: string, userId: string) {
   return mutateDomainIcon(domain, async () => {
-  const removed = await deleteDomainIconRow(domain, userId);
-  await rm(domainIconPath(domain), { force: true });
-  return removed;
+    const removed = await deleteDomainIconRow(domain, userId);
+    await rm(domainIconPath(domain), { force: true });
+    return removed;
   });
 }

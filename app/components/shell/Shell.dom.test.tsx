@@ -271,7 +271,7 @@ describe("collapsible domain groups", () => {
   it("restores the collapsed groups per user after a remount", () => {
     const first = renderGroups("user-1");
     fireEvent.click(headerOf(first, "brand.example.test"));
-    expect(window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1")).toBe('["mine:brand.example.test"]');
+    expect(window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1")).toBe('["brand.example.test"]');
     first.unmount();
     const again = renderGroups("user-1");
     expect(headerOf(again, "brand.example.test").getAttribute("aria-expanded")).toBe("false");
@@ -279,6 +279,17 @@ describe("collapsible domain groups", () => {
     again.unmount();
     const other = renderGroups("user-2");
     expect(headerOf(other, "brand.example.test").getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("migrates both old section prefixes to the unified list on mount", () => {
+    const key = "noctua:sidebarDomainsCollapsed:user-1";
+    window.localStorage.setItem(key, '["mine:brand.example.test","shared:plain.example.test","shared:brand.example.test"]');
+    const view = renderGroups();
+    expect(headerOf(view, "brand.example.test").getAttribute("aria-expanded")).toBe("false");
+    expect(headerOf(view, "plain.example.test").getAttribute("aria-expanded")).toBe("false");
+    expect(window.localStorage.getItem(key)).toBe('["brand.example.test","plain.example.test"]');
+    fireEvent.click(headerOf(view, "brand.example.test"));
+    expect(window.localStorage.getItem(key)).toBe('["plain.example.test"]');
   });
 
   it("shows the summed counters only on a collapsed heading, hiding zero totals", () => {
@@ -325,7 +336,7 @@ describe("collapsible domain groups", () => {
     expect(headers[0].getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(headers[0]);
     expect(headers[0].getAttribute("aria-expanded")).toBe("true");
-    // The legacy bare key is split per section on the first toggle; only the list's own entry matters now.
+    // The unified list stores only the domain; expanding removes its collapsed state.
     const stored = window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1") ?? "[]";
     expect(stored).not.toContain("mine:brand.example.test");
     expect(stored).not.toContain('"brand.example.test"');
@@ -423,6 +434,18 @@ describe("mailbox avatars and domain icons", () => {
     } finally {
       images.restore();
     }
+  });
+
+  it("uses the inherited parent version to invalidate a subdomain header's icon", async () => {
+    const images = stubAvatarImages();
+    try {
+      const rows = ["a", "b", "c", "d", "e", "f", "g"].map(id => ({
+        ...account(id, `Brand ${id}`, "mail.brand.example.test"), settings: { appearance: { senderIcons: false } }
+      }) as ShellAccount);
+      renderSidebar(rows, () => {}, undefined, {}, undefined, "en", null, {}, rows[0].id,
+        { domainIcons: { "brand.example.test": "parent-version" } });
+      expect(images.probes.map(probe => probe.src)).toEqual([`${domainIconSrc(rows[0], "mail.brand.example.test")}&v=parent-version`]);
+    } finally { images.restore(); }
   });
 
   it("loads an uploaded domain icon by its version, also when sender icons are off", async () => {

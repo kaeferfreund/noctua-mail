@@ -68,8 +68,8 @@ const REVOKE_WINDOW_MS = 7 * 24 * 60 * 60_000;
 /** What the service reaches outside the database; tests replace them (no model API, no IMAP). */
 export type SpamServiceDeps = {
   languageModel: (config: SpamConfig) => LanguageModel | null;
-  /** The raw source bytes: the parser decodes each part by its MIME charset. */
   loadStaticRules: typeof loadStaticRules;
+  /** The raw source bytes: the parser decodes each part by its MIME charset. */
   readSource: (accountId: string, messageId: string) => Promise<Buffer | null>;
   moveToJunk: typeof moveMessageToJunk;
   accountRole: typeof resolveAccountRole;
