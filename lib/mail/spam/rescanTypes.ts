@@ -37,6 +37,10 @@ export type SpamRescanMoveStatus = "pending" | "moved" | "gone" | "changed" | "e
 /** Why the model step did not run although it was requested. */
 export type SpamRescanModelBlock = "detection-off" | "mailbox-off" | "missing-key" | "unsupported-provider";
 
+/** Detection switches still apply; an unavailable provider leaves static rules usable. */
+export const spamRescanDetectionBlocked = (reason: SpamRescanModelBlock | null | undefined) =>
+  reason === "detection-off" || reason === "mailbox-off";
+
 export type SpamRescanCounts = {
   /** INBOX rows in the range. */
   inboxRows?: number;

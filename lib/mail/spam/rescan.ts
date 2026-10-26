@@ -36,6 +36,7 @@ import {
   SPAM_RESCAN_ITEM_LIMIT,
   SPAM_RESCAN_MODEL_MAX,
   spamRescanSince,
+  spamRescanDetectionBlocked,
   type SpamRescanActivity,
   type SpamRescanCounts,
   type SpamRescanModelBlock,
@@ -77,7 +78,7 @@ export class SpamRescanInputError extends Error {
 export type SpamRescanDeps = {
   /** Stage B; the default loads the spam service (AI SDK) lazily, like the sync hook. */
   runChecks: (accountId: string, candidates: Array<{ id: string; failedAttempts?: number }>, options: {
-    rescanJobId: string; isCancelled: () => boolean; onProgress: (checked: number, usage: SpamTokenUsage) => void;
+    rescanJobId: string; staticOnly?: boolean; isCancelled: () => boolean; onProgress: (checked: number, usage: SpamTokenUsage) => void;
   }) => Promise<SpamTokenUsage>;
   /** The IMAP move with the local relocation (junkMove.ts); the example is recorded around it. */
   moveToJunk: typeof moveMessageToJunk;
@@ -202,7 +203,7 @@ export async function startSpamRescan(input: { accountId: string; period: SpamRe
   const preview = await previewSpamRescan(input.accountId, input.period);
   const inbox = findInboxFolder(await getFolders(input.accountId), input.accountId);
   if (!inbox) throw new SpamRescanInputError("no_inbox");
-  if (input.withModel && preview.modelBlocked) throw new SpamRescanInputError("model_unavailable");
+  if (input.withModel && spamRescanDetectionBlocked(preview.modelBlocked)) throw new SpamRescanInputError("model_unavailable");
   // Never more than the admin saw, than the cap, or than the unchecked rows counted now.
   const modelLimit = input.withModel ? Math.min(input.modelLimit, preview.modelLimit) : 0;
   const id = randomUUID();
@@ -285,13 +286,13 @@ async function runScan(job: StoredSpamRescanJob, inboxId: string) {
   if (job.withModel && !isCancelled()) {
     const blocked = await modelBlock(accountId);
     if (blocked) counts.modelBlocked = blocked;
-    else if (job.modelLimit > 0) {
+    if (!spamRescanDetectionBlocked(blocked) && job.modelLimit > 0) {
       const candidates = (await listUncheckedSpamMessages(accountId, inboxId, since, job.modelLimit + listedIds.size, SPAM_MAX_ATTEMPTS, { newestFirst: true }))
         .filter((candidate) => !listedIds.has(candidate.id)).slice(0, job.modelLimit);
       progress("classifier", 0, candidates.length, true);
       counts.modelChecked = 0;
       const usage = await deps().runChecks(accountId, candidates, {
-        rescanJobId: job.id, isCancelled,
+        rescanJobId: job.id, staticOnly: !!blocked, isCancelled,
         onProgress: (checked) => { counts.modelChecked = checked; progress("classifier", checked, candidates.length); }
       });
       counts.modelCalls = usage.calls;

@@ -318,3 +318,28 @@ test("a failed example write after a successful move leaves the item moved", asy
     expect(f.moved).toEqual([message.id]);
   } finally { f.db.exec("DROP TRIGGER synthetic_example_failure"); }
 });
+
+
+test("stage B applies static rules without a model and leaves other mail unchecked", async () => {
+  const f = await fixture();
+  const [denied, undecided] = await f.seed(f.mail({ from: "Blocked <blocked@lottery.invalid>" }), f.mail({ from: "Unknown <unknown@lottery.invalid>" }));
+  const previous = process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
+  const restoreService = replaceSpamServiceDeps({ languageModel: () => { throw new Error("static-only must not load a model"); } });
+  const restoreRescan = rescan.replaceSpamRescanDeps({ loadStaticRules: async () => EMPTY_STATIC_RULES });
+  try {
+    const restoreRules = replaceSpamServiceDeps({ loadStaticRules: async () => ({ ...EMPTY_STATIC_RULES,
+      deny: [{ type: "address", value: "blocked@lottery.invalid", safe: true }] }) });
+    try {
+      await rescan.startSpamRescan({ accountId: f.accountId, period: "all", withModel: true, modelLimit: 2, userId: ADMIN });
+      await rescan.spamRescansIdle();
+      const state = await rescan.loadSpamRescanState(f.accountId);
+      expect(state.job?.counts).toMatchObject({ modelBlocked: "missing-key", modelChecked: 2, modelCalls: 0 });
+      expect(state.items.map(item => item.id)).toEqual([denied.id]);
+      expect((await f.api.getMessageById(f.accountId, undecided.id))?.spamVerdict).toBeUndefined();
+    } finally { restoreRules(); }
+  } finally {
+    restoreRescan(); restoreService();
+    if (previous === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = previous;
+  }
+});

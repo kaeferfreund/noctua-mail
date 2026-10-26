@@ -95,9 +95,10 @@ describe("admin INBOX rescan", () => {
     expect(post.url).toBe("/api/admin/accounts/acc-a/spam-rescan/move");
     expect(JSON.parse(String(post.init?.body))).toEqual({ jobId: "job-1", ids: ["m1", "m3"] });
     await waitFor(() => expect(within(list).getAllByText("Verschoben")).toHaveLength(2));
-    // Moved hits are no longer selectable; the deselected one stays deselected until chosen again.
+    // Remaining hits are selected afresh after the accepted move.
     expect(within(list).getAllByRole("checkbox")).toHaveLength(1);
-    expect((view.getByRole("button", { name: "Ausgewählte verschieben (0)" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(list).getByRole("checkbox") as HTMLInputElement).checked).toBe(true);
+    expect((view.getByRole("button", { name: "Ausgewählte verschieben (1)" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("reports an interrupted scan and a blocked model check", async () => {
@@ -113,4 +114,20 @@ describe("admin INBOX rescan", () => {
     expect((view.getByLabelText("Auch Filter-Prüfung mit Modell") as HTMLInputElement).disabled).toBe(true);
     expect(view.getByText(/hat keinen Spam-Ordner/)).toBeTruthy();
   });
+});
+
+
+it("offers a rules-only filter check without a model", async () => {
+  let posted: unknown;
+  const apiFetch: AdminFetch = async (_input, init) => {
+    if (init?.method === "POST") { posted = JSON.parse(String(init.body)); return response({ ok: true }, 202); }
+    return response({ ok: true, preview: { ...preview("30d"), modelBlocked: "missing-key" }, job: null, items: [] });
+  };
+  const view = mount(apiFetch);
+  fireEvent.click(view.getByRole("button", { name: "Posteingang von team@example.test prüfen" }));
+  const check = await view.findByLabelText("Auch Filter-Prüfung ohne Modell") as HTMLInputElement;
+  expect(check.disabled).toBe(false); expect(check.checked).toBe(true);
+  expect(view.getByText(/Kein Modell verfügbar/)).toBeTruthy();
+  fireEvent.click(view.getByRole("button", { name: "Prüfung starten" }));
+  await waitFor(() => expect(posted).toEqual({ period: "30d", withModel: true, modelLimit: 40 }));
 });

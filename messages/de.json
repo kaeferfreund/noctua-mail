@@ -1323,7 +1323,10 @@
         "noSubject": "(kein Betreff)",
         "running": "Prüfung läuft",
         "latest": "Letzte Prüfung: {items, plural, =0 {keine Treffer} one {# Treffer} other {# Treffer}}",
-        "noMailboxes": "Du bist in keinem Postfach Mitglied. Geprüft werden können nur Postfächer, in denen du Mitglied bist."
+        "noMailboxes": "Du bist in keinem Postfach Mitglied. Geprüft werden können nur Postfächer, in denen du Mitglied bist.",
+        "withRules": "Auch Filter-Prüfung ohne Modell",
+        "staticOnly": "Kein Modell verfügbar. Es greifen nur die Allowlist und feste Regeln; übrige Mails bleiben ungeprüft.",
+        "classifierPhase": "Filter-Prüfung"
       }
     },
     "domainIcons": {
