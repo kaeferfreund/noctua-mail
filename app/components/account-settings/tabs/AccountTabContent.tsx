@@ -2,10 +2,13 @@ import { useTranslations } from "next-intl";
 import { Button, Flex, Grid, Select, Text, TextField } from "@radix-ui/themes";
 import PasswordField from "@/app/components/PasswordField";
 import Field from "@/app/components/account-settings/Field";
+import MailboxReadingPreference from "./MailboxReadingPreference";
+import type { AdminFetch } from "@/app/hooks/useAdminApi";
 import type { Account } from "@/lib/data";
 
 type Props = {
   editingAccount: Account;
+  apiFetch?: AdminFetch;
   isExistingAccount: boolean;
   imapDetecting: boolean;
   smtpDetecting: boolean;
@@ -26,6 +29,7 @@ type Props = {
 
 export default function AccountTabContent({
   editingAccount,
+  apiFetch = fetch,
   isExistingAccount,
   imapDetecting,
   smtpDetecting,
@@ -82,6 +86,7 @@ export default function AccountTabContent({
           </Grid>
         </Flex>
 
+        {isExistingAccount && editingAccount.accessRole === "manager" && <MailboxReadingPreference key={editingAccount.id} account={editingAccount} apiFetch={apiFetch} />}
         <Flex direction="column" gap="3">
           <Flex align="center" justify="between" wrap="wrap" gap="2">
             <Text size="3" weight="medium">

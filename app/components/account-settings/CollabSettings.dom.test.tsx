@@ -3,6 +3,7 @@ import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import MembersTabContent from "./tabs/MembersTabContent";
+import MailboxReadingPreference from "./tabs/MailboxReadingPreference";
 import PreferencesTabContent from "./tabs/PreferencesTabContent";
 import AccountSettingsModal from "@/app/components/AccountSettingsModal";
 import type { Account } from "@/lib/data";
@@ -169,7 +170,7 @@ it("slice2b preferences: saved personal overrides round trip on remount without 
 
 it("managers save the mailbox auto-read default separately from personal preferences", async () => {
   const writes: unknown[] = [];
-  const page = render(<Theme><PreferencesTabContent editingAccount={account} onClose={() => {}} apiFetch={async (input, init) => {
+  const page = render(<Theme><MailboxReadingPreference account={account} apiFetch={async (input, init) => {
     if (init?.method === "PUT") writes.push({ url: String(input), body: JSON.parse(String(init.body)) });
     return response({ ok: true, prefs: { reading: { autoMarkRead: "never" } } });
   }} /></Theme>);
@@ -177,7 +178,7 @@ it("managers save the mailbox auto-read default separately from personal prefere
   fireEvent.change(page.getByLabelText("Default for all members"), { target: { value: "after3s" } });
   fireEvent.click(page.getByRole("button", { name: "Save mailbox default" }));
   await waitFor(() => expect(writes).toEqual([{ url: "/api/accounts/synthetic-account/settings", body: { teamDefaults: true, settings: { reading: { autoMarkRead: "after3s" } } } }]));
-  expect((page.getByLabelText("Mark opened messages as read") as HTMLSelectElement).value).toBe("never");
+  expect((page.getByLabelText("Default for all members") as HTMLSelectElement).value).toBe("after3s");
 });
 
 it("editors do not see the mailbox-wide auto-read default", async () => {
