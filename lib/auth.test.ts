@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { SETUP_SESSION_MAX_AGE_MS } from "./authSessionLifetime";
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
-import { requireActiveUserSession, forwardAuthHeaders, SETUP_SESSION_MAX_AGE_MS } from "./auth";
+import { requireActiveUserSession, forwardAuthHeaders } from "./auth";
 import { createAuthenticatedTestSession, getSharedTestAuthHarness } from "./testAuthHarness";
 import { withDbWriteRetry } from "./dbWriteRetry";
 

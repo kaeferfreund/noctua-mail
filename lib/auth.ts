@@ -10,8 +10,7 @@ import { readAccountSelectionCandidates } from "./db/accounts";
 import { compareDisplayOrder } from "./accountPresentation";
 import type { AccountAccessSnapshot } from "./accountAccess";
 import { isMfaEnrollmentComplete } from "./authPolicy";
-
-export const SETUP_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+import { effectiveSessionExpiry } from "./authSessionLifetime";
 
 export type ActiveUserSession = {
   userId: string;
@@ -87,10 +86,7 @@ export async function requireActiveUserSession(request?: Request | null, options
     !Number.isSafeInteger(security.authenticatedAt) || security.authenticatedAt > Date.now()) return denied(401, undefined, headers);
   // Setup cannot be kept alive indefinitely by repeatedly opening enrollment.
   // Use creation, not authenticatedAt/updatedAt, which can change during setup.
-  const createdAt = new Date(result.session.createdAt).getTime();
-  const expiresAt = security.assurance === "setup"
-    ? Math.min(new Date(result.session.expiresAt).getTime(), createdAt + SETUP_SESSION_MAX_AGE_MS)
-    : new Date(result.session.expiresAt).getTime();
+  const expiresAt = effectiveSessionExpiry(result.session, security.assurance);
   if (!Number.isFinite(expiresAt) || expiresAt < Date.now()) return denied(401, undefined, headers);
   const mfa = await isMfaEnrollmentComplete(user.id);
   const pendingSecurity = !!db.prepare(`SELECT 1 FROM admin_lifecycle_operations WHERE slot=?
