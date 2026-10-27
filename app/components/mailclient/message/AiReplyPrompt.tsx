@@ -140,7 +140,7 @@ function AiReplyPromptForm({ onSubmit }: { onSubmit: (instruction: string) => vo
         <div className="relative min-w-0 flex-1">
           <Input value={value} maxLength={AI_REPLY_INSTRUCTION_LIMIT} placeholder={dictation.interim ? undefined : t("placeholder")}
             aria-label={t("label")} aria-describedby={hint ? hintId : undefined} autoComplete="off" enterKeyHint="send"
-            data-ai-reply-instruction className={cn("h-9", textClass, dictation.interim && "text-transparent")} onChange={event => setValue(event.target.value)} />
+            data-ai-reply-instruction className={cn("h-9", textClass, dictation.interim && "text-transparent transition-none")} onChange={event => setValue(event.target.value)} />
           {dictation.interim ? (
             // While words are recognized the text shows here: typed text, then the interim words in grey;
             // the final result replaces them in the field.
