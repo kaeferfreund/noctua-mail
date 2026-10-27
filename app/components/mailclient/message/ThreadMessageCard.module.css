@@ -78,6 +78,15 @@
   gap: var(--space-2);
 }
 
+/* AI reply / copy icons (MessageQuickActions) only where they fit on one row;
+   narrower readers reach them through the ⋮ menu. */
+@media (width < 768px) {
+  .messageActions > [data-reader-extra] { display: none; }
+}
+@media (width < 1024px) {
+  .messageActions > [data-reader-extra="widest"] { display: none; }
+}
+
 .info {
   display: flex;
   flex-direction: column;

@@ -58,7 +58,7 @@ import {
 } from "@/lib/topics";
 import { listRecipientAliases } from "@/lib/recipientAliases";
 import { readAuthEnv } from "@/lib/betterAuth";
-import { appDeepLink, messageDeepLink, type DeepLinkState } from "@/lib/navigation/deepLinks";
+import { appDeepLink, messageDeepLink, parseDeepLink, type DeepLinkState } from "@/lib/navigation/deepLinks";
 import {
   AI_MODIFIED_FLAG,
   DONE_FLAG,
@@ -191,9 +191,16 @@ const SEARCH_MESSAGES_SCHEMA = {
   )
 };
 
+/** A pasted Noctua Mail link; tools resolve it like resolve_link. */
+const LINK_ARG = z.string().trim().min(1).max(4096);
+const MESSAGE_URL_ARG = LINK_ARG.optional().describe(
+  "A Noctua Mail link to the message (e.g. pasted by the user, or a `url` from another tool), instead of accountId + messageId."
+);
+
 const MESSAGE_ID_SCHEMA = {
   ...ACCOUNT_ID_ARG,
-  messageId: z.string().trim().min(1)
+  messageId: z.string().trim().min(1).optional().describe("Message id. Pass either messageId or url."),
+  url: MESSAGE_URL_ARG
 };
 
 const CREATE_DRAFT_MESSAGE_SCHEMA = {
@@ -201,6 +208,7 @@ const CREATE_DRAFT_MESSAGE_SCHEMA = {
   ...ACCOUNT_ID_ARG,
   mode: z.enum(["new", "reply", "forward"]).optional(),
   messageId: z.string().trim().optional(),
+  url: MESSAGE_URL_ARG.describe("For mode reply/forward: a Noctua Mail link to the original, instead of accountId + messageId."),
   to: z.string().optional(),
   cc: z.string().optional(),
   bcc: z.string().optional(),
@@ -222,7 +230,8 @@ const CREATE_DRAFT_MESSAGE_SCHEMA = {
 };
 
 const DRAFT_ID_ARG = {
-  draftId: z.string().trim().min(1).describe("Draft id from create_draft_message, list_draft_messages or search_messages (badge draft).")
+  draftId: z.string().trim().min(1).optional().describe("Draft id from create_draft_message, list_draft_messages or search_messages (badge draft). Pass either draftId or url."),
+  url: LINK_ARG.optional().describe("A Noctua Mail link to the draft, instead of accountId + draftId.")
 };
 
 const DRAFT_EDIT_HINT =
@@ -442,6 +451,45 @@ async function resolveAccountContext(
   const live = await resolveMcpToolContext(baseContext.tokenRecord.id, id, minRole);
   return { ...baseContext, ...live };
 }
+/**
+ * A Noctua Mail link as the user pastes it: an absolute URL of any origin, or
+ * just its query ("?a=…&m=…", "a=…&m=…"). The mailbox (`a`) is required.
+ */
+export function parseMailLink(value: string) {
+  const text = value.trim();
+  const query = !text.includes("?") && !text.includes("://") && text.includes("=") ? `?${text}` : text;
+  let state: DeepLinkState | null = null;
+  try { state = parseDeepLink(new URL(query, "http://localhost").search); } catch { /* not a URL */ }
+  if (!state?.accountId) throw new Error("Not a Noctua Mail link: it needs the mailbox parameter a=.");
+  return { accountId: state.accountId, folderId: state.folderId || null, messageId: state.messageId || null };
+}
+
+/**
+ * The mailbox and message (or draft) a tool acts on: from `url` (authorized like
+ * an accountId, so a foreign mailbox fails the same way) or from accountId + id.
+ */
+async function resolveMessageTarget(
+  baseContext: McpAccountContext,
+  args: { accountId?: string; url?: string; id?: string },
+  minRole: AccountRole,
+  idName: "messageId" | "draftId"
+) {
+  const id = args.id?.trim();
+  if (!args.url) {
+    if (!id) throw new Error(`Provide ${idName} or url.`);
+    return { ctx: await resolveAccountContext(baseContext, args.accountId, minRole), id };
+  }
+  if (id) throw new Error(`Pass either ${idName} or url, not both.`);
+  const link = parseMailLink(args.url);
+  if (!link.messageId) throw new Error("The link opens a mailbox or folder, not a message.");
+  if (args.accountId?.trim() && args.accountId.trim() !== link.accountId) throw new Error("accountId does not match the link's mailbox.");
+  const ctx = await resolveAccountContext(baseContext, link.accountId, minRole);
+  // Links may carry a collision base or an RFC Message-ID; tools act on the row id.
+  const message = await getMessageById(ctx.accountId, link.messageId);
+  if (!message) throw new Error("Message not found");
+  return { ctx, id: message.id };
+}
+
 function mcpActor(context: McpAccountContext) {
   return { userId: context.tokenRecord.createdByUserId, clientId: `mcp:${context.tokenRecord.id}` };
 }
@@ -530,7 +578,7 @@ const DESTRUCTIVE_CHANGE = { readOnlyHint: false, destructiveHint: true, idempot
 export const MCP_SERVER_INFO = {
   name: "noctua-mail",
   title: "Noctua Mail",
-  version: "1.0.2",
+  version: "1.0.3",
   description: "The user's e-mail: personal and shared mailboxes in Noctua Mail."
 };
 
@@ -544,6 +592,8 @@ export const MCP_SERVER_INSTRUCTIONS = [
   "(mode reply/forward with messageId) or update_draft_message to revise an existing draft in place.",
   "Drafts are never sent by these tools: the user reviews and sends them in Noctua Mail.",
   "Every created, changed or listed item comes back with a `url`; give that link to the user so they can open it directly.",
+  "When the user pastes a Noctua Mail link (a URL whose query has `a=` and usually `m=`, like https://mail.example.test/?a=…&m=…), it identifies a mailbox and message:",
+  "call resolve_link with it first, then act on that message (reply, forward, summarise, flag). Such links can be passed as `url` to the draft and flag tools directly.",
   "accountId selects the mailbox; omit it to use the token's own mailbox, and take other ids from list_accounts."
 ].join("\n");
 
@@ -1334,6 +1384,38 @@ export async function executeMcpHttpRequest(params: {
     }
   );
 
+  server.registerTool("resolve_link", {
+    title: "Open a Noctua Mail link",
+    description: "Resolve a Noctua Mail link the user pasted (from „Link kopieren“ in Noctua Mail or a `url` of these tools; its query has a= and usually m=) to its mailbox, folder and message. Call it first when such a link appears, then act on the message. A draft link also returns the draft as get_draft_message does.",
+    inputSchema: z.object({ url: LINK_ARG.describe("The pasted link, e.g. https://mail.example.test/?a=…&m=… (any origin), or just its query.") }).strict(),
+    annotations: READ_ONLY,
+    outputSchema: { ok: z.boolean(), accountId: z.string(), account: z.object({ name: z.string(), email: z.string() }), folderId: z.string().nullable(),
+      messageId: z.string().nullable(), message: z.object(SEARCH_RESULT_MESSAGE_SCHEMA).passthrough().nullable(), isDraft: z.boolean(),
+      draft: EDITABLE_DRAFT_SCHEMA.optional(), url: URL_OUTPUT }
+  }, async ({ url }) => {
+    const link = parseMailLink(url);
+    const ctx = await resolveAccountContext(context, link.accountId);
+    const account = { name: ctx.account.name, email: ctx.account.email };
+    const mailbox = `${JSON.stringify(account.name)} <${account.email}> (accountId=${ctx.accountId})`;
+    if (!link.messageId) {
+      // Folder ids name their mailbox; one of another mailbox is dropped, never resolved.
+      const folderId = link.folderId && (await getFolders(ctx.accountId)).some(folder => folder.id === link.folderId) ? link.folderId : null;
+      const target = appUrl({ accountId: ctx.accountId, folderId: folderId ?? undefined });
+      return buildToolResult(withLink(`The link opens mailbox ${mailbox}${folderId ? `, folder ${folderId}` : ""}.`, target),
+        { ok: true, accountId: ctx.accountId, account, folderId, messageId: null, message: null, isDraft: false, url: target });
+    }
+    const message = await getMessageById(ctx.accountId, link.messageId);
+    if (!message) throw new Error("Message not found");
+    await enrichMessagesWithThreadCollab([message], { accountId: ctx.accountId });
+    await enrichMessagesWithThreadTopics([message], { accountId: ctx.accountId });
+    const item = { ...message, url: messageUrl(message) };
+    const draft = await getStoredDraft(ctx.accountId, message.id).then(stored => toEditableDraft(ctx.accountId, stored))
+      .catch(error => { if (error instanceof DraftSaveError) return null; throw error; });
+    return buildToolResult(withLink(`The link opens ${draft ? "draft" : "message"} ${JSON.stringify(message.subject)} id=${message.id} in mailbox ${mailbox}.`, item.url),
+      { ok: true, accountId: ctx.accountId, account, folderId: message.folderId, messageId: message.id, message: item, isDraft: Boolean(draft),
+        ...(draft ? { draft } : {}), url: item.url });
+  });
+
   server.registerTool(
     "assign_topics",
     {
@@ -1368,16 +1450,18 @@ export async function executeMcpHttpRequest(params: {
 
   server.registerTool("create_draft_message", {
     title: "Write an e-mail (draft)",
-    description: `Write an e-mail: create a draft (new message, reply or forward) in the user's mailbox. For a reply or forward pass mode and the messageId of the original. The user reviews and sends the draft in Noctua Mail; nothing is sent by this tool. The result includes a link that opens the draft. identityId selects an enabled sender identity of this mailbox. To change an existing draft use update_draft_message. ${DRAFT_EDIT_HINT}`,
+    description: `Write an e-mail: create a draft (new message, reply or forward) in the user's mailbox. For a reply or forward pass mode and the messageId of the original, or its Noctua Mail link as url. The user reviews and sends the draft in Noctua Mail; nothing is sent by this tool. The result includes a link that opens the draft. identityId selects an enabled sender identity of this mailbox. To change an existing draft use update_draft_message. ${DRAFT_EDIT_HINT}`,
     inputSchema: z.object(CREATE_DRAFT_MESSAGE_SCHEMA).strict(),
     annotations: ADDITIVE_CHANGE,
     outputSchema: senderToolOutput({ mode: z.enum(["new", "reply", "forward"]), referenceMessageId: z.string().nullable(),
       identityId: z.string(), draftId: z.string().nullable(), message: z.object(SEARCH_RESULT_MESSAGE_SCHEMA).passthrough().nullable(),
       url: URL_OUTPUT.nullable(), warning: z.string().optional() })
-  }, async args => {
-    const ctx = await resolveAccountContext(context, args.accountId, "editor");
+  }, async ({ url, ...args }) => {
+    if (url && (args.mode ?? "new") === "new") throw new Error('url selects the original of a reply or forward: pass mode "reply" or "forward".');
+    const { ctx, id } = url ? await resolveMessageTarget(context, { accountId: args.accountId, url, id: args.messageId }, "editor", "messageId")
+      : { ctx: await resolveAccountContext(context, args.accountId, "editor"), id: args.messageId };
     return senderToolCall(async () => {
-      const result = await createDraftMessage(ctx, args);
+      const result = await createDraftMessage(ctx, { ...args, messageId: id });
       return buildToolResult(withLink(`Created ${result.mode} draft${result.draftId ? ` ${result.draftId}` : ""}.`, result.url), result);
     });
   });
@@ -1401,14 +1485,14 @@ export async function executeMcpHttpRequest(params: {
 
   server.registerTool("get_draft_message", {
     title: "Read a draft",
-    description: `Read an existing draft with everything needed to revise it: sender identity, recipients, subject, body (text and, if stored, html/markdown), reply/forward references and attachment names/sizes, plus a link that opens it. ${DRAFT_EDIT_HINT}`,
+    description: `Read an existing draft with everything needed to revise it: sender identity, recipients, subject, body (text and, if stored, html/markdown), reply/forward references and attachment names/sizes, plus a link that opens it. Select it by draftId or by its Noctua Mail link (url). ${DRAFT_EDIT_HINT}`,
     inputSchema: z.object({ ...ACCOUNT_ID_ARG, ...DRAFT_ID_ARG }).strict(),
     annotations: READ_ONLY,
     outputSchema: senderToolOutput({ draft: EDITABLE_DRAFT_SCHEMA, url: URL_OUTPUT })
   }, async args => {
-    const ctx = await resolveAccountContext(context, args.accountId);
+    const { ctx, id } = await resolveMessageTarget(context, { accountId: args.accountId, url: args.url, id: args.draftId }, "viewer", "draftId");
     return senderToolCall(async () => {
-      const stored = await getStoredDraft(ctx.accountId, args.draftId);
+      const stored = await getStoredDraft(ctx.accountId, id);
       const draft = await toEditableDraft(ctx.accountId, stored);
       const url = messageUrl(stored);
       return buildToolResult(withLink(`Draft ${draft.draftId}: ${JSON.stringify(draft.subject)}.`, url), { ok: true, draft, url });
@@ -1417,17 +1501,17 @@ export async function executeMcpHttpRequest(params: {
 
   server.registerTool("update_draft_message", {
     title: "Revise a draft",
-    description: `Revise an existing draft in place (recipients, subject, sender or text). Only the fields you pass change; everything else (sender, recipients, subject, body, reply/forward headers, attachments) is kept. Use appendBody to add a sentence or paragraph, or text/html/markdown to replace the whole body (read it first with get_draft_message). Text alone converts an HTML/Markdown reply to plain text and removes its quoted original unless you include it in the replacement; appendBody preserves both. Saving may assign a new draft id: always continue with the returned draftId (draftIdChanged tells you). The result includes a link that opens the draft. ${DRAFT_EDIT_HINT}`,
+    description: `Revise an existing draft in place (recipients, subject, sender or text). Only the fields you pass change; everything else (sender, recipients, subject, body, reply/forward headers, attachments) is kept. Use appendBody to add a sentence or paragraph, or text/html/markdown to replace the whole body (read it first with get_draft_message). Text alone converts an HTML/Markdown reply to plain text and removes its quoted original unless you include it in the replacement; appendBody preserves both. Saving may assign a new draft id: always continue with the returned draftId (draftIdChanged tells you). Select the draft by draftId or by its Noctua Mail link (url). The result includes a link that opens the draft. ${DRAFT_EDIT_HINT}`,
     inputSchema: z.object(UPDATE_DRAFT_MESSAGE_SCHEMA).strict(),
     annotations: ADDITIVE_CHANGE,
     outputSchema: senderToolOutput({ mode: z.enum(["new", "reply", "forward"]), identityId: z.string(), draftId: z.string().nullable(),
       previousDraftId: z.string(), draftIdChanged: z.boolean(), message: z.object(SEARCH_RESULT_MESSAGE_SCHEMA).passthrough().nullable(),
       url: URL_OUTPUT.nullable(), warning: z.string().optional() })
   }, async args => {
-    const ctx = await resolveAccountContext(context, args.accountId, "editor");
+    const { accountId, url, draftId, ...patch } = args;
+    const { ctx, id } = await resolveMessageTarget(context, { accountId, url, id: draftId }, "editor", "draftId");
     return senderToolCall(async () => {
-      const { accountId: _accountId, ...input } = args; void _accountId;
-      const result = await updateDraftMessage(ctx, input);
+      const result = await updateDraftMessage(ctx, { ...patch, draftId: id });
       return buildToolResult(withLink(`Updated draft ${result.previousDraftId}${result.draftIdChanged ? `; its new id is ${result.draftId}` : ""}.`, result.url), result);
     });
   });
@@ -1569,8 +1653,8 @@ export async function executeMcpHttpRequest(params: {
     });
   });
 
-  const setFlagged = async (requestedAccountId: string | undefined, messageId: string, value: boolean) => {
-    const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
+  const setFlagged = async (args: { accountId?: string; messageId?: string; url?: string }, value: boolean) => {
+    const { ctx, id: messageId } = await resolveMessageTarget(context, { accountId: args.accountId, url: args.url, id: args.messageId }, "editor", "messageId");
     const message = await getMessageById(ctx.accountId, messageId);
     if (!message) {
       throw new Error("Message not found");
@@ -1596,21 +1680,21 @@ export async function executeMcpHttpRequest(params: {
 
   server.registerTool(
     "flag_message",
-    { title: "Flag an e-mail", description: "Flag (star) an e-mail so it stands out for follow-up.", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
-    async ({ accountId: requestedAccountId, messageId }) => setFlagged(requestedAccountId, messageId, true)
+    { title: "Flag an e-mail", description: "Flag (star) an e-mail so it stands out for follow-up. Select it by messageId or by its Noctua Mail link (url).", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
+    async (args) => setFlagged(args, true)
   );
 
   server.registerTool(
     "unflag_message",
-    { title: "Unflag an e-mail", description: "Remove the flag (star) from an e-mail.", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
-    async ({ accountId: requestedAccountId, messageId }) => setFlagged(requestedAccountId, messageId, false)
+    { title: "Unflag an e-mail", description: "Remove the flag (star) from an e-mail, selected by messageId or by its Noctua Mail link (url).", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
+    async (args) => setFlagged(args, false)
   );
 
   server.registerTool(
     "mark_message_todo",
-    { title: "Mark an e-mail as to-do", description: "Put an e-mail on the user's to-do list (clears a done mark).", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
-    async ({ accountId: requestedAccountId, messageId }) => {
-      const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
+    { title: "Mark an e-mail as to-do", description: "Put an e-mail on the user's to-do list (clears a done mark). Select it by messageId or by its Noctua Mail link (url).", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
+    async (args) => {
+      const { ctx, id: messageId } = await resolveMessageTarget(context, { accountId: args.accountId, url: args.url, id: args.messageId }, "editor", "messageId");
       const result = await updateTodoState(ctx, messageId, "todo");
       return buildToolResult(withLink(`Marked message ${messageId} as To-Do.`, result.url), result);
     }
@@ -1618,9 +1702,9 @@ export async function executeMcpHttpRequest(params: {
 
   server.registerTool(
     "mark_message_done",
-    { title: "Mark an e-mail as done", description: "Mark an e-mail as done (clears a to-do mark).", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
-    async ({ accountId: requestedAccountId, messageId }) => {
-      const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
+    { title: "Mark an e-mail as done", description: "Mark an e-mail as done (clears a to-do mark). Select it by messageId or by its Noctua Mail link (url).", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
+    async (args) => {
+      const { ctx, id: messageId } = await resolveMessageTarget(context, { accountId: args.accountId, url: args.url, id: args.messageId }, "editor", "messageId");
       const result = await updateTodoState(ctx, messageId, "done");
       return buildToolResult(withLink(`Marked message ${messageId} as Done.`, result.url), result);
     }
@@ -1628,9 +1712,9 @@ export async function executeMcpHttpRequest(params: {
 
   server.registerTool(
     "clear_message_todo",
-    { title: "Clear to-do and done", description: "Remove both the to-do and the done mark from an e-mail.", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
-    async ({ accountId: requestedAccountId, messageId }) => {
-      const ctx = await resolveAccountContext(context, requestedAccountId, "editor");
+    { title: "Clear to-do and done", description: "Remove both the to-do and the done mark from an e-mail, selected by messageId or by its Noctua Mail link (url).", inputSchema: MESSAGE_ID_SCHEMA, annotations: IDEMPOTENT_CHANGE },
+    async (args) => {
+      const { ctx, id: messageId } = await resolveMessageTarget(context, { accountId: args.accountId, url: args.url, id: args.messageId }, "editor", "messageId");
       const result = await updateTodoState(ctx, messageId, "clear");
       return buildToolResult(withLink(`Cleared To-Do state from message ${messageId}.`, result.url), result);
     }

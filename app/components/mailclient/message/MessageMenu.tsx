@@ -32,6 +32,7 @@ import {
   ShieldOff,
   Square,
   SquareCheckBig,
+  Sparkles,
   Tags,
   Trash2
 } from "lucide-react";
@@ -52,6 +53,7 @@ import TooltipIconButton, { useQuietMenuFocusReturn } from "@/app/components/Too
 import { useMessageMenuPrimitives } from "./messageMenuPrimitives";
 import { MessageMenuControlContext } from "./messageMenuControl";
 import { useDraftScheduleAction } from "../scheduledSend/ScheduledSend";
+import { useMessageReaderActions } from "./MessageReaderActions";
 
 type ComposeMode = "new" | "reply" | "replyAll" | "forward" | "edit" | "editAsNew";
 type MessageMenuAction =
@@ -62,6 +64,7 @@ type MessageMenuAction =
   | "reply"
   | "replyAll"
   | "forward"
+  | "aiReply"
   | "editAsNew"
   | "markRead"
   | "flag"
@@ -80,6 +83,7 @@ type MessageMenuAction =
   | "showThread"
   | "topics"
   | "copyLink"
+  | "copyContent"
   | "openWindow"
   | "openHtmlWindow"
   | "downloadEml"
@@ -176,6 +180,7 @@ export default function MessageMenu({
   const t = useTranslations("Reader");
   const tSchedule = useTranslations("Compose.schedule");
   const scheduleDraft = useDraftScheduleAction(message);
+  const readerActions = useMessageReaderActions();
   const { isMobile, DropdownMenu } = useMessageMenuPrimitives();
   const control = useContext(MessageMenuControlContext);
   const quietFocusReturn = useQuietMenuFocusReturn();
@@ -328,6 +333,11 @@ export default function MessageMenu({
               ? buildItem("forward", t("forward"), <Forward size={14} />, () =>
                   openCompose("forward", message)
                 , isDisabled("forward"))
+              : null,
+            !isDraft && isVisible("aiReply") && readerActions?.canAiReply(message)
+              ? buildItem("aiReply", t(readerActions.isAiReplyPending(message.id) ? "aiReplyBusy" : "aiReply"), <Sparkles size={14} />, () =>
+                  void readerActions.draftAiReply(message)
+                , isDisabled("aiReply", readerActions.isAiReplyPending(message.id)))
               : null,
             isVisible("editAsNew")
               ? buildItem("editAsNew", t("editAsNew"), <FileText size={14} />, () =>
@@ -573,12 +583,17 @@ export default function MessageMenu({
                   isDisabled("showThread")
                 )
               : null,
+            // In the mail client the reader actions report with a notice; hosts without them (detached window) label the item.
             isVisible("copyLink") ? buildItem("copyLink", t(copyResult === "copied" ? "linkCopied" : copyResult === "failed" ? "linkCopyFailed" : "copyLink"), <Link size={14} />, () => {
+              if (readerActions) { void readerActions.copyLink(message); return; }
               void (async () => {
                 try { await navigator.clipboard.writeText(messageDeepLink(message, window.location.origin)); setCopyResult("copied"); }
                 catch { setCopyResult("failed"); }
               })();
             }) : null,
+            isVisible("copyContent") && readerActions
+              ? buildItem("copyContent", t("copyContent"), <Copy size={14} />, () => void readerActions.copyContent(message))
+              : null,
             isVisible("openWindow")
               ? buildItem(
                   "openWindow",

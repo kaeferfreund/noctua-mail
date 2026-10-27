@@ -52,9 +52,12 @@ After (47 characters, 64% shorter):
 /?a=A1fm3AepO-ADwzIb&f=INBOX&m=TS77tpY9aCUFO6LV
 ```
 
-This opens that account's message. Copy link
-always uses the message's own account, folder and local ID, including when the
-menu is used in a detached reader. No subject, sender, recipient, draft body or
+This opens that account's message. „Link kopieren“ (link icon in the reader
+toolbar from 768 px, and the ⋮ menu) always uses the message's own account, folder and local ID, including when the
+menu is used in a detached reader. It is the same URL the MCP tools return, so
+it can be pasted into an MCP conversation (`resolve_link`, doc/API.md). „Inhalt kopieren“
+(⋮ menu; copy icon from 1024 px) copies Von/An/Cc/Datum/Betreff, the text body
+and the attachment names as plain text. No subject, sender, recipient, draft body or
 signature is serialized. Search queries are intentionally visible. Unrelated
 query parameters and hashes are retained.
 

@@ -29,6 +29,7 @@ import { createAutoReadCoordinator, useAutoMarkReadDelay } from "@/app/hooks/use
 import { CollabRowsContext, type CollabSummary, type ThreadCollabState } from "./collab/types";
 import { SpamCorrectionProvider } from "./mailclient/SpamBadge";
 import { ScheduledSendProvider } from "./mailclient/scheduledSend/ScheduledSend";
+import { MessageReaderActionsProvider, useMessageReaderActionsValue } from "./mailclient/message/MessageReaderActions";
 import ScheduleSendDialog from "./mailclient/composition/ScheduleSendDialog";
 import { useScheduledSendControls } from "./mailclient/scheduledSend/useScheduledSends";
 import { readScheduledSendConflict } from "./mailclient/scheduledSend/scheduledSendClient";
@@ -401,6 +402,8 @@ function describeRequestTarget(input: RequestInfo | URL): string | null {
 type MailClientProps = {
   buildVersionLabel?: string;
   buildInfo?: BuildIdentity | null;
+  /** Server has an AI key: shows „KI-Antwort entwerfen“ (doc/AI-REPLY.md). */
+  aiReplyAvailable?: boolean;
 };
 
 type MoveToDialogState = {
@@ -436,7 +439,8 @@ const getNoReaderRows = () => NO_READER_ROWS;
 
 export default function MailClient({
   buildVersionLabel = "",
-  buildInfo = null
+  buildInfo = null,
+  aiReplyAvailable = false
 }: MailClientProps) {
   const tn = useTranslations("Notifications");
   const tv = useTranslations("Views");
@@ -1931,6 +1935,8 @@ export default function MailClient({
     }
     composeHandleRef.current?.openCompose(mode, message, asNew, prefill);
   };
+  const editGeneratedDraft = useCallback((draft: Message) => composeHandleRef.current?.openCompose("edit", draft), []);
+  const readerActions = useMessageReaderActionsValue({ aiReplyAvailable, accounts, accountDateFormat, apiFetch, pushNotice, editDraft: editGeneratedDraft });
 
 
   const getAssignedThreadTopics = useCallback((message: Message) => {
@@ -5218,6 +5224,7 @@ export default function MailClient({
     <AccountDateFormatProvider value={accountDateFormat}>
     <SpamCorrectionProvider value={spamCorrection}>
     <ScheduledSendProvider value={scheduledSend.controls}>
+    <MessageReaderActionsProvider value={readerActions}>
     <CollabRowsContext.Provider value={{ members: collab.members, threadCollabById }}>
     <DomainIconVersionsContext.Provider value={domainIcons}>
       {identityDialogs}
@@ -5907,6 +5914,7 @@ export default function MailClient({
       />
     </DomainIconVersionsContext.Provider>
     </CollabRowsContext.Provider>
+    </MessageReaderActionsProvider>
     </ScheduledSendProvider>
     </SpamCorrectionProvider>
     </AccountDateFormatProvider>
