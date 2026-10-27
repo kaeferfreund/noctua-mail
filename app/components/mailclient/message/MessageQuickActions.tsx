@@ -1,6 +1,6 @@
 import { useTranslations } from "next-intl";
 import type React from "react";
-import { Clock, Edit3, Forward, Reply, ReplyAll, Search, Send, Sparkles, Trash2 } from "lucide-react";
+import { Clock, Copy, Edit3, Forward, Link, Reply, ReplyAll, Search, Send, Sparkles, Trash2 } from "lucide-react";
 import type { Message } from "@/lib/data";
 import { hasSendableRecipients } from "../utils/messageHelpers";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
@@ -16,6 +16,8 @@ type MessageQuickAction =
   | "replyAll"
   | "forward"
   | "aiReply"
+  | "copyLink"
+  | "copyContent"
   | "showRelated"
   | "delete";
 
@@ -54,6 +56,46 @@ export default function MessageQuickActions({
   const buttonSize = origin === "thread" ? "2" : "1";
   const isVisible = (action: MessageQuickAction, defaultValue = true) =>
     actionVisibility?.[action] ?? defaultValue;
+  // Reader only, like the AI reply; `data-reader-extra` hides them on narrow
+  // viewports (ThreadMessageCard.module.css), where the ⋮ menu has them.
+  const copyActions = origin === "thread" && readerActions ? (
+    <>
+      {isVisible("copyLink") ? (
+        <TooltipIconButton
+          size={buttonSize}
+          variant="ghost"
+          color="gray"
+          tooltip={t("copyLink")}
+          aria-label={t("copyLink")}
+          data-message-action="copy-link"
+          data-reader-extra="wide"
+          onClick={(event) => {
+            event.stopPropagation();
+            void readerActions.copyLink(message);
+          }}
+        >
+          <Link size={iconSize} />
+        </TooltipIconButton>
+      ) : null}
+      {isVisible("copyContent") ? (
+        <TooltipIconButton
+          size={buttonSize}
+          variant="ghost"
+          color="gray"
+          tooltip={t("copyContent")}
+          aria-label={t("copyContent")}
+          data-message-action="copy-content"
+          data-reader-extra="widest"
+          onClick={(event) => {
+            event.stopPropagation();
+            void readerActions.copyContent(message);
+          }}
+        >
+          <Copy size={iconSize} />
+        </TooltipIconButton>
+      ) : null}
+    </>
+  ) : null;
 
   if (isDraft) {
     const canSendDraft = hasSendableRecipients(message);
@@ -106,6 +148,7 @@ export default function MessageQuickActions({
             <Clock size={iconSize} />
           </TooltipIconButton>
         ) : null}
+        {copyActions}
         {isVisible("showRelated") ? (
           <TooltipIconButton
             size={buttonSize}
@@ -199,6 +242,7 @@ export default function MessageQuickActions({
           tooltip={readerActions.isAiReplyPending(message.id) ? t("aiReplyBusy") : t("aiReply")}
           aria-label={t("aiReply")}
           data-message-action="ai-reply"
+          data-reader-extra="wide"
           loading={readerActions.isAiReplyPending(message.id)}
           disabled={pendingMessageActions.has(message.id) || readerActions.isAiReplyPending(message.id)}
           onClick={(event) => {
@@ -209,6 +253,7 @@ export default function MessageQuickActions({
           <Sparkles size={iconSize} />
         </TooltipIconButton>
       ) : null}
+      {copyActions}
       {isVisible("showRelated") ? (
         <TooltipIconButton
           size={buttonSize}

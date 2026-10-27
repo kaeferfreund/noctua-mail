@@ -1936,7 +1936,7 @@ export default function MailClient({
     composeHandleRef.current?.openCompose(mode, message, asNew, prefill);
   };
   const editGeneratedDraft = useCallback((draft: Message) => composeHandleRef.current?.openCompose("edit", draft), []);
-  const readerActions = useMessageReaderActionsValue({ aiReplyAvailable, accounts, apiFetch, pushNotice, editDraft: editGeneratedDraft });
+  const readerActions = useMessageReaderActionsValue({ aiReplyAvailable, accounts, accountDateFormat, apiFetch, pushNotice, editDraft: editGeneratedDraft });
 
 
   const getAssignedThreadTopics = useCallback((message: Message) => {

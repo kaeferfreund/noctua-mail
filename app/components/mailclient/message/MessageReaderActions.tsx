@@ -1,9 +1,14 @@
 "use client";
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import type { Account, Message } from "@/lib/data";
+import type { Account, AccountDateFormat, Message } from "@/lib/data";
 import { buildAccountMessageActionPath, buildAccountMessagePath } from "@/lib/accountApiPaths";
 import { roleAtLeast } from "@/lib/accountRole";
+import { getMessageDateDisplay } from "@/lib/dateFormatting";
+import { isUiLocale } from "@/lib/i18n/config";
+import { messageDeepLink } from "@/lib/navigation/deepLinks";
+import { buildMessageCopyText } from "@/lib/ui/messageCopyText";
+import { isMessageContentUnloaded } from "@/lib/ui/messageView";
 import type { NoticeInput } from "../types";
 
 /** Reader actions that need the mail client (notices, compose, API); absent in hosts without them. */
@@ -11,6 +16,10 @@ export type MessageReaderActions = {
   canAiReply: (message: Message) => boolean;
   isAiReplyPending: (messageId: string) => boolean;
   draftAiReply: (message: Message) => Promise<void>;
+  /** The message's shell URL: opens it in the browser and resolves in MCP (`resolve_link`). */
+  copyLink: (message: Message) => Promise<void>;
+  /** Headers, text body and attachment names as plain text. */
+  copyContent: (message: Message) => Promise<void>;
 };
 
 const MessageReaderActionsContext = createContext<MessageReaderActions | null>(null);
@@ -26,18 +35,20 @@ export function useMessageReaderActions() {
 type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 /**
- * „KI-Antwort“: the server writes and saves a reply draft (doc/AI-REPLY.md),
+ * Copy actions report through notices. „KI-Antwort“: the server writes and saves a reply draft (doc/AI-REPLY.md),
  * which then opens in the composer for review. One request per message at a time.
  */
 export function useMessageReaderActionsValue(input: {
   aiReplyAvailable: boolean;
   accounts: Account[];
+  accountDateFormat?: AccountDateFormat;
   apiFetch: ApiFetch;
   pushNotice: (notice: NoticeInput) => void;
   editDraft: (draft: Message) => void;
 }): MessageReaderActions {
-  const { aiReplyAvailable, accounts, apiFetch, pushNotice, editDraft } = input;
+  const { aiReplyAvailable, accounts, accountDateFormat, apiFetch, pushNotice, editDraft } = input;
   const t = useTranslations("Reader");
+  const tFields = useTranslations("Compose.generated.forwardFields");
   const locale = useLocale();
   const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set());
   const inFlight = useRef(new Set<string>());
@@ -74,5 +85,30 @@ export function useMessageReaderActionsValue(input: {
 
   const isAiReplyPending = useCallback((messageId: string) => pending.has(messageId), [pending]);
 
-  return useMemo(() => ({ canAiReply, isAiReplyPending, draftAiReply }), [canAiReply, draftAiReply, isAiReplyPending]);
+  const copy = useCallback(async (text: () => Promise<string>, copied: string, failed: string) => {
+    try {
+      await navigator.clipboard.writeText(await text());
+      pushNotice({ type: "success", title: copied });
+    } catch {
+      pushNotice({ type: "error", title: failed });
+    }
+  }, [pushNotice]);
+
+  const copyLink = useCallback((message: Message) => copy(async () => messageDeepLink(message, window.location.origin),
+    t("linkCopied"), t("linkCopyFailed")), [copy, t]);
+
+  const copyContent = useCallback((message: Message) => copy(async () => {
+    // List rows carry no body: read it from the detail route like the reader does.
+    let full = message;
+    if (isMessageContentUnloaded(message)) {
+      const response = await apiFetch(buildAccountMessagePath(message.accountId, message.id), { cache: "no-store" });
+      full = ((await response.json()) as { message?: Message }).message ?? message;
+    }
+    const date = getMessageDateDisplay(full.dateValue, full.date, accountDateFormat, isUiLocale(locale) ? locale : undefined).text;
+    return buildMessageCopyText(full, { date, labels: { from: tFields("from"), to: tFields("to"), cc: tFields("cc"), date: tFields("date"),
+      subject: tFields("subject"), attachments: t("attachments") } });
+  }, t("contentCopied"), t("contentCopyFailed")), [accountDateFormat, apiFetch, copy, locale, t, tFields]);
+
+  return useMemo(() => ({ canAiReply, isAiReplyPending, draftAiReply, copyLink, copyContent }),
+    [canAiReply, copyContent, copyLink, draftAiReply, isAiReplyPending]);
 }

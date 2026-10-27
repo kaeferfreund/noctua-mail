@@ -83,6 +83,7 @@ type MessageMenuAction =
   | "showThread"
   | "topics"
   | "copyLink"
+  | "copyContent"
   | "openWindow"
   | "openHtmlWindow"
   | "downloadEml"
@@ -582,12 +583,17 @@ export default function MessageMenu({
                   isDisabled("showThread")
                 )
               : null,
+            // In the mail client the reader actions report with a notice; hosts without them (detached window) label the item.
             isVisible("copyLink") ? buildItem("copyLink", t(copyResult === "copied" ? "linkCopied" : copyResult === "failed" ? "linkCopyFailed" : "copyLink"), <Link size={14} />, () => {
+              if (readerActions) { void readerActions.copyLink(message); return; }
               void (async () => {
                 try { await navigator.clipboard.writeText(messageDeepLink(message, window.location.origin)); setCopyResult("copied"); }
                 catch { setCopyResult("failed"); }
               })();
             }) : null,
+            isVisible("copyContent") && readerActions
+              ? buildItem("copyContent", t("copyContent"), <Copy size={14} />, () => void readerActions.copyContent(message))
+              : null,
             isVisible("openWindow")
               ? buildItem(
                   "openWindow",
