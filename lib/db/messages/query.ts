@@ -2988,6 +2988,8 @@ export async function listThreads(params: {
     );
   }
 
+  // Seek the page's threads instead of walking the account's date index; the
+  // rowid tie-break keeps the order that walk produced for equal dates.
   const messagesRows =
     threadIds.length > 0
       ? (db
@@ -3035,10 +3037,10 @@ export async function listThreads(params: {
               ${buildMeaningfulAttachmentExistsSql("m")} as hasAttachments,
               EXISTS(SELECT 1 FROM attachments a WHERE a.accountId = m.accountId AND a.messageId = m.id AND a.inline = 1)
                 as hasInlineAttachments
-            FROM messages m
+            FROM messages m INDEXED BY idx_messages_account_thread_date
             WHERE ${threadMessageWhere}
               AND m.threadId IN (${threadIds.map(() => "?").join(",")})
-            ORDER BY m.dateValue DESC
+            ORDER BY m.dateValue DESC, m.rowid ASC
           `
           )
           .all(...threadMessageArgs, ...threadIds) as any[])

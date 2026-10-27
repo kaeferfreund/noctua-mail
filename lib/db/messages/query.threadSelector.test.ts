@@ -212,7 +212,7 @@ describe("thread selector flagged EXISTS differential", () => {
     let plan: string[] = [];
     const spy = spyOn(fixture.db, "prepare").mockImplementation((sql: string) => {
       const statement = prepare(sql);
-      if (!sql.includes("INDEXED BY idx_messages_account_thread_date")) return statement;
+      if (!sql.includes("INDEXED BY idx_messages_account_thread_date") || !sql.includes("COUNT(*)")) return statement;
       return {
         get(...args: unknown[]) {
           plan = (prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args) as Array<{ detail: string }>).map(row => row.detail);
@@ -236,6 +236,53 @@ describe("thread selector flagged EXISTS differential", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  test("message rows seek the page threads and keep the date-walk order and payload", async () => {
+    const prepare = fixture.db.prepare.bind(fixture.db);
+    const rowsSql = /FROM messages m INDEXED BY idx_messages_account_thread_date\s+WHERE[\s\S]*ORDER BY m\.dateValue DESC, m\.rowid ASC/;
+    const capture = async (params: Params, legacy: boolean) => {
+      let plan: string[] = [];
+      let rows: Array<{ id: string }> = [];
+      const spy = spyOn(fixture.db, "prepare").mockImplementation((sql: string) => {
+        if (!rowsSql.test(sql)) return prepare(sql);
+        // Frozen pre-change shape: no index hint, no explicit tie-break.
+        if (legacy) sql = sql.replace(" INDEXED BY idx_messages_account_thread_date", "").replace(", m.rowid ASC", "");
+        const statement = prepare(sql);
+        return {
+          all(...args: unknown[]) {
+            plan = (prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args) as Array<{ detail: string }>).map(row => row.detail);
+            rows = statement.all(...args) as Array<{ id: string }>;
+            return rows;
+          }
+        };
+      });
+      try {
+        return { result: await listThreads(params), plan, rows };
+      } finally {
+        spy.mockRestore();
+      }
+    };
+    let checked = 0;
+    for (const options of [
+      {}, { folderId: "inbox" }, { folderId: "archive" }, { excludedFolderIds: ["archive"] },
+      { folderId: "inbox", excludedFolderIds: ["sent", "archive"] }, { query: "needle" }, { query: "topic:none" },
+      { badges: ["assigned-to-me"], viewerUserId }, { groupBy: "sender" }, { threadDateSource: "latestDateValue" as const }
+    ] satisfies Array<Partial<Params>>) {
+      for (const page of [1, 2]) {
+        const params = { accountId: fixture.a.accountId, page, pageSize: 8, ...options };
+        const current = await capture(params, false);
+        const legacy = await capture(params, true);
+        expect(current.result).toEqual(legacy.result);
+        if (current.result.items.length === 0) continue;
+        checked++;
+        expect(current.plan[0]).toContain("USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)");
+        expect(legacy.plan[0]).toContain("USING INDEX idx_messages_account_date (accountId=?)");
+        expect(current.rows.length).toBeGreaterThan(0);
+        expect(current.rows.map(row => row.id)).toEqual(legacy.rows.map(row => row.id));
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(15);
   });
 
   test("an empty query does not read the own addresses; from:me still does", async () => {
