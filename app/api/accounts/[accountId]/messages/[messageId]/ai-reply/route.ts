@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { withAuthResponse } from "@/lib/auth";
 import { readAuthEnv } from "@/lib/betterAuth";
+import { AI_REPLY_INSTRUCTION_LIMIT, normalizeAiReplyInstruction } from "@/lib/aiReplyInstruction";
 import { AiReplyError, buildAiReplyDraftBody, generateAiReply, getAiReplyLanguageModel, resolveAiReplyConfig } from "@/lib/aiReply";
 import { normalizeAccountDateFormat, getMessageDateDisplay } from "@/lib/dateFormatting";
 import { DraftSaveError, buildDraftInputForMode, saveDraftForAccount } from "@/lib/drafts";
@@ -44,11 +45,20 @@ export async function POST(request: Request, { params }: Params) {
     const config = resolveAiReplyConfig();
     const model = getAiReplyLanguageModel(config);
     if (!model) return NextResponse.json({ ok: false, code: "ai_unavailable", message: "AI reply is not configured (no API key)." }, { status: 503 });
+    const body = (await request.json().catch(() => null)) as { locale?: unknown; instruction?: unknown } | null;
+    if (body?.instruction != null && typeof body.instruction !== "string") {
+      return NextResponse.json({ ok: false, code: "invalid_instruction", message: "instruction must be a string." }, { status: 400 });
+    }
+    // Whitespace only counts as no instruction: exactly the plain closing reply.
+    const instruction = normalizeAiReplyInstruction(body?.instruction ?? "");
+    if (instruction.length > AI_REPLY_INSTRUCTION_LIMIT) {
+      return NextResponse.json({ ok: false, code: "instruction_too_long", message: `The instruction is longer than ${AI_REPLY_INSTRUCTION_LIMIT} characters.` },
+        { status: 400 });
+    }
     if (aiReplyLimiter.isLimited(userId)) {
       return NextResponse.json({ ok: false, code: "rate_limited", message: "Too many AI replies. Try again in a minute." },
         { status: 429, headers: { "Retry-After": "60" } });
     }
-    const body = (await request.json().catch(() => null)) as { locale?: unknown } | null;
     const locale = isUiLocale(body?.locale) ? body.locale : defaultLocale;
     const started = Date.now();
     try {
@@ -56,7 +66,7 @@ export async function POST(request: Request, { params }: Params) {
       const [prefs, user] = await Promise.all([getUserAccountPrefs(userId, resolvedAccountId), getUserById(userId)]);
       const template = resolveSignatureTemplate(account.settings, prefs, identity);
       const signature = template.body && user ? renderSignatureTemplate(template.body, { name: user.name, email: user.email }, identity) : null;
-      const { text: reply, usage } = await generateAiReply({ model, message,
+      const { text: reply, usage } = await generateAiReply({ model, message, instruction,
         sender: { name: identity.displayName || user?.name || identity.email, signatureFollows: Boolean(signature?.text) } });
       const date = getMessageDateDisplay(message.dateValue, message.date, normalizeAccountDateFormat(account.settings?.appearance?.dateFormat), locale).text;
       const replyHeader = getTranslator(locale)("Compose.generated.replyHeader", { date, sender: message.from });
@@ -65,15 +75,15 @@ export async function POST(request: Request, { params }: Params) {
       const result = await saveDraftForAccount({ account, accountId: resolvedAccountId, clientId: context.clientId ?? "", payload,
         localFlags: [AI_MODIFIED_FLAG], actor: collabActorFromSession(context.session, context.clientId), authorization: { request } });
       const draft = result.draftId ? await getMessageById(resolvedAccountId, result.draftId) : result.message;
-      // Content-free journal line: never the mail or the reply text.
+      // Content-free journal line: never the mail, the instruction or the reply text.
       console.info("[ai-reply] draft created", { accountId: resolvedAccountId, messageId: message.id, model: config.model,
-        durationMs: Date.now() - started, inputTokens: usage.inputTokens ?? 0, outputTokens: usage.outputTokens ?? 0 });
+        durationMs: Date.now() - started, instructionChars: instruction.length, inputTokens: usage.inputTokens ?? 0, outputTokens: usage.outputTokens ?? 0 });
       return NextResponse.json({ ok: true, draftId: result.draftId, message: draft ?? null,
         url: draft ? messageDeepLink(draft, readAuthEnv().baseURL) : null });
     } catch (error) {
       if (error instanceof AiReplyError) {
         console.warn("[ai-reply] model call failed", { accountId: resolvedAccountId, messageId: message.id, model: config.model,
-          durationMs: Date.now() - started, code: error.code });
+          durationMs: Date.now() - started, instructionChars: instruction.length, code: error.code });
         return NextResponse.json({ ok: false, code: "ai_failed", reason: error.code, message: "The AI reply could not be written." }, { status: 502 });
       }
       if (error instanceof OutboundAuthorizationError) return error.response;
