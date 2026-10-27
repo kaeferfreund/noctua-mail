@@ -1,4 +1,5 @@
-import { beforeAll, describe, expect, spyOn, test } from "bun:test";
+import { beforeAll, describe, expect, setSystemTime, spyOn, test } from "bun:test";
+import { buildMessageGroupKey } from "../../messageGrouping";
 import { createSharedShardFixture } from "../../testSharedShardHarness";
 import { getDb } from "../connection";
 import { updateThreadCollabState } from "../threadCollab";
@@ -283,6 +284,30 @@ describe("thread selector flagged EXISTS differential", () => {
       }
     }
     expect(checked).toBeGreaterThanOrEqual(15);
+  });
+
+  test("thread date group keys equal the uncached keys around midnight (frozen clock)", async () => {
+    const seen = new Set<string>();
+    try {
+      for (const nowMs of [Date.UTC(2026, 0, 1, 12), Date.UTC(2025, 11, 31, 23), Date.UTC(2026, 0, 1, 22, 59, 59, 999),
+        Date.UTC(2026, 0, 1, 23), Date.UTC(2026, 0, 6, 12), Date.UTC(2026, 1, 1)]) {
+        setSystemTime(new Date(nowMs));
+        for (const groupBy of ["date", "week", "year"]) {
+          for (const threadDateSource of ["latestDateValue", "latestReceivedDateValue"] as const) {
+            const result = await listThreads({ accountId: fixture.a.accountId, page: 1, pageSize: 24, groupBy, threadDateSource });
+            expect(result.items.length).toBeGreaterThan(0);
+            for (const item of result.items) {
+              expect(item.groupKey).toBe(buildMessageGroupKey(item, groupBy, item.threadSortDateValue));
+              seen.add(item.groupKey!);
+            }
+          }
+        }
+      }
+    } finally {
+      setSystemTime();
+    }
+    expect([...seen].filter(key => ["Today", "Yesterday", "This Week", "Older"].includes(key)).sort())
+      .toEqual(["Older", "This Week", "Today", "Yesterday"]);
   });
 
   test("an empty query does not read the own addresses; from:me still does", async () => {

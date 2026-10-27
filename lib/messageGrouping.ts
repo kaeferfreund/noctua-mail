@@ -23,8 +23,26 @@ export type InviteDeckEventBounds = {
   eventLastEndAtMs?: number | null;
 };
 
-export function buildWeekGroupKey(timestampMs: number) {
-  const dayNumber = displayDayNumber(timestampMs);
+/** Display-day lookup for one list request: one clock reading and an exact-value memo. */
+export type DisplayDayContext = { nowMs: number; dayNumber: (value: number) => number };
+
+export function createDisplayDayContext(nowMs = Date.now()): DisplayDayContext {
+  const days = new Map<number, number>();
+  return {
+    nowMs,
+    dayNumber(value) {
+      let day = days.get(value);
+      if (day === undefined) {
+        day = displayDayNumber(value);
+        days.set(value, day);
+      }
+      return day;
+    }
+  };
+}
+
+export function buildWeekGroupKey(timestampMs: number, days?: DisplayDayContext) {
+  const dayNumber = (days?.dayNumber ?? displayDayNumber)(timestampMs);
   const date = new Date(dayNumber * DAY_MS);
   const year = date.getUTCFullYear();
   const jan1 = new Date(Date.UTC(year, 0, 1));
@@ -38,9 +56,14 @@ export function buildWeekGroupKey(timestampMs: number) {
   return `${year}-W${String(week).padStart(2, "0")}`;
 }
 
-export function buildTimeGroupKey(timestampMs: number, groupBy: string, nowMs = Date.now()) {
-  const todayStart = displayDayNumber(nowMs);
-  const targetDay = displayDayNumber(timestampMs);
+export function buildTimeGroupKey(
+  timestampMs: number,
+  groupBy: string,
+  nowMs = Date.now(),
+  dayNumber: (value: number) => number = displayDayNumber
+) {
+  const todayStart = dayNumber(nowMs);
+  const targetDay = dayNumber(timestampMs);
 
   if (groupBy === INVITE_DECK_GROUP_BY) {
     return targetDay >= todayStart ? "UPCOMING" : "PAST";
@@ -61,7 +84,8 @@ export function buildTimeGroupKey(timestampMs: number, groupBy: string, nowMs = 
 export function buildMessageGroupKey(
   message: Pick<Message, "dateValue" | "from" | "folderId">,
   groupBy: string,
-  dateValueOverride?: number
+  dateValueOverride?: number,
+  days?: DisplayDayContext
 ) {
   const effectiveDateValue =
     typeof dateValueOverride === "number" && Number.isFinite(dateValueOverride)
@@ -69,16 +93,16 @@ export function buildMessageGroupKey(
       : message.dateValue;
 
   if (groupBy === "date" || groupBy === INVITE_DECK_GROUP_BY) {
-    return buildTimeGroupKey(effectiveDateValue, groupBy);
+    return buildTimeGroupKey(effectiveDateValue, groupBy, days?.nowMs, days?.dayNumber);
   }
   if (groupBy === EVENT_GROUP_BY) {
     return "Other";
   }
   if (groupBy === "week") {
-    return buildWeekGroupKey(effectiveDateValue);
+    return buildWeekGroupKey(effectiveDateValue, days);
   }
   if (groupBy === "year") {
-    return String(new Date(displayDayNumber(effectiveDateValue) * DAY_MS).getUTCFullYear());
+    return String(new Date((days?.dayNumber ?? displayDayNumber)(effectiveDateValue) * DAY_MS).getUTCFullYear());
   }
   if (groupBy === "domain") {
     const emailMatch = message.from.match(/<([^>]+)>/);

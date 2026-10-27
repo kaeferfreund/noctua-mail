@@ -1,6 +1,7 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it, setSystemTime } from "bun:test";
 import {
   buildMessageGroupKey,
+  createDisplayDayContext,
   buildTimeGroupKey,
   buildWeekGroupKey,
   buildInviteDeckGroupKeyFromBounds,
@@ -65,6 +66,52 @@ describe("buildWeekGroupKey", () => {
     expect(buildWeekGroupKey(localDateMs(2024, 5, 17, 12))).toBe("2024-W25");
     expect(buildWeekGroupKey(localDateMs(2024, 5, 23, 12))).toBe("2024-W25");
     expect(buildWeekGroupKey(localDateMs(2024, 5, 24, 12))).toBe("2024-W26");
+  });
+});
+
+describe("createDisplayDayContext", () => {
+  afterEach(() => setSystemTime());
+
+  it("yields the uncached group keys across midnight, both DST changes and LMT dates (frozen clock)", () => {
+    const hour = 3_600_000;
+    // Berlin wall-clock midnights and DST switches (29 Mar / 25 Oct 2026), plus pre-1893 local mean time.
+    const anchors = [
+      Date.UTC(2026, 2, 28, 23), Date.UTC(2026, 2, 29, 0, 59, 59, 999), Date.UTC(2026, 2, 29, 1), Date.UTC(2026, 2, 29, 22),
+      Date.UTC(2026, 9, 24, 22), Date.UTC(2026, 9, 25, 0, 59, 59, 999), Date.UTC(2026, 9, 25, 1), Date.UTC(2026, 9, 25, 23),
+      Date.UTC(2026, 9, 26, 22, 59, 59, 999), Date.UTC(2026, 9, 26, 23), Date.UTC(1880, 5, 1, 23, 6, 31), Date.UTC(1880, 5, 1, 23, 6, 32)
+    ];
+    const values = anchors.flatMap(anchor => [-8 * 24, -24, -2, -1, 0, 1, 2, 24, 7 * 24].map(offset => anchor + offset * hour))
+      .concat(anchors, anchors.map(anchor => anchor - 1));
+    const groupings = ["date", INVITE_DECK_GROUP_BY, "week", "year", "sender"];
+    const message = { dateValue: 0, from: "Sender <sender@example.test>", folderId: "acc:INBOX" };
+    let compared = 0;
+    for (const nowMs of anchors.slice(0, 10)) {
+      setSystemTime(new Date(nowMs));
+      const days = createDisplayDayContext();
+      expect(days.nowMs).toBe(nowMs);
+      for (const groupBy of groupings) {
+        for (const value of values) {
+          // Twice: the second call is served by the memo.
+          for (let pass = 0; pass < 2; pass++) {
+            expect(buildMessageGroupKey({ ...message, dateValue: value }, groupBy, undefined, days))
+              .toBe(buildMessageGroupKey({ ...message, dateValue: value }, groupBy));
+            expect(buildMessageGroupKey(message, groupBy, value, days)).toBe(buildMessageGroupKey(message, groupBy, value));
+            compared += 2;
+          }
+        }
+      }
+    }
+    expect(compared).toBe(10 * groupings.length * values.length * 4);
+  });
+
+  it("keeps one clock reading for the whole list", () => {
+    const beforeMidnight = Date.UTC(2026, 9, 26, 22, 59, 59, 999);
+    setSystemTime(new Date(beforeMidnight));
+    const days = createDisplayDayContext();
+    setSystemTime(new Date(beforeMidnight + 1));
+    const message = { dateValue: beforeMidnight, from: "", folderId: "" };
+    expect(buildMessageGroupKey(message, "date")).toBe("Yesterday");
+    expect(buildMessageGroupKey(message, "date", undefined, days)).toBe("Today");
   });
 });
 

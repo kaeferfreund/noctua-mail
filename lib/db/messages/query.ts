@@ -37,7 +37,9 @@ import {
   buildMessageGroupKey,
   buildInviteDeckGroupKeyFromBounds,
   buildTimeGroupKey,
+  createDisplayDayContext,
   DATE_GROUP_ORDER,
+  type DisplayDayContext,
   EVENT_GROUP_BY,
   INVITE_DECK_GROUP_BY,
   sortGroupsForGroupBy
@@ -72,8 +74,8 @@ import {
 
 export type GroupMeta = { key: string; label: string; count: number };
 
-function buildGroupKey(message: Message, groupBy: string, dateValueOverride?: number) {
-  return buildMessageGroupKey(message, groupBy, dateValueOverride);
+function buildGroupKey(message: Message, groupBy: string, dateValueOverride?: number, days?: DisplayDayContext) {
+  return buildMessageGroupKey(message, groupBy, dateValueOverride, days);
 }
 
 function buildGroupLabel(key: string, groupBy: string) {
@@ -3072,6 +3074,7 @@ export async function listThreads(params: {
 
   // Date-sensitive keys depend only on the thread date: derive them once per thread.
   const threadDateGroupKeyByThreadId = new Map<string, string>();
+  const displayDays = createDisplayDayContext();
   const items: Message[] = messagesRows.map((row) => {
     const calendarInviteData = calendarInviteDataByMessageId.get(row.id);
     const message: Message = {
@@ -3131,7 +3134,7 @@ export async function listThreads(params: {
     if (isThreadDateSensitiveGroupBy(groupBy) && threadDateValue !== undefined) {
       threadDateGroupKey = threadDateGroupKeyByThreadId.get(message.threadId);
       if (threadDateGroupKey === undefined) {
-        threadDateGroupKey = buildGroupKey(message, groupBy, threadDateValue);
+        threadDateGroupKey = buildGroupKey(message, groupBy, threadDateValue, displayDays);
         threadDateGroupKeyByThreadId.set(message.threadId, threadDateGroupKey);
       }
     }
@@ -3139,7 +3142,7 @@ export async function listThreads(params: {
       eventGroupsByMessageId.get(message.id)?.key ??
       inviteDeckThreadGroupsByMessageId.get(message.id) ??
       threadDateGroupKey ??
-      buildGroupKey(message, groupBy);
+      buildGroupKey(message, groupBy, undefined, displayDays);
     return message;
   });
 
