@@ -4,6 +4,7 @@ import { dbModulePromise } from "./testDbHarness";
 import type { Account, Folder, Message } from "./data";
 import {
   createTopic,
+  deleteTopic,
   excludeTopicLearningSignal,
   getTopicThreadSuggestions,
   getTopicSuggestionExplanationForThread,
@@ -1696,5 +1697,92 @@ describe("topic suggestions", () => {
     expect((batched.get("thread-shared-learning") ?? []).map((item) => item.name)).toEqual(["Vendor"]);
     expect(batched.get("thread-shared-b")).not.toBe(batched.get("thread-shared-a"));
     expect(batched.get("thread-shared-b")?.[0]).not.toBe(batched.get("thread-shared-a")?.[0]);
+  });
+
+  test("batched suggestions over shared domains, own addresses and deleted topics match per-thread scores", async () => {
+    const accountId = uniqueAccountId("acc-topic-suggestions-aggregate");
+    const folder = buildFolder(accountId);
+    const { saveFoldersForAccount, upsertAccount, upsertMessages, withAccountDb } = await dbModulePromise;
+
+    await upsertAccount(buildAccount(accountId));
+    await saveFoldersForAccount(accountId, [folder]);
+    // Own addresses: the account address plus an alias identity.
+    const accountEmail = ["owner@example.com", "alias@example.com"];
+    const senders = [
+      "Desk <desk@shared.example>", "Ops <ops@shared.example>", "Billing <billing@shared.example>",
+      "News <news@lists.example>", "Me <alias@example.com>", "Friend <friend@gmail.com>", "Solo <solo@single.example>"
+    ];
+    const messages: Message[] = [];
+    const message = (threadId: string, index: number, minute: number) => {
+      const from = senders[index % senders.length];
+      messages.push(buildMessage({
+        id: `msg-${threadId}-${minute}`,
+        accountId,
+        folderId: folder.id,
+        threadId,
+        messageId: `<${threadId}-${minute}@example.test>`,
+        from,
+        fromEmail: from.replace(/^.*<|>$/g, ""),
+        to: index % 3 === 0 ? "owner@example.com, peer@partner.example" : "alias@example.com",
+        cc: index % 4 === 1 ? `team${index % 2}@partner.example` : undefined,
+        listId: index % 7 === 3 ? "news.lists.example" : undefined,
+        dateValue: Date.UTC(2026, 2, 19, 8, minute)
+      }));
+    };
+    // 60 learning threads and 40 page threads, two messages each from different senders.
+    for (let i = 0; i < 60; i++) {
+      message(`thread-learn-${i}`, i, 2 * i);
+      message(`thread-learn-${i}`, i * 5 + 1, 2 * i + 1);
+    }
+    for (let i = 0; i < 40; i++) {
+      message(`thread-page-${i}`, i * 3, 200 + 2 * i);
+      if (i % 2 === 0) message(`thread-page-${i}`, i + 2, 201 + 2 * i);
+    }
+    // Two topics with the same name and identical history, one page thread from that sender.
+    for (const threadId of ["thread-twin-a", "thread-twin-b", "thread-page-twin"]) {
+      messages.push(buildMessage({
+        id: `msg-${threadId}`, accountId, folderId: folder.id, threadId, messageId: `<${threadId}@example.test>`,
+        from: "Twins <twins@twin.example>", fromEmail: "twins@twin.example", to: "alias@example.com",
+        dateValue: Date.UTC(2026, 2, 19, 12, messages.length % 60)
+      }));
+    }
+    await upsertMessages(accountId, folder.id, messages, true, { recomputeThreads: false });
+
+    const names = ["Alpha", "Beta", "Gamma", "Deleted", "Orphaned"];
+    const topics: Array<{ id: string }> = [];
+    for (const name of names) topics.push(await createTopic(accountId, name, "blue"));
+    for (let i = 0; i < 60; i++) {
+      const assigned = [topics[i % names.length].id];
+      if (i % 4 === 0) assigned.push(topics[(i + 2) % names.length].id);
+      await setThreadTopics(accountId, `thread-learn-${i}`, Array.from(new Set(assigned)));
+    }
+    const twinA = await createTopic(accountId, "Twin", "red");
+    const twinB = await createTopic(accountId, "Twin", "green");
+    await setThreadTopics(accountId, "thread-twin-a", [twinA.id]);
+    await setThreadTopics(accountId, "thread-twin-b", [twinB.id]);
+    // Page threads that are learning threads themselves keep their own history out of their score.
+    for (const i of [1, 6, 13]) await setThreadTopics(accountId, `thread-page-${i}`, [topics[i % 3].id]);
+    expect(await deleteTopic(accountId, topics[3].id)).toBe(true);
+    // A topic row removed without its learning rows: the join must drop those rows.
+    await withAccountDb(accountId, (db) => db.prepare("DELETE FROM topics WHERE id = ?").run(topics[4].id));
+    const orphanRows = await withAccountDb(accountId, (db) =>
+      (db.prepare("SELECT COUNT(*) AS count FROM topic_learning_signals WHERE topicId = ?").get(topics[4].id) as { count: number }).count);
+    expect(orphanRows).toBeGreaterThan(0);
+
+    const threadIds = [...Array.from({ length: 40 }, (_, i) => `thread-page-${i}`), "thread-page-twin"];
+    const batched = await getTopicSuggestionsForThreads(accountId, threadIds, { accountEmail });
+    let multiTopic = 0;
+    for (const threadId of threadIds) {
+      const single = await getTopicSuggestionsForThread(accountId, threadId, { accountEmail });
+      expect(batched.get(threadId) ?? []).toEqual(single);
+      if (single.length >= 3) multiTopic++;
+      for (const topic of batched.get(threadId) ?? []) expect([topics[3].id, topics[4].id]).not.toContain(topic.id);
+    }
+    expect(multiTopic).toBeGreaterThanOrEqual(10);
+    expect(batched.size).toBeGreaterThanOrEqual(35);
+    // Equal score, count and name: the two "Twin" topics keep their first-match order.
+    const twins = batched.get("thread-page-twin") ?? [];
+    expect(twins.map((topic) => [topic.name, topic.suggestionScore, topic.matchCount])).toEqual([["Twin", 5, 1], ["Twin", 5, 1]]);
+    expect(twins.map((topic) => topic.id)).toEqual([twinA.id, twinB.id].sort());
   });
 });
