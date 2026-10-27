@@ -84,6 +84,8 @@ type UseSearchStateOptions = {
   virtualDefaultExcludedFolderIdsKey: string;
   apiFetch: (url: string, options?: RequestInit) => Promise<Response>;
   syncCompletionVersion?: number;
+  /** False while a mailbox switch is pending: the virtual folder counts wait for it. */
+  secondaryReadsReady?: boolean;
 };
 
 export type SearchState = {
@@ -133,7 +135,8 @@ export function useSearchState(options: UseSearchStateOptions) {
     relatedQueryId,
     virtualDefaultExcludedFolderIdsKey,
     apiFetch,
-    syncCompletionVersion
+    syncCompletionVersion,
+    secondaryReadsReady = true
   } = options;
 
   const trimmedQuery = query.trim();
@@ -205,9 +208,9 @@ export function useSearchState(options: UseSearchStateOptions) {
     [folder.id, folder.count, folder.unreadCount]
   )), [accountFolders]);
 
-  // Fetch virtual folder counts
+  // Fetch virtual folder counts once a pending mailbox switch has settled.
   useEffect(() => {
-    if (!activeAccountId) return;
+    if (!activeAccountId || !secondaryReadsReady) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       const fetchCount = async (badges: string, excludedFolderIdsKey: string) => {
@@ -245,7 +248,7 @@ export function useSearchState(options: UseSearchStateOptions) {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [activeAccountId, apiFetch, virtualDefaultExcludedFolderIdsKey, syncCompletionVersion, folderCountsKey]);
+  }, [activeAccountId, apiFetch, virtualDefaultExcludedFolderIdsKey, syncCompletionVersion, folderCountsKey, secondaryReadsReady]);
 
   // Auto-clear virtual folder when conditions change
   useEffect(() => {

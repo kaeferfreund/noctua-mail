@@ -461,6 +461,9 @@ export default function MailClient({
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [activeAccountId, setActiveAccountId] = useState("");
+  // True while a mailbox switch runs: per-mailbox side reads wait for it to settle.
+  const [switchPending, setSwitchPending] = useState(false);
+  const secondaryReadsReady = !switchPending;
   const [activeFolderId, setActiveFolderId] = useState("");
   const [activeMessageId, setActiveMessageId] = useState("");
   const isMobile = useIsMobile();
@@ -562,11 +565,11 @@ export default function MailClient({
     setAllTopics,
     topicMessageCountById,
     refreshTopicStats
-  } = useTopics({ activeAccountId, apiFetch });
+  } = useTopics({ activeAccountId, apiFetch, secondaryReadsReady });
   const {
     recipientAliases,
     setRecipientAliases
-  } = useRecipientAliases({ activeAccountId, apiFetch });
+  } = useRecipientAliases({ activeAccountId, apiFetch, secondaryReadsReady });
   const activeTopicSearchMode = useMemo(() => parseSimpleTopicSearchMode(query), [query]);
   const activeTopicId = activeTopicSearchMode?.topicId ?? null;
   const activeTopic = useMemo(
@@ -894,7 +897,8 @@ export default function MailClient({
     relatedQueryId,
     virtualDefaultExcludedFolderIdsKey,
     apiFetch,
-    syncCompletionVersion
+    syncCompletionVersion,
+    secondaryReadsReady
   });
 
   // Destructure search state and actions
@@ -1618,7 +1622,8 @@ export default function MailClient({
     setDeletingFolderIds,
     prefetchFirstPage,
     dropFirstPagePrefetch,
-    viewCache
+    viewCache,
+    setSwitchPending
   });
 
   const preferToDisplay = isDraftsFolder(activeFolderId) || isSentFolder(activeFolderId);

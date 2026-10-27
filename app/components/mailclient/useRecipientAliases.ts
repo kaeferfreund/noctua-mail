@@ -9,9 +9,11 @@ type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respon
 type UseRecipientAliasesOptions = {
   activeAccountId: string;
   apiFetch: ApiFetch;
+  /** False while a mailbox switch is pending: the idle read waits for it. */
+  secondaryReadsReady?: boolean;
 };
 
-export function useRecipientAliases({ activeAccountId, apiFetch }: UseRecipientAliasesOptions) {
+export function useRecipientAliases({ activeAccountId, apiFetch, secondaryReadsReady = true }: UseRecipientAliasesOptions) {
   const resource = useMemo(
     () => getRecipientAliasesResource(apiFetch, activeAccountId),
     [apiFetch, activeAccountId]
@@ -25,10 +27,15 @@ export function useRecipientAliases({ activeAccountId, apiFetch }: UseRecipientA
   );
 
   useEffect(() => {
-    if (!activeAccountId) return;
+    if (!activeAccountId || !secondaryReadsReady) return;
     resource.invalidate();
-    return deferUntilIdle(() => { void resource.load(); });
-  }, [activeAccountId, resource]);
+    const controller = new AbortController();
+    const cancel = deferUntilIdle(() => { void resource.load(false, controller.signal); });
+    return () => {
+      cancel();
+      controller.abort();
+    };
+  }, [activeAccountId, resource, secondaryReadsReady]);
 
   return {
     recipientAliases,
