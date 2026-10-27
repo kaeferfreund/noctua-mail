@@ -5,6 +5,7 @@ import type { MessageResolution } from "@/lib/navigation/resolveMessage";
 import type { Message } from "@/lib/data";
 import { authorizeDeepLink, deepLinkHistoryMode, emptyDeepLink, parseDeepLink, serializeDeepLink, type DeepLinkState } from "@/lib/navigation/deepLinks";
 import { afterMobileOverlayNavigation, isMobileOverlayPop } from "@/app/hooks/useMobileOverlayHistory";
+import { installStandaloneRootTrap, isStandaloneRootPop, rememberStandaloneEntry } from "@/app/hooks/standaloneRootTrap";
 import { readerShortcut } from "@/lib/ui/readerFocus";
 
 type Options = {
@@ -79,14 +80,17 @@ export function useDeepLinks(options: Options) {
     if (href !== current || !window.history.state?.noctuaUrl) {
       window.history[mode === "push" ? "pushState" : "replaceState"](historyState, "", href);
     }
+    rememberStandaloneEntry();
   }, []);
   useEffect(() => {
     initialized.current = true;
+    // Before the first URL write, so the app's own entries sit on top of the trap.
+    const removeRootTrap = installStandaloneRootTrap();
     // Hydrate external browser state after mount; subsequent updates come from popstate.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     request(parseDeepLink(window.location.search), "initial");
     const onPop = (event: PopStateEvent) => {
-      if (!isMobileOverlayPop(event)) void request(parseDeepLink(window.location.search), "history");
+      if (!isStandaloneRootPop(event) && !isMobileOverlayPop(event)) void request(parseDeepLink(window.location.search), "history");
     };
     // Only keys that move the selection (reader next/previous) mark the next change;
     // arrow keys scroll and must not leave the flag set for a later click-free change.
@@ -100,6 +104,7 @@ export function useDeepLinks(options: Options) {
     window.addEventListener("pointerdown", onPointer, true);
     return () => {
       initialized.current = false;
+      removeRootTrap();
       pending.current?.controller.abort();
       pending.current?.done();
       window.removeEventListener("popstate", onPop);

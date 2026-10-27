@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect } from "react";
 import { afterMobileOverlayNavigation, isMobileOverlayPop } from "./useMobileOverlayHistory";
+import { isStandaloneRootPop } from "./standaloneRootTrap";
 
 export function useMobileNavigation(isMobile: boolean, messageId: string | null, clearMessage: () => void, urlManaged = false) {
   // Derive visibility from the selection even during SSR; CSS applies it only
@@ -22,7 +23,7 @@ export function useMobileNavigation(isMobile: boolean, messageId: string | null,
   useEffect(() => {
     if (!isMobile || urlManaged) return;
     const onPopState = (event: PopStateEvent) => {
-      if (!isMobileOverlayPop(event) && !event.state?.noctuaMobileView) clearMessage();
+      if (!isStandaloneRootPop(event) && !isMobileOverlayPop(event) && !event.state?.noctuaMobileView) clearMessage();
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
