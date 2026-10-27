@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createContext, useCallback, useContext, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Mic } from "lucide-react";
 import { cn } from "cn";
@@ -127,6 +127,12 @@ function AiReplyPromptForm({ onSubmit }: { onSubmit: (instruction: string) => vo
   const submit = (instruction: string) => onSubmit(normalizeAiReplyInstruction(instruction).slice(0, AI_REPLY_INSTRUCTION_LIMIT));
   const hint = dictation.error ? t(`dictationErrors.${dictation.error}`) : dictation.listening ? t("listening") : null;
   const textClass = "text-base md:text-sm";
+  const interimRef = useRef<HTMLDivElement>(null);
+  // Keep the newest words in view when the text is longer than the field.
+  useLayoutEffect(() => {
+    const mirror = interimRef.current;
+    if (mirror) mirror.scrollLeft = mirror.scrollWidth;
+  }, [dictation.interim, value]);
 
   return (
     <form className="flex flex-col gap-2" onSubmit={event => { event.preventDefault(); submit(value); }}>
@@ -134,12 +140,13 @@ function AiReplyPromptForm({ onSubmit }: { onSubmit: (instruction: string) => vo
         <div className="relative min-w-0 flex-1">
           <Input value={value} maxLength={AI_REPLY_INSTRUCTION_LIMIT} placeholder={dictation.interim ? undefined : t("placeholder")}
             aria-label={t("label")} aria-describedby={hint ? hintId : undefined} autoComplete="off" enterKeyHint="send"
-            data-ai-reply-instruction className={cn("h-9", textClass)} onChange={event => setValue(event.target.value)} />
+            data-ai-reply-instruction className={cn("h-9", textClass, dictation.interim && "text-transparent")} onChange={event => setValue(event.target.value)} />
           {dictation.interim ? (
-            // Interim words in grey right after the typed text; the final result replaces them.
-            <div aria-hidden data-ai-reply-interim
+            // While words are recognized the text shows here: typed text, then the interim words in grey;
+            // the final result replaces them in the field.
+            <div ref={interimRef} aria-hidden data-ai-reply-interim
               className={cn("pointer-events-none absolute inset-0 flex items-center overflow-hidden border border-transparent px-2.5 whitespace-pre", textClass)}>
-              <span className="invisible">{value ? `${value} ` : ""}</span>
+              <span>{value ? `${value} ` : ""}</span>
               <span className="text-muted-foreground">{dictation.interim}</span>
             </div>
           ) : null}
