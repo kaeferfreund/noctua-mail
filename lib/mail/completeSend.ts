@@ -125,7 +125,7 @@ export async function completeSend(params: {
     console.warn("[send] post-send deadline exceeded", { accountId: account.id, error });
     result.sentCopy = "failed";
     result.sentCopyWarning = "Email sent, but post-send processing timed out. Do not send it again.";
-    result.postSendWarning = [result.postSendWarning, "Email sent, but updating reply or forward flags may be incomplete."].filter(Boolean).join(" ");
+    result.postSendWarning = [result.postSendWarning, "Email sent, but updating reply, forward or to-do flags may be incomplete."].filter(Boolean).join(" ");
   }
   return { ...result };
 }

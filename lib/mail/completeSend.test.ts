@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import type { Account, Message } from "@/lib/data";
 import { DONE_FLAG, TODO_FLAG } from "@/lib/messageFlags";
 import { dbModulePromise } from "@/lib/testDbHarness";
@@ -11,40 +11,25 @@ let storedMessages = new Map<string, Message>();
 let failKeyword: string | null = null;
 const flagCalls: FlagCall[] = [];
 
-const applyFlagMutationsToMessage = mock(async (params: {
-  messageId: string; message: Pick<Message, "flags">; flag?: string; keyword?: string; value: boolean;
-}) => {
+// `mock.module` would replace these modules for the whole test process (and
+// `mock.restore()` does not undo it), so the stubs are `spyOn` overrides that
+// are installed in `beforeAll` and restored in `afterAll`.
+import * as threadCollab from "@/lib/threadCollab";
+import * as serverDb from "@/lib/serverDb";
+import * as serverImap from "@/lib/serverImap";
+import * as flagMutation from "@/lib/messageFlagMutation";
+
+async function applyFlagMutationsStub(params: Parameters<typeof flagMutation.applyFlagMutationsToMessage>[0]) {
   const { messageId, flag, keyword, value } = params;
   flagCalls.push({ messageId, flag, keyword, value });
   if (keyword && keyword === failKeyword) throw new Error("STORE rejected");
   const name = keyword ?? (flag === "answered" ? "\\Answered" : "\\Forwarded");
   const flags = params.message.flags ?? [];
   return value ? Array.from(new Set([...flags, name])) : flags.filter((item) => item !== name);
-});
-const listReplySourceMessageIds = mock(async (_accountId: string, messageId: string) =>
-  [...storedMessages.values()].filter((message) => message.messageId === messageId).map((message) => ({ id: message.id })));
-const recordReplySent = mock(async () => {});
-const getMessageById = mock(async (_accountId: string, id: string) => storedMessages.get(id) ?? null);
-
-const actualThreadCollab = await import("@/lib/threadCollab");
-const actualServerDb = await import("@/lib/serverDb");
-const actualServerImap = await import("@/lib/serverImap");
-const actualFlagMutation = await import("@/lib/messageFlagMutation");
-
-mock.module("@/lib/threadCollab", () => ({ ...actualThreadCollab, recordReplySent, listReplySourceMessageIds }));
-mock.module("@/lib/serverDb", () => ({
-  ...actualServerDb,
-  getFolders: mock(async () => []),
-  saveFoldersForAccount: mock(async () => {}),
-  getMessageById
-}));
-mock.module("@/lib/serverImap", () => ({ ...actualServerImap, listImapFolders: mock(async () => []) }));
-mock.module("@/lib/messageFlagMutation", () => ({ ...actualFlagMutation, applyFlagMutationsToMessage }));
+}
 
 await dbModulePromise;
 const { completeSend } = await import("./completeSend");
-
-mock.restore();
 
 const account = { id: "complete-send", name: "Complete Send", email: "owner@example.test", avatar: "" } as Account;
 const actor = { userId: "user-1", clientId: "client-1" };
@@ -65,6 +50,20 @@ function send(params: { inReplyTo?: string; xForwardedMessageId?: string }) {
 }
 
 describe("completeSend post-send flags", () => {
+  const spies: Array<{ mockRestore: () => void }> = [];
+  beforeAll(() => {
+    spies.push(
+      spyOn(flagMutation, "applyFlagMutationsToMessage").mockImplementation(applyFlagMutationsStub),
+      spyOn(threadCollab, "listReplySourceMessageIds").mockImplementation(async (_accountId: string, messageId: string) =>
+        [...storedMessages.values()].filter((message) => message.messageId === messageId).map((message) => ({ id: message.id }))),
+      spyOn(threadCollab, "recordReplySent").mockImplementation(async () => {}),
+      spyOn(serverDb, "getMessageById").mockImplementation(async (_accountId: string, id: string) => storedMessages.get(id) ?? null),
+      spyOn(serverDb, "getFolders").mockImplementation(async () => []),
+      spyOn(serverDb, "saveFoldersForAccount").mockImplementation(async () => {}),
+      spyOn(serverImap, "listImapFolders").mockImplementation(async () => [])
+    );
+  });
+  afterAll(() => { spies.forEach((spy) => spy.mockRestore()); });
   beforeEach(() => {
     storedMessages = new Map();
     failKeyword = null;
