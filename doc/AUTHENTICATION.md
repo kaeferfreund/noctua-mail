@@ -208,6 +208,11 @@ other requests and streams continue; the settings tab collects it through Reauth
 label and optional ttlSeconds (default 30 days; range 60 seconds through 365 days).
 Editor token GET/DELETE covers own tokens; managers can list/delete all mailbox tokens. Deletion
 needs no grant, since it only removes access.
+PATCH `mcp-tokens/[tokenId]` with `{accountIds}` replaces a live token's mailbox set without changing
+the secret. It spends the same `mcp.create` grant and repeats the mint proofs in one immediate
+transaction (MFA session, editor on the route mailbox, membership in every selected mailbox). Only the
+token's creator may change it, and only from a mailbox the token already covers; otherwise 404. The
+primary stays unless it is deselected, then it moves to the creator's highest-role mailbox (ties by ID).
 Every bearer request and tool use checks the live creator/profile/ban, both MFA records, non-NULL
 current generation, expiry and current role. No cookie fallback. Each requested tool accountId must
 repeat the bound mailbox; cross-mailbox calls require another token. Mutation tools require editor;
@@ -850,6 +855,7 @@ Mailbox DELETE additionally requires owner/admin; copy/move checks editor on bot
 | GET | `mcp-tokens` | editor |
 | POST | `mcp-tokens` | editor |
 | DELETE | `mcp-tokens/[tokenId]` | editor |
+| PATCH | `mcp-tokens/[tokenId]` | editor (creator only) |
 | GET | `members` | viewer |
 | GET | `members/candidates` | manager |
 | DELETE | `members/[userId]` | manager |

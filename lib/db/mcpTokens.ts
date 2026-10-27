@@ -30,13 +30,15 @@ export function deleteMcpTokenAccountRows(db: import("bun:sqlite").Database, acc
   const moved = db.prepare(`SELECT id, accountId, createdByUserId FROM mcp_tokens WHERE accountId=?${owner}`).all(...args) as
     { id: string; accountId: string; createdByUserId: string }[];
   for (const token of moved) {
-    // New primary: the remaining mailbox with the creator's highest live role; ties (and no role) by ID.
-    const remaining = mcpTokenAccountIds(db, token);
-    const roles = resolveAccountRoleRows(db, token.createdByUserId, remaining);
-    const rank = (id: string) => { const role = roles.get(id); return role ? ACCOUNT_ROLE_ORDER[role] : 0; };
-    const primary = remaining.reduce((best, id) => rank(id) > rank(best) ? id : best);
-    db.prepare("UPDATE mcp_tokens SET accountId=? WHERE id=?").run(primary, token.id);
+    db.prepare("UPDATE mcp_tokens SET accountId=? WHERE id=?").run(pickMcpTokenPrimary(db, token.createdByUserId, mcpTokenAccountIds(db, token)), token.id);
   }
+}
+/** New primary: the mailbox with the creator's highest live role; ties (and no role) by ID. */
+export function pickMcpTokenPrimary(db: import("bun:sqlite").Database, createdByUserId: string, accountIds: readonly string[]) {
+  const sorted = [...accountIds].sort();
+  const roles = resolveAccountRoleRows(db, createdByUserId, sorted);
+  const rank = (id: string) => { const role = roles.get(id); return role ? ACCOUNT_ROLE_ORDER[role] : 0; };
+  return sorted.reduce((best, id) => rank(id) > rank(best) ? id : best);
 }
 export async function listMcpTokens(accountId: string) {
   const db = await getDb();
