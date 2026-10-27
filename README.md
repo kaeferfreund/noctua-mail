@@ -238,7 +238,8 @@ Sources: [watcher](lib/mailboxWatcher.ts), [sync jobs](lib/syncJobs.ts),
 | `NOCTUA_SPAM_PROVIDER` | `anthropic` | Only implemented model provider |
 | `NOCTUA_SPAM_MODEL` | `claude-haiku-5-5` | Model ID; admin settings can override |
 | `NOCTUA_SPAM_THRESHOLD` | `0.85` | Spam confidence threshold, valid range 0.5–1; admin/mailbox settings can override |
-| `ANTHROPIC_API_KEY` | unset | Required for model calls; allowlist, static and trusted-sender checks can work without it |
+| `ANTHROPIC_API_KEY` | unset | Required for model calls (spam detection, AI reply drafts); allowlist, static and trusted-sender checks can work without it |
+| `NOCTUA_AI_REPLY_MODEL` | `claude-opus-5-5` | Model for the reader's „KI-Antwort“ draft ([AI-REPLY.md](doc/AI-REPLY.md)) |
 | `NOCTUA_SPAM_RULES_FILE` | `<data-dir>/spam-static-rules.json` | Static rules file; missing/unreadable file means no static rules |
 | `NOCTUA_SPAM_AUTHSERV_ID` | empty; infer receiving server | Comma-separated exact receiving authserv-ids used to select Authentication-Results |
 | `NOCTUA_VAPID_PUBLIC_KEY` | unset; push off | Base64url VAPID public key; all three VAPID values must be valid |

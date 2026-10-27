@@ -32,6 +32,7 @@ import {
   ShieldOff,
   Square,
   SquareCheckBig,
+  Sparkles,
   Tags,
   Trash2
 } from "lucide-react";
@@ -52,6 +53,7 @@ import TooltipIconButton, { useQuietMenuFocusReturn } from "@/app/components/Too
 import { useMessageMenuPrimitives } from "./messageMenuPrimitives";
 import { MessageMenuControlContext } from "./messageMenuControl";
 import { useDraftScheduleAction } from "../scheduledSend/ScheduledSend";
+import { useMessageReaderActions } from "./MessageReaderActions";
 
 type ComposeMode = "new" | "reply" | "replyAll" | "forward" | "edit" | "editAsNew";
 type MessageMenuAction =
@@ -62,6 +64,7 @@ type MessageMenuAction =
   | "reply"
   | "replyAll"
   | "forward"
+  | "aiReply"
   | "editAsNew"
   | "markRead"
   | "flag"
@@ -176,6 +179,7 @@ export default function MessageMenu({
   const t = useTranslations("Reader");
   const tSchedule = useTranslations("Compose.schedule");
   const scheduleDraft = useDraftScheduleAction(message);
+  const readerActions = useMessageReaderActions();
   const { isMobile, DropdownMenu } = useMessageMenuPrimitives();
   const control = useContext(MessageMenuControlContext);
   const quietFocusReturn = useQuietMenuFocusReturn();
@@ -328,6 +332,11 @@ export default function MessageMenu({
               ? buildItem("forward", t("forward"), <Forward size={14} />, () =>
                   openCompose("forward", message)
                 , isDisabled("forward"))
+              : null,
+            !isDraft && isVisible("aiReply") && readerActions?.canAiReply(message)
+              ? buildItem("aiReply", t(readerActions.isAiReplyPending(message.id) ? "aiReplyBusy" : "aiReply"), <Sparkles size={14} />, () =>
+                  void readerActions.draftAiReply(message)
+                , isDisabled("aiReply", readerActions.isAiReplyPending(message.id)))
               : null,
             isVisible("editAsNew")
               ? buildItem("editAsNew", t("editAsNew"), <FileText size={14} />, () =>

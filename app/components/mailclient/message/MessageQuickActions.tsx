@@ -1,10 +1,11 @@
 import { useTranslations } from "next-intl";
 import type React from "react";
-import { Clock, Edit3, Forward, Reply, ReplyAll, Search, Send, Trash2 } from "lucide-react";
+import { Clock, Edit3, Forward, Reply, ReplyAll, Search, Send, Sparkles, Trash2 } from "lucide-react";
 import type { Message } from "@/lib/data";
 import { hasSendableRecipients } from "../utils/messageHelpers";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 import { useDraftScheduleAction } from "../scheduledSend/ScheduledSend";
+import { useMessageReaderActions } from "./MessageReaderActions";
 
 type ComposeMode = "new" | "reply" | "replyAll" | "forward" | "edit" | "editAsNew";
 type MessageQuickAction =
@@ -14,6 +15,7 @@ type MessageQuickAction =
   | "reply"
   | "replyAll"
   | "forward"
+  | "aiReply"
   | "showRelated"
   | "delete";
 
@@ -47,6 +49,7 @@ export default function MessageQuickActions({
   const t = useTranslations("Reader");
   const tSchedule = useTranslations("Compose.schedule");
   const scheduleDraft = useDraftScheduleAction(message);
+  const readerActions = useMessageReaderActions();
   const allowThreadDeletion = origin !== "thread";
   const buttonSize = origin === "thread" ? "2" : "1";
   const isVisible = (action: MessageQuickAction, defaultValue = true) =>
@@ -185,6 +188,25 @@ export default function MessageQuickActions({
           }}
         >
           <Forward size={iconSize} />
+        </TooltipIconButton>
+      ) : null}
+      {/* Reader only: list rows keep their short hover set; the ⋮ menu has it everywhere. */}
+      {origin === "thread" && isVisible("aiReply") && readerActions?.canAiReply(message) ? (
+        <TooltipIconButton
+          size={buttonSize}
+          variant="ghost"
+          color="gray"
+          tooltip={readerActions.isAiReplyPending(message.id) ? t("aiReplyBusy") : t("aiReply")}
+          aria-label={t("aiReply")}
+          data-message-action="ai-reply"
+          loading={readerActions.isAiReplyPending(message.id)}
+          disabled={pendingMessageActions.has(message.id) || readerActions.isAiReplyPending(message.id)}
+          onClick={(event) => {
+            event.stopPropagation();
+            void readerActions.draftAiReply(message);
+          }}
+        >
+          <Sparkles size={iconSize} />
         </TooltipIconButton>
       ) : null}
       {isVisible("showRelated") ? (

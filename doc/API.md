@@ -360,6 +360,16 @@ Replies/forwards record reply activity with the authenticated actor before updat
 `\Answered`/`$Forwarded` server-side. Every outbound Message-ID, including new mail, gets shard
 `sent_by(accountId,messageId,userId,sentAt)` attribution. Sending never changes thread status.
 
+## AI reply draft
+
+`POST /api/accounts/{accountId}/messages/{messageId}/ai-reply`, body `{"locale":"de"}`
+(optional, `de`/`en`). Editor or manager, same origin, JSON. The model writes a short
+closing reply that is saved as a reply draft (never sent), flagged `$NoctuaAI`.
+Success: `{ok:true,draftId,message,url}`. Errors: 400 for a draft message, 403 for viewers,
+404 unknown message, 429 `{code:"rate_limited"}` (10 per user and minute), 502
+`{code:"ai_failed",reason}`, 503 `{code:"ai_unavailable"}` without `ANTHROPIC_API_KEY`.
+Details: [AI-REPLY.md](AI-REPLY.md).
+
 ## Integration seams
 
 `lib/threadCollab.ts` exports temporary resolveAccountRole/roleAtLeast/listAccountMembers;

@@ -38,6 +38,11 @@ export function stripQuotedText(text: string, keepAtLeast = 0) {
   return kept.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+/** Plain text of an HTML-only body: no line wrapping, images skipped. */
+export function htmlToPlainText(html: string) {
+  return htmlToTextConvert(html, { wordwrap: false, selectors: [{ selector: "img", format: "skip" }] });
+}
+
 const URL_PATTERN = /\bhttps?:\/\/[^\s<>"'()]+/gi;
 const HREF_PATTERN = /\bhref\s*=\s*["']?\s*(https?:\/\/[^\s"'<>]+)/gi;
 
@@ -218,7 +223,7 @@ export function buildSpamInput(parsed: ParsedSpamSource): SpamInput {
   const from = parsed.from?.text ?? "";
   const plain = parsed.text?.trim()
     ? parsed.text
-    : typeof parsed.html === "string" ? htmlToTextConvert(parsed.html, { wordwrap: false, selectors: [{ selector: "img", format: "skip" }] }) : "";
+    : typeof parsed.html === "string" ? htmlToPlainText(parsed.html) : "";
   return {
     from,
     ...firstMailbox(from),

@@ -1502,6 +1502,11 @@
     "copyLink": "Copy link",
     "linkCopied": "Link copied",
     "linkCopyFailed": "Could not copy link",
+    "aiReply": "Draft AI reply",
+    "aiReplyBusy": "Writing AI reply …",
+    "aiReplyUnavailable": "AI reply is not set up (no API key)",
+    "aiReplyRateLimited": "Too many AI replies in a short time. Please try again in a minute.",
+    "aiReplyFailed": "Could not write the AI reply",
     "focus": {
       "expand": "Expand reading view",
       "showList": "Show message list",
