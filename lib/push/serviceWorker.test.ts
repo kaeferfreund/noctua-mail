@@ -12,7 +12,7 @@ type FetchCall = { url: string; method: string; body: unknown };
 
 function loadWorker(options: {
   setAppBadge?: boolean;
-  clients?: Array<{ url: string }>;
+  clients?: Array<{ url: string; focusFails?: boolean; noPostMessage?: boolean }>;
   fetchResponses?: Record<string, Response>;
 } = {}) {
   const listeners = new Map<string, Listener>();
@@ -23,10 +23,13 @@ function loadWorker(options: {
   const posted: Array<{ client: string; message: unknown }> = [];
   const focused: string[] = [];
   const opened: string[] = [];
-  const windows = (options.clients ?? []).map(({ url }) => ({
+  const windows = (options.clients ?? []).map(({ url, focusFails, noPostMessage }) => ({
     url,
-    focus: async () => { focused.push(url); },
-    postMessage: (message: unknown) => { posted.push({ client: url, message }); }
+    focus: async () => {
+      if (focusFails) throw new DOMException("Not allowed to focus", "InvalidAccessError");
+      focused.push(url);
+    },
+    ...noPostMessage ? {} : { postMessage: (message: unknown) => { posted.push({ client: url, message }); } }
   }));
   const navigator: Record<string, unknown> = { userAgent: "SyntheticAgent/1.0" };
   if (options.setAppBadge !== false) {
@@ -167,6 +170,26 @@ describe("service worker notification click", () => {
     const cold = loadWorker();
     await cold.dispatch("notificationclick", { notification: { data: { url: mail.url }, close() {} } });
     expect(cold.opened).toEqual([mail.url]);
+  });
+});
+
+describe("service worker notification click on a window that cannot take it", () => {
+  it("still posts the message when focus is refused", async () => {
+    const worker = loadWorker({ clients: [{ url: `${origin}/?f=INBOX`, focusFails: true }] });
+    await worker.dispatch("notificationclick", { notification: { data: { url: mail.url }, close() {} } });
+    expect(worker.posted).toEqual([{ client: `${origin}/?f=INBOX`, message: { type: "noctua:notification-open", url: mail.url } }]);
+    expect(worker.opened).toEqual([]);
+  });
+
+  it("opens a window when no same-origin window can receive the message", async () => {
+    const foreign = loadWorker({ clients: [{ url: "https://other.example.test/" }] });
+    await foreign.dispatch("notificationclick", { notification: { data: { url: mail.url }, close() {} } });
+    expect(foreign.opened).toEqual([mail.url]);
+    expect(foreign.posted).toEqual([]);
+    expect(foreign.focused).toEqual([]);
+    const mute = loadWorker({ clients: [{ url: `${origin}/`, noPostMessage: true }] });
+    await mute.dispatch("notificationclick", { notification: { data: { url: mail.url }, close() {} } });
+    expect(mute.opened).toEqual([mail.url]);
   });
 });
 

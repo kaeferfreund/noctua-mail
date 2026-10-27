@@ -248,30 +248,23 @@ function isMainWindow(client) {
   return new URL(client.url).pathname === "/";
 }
 
+// samePushUrl keeps the target on this origin, so only same-origin windows can take it.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const targetUrl = samePushUrl(event.notification?.data?.url);
-  const target = new URL(targetUrl, self.location.origin);
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (clients) => {
-      const ordered = [...clients].sort((a, b) => Number(isMainWindow(b)) - Number(isMainWindow(a)));
-      for (const client of ordered) {
-        const clientUrl = new URL(client.url);
-        if (clientUrl.origin !== target.origin) continue;
-        if ("focus" in client) {
-          await client.focus();
-        }
-        if ("postMessage" in client) {
-          client.postMessage({
-            type: "noctua:notification-open",
-            url: targetUrl
-          });
-        }
-        return;
+      const client = [...clients]
+        .filter((candidate) => new URL(candidate.url).origin === self.location.origin && "postMessage" in candidate)
+        .sort((a, b) => Number(isMainWindow(b)) - Number(isMainWindow(a)))[0];
+      if (!client) return self.clients.openWindow ? self.clients.openWindow(targetUrl) : undefined;
+      // A window that refuses focus (seen in home-screen apps) still opens the message.
+      try {
+        if ("focus" in client) await client.focus();
+      } catch {
+        // The tap brings the app to the foreground anyway.
       }
-      if (self.clients.openWindow && target.origin === self.location.origin) {
-        return self.clients.openWindow(targetUrl);
-      }
+      client.postMessage({ type: "noctua:notification-open", url: targetUrl });
       return undefined;
     })
   );
