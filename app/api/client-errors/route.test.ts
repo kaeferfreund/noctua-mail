@@ -69,3 +69,20 @@ test("overlay Back telemetry reaches the journal with count and no stack", async
   expect((await POST(request(f.jar.header(), { ...report, source: "error", kind: "overlay-back-fallback", count: 4, stack: "ignored" }))).status).toBe(204);
   expect(JSON.parse(crashLines()[0][1] as string)).toMatchObject({ kind: "overlay-back-fallback", count: 4, stack: "" });
 });
+
+test("a blank-screen report logs as [client] blank, once per minute and session", async () => {
+  const f = await createAuthenticatedTestSession();
+  const blank = { ...report, source: "watchdog", message: "Blank screen", kind: "blank-screen", stack: "ignored",
+    blank: { search: "?a=~qa&q=private search", historyStateKeys: ["noctuaRoot"], visibilityState: "visible", navigationType: "navigate", trigger: "load" } };
+  expect((await POST(request(f.jar.header(), blank))).status).toBe(204);
+  expect((await POST(request(f.jar.header(), blank))).status).toBe(429);
+  // Crash reports keep their own budget.
+  expect((await POST(request(f.jar.header()))).status).toBe(204);
+  const blankLines = logged.mock.calls.filter(call => call[0] === "[client] blank");
+  expect(blankLines).toHaveLength(1);
+  expect(crashLines()).toHaveLength(1);
+  const line = blankLines[0][1] as string;
+  expect(JSON.parse(line)).toMatchObject({ kind: "blank-screen", stack: "", userId: f.user.id,
+    blank: { search: "?a=%7Eqa&q=", historyStateKeys: ["noctuaRoot"], navigationType: "navigate", trigger: "load" } });
+  expect(line).not.toContain("private search");
+});

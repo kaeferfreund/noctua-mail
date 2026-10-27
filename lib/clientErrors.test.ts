@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { CLIENT_ERROR_LIMITS, clientErrorLocation, sanitizeClientErrorReport } from "./clientErrors";
+import { CLIENT_ERROR_LIMITS, clientErrorLocation, clientErrorSearch, sanitizeClientErrorReport } from "./clientErrors";
 
 test("a location keeps the path and parameter names, never the values of a search or deep link", () => {
   expect(clientErrorLocation("https://mail.example.test/?a=~qa&f=INBOX&m=~id&q=private%20search&q=again")).toEqual({ path: "/", queryKeys: ["a", "f", "m", "q"] });
@@ -36,4 +36,20 @@ test("anything that is not a report is rejected", () => {
 test("overlay fallback reports keep their aggregate kind/count and never a stack", () => {
   expect(sanitizeClientErrorReport({ source: "error", message: "Mobile overlay Back timeout", kind: "overlay-back-fallback", count: 3, stack: "private stack" }))
     .toMatchObject({ kind: "overlay-back-fallback", count: 3, stack: "" });
+});
+
+test("blank-screen reports keep the search without a search text, the state keys and no stack", () => {
+  expect(clientErrorSearch("?a=~qa&f=INBOX&m=~id&q=private%20search")).toBe("?a=%7Eqa&f=INBOX&m=%7Eid&q=");
+  expect(clientErrorSearch("")).toBe("");
+  const report = sanitizeClientErrorReport({ source: "watchdog", message: "Blank screen", kind: "blank-screen", stack: "private stack", path: "/",
+    blank: { search: "?a=~qa&m=~id&q=secret", historyStateKeys: ["__NA", "noctuaRootTrap", "bad key", 5], visibilityState: "visible",
+      navigationType: "back_forward", trigger: "popstate", state: { noctuaEntry: "secret" } } });
+  expect(report).toMatchObject({ source: "watchdog", kind: "blank-screen", stack: "",
+    blank: { search: "?a=%7Eqa&m=%7Eid&q=", historyStateKeys: ["__NA", "noctuaRootTrap"], visibilityState: "visible", navigationType: "back_forward", trigger: "popstate" } });
+  expect(Object.keys(report!.blank!).sort()).toEqual(["historyStateKeys", "navigationType", "search", "trigger", "visibilityState"]);
+  expect(JSON.stringify(report)).not.toContain("secret");
+  // Without its kind the context is dropped; values that are no plain words become empty.
+  expect(sanitizeClientErrorReport({ source: "watchdog", message: "x", blank: { search: "?a=1" } })).not.toHaveProperty("blank");
+  expect(sanitizeClientErrorReport({ source: "watchdog", message: "x", kind: "blank-screen", blank: { visibilityState: "<b>", trigger: 1 } })!.blank)
+    .toEqual({ search: "", historyStateKeys: [], visibilityState: "", navigationType: "", trigger: "" });
 });
