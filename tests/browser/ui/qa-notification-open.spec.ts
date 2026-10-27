@@ -227,7 +227,8 @@ for (const [label, width, height] of [["desktop", 1440, 900], ["phone", 390, 844
     await page.waitForTimeout(13000); // Login rate budget of the fixture (three per ten seconds).
     await expect(page.locator('input[name="email"]')).toBeVisible();
     await signInForm(page);
-    // The notification's message is not reopened after this sign-in (noted in the report); the shell must stay usable.
+    // The notification's message opens after the sign-in (briefs/fix/pwa-notification-deeplink.md).
+    await expectReader(page, "qa-shared", threads["qa-shared"][3]);
     await expectShell(page, errors);
     await switchMailbox(page, /QA Second/, "qa-second");
     await expectShell(page, errors);

@@ -47,3 +47,21 @@ test("navigation resumes when the browser never reports the Back of a closed She
   back.mockRestore();
   view.unmount();
 });
+
+test("a notification target runs right away without a Sheet, and after a tick with a Sheet left open on top", () => {
+  jest.useFakeTimers();
+  const ran: string[] = [];
+  // The phone reader is URL-managed, not a Sheet: nothing to wait for.
+  afterMobileOverlayNavigation(() => ran.push("from-reader"));
+  expect(ran).toEqual(["from-reader"]);
+  const back = jest.spyOn(window.history, "back").mockImplementation(() => {});
+  const view = renderHook(() => useMobileOverlayHistory(true, () => {}));
+  expect(window.history.state?.noctuaMobileOverlay).toBeGreaterThan(0);
+  afterMobileOverlayNavigation(() => ran.push("from-sheet"));
+  expect(ran).toEqual(["from-reader"]);
+  act(() => { jest.advanceTimersByTime(0); });
+  expect(ran).toEqual(["from-reader", "from-sheet"]);
+  view.unmount();
+  act(() => { jest.advanceTimersByTime(MOBILE_OVERLAY_BACK_TIMEOUT_MS + 1); });
+  back.mockRestore();
+});
