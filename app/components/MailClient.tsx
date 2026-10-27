@@ -4870,6 +4870,7 @@ export default function MailClient({
   const { navigateAccount: navigateLinkedAccount, navigateMessage, queueFolderChoice } = useDeepLinks({
     ready: authState === "ok" && initialDataReady &&
       (initialFoldersLoadedAccountId === activeAccountId || foldersUnavailableAccountId === activeAccountId),
+    authenticated: authState !== "unauth",
     state: deepLinkState, messages, accountIds: accounts.map(account => account.id), switchAccount,
     applyPlace: requested => {
       const targetView = requested.query.trim() || requested.badges.length ? null : requested.view;
