@@ -114,13 +114,13 @@ describe("copy actions", () => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
     try { await run(); } finally { Object.defineProperty(navigator, "clipboard", { configurable: true, value: original }); }
   }
-  function harness(full?: Message) {
+  function harness(full?: Message, respond?: () => Response) {
     const notices: NoticeInput[] = [];
     const fetched: string[] = [];
     let actions!: MessageReaderActions;
     function Host() {
       actions = useMessageReaderActionsValue({ aiReplyAvailable: false, accounts, pushNotice: (notice) => { notices.push(notice); }, editDraft: noop,
-        apiFetch: async (input) => { fetched.push(String(input)); return Response.json({ ok: true, message: full }); } });
+        apiFetch: async (input) => { fetched.push(String(input)); return respond ? respond() : Response.json({ ok: true, message: full }); } });
       return null;
     }
     render(<Host />);
@@ -149,6 +149,15 @@ describe("copy actions", () => {
     expect(copied).toStartWith("From: Erika <erika@example.test>\nTo: owner@example.test\nCc: max@example.test\nDate: ");
     expect(copied).toEndWith("\nSubject: Synthetic\n\nHallo,\nanbei.\n\nAttachments:\n- Angebot.pdf");
     expect(notices).toEqual([{ type: "success", title: "Content copied" }]);
+  });
+
+  it("does not copy an error body when the body-less row cannot be loaded", async () => {
+    let copied: string | null = null;
+    const { notices, actions } = harness(undefined, () => Response.json({ ok: false, message: "Message not found" }, { status: 404 }));
+    const row: Message = { ...message, body: "", contentState: "omitted" };
+    await withClipboard(async (value) => { copied = value; }, async () => { await act(async () => { await actions().copyContent(row); }); });
+    expect(copied).toBeNull();
+    expect(notices).toEqual([{ type: "error", title: "Could not copy content" }]);
   });
 
   it("reports a refused clipboard", async () => {

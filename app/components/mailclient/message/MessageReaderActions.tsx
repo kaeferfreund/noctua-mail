@@ -102,7 +102,10 @@ export function useMessageReaderActionsValue(input: {
     let full = message;
     if (isMessageContentUnloaded(message)) {
       const response = await apiFetch(buildAccountMessagePath(message.accountId, message.id), { cache: "no-store" });
-      full = ((await response.json()) as { message?: Message }).message ?? message;
+      // apiFetch does not throw on HTTP errors; an error body is { ok: false, message: "<string>" }.
+      const loaded = response.ok ? ((await response.json()) as { message?: unknown }).message : null;
+      if (!loaded || typeof loaded !== "object") throw new Error("message_unavailable");
+      full = loaded as Message;
     }
     const date = getMessageDateDisplay(full.dateValue, full.date, accountDateFormat, isUiLocale(locale) ? locale : undefined).text;
     return buildMessageCopyText(full, { date, labels: { from: tFields("from"), to: tFields("to"), cc: tFields("cc"), date: tFields("date"),
