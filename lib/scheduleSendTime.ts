@@ -9,8 +9,6 @@ export type SchedulePreset = { kind: SchedulePresetKind; sendAt: number };
 export type LocalDate = { year: number; month: number; day: number };
 export type CustomTimeOption = { value: string; sendAt: number };
 
-export const SCHEDULED_SEND_MIN_AHEAD_MS = 60_000;
-
 const MORNING_HOUR = 8;
 const AFTERNOON_HOUR = 13;
 export const CUSTOM_TIME_STEP_MINUTES = 15;
@@ -93,12 +91,12 @@ export function computeSchedulePresets(now: number, timeZone: string): ScheduleP
   const todayMorning = atHour(today, MORNING_HOUR, timeZone);
   const todayAfternoon = atHour(today, AFTERNOON_HOUR, timeZone);
   const weekday = zonedParts(now, timeZone).weekday;
-  const daysToMonday = weekday === 1 && todayMorning >= now + SCHEDULED_SEND_MIN_AHEAD_MS ? 0 : ((8 - weekday) % 7) || 7;
+  const daysToMonday = weekday === 1 && todayMorning > now ? 0 : ((8 - weekday) % 7) || 7;
   return [
-    todayMorning >= now + SCHEDULED_SEND_MIN_AHEAD_MS
+    todayMorning > now
       ? { kind: "thisMorning", sendAt: todayMorning }
       : { kind: "tomorrowMorning", sendAt: atHour(tomorrow, MORNING_HOUR, timeZone) },
-    todayAfternoon >= now + SCHEDULED_SEND_MIN_AHEAD_MS
+    todayAfternoon > now
       ? { kind: "thisAfternoon", sendAt: todayAfternoon }
       : { kind: "tomorrowAfternoon", sendAt: atHour(tomorrow, AFTERNOON_HOUR, timeZone) },
     { kind: "mondayMorning", sendAt: atHour(addLocalDays(today, daysToMonday), MORNING_HOUR, timeZone) }
@@ -111,13 +109,13 @@ export function customTimeOptions(date: LocalDate, now: number, timeZone: string
   for (let minutes = 0; minutes < 24 * 60; minutes += CUSTOM_TIME_STEP_MINUTES) {
     const hour = Math.floor(minutes / 60), minute = minutes % 60;
     const sendAt = zonedTimeToEpoch(date, hour, minute, timeZone);
-    if (sendAt === null || sendAt < now + SCHEDULED_SEND_MIN_AHEAD_MS) continue;
+    if (sendAt === null || sendAt <= now) continue;
     options.push({ value: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`, sendAt });
   }
   return options;
 }
 
-export type CustomTimeResult = { ok: true; sendAt: number } | { ok: false; reason: "invalid" | "nonexistent" | "past" | "tooSoon" };
+export type CustomTimeResult = { ok: true; sendAt: number } | { ok: false; reason: "invalid" | "nonexistent" | "past" };
 
 /** Validates the custom date + "HH:MM" pair; only quarter-hour, existing, future wall times pass. */
 export function resolveCustomTime(dateValue: string, timeValue: string, now: number, timeZone: string): CustomTimeResult {
@@ -128,8 +126,7 @@ export function resolveCustomTime(dateValue: string, timeValue: string, now: num
   if (hour > 23 || minute > 59 || minute % CUSTOM_TIME_STEP_MINUTES) return { ok: false, reason: "invalid" };
   const sendAt = zonedTimeToEpoch(date, hour, minute, timeZone);
   if (sendAt === null) return { ok: false, reason: "nonexistent" };
-  if (sendAt <= now) return { ok: false, reason: "past" };
-  return sendAt >= now + SCHEDULED_SEND_MIN_AHEAD_MS ? { ok: true, sendAt } : { ok: false, reason: "tooSoon" };
+  return sendAt > now ? { ok: true, sendAt } : { ok: false, reason: "past" };
 }
 
 /** „25. Okt., 08:00“ (de) / „Oct 25, 08:00“ (en). */

@@ -2,7 +2,6 @@
 export type ScheduledSendView = {
   id: string;
   draftId: string;
-  subject?: string;
   /** UTC epoch ms chosen by the user. */
   sendAt: number;
   status: "queued" | "sending" | "sent" | "failed" | "cancelled";

@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/app/components/ui/sheet";
 import { nativeControlBaseClass } from "@/app/components/account-settings/Field";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import {
-  SCHEDULED_SEND_MIN_AHEAD_MS, browserTimeZone, computeSchedulePresets, customTimeOptions, formatLocalDate, formatScheduledSendTime, localDateOf,
+  browserTimeZone, computeSchedulePresets, customTimeOptions, formatLocalDate, formatScheduledSendTime, localDateOf,
   parseLocalDate, resolveCustomTime, type SchedulePresetKind
 } from "@/lib/scheduleSendTime";
 import styles from "./ScheduleSendDialog.module.css";
@@ -19,13 +19,12 @@ type ScheduleSendDialogProps = {
   onOpenChange: (open: boolean) => void;
   /** Resolves true when the send was scheduled (the dialog then closes). */
   onSchedule: (sendAt: number) => Promise<boolean>;
-  existingSendAt?: number;
   now?: () => number;
   timeZone?: string;
 };
 
 type Selection = SchedulePresetKind | "custom";
-type CustomError = "invalid" | "past" | "nonexistent" | "tooSoon" | null;
+type CustomError = "invalid" | "past" | "nonexistent" | null;
 
 /** „Senden planen“: presets in the browser's zone plus a custom date and quarter-hour time. */
 export default function ScheduleSendDialog({ open, onOpenChange, ...props }: ScheduleSendDialogProps) {
@@ -56,7 +55,7 @@ export default function ScheduleSendDialog({ open, onOpenChange, ...props }: Sch
   );
 }
 
-function ScheduleSendForm({ onSchedule, onCancel, existingSendAt, now: clock = Date.now, timeZone: zone }: Omit<ScheduleSendDialogProps, "open" | "onOpenChange"> & { onCancel: () => void }) {
+function ScheduleSendForm({ onSchedule, onCancel, now: clock = Date.now, timeZone: zone }: Omit<ScheduleSendDialogProps, "open" | "onOpenChange"> & { onCancel: () => void }) {
   const t = useTranslations("Compose.schedule");
   const locale = useLocale();
   const timeZone = zone ?? browserTimeZone();
@@ -103,7 +102,6 @@ function ScheduleSendForm({ onSchedule, onCancel, existingSendAt, now: clock = D
         ?? presets.find(preset => preset.kind === selection)!.sendAt;
       if (sendAt <= now) { setError("past"); return; }
     }
-    if (sendAt < now + SCHEDULED_SEND_MIN_AHEAD_MS) { setError("tooSoon"); return; }
     setSubmitting(true);
     try {
       if (await onSchedule(sendAt)) onCancel();
@@ -124,7 +122,6 @@ function ScheduleSendForm({ onSchedule, onCancel, existingSendAt, now: clock = D
   return (
     // noValidate: the inline error replaces the browser's min/required bubbles.
     <form className={styles.form} noValidate onSubmit={event => { event.preventDefault(); void submit(); }}>
-      {existingSendAt !== undefined && <p className={styles.hint} role="status">{t("existing", { time: format(existingSendAt) })}</p>}
       <div className={styles.options} role="radiogroup" aria-label={t("title")}>
         {presets.map(preset => row(preset.kind, t(`presets.${preset.kind}`),
           <span className={styles.optionTime}>{format(preset.sendAt)}</span>))}

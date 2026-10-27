@@ -53,7 +53,6 @@ export async function POST(request: Request, { params }: Params) {
       const result = await sendDraftForAccount({
         account,
         authorization: { request },
-        assertScheduleHold: scheduleHold.assertCurrent,
         accountId: resolvedAccountId,
         clientId: clientId ?? "",
         draftId,

@@ -179,8 +179,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     }
     try {
       const authorization = await authorizeOutbound({ request }, { accountId, minRole: "editor", identity });
-      const assertAuthorized = await prepareOutboundAssertion(authorization);
-      const beforeSend = () => { assertAuthorized(); scheduleHold?.assertCurrent(); };
+      const beforeSend = await prepareOutboundAssertion(authorization);
       beforeSend();
       result = await sendSmtpMessage(account, {
         to: outboundTo || undefined,
@@ -198,8 +197,6 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       }, identity, beforeSend);
     } catch (error) {
       await scheduleHold?.abort(error);
-      const conflict = scheduledSendConflictResponse(error);
-      if (conflict) return conflict;
       if (error instanceof OutboundAuthorizationError) return error.response;
       if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
       const upstreamResponse = smtpUpstreamErrorResponse(error, {
