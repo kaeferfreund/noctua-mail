@@ -22,6 +22,11 @@ export function mcpPermissionMode(scopes?: readonly McpScope[]): McpPermissionMo
   if (!effective.length) return "invalid";
   return effective.includes("send") ? "full" : effective.includes("drafts") ? "drafts" : "read";
 }
+/** Request shape for a token's mailbox set: nonempty list of trimmed, nonblank IDs that includes the route mailbox. */
+export function isMcpAccountIdList(value: unknown, routeAccountId: string): value is string[] {
+  return Array.isArray(value) && value.length > 0 && value.includes(routeAccountId) &&
+    value.every(id => typeof id === "string" && id.trim() === id && id.length > 0);
+}
 /** A token row as one mailbox tab shows it: covered mailboxes the viewer can access; the rest (primary included) only as a count. */
 export type McpTokenListItem = Omit<McpTokenMetadata, "accountId" | "accountIds"> & { accountIds: string[]; hiddenMailboxCount: number };
 export function mcpTokenListItem({ accountId, accountIds = [accountId], ...token }: McpTokenMetadata, accessible: ReadonlySet<string>): McpTokenListItem {

@@ -1,12 +1,12 @@
 import { listAccessibleAccountsForUser } from "@/lib/accountAccess";
-import { MCP_PERMISSION_MODES, mcpTokenListItem } from "@/lib/mcpPermissions";
+import { MCP_PERMISSION_MODES, isMcpAccountIdList, mcpTokenListItem } from "@/lib/mcpPermissions";
 import { NextResponse } from "next/server";
 import { requireAccountContextFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { listMcpTokens } from "@/lib/serverDb";
-import { consumeMcpCreateGrant, mintMcpToken } from "@/lib/mcpAuth";
-import { AuthPolicyError } from "@/lib/authPolicy";
+import { mintMcpToken } from "@/lib/mcpAuth";
+import { requireMcpGrant } from "./mcpGrant";
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const context = await requireAccountContextFromParams(request, params, { minRole: "editor" });
   if (context instanceof NextResponse) return context;
@@ -15,7 +15,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     const mailboxes = (await listAccessibleAccountsForUser(context.userId)).map(({ account, role }) => ({ id: account.id, name: account.name, email: account.email, accessRole: role }));
     const accessible = new Set(mailboxes.map(mailbox => mailbox.id));
     const visible = context.role === "manager" ? tokens : tokens.filter(t => t.createdByUserId === context.userId);
-    return NextResponse.json({ ok: true, mailboxes, tokens: visible.map(token => mcpTokenListItem(token, accessible)) });
+    return NextResponse.json({ ok: true, userId: context.userId, mailboxes, tokens: visible.map(token => mcpTokenListItem(token, accessible)) });
   });
 }
 export async function POST(request: Request, { params }: AccountRouteParams) {
@@ -26,17 +26,11 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     const body = await request.json().catch(() => null);
     if (!body || typeof body.label !== "string" || (body.ttlSeconds !== undefined && (!Number.isSafeInteger(body.ttlSeconds) || body.ttlSeconds < 60 || body.ttlSeconds > 31_536_000))) return NextResponse.json({ ok: false, message: "Invalid token parameters" }, { status: 400 });
     if ((body.mode !== undefined && !MCP_PERMISSION_MODES.includes(body.mode)) ||
-      (body.accountIds !== undefined && (!Array.isArray(body.accountIds) || !body.accountIds.length ||
-        !body.accountIds.every((id: unknown) => typeof id === "string" && id.trim() === id && id.length > 0) ||
-        !body.accountIds.includes(context.accountId)))) {
+      (body.accountIds !== undefined && !isMcpAccountIdList(body.accountIds, context.accountId))) {
       return NextResponse.json({ ok: false, message: "Invalid token mailboxes or permission mode" }, { status: 400 });
     }
     // A token outlives session expiry and revocation, so creating one needs a fresh factor proof.
-    try { await consumeMcpCreateGrant(context.session, request.headers.get("x-noctua-reauth")); }
-    catch (error) {
-      if (!(error instanceof AuthPolicyError)) throw error;
-      return NextResponse.json({ ok: false, code: error.code, message: "Fresh verification required" }, { status: error.status, headers: { "cache-control": "no-store" } });
-    }
+    const proof = await requireMcpGrant(context.session, request); if (proof) return proof;
     try { return NextResponse.json({ ok: true, ...await mintMcpToken(context.session, context.accountId, body.label, body.ttlSeconds ?? 2_592_000, { accountIds: body.accountIds, mode: body.mode }) }, { status: 201 }); }
     catch { return NextResponse.json({ ok: false, message: "MFA session and editor membership required" }, { status: 403 }); }
   });

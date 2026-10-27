@@ -282,7 +282,11 @@
       "createFailed": "Failed to create MCP token.",
       "deleteConfirm": "Delete this MCP token?",
       "deleteConfirmShared": "Delete this MCP token? It is revoked for every covered mailbox, including: {mailboxes}",
-      "deleteFailed": "Failed to delete MCP token."
+      "deleteFailed": "Failed to delete MCP token.",
+      "editMailboxes": "Edit mailboxes",
+      "editMailboxesHint": "The token stays the same; only its mailboxes change. This mailbox cannot be deselected here.",
+      "mailboxesUpdated": "Mailboxes updated",
+      "updateFailed": "Failed to update mailboxes."
     },
     "calendar": {
       "appearance": "Appearance",

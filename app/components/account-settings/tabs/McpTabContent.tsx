@@ -37,8 +37,15 @@ type CreateTokenResponse = Partial<Awaited<ReturnType<typeof mintMcpToken>>> & {
 
 type ListTokensResponse = {
   ok?: boolean;
+  userId?: string;
   tokens?: McpTokenListItem[];
   mailboxes?: { id: string; name: string; email: string }[];
+  message?: string;
+};
+type Mailbox = NonNullable<ListTokensResponse["mailboxes"]>[number];
+type UpdateTokenResponse = Partial<Pick<Awaited<ReturnType<typeof mintMcpToken>>, "tokenRecord">> & {
+  ok?: boolean;
+  code?: string;
   message?: string;
 };
 
@@ -87,6 +94,10 @@ function toDateTimeLocalValue(value: number) {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
+function sameMailboxes(a: readonly string[], b: readonly string[]) {
+  return a.length === b.length && a.every(id => b.includes(id));
+}
+
 function ttlFromPreset(
   preset: (typeof EXPIRY_PRESETS)[number]["value"],
   customDateTime: string
@@ -97,6 +108,23 @@ function ttlFromPreset(
   const days = Number.parseInt(preset, 10);
   if (!Number.isFinite(days) || days <= 0) return Number.NaN;
   return days * 24 * 60 * 60;
+}
+
+/** Mailbox selection shared by token creation and editing; `lockedId` (the tab's mailbox) stays selected. */
+function McpMailboxChecklist({ mailboxes, selected, lockedId, disabled, onChange }: {
+  mailboxes: Mailbox[];
+  selected: string[];
+  lockedId?: string;
+  disabled: boolean;
+  onChange: (selected: string[]) => void;
+}) {
+  return mailboxes.map(mailbox => (
+    <Text as="label" size="2" key={mailbox.id} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+      <Checkbox checked={selected.includes(mailbox.id)} disabled={mailbox.id === lockedId || disabled}
+        onCheckedChange={checked => onChange(checked ? [...new Set([...selected, mailbox.id])] : selected.filter(id => id !== mailbox.id))} />
+      <span data-user-text>{mailbox.name} ({mailbox.email})</span>
+    </Text>
+  ));
 }
 
 export default function McpTabContent(props: Props) {
@@ -116,7 +144,8 @@ function McpTokenSettings({
   const locale = useLocale();
   const request = apiFetch ?? fetch;
   const [tokens, setTokens] = useState<McpTokenListItem[]>([]);
-  const [mailboxes, setMailboxes] = useState<NonNullable<ListTokensResponse["mailboxes"]>>([]);
+  const [mailboxes, setMailboxes] = useState<Mailbox[]>([]);
+  const [userId, setUserId] = useState("");
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>(accountId ? [accountId] : []);
   const [mode, setMode] = useState<McpPermissionMode>("drafts");
   const [label, setLabel] = useState("");
@@ -127,7 +156,12 @@ function McpTokenSettings({
   const [createdSecret, setCreatedSecret] = useState("");
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [verifying, setVerifying] = useState(false);
+  /** Which write waits for the fresh factor proof. */
+  const [verifying, setVerifying] = useState<"create" | "update" | null>(null);
+  const [editing, setEditing] = useState<{ tokenId: string; accountIds: string[] } | null>(null);
+  const [savingMailboxes, setSavingMailboxes] = useState(false);
+  /** Token whose mailboxes were just saved; its row confirms the change. */
+  const [updatedId, setUpdatedId] = useState("");
   const [deletingId, setDeletingId] = useState("");
   const [copiedValue, setCopiedValue] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -158,6 +192,7 @@ function McpTokenSettings({
       const data = (await response.json()) as ListTokensResponse;
       setTokens(data.ok && Array.isArray(data.tokens) ? data.tokens : []);
       setMailboxes(data.ok && Array.isArray(data.mailboxes) ? data.mailboxes : []);
+      setUserId(data.ok && typeof data.userId === "string" ? data.userId : "");
     } catch {
       setError(t("mcp.loadFailed"));
     } finally {
@@ -208,8 +243,9 @@ function McpTokenSettings({
   /** Check the input before asking for the password and authenticator code. */
   const requestCreate = useCallback(() => {
     setError("");
+    setUpdatedId("");
     if (validTtl() === null) { setError(t("mcp.invalidExpiry")); return; }
-    setVerifying(true);
+    setVerifying("create");
   }, [validTtl, t]);
 
   const handleCreate = useCallback(async (grant: string) => {
@@ -252,6 +288,37 @@ function McpTokenSettings({
     }
   }, [accountId, validTtl, label, selectedAccountIds, mode, request, loadTokens, t]);
 
+  /** Replaces the edited token's mailboxes; a rejected proof asks for verification again. */
+  const handleUpdate = useCallback(async (grant: string) => {
+    if (!accountId || !editing) return;
+    setSavingMailboxes(true);
+    setError("");
+    try {
+      const response = await request(buildAccountMcpTokenPath(accountId, editing.tokenId), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-noctua-reauth": grant },
+        body: JSON.stringify({ accountIds: editing.accountIds })
+      });
+      const data = (await response.json().catch(() => null)) as UpdateTokenResponse | null;
+      if (response.status === 403 && (data?.code === "reauth_required" || data?.code === "invalid_proof")) {
+        setVerifying("update");
+        return;
+      }
+      if (!response.ok || !data?.ok || !data.tokenRecord?.id) {
+        setError(data?.message ?? t("mcp.updateFailed"));
+        return;
+      }
+      const tokenRecord = mcpTokenListItem(data.tokenRecord, new Set(mailboxes.map(mailbox => mailbox.id)));
+      setTokens((current) => current.map((item) => item.id === tokenRecord.id ? tokenRecord : item));
+      setEditing(null);
+      setUpdatedId(tokenRecord.id);
+    } catch {
+      setError(t("mcp.updateFailed"));
+    } finally {
+      setSavingMailboxes(false);
+    }
+  }, [accountId, editing, mailboxes, request, t]);
+
   /** Names of accessible covered mailboxes plus a count for the rest; `exclude` drops the current tab's mailbox. */
   const describeMailboxes = useCallback((token: McpTokenListItem, exclude?: string) => [
     ...token.accountIds.filter(id => id !== exclude).map(id => {
@@ -270,6 +337,7 @@ function McpTokenSettings({
     if (!confirmed) return;
     setDeletingId(tokenId);
     setError("");
+    setUpdatedId("");
     try {
       const response = await request(buildAccountMcpTokenPath(accountId, tokenId), {
         method: "DELETE"
@@ -279,6 +347,7 @@ function McpTokenSettings({
         return;
       }
       setTokens((current) => current.filter((item) => item.id !== tokenId));
+      setEditing((current) => current?.tokenId === tokenId ? null : current);
     } catch {
       setError(t("mcp.deleteFailed"));
     } finally {
@@ -337,13 +406,7 @@ function McpTokenSettings({
             <Flex direction="column" gap="2" role="group" aria-label={t("mcp.mailboxes")}>
               <Text size="2" weight="medium">{t("mcp.mailboxes")}</Text>
               <Text size="1" color="gray">{t("mcp.primaryMailboxHint")}</Text>
-              {mailboxes.map(mailbox => (
-                <Text as="label" size="2" key={mailbox.id} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
-                  <Checkbox checked={selectedAccountIds.includes(mailbox.id)} disabled={mailbox.id === accountId || creating}
-                    onCheckedChange={checked => setSelectedAccountIds(current => checked ? [...new Set([...current, mailbox.id])] : current.filter(id => id !== mailbox.id))} />
-                  <span data-user-text>{mailbox.name} ({mailbox.email})</span>
-                </Text>
-              ))}
+              <McpMailboxChecklist mailboxes={mailboxes} selected={selectedAccountIds} lockedId={accountId} disabled={creating} onChange={setSelectedAccountIds} />
             </Flex>
             <Flex direction="column" gap="2" role="group" aria-label={t("mcp.permissionMode")}>
               <Text size="2" weight="medium">{t("mcp.permissionMode")}</Text>
@@ -380,7 +443,7 @@ function McpTokenSettings({
             <Flex align="center" gap="2" wrap="wrap">
               <Button
                 onClick={requestCreate}
-                disabled={!accountId || !label.trim() || creating || verifying}
+                disabled={!accountId || !label.trim() || creating || verifying !== null}
               >
                 {creating ? t("mcp.creating") : t("mcp.create")}
               </Button>
@@ -445,18 +508,47 @@ function McpTokenSettings({
                         })}
                       </Text>
                     </Flex>
-                    <Button
-                      size="1"
-                      color="red"
-                      variant="soft"
-                      disabled={deletingId === token.id}
-                      onClick={() => void handleDelete(token)}
-                    >
-                      {deletingId === token.id ? t("mcp.deleting") : t("common.delete")}
-                    </Button>
+                    <Flex gap="2" wrap="wrap" justify="end">
+                      {/* Only the creator may change a token's mailboxes (the server enforces the same). */}
+                      {userId && token.createdByUserId === userId && editing?.tokenId !== token.id && (
+                        <Button size="1" variant="soft" disabled={deletingId === token.id}
+                          onClick={() => { setError(""); setUpdatedId(""); setEditing({ tokenId: token.id, accountIds: token.accountIds }); }}>
+                          {t("mcp.editMailboxes")}
+                        </Button>
+                      )}
+                      <Button
+                        size="1"
+                        color="red"
+                        variant="soft"
+                        disabled={deletingId === token.id}
+                        onClick={() => void handleDelete(token)}
+                      >
+                        {deletingId === token.id ? t("mcp.deleting") : t("common.delete")}
+                      </Button>
+                    </Flex>
                   </Flex>
                   <Text size="1">{t(`mcp.mode.${mcpPermissionMode(token.scopes)}`)}</Text>
                   <Text size="1" style={{ overflowWrap: "anywhere" }}>{t("mcp.tokenMailboxes", { mailboxes: describeMailboxes(token) })}</Text>
+                  {updatedId === token.id && <Text size="1" color="green" role="status">{t("mcp.mailboxesUpdated")}</Text>}
+                  {editing?.tokenId === token.id && (
+                    <Card variant="surface">
+                      <Flex direction="column" gap="2" role="group" aria-label={t("mcp.editMailboxes")}>
+                        <Text size="2" weight="medium">{t("mcp.editMailboxes")}</Text>
+                        <Text size="1" color="gray">{t("mcp.editMailboxesHint")}</Text>
+                        <McpMailboxChecklist mailboxes={mailboxes} selected={editing.accountIds} lockedId={accountId} disabled={savingMailboxes}
+                          onChange={accountIds => setEditing({ tokenId: token.id, accountIds })} />
+                        <Flex direction={{ initial: "column", sm: "row" }} gap="2" justify="end">
+                          <Button size="2" variant="soft" color="gray" disabled={savingMailboxes} onClick={() => setEditing(null)}>
+                            {t("common.cancel")}
+                          </Button>
+                          <Button size="2" disabled={savingMailboxes || verifying !== null || sameMailboxes(editing.accountIds, token.accountIds)}
+                            onClick={() => { setError(""); setUpdatedId(""); setVerifying("update"); }}>
+                            {savingMailboxes ? t("common.saving") : t("common.save")}
+                          </Button>
+                        </Flex>
+                      </Flex>
+                    </Card>
+                  )}
                   <Text size="1" color="gray">{t("mcp.created", { date: timestampLabel(token.createdAt) })}</Text>
                   <Text size="1" color="gray">{t("mcp.expires", { date: timestampLabel(token.expiresAt) })}</Text>
                   <Text size="1" color="gray">{t("mcp.lastUsed", { date: timestampLabel(token.lastUsedAt) })}</Text>
@@ -481,9 +573,10 @@ function McpTokenSettings({
           {t("close")}
         </Button>
       </Flex>
-      {verifying && <ReauthDialog purpose="mcp.create" client={authClient} onCancel={() => setVerifying(false)} onVerified={async proof => {
-        setVerifying(false);
-        await handleCreate(proof.grant);
+      {verifying && <ReauthDialog purpose="mcp.create" client={authClient} onCancel={() => setVerifying(null)} onVerified={async proof => {
+        const action = verifying;
+        setVerifying(null);
+        await (action === "create" ? handleCreate : handleUpdate)(proof.grant);
       }} />}
     </Flex>
   );

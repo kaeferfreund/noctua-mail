@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { render } from "@/lib/i18n/testRender";
 import { Theme } from "@radix-ui/themes";
 import McpTabContent from "./tabs/McpTabContent";
@@ -141,4 +141,62 @@ it("cancelling the identity check creates no token and leaves the form editable"
   await waitFor(() => expect(page.queryByText("Verify your identity")).toBeNull());
   expect(writes).toEqual([]); expect(proofs).toEqual([]);
   expect((page.getByRole("button", { name: "Create token" }) as HTMLButtonElement).disabled).toBe(false);
+});
+
+it("lets the creator edit a token's mailboxes behind the identity check and asks again when the proof is rejected", async () => {
+  const mailboxes = [{ id: "synthetic-mailbox", name: "Synthetic own", email: "own@example.test" },
+    { id: "synthetic-shared", name: "Synthetic shared", email: "shared@example.test" }];
+  const accessible = new Set(mailboxes.map(item => item.id));
+  const own = mcpTokenListItem({ ...minted.tokenRecord, accountIds: ["synthetic-mailbox"] }, accessible);
+  const foreign = { ...own, id: "synthetic-foreign", label: "Synthetic foreign token", createdByUserId: "synthetic-colleague" };
+  const patches: { url: string; body: unknown; grant: string | null }[] = [];
+  const apiFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.method === "PATCH") {
+      patches.push({ url: String(input), body: JSON.parse(String(init.body)), grant: new Headers(init.headers).get("x-noctua-reauth") });
+      if (patches.length === 1) return response({ ok: false, code: "reauth_required", message: "Fresh verification required" }, 403);
+      return response({ ok: true, tokenRecord: { ...minted.tokenRecord, accountIds: ["synthetic-mailbox", "synthetic-shared"] } });
+    }
+    return response({ ok: true, userId: "synthetic-user", mailboxes, tokens: [own, foreign] });
+  };
+  const { proofs, client } = proofClient();
+  const page = render(<Theme><McpTabContent accountId="synthetic-mailbox" isActive isExistingAccount apiFetch={apiFetch} authClient={client} onClose={() => {}} /></Theme>);
+  await page.findByText("Synthetic foreign token");
+  // Only the viewer's own token offers editing.
+  expect(page.getAllByRole("button", { name: "Edit mailboxes" }).length).toBe(1);
+  fireEvent.click(page.getByRole("button", { name: "Edit mailboxes" }));
+  const editor = within(page.getByRole("group", { name: "Edit mailboxes" }));
+  expect((editor.getByRole("checkbox", { name: "Synthetic own (own@example.test)" }) as HTMLButtonElement).disabled).toBe(true);
+  const save = editor.getByRole("button", { name: "Save" }) as HTMLButtonElement;
+  expect(save.disabled).toBe(true);
+  fireEvent.click(editor.getByRole("checkbox", { name: "Synthetic shared (shared@example.test)" }));
+  expect(save.disabled).toBe(false);
+  fireEvent.click(save);
+  await verify(page);
+  // The first proof is rejected: the dialog opens again and the second proof goes through.
+  await waitFor(() => expect(patches.length).toBe(1));
+  await verify(page);
+  await page.findByText("Mailboxes updated");
+  expect(proofs.map(proof => proof.purpose)).toEqual(["mcp.create", "mcp.create"]);
+  expect(patches).toEqual([1, 2].map(() => ({ url: "/api/accounts/synthetic-mailbox/mcp-tokens/synthetic-token",
+    body: { accountIds: ["synthetic-mailbox", "synthetic-shared"] }, grant: "synthetic-grant" })));
+  expect(page.queryByRole("group", { name: "Edit mailboxes" })).toBeNull();
+  expect(page.getByText("Mailboxes: Synthetic own (own@example.test), Synthetic shared (shared@example.test)")).toBeTruthy();
+});
+
+it("shows the server message when saving mailboxes fails", async () => {
+  const mailboxes = [{ id: "synthetic-mailbox", name: "Synthetic own", email: "own@example.test" },
+    { id: "synthetic-shared", name: "Synthetic shared", email: "shared@example.test" }];
+  const own = mcpTokenListItem({ ...minted.tokenRecord, accountIds: ["synthetic-mailbox"] }, new Set(mailboxes.map(item => item.id)));
+  const apiFetch = async (_input: RequestInfo | URL, init?: RequestInit) => init?.method === "PATCH"
+    ? response({ ok: false, message: "MFA session and membership in every selected mailbox required" }, 403)
+    : response({ ok: true, userId: "synthetic-user", mailboxes, tokens: [own] });
+  const page = render(<Theme><McpTabContent accountId="synthetic-mailbox" isActive isExistingAccount apiFetch={apiFetch} authClient={proofClient().client} onClose={() => {}} /></Theme>);
+  fireEvent.click(await page.findByRole("button", { name: "Edit mailboxes" }));
+  const editor = within(page.getByRole("group", { name: "Edit mailboxes" }));
+  fireEvent.click(editor.getByRole("checkbox", { name: "Synthetic shared (shared@example.test)" }));
+  fireEvent.click(editor.getByRole("button", { name: "Save" }));
+  await verify(page);
+  await page.findByText("MFA session and membership in every selected mailbox required");
+  expect(page.queryByText("Verify your identity")).toBeNull();
+  expect(page.getByRole("group", { name: "Edit mailboxes" })).toBeTruthy();
 });

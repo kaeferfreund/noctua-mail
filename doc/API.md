@@ -168,7 +168,8 @@ The text content repeats them (`Open in Noctua Mail: <url>`, or one line per lis
 Links contain ids only, never subjects, recipients, bodies or search text.
 
 `GET /api/accounts/{accountId}/mcp-tokens` returns `tokens` plus selectable `mailboxes`
-from the creator's accessible own/shared mailboxes. Managers see all tokens covering
+from the creator's accessible own/shared mailboxes and the requester's `userId` (the tab offers
+mailbox editing on tokens whose `createdByUserId` matches). Managers see all tokens covering
 that mailbox; editors see their own. Token rows list only `accountIds` the requester can
 access plus `hiddenMailboxCount` for the others; the primary `accountId` is not returned. `POST` accepts `{label, ttlSeconds?, accountIds?, mode?}`.
 Token creation requires a fresh, single-use `mcp.create` grant in `x-noctua-reauth`,
@@ -200,7 +201,13 @@ and structured `{ok:false,code:"rate_limited",status:429,message,retryAfterSecon
 Wait 60 seconds before retrying. Budgets reset on process restart and are not shared
 between server processes.
 
-Sets/modes cannot be edited after creation. A token appears in every covered mailbox's
+`PATCH /api/accounts/{accountId}/mcp-tokens/{tokenId}` with `{accountIds}` replaces the mailbox set of
+a live token; the token string stays valid and is never returned. Same `accountIds` validation and
+fresh `mcp.create` grant as `POST` (403 `reauth_required` / `invalid_proof`), 400 for an invalid set,
+403 when a selected mailbox lacks the creator's membership, 404 unless the requester created the token
+and the token covers the route mailbox. Legacy primary-only tokens get mapping rows. The primary is kept
+while selected; otherwise it moves to the selected mailbox with the creator's highest live role (ties by
+ID). Response: `{ok:true,tokenRecord}` with `accountIds`. The mode cannot be edited after creation. A token appears in every covered mailbox's
 MCP tab; deleting it there revokes it everywhere (the confirmation names the other covered
 mailboxes, or counts those the user cannot access). Deleting a mailbox removes its mapping,
 promotes the remaining mailbox with the creator's highest live role (ties by ID) if the

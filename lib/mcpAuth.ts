@@ -1,5 +1,5 @@
 import { assertMcpScope, mcpToolScope, scopesForMcpMode, type McpPermissionMode, type McpScope } from "./mcpPermissions";
-import { mcpTokenAccountIds } from "./db/mcpTokens";
+import { mcpTokenAccountIds, pickMcpTokenPrimary } from "./db/mcpTokens";
 import { readAccountAccess, type AccountAccessEntry } from "./accountAccess";
 import { createHash, randomBytes, randomUUID } from "crypto";
 import type { Account, AccountRole, McpTokenMetadata } from "./data";
@@ -99,22 +99,27 @@ export async function listMcpTokenAccounts(tokenId: string): Promise<AccountAcce
 export async function consumeMcpCreateGrant(session: ActiveUserSession, grant: string | null) {
   await consumeActionGrant(await getDb(), grant, session, "mcp.create");
 }
+/** Token writes need a live MFA session, editor on the route mailbox and membership in every selected mailbox. */
+function assertMcpTokenWriter(db: import("bun:sqlite").Database, session: ActiveUserSession, accountId: string, selected: readonly string[]) {
+  const proof = db.prepare(`SELECT 1 FROM auth_session s JOIN auth_session_security ss ON ss.sessionId=s.id AND ss.userId=s.userId
+    JOIN auth_security_state st ON st.userId=s.userId WHERE s.id=? AND s.userId=? AND ss.assurance='mfa'
+    AND ss.generation=st.generation AND st.generation=? AND ss.authenticatedAt=?
+    AND julianday(s.expiresAt)>julianday('now') AND ss.authenticatedAt<=?`)
+    .get(session.sessionId, session.userId, session.generation, session.authenticatedAt, Date.now());
+  if (!proof || session.assurance !== "mfa" || session.expiresAt <= Date.now() || !roleAtLeast(resolveAccountRoleRow(db, session.userId, accountId), "editor")) throw new Error("MFA session and editor membership required");
+  const accountIds = [...new Set(selected)];
+  if (!accountIds.length || !accountIds.includes(accountId) || accountIds.some(id => !resolveAccountRoleRow(db, session.userId, id))) {
+    throw new Error("Mailbox membership required for every selected mailbox");
+  }
+  return accountIds;
+}
 export async function mintMcpToken(session: ActiveUserSession, accountId: string, label: string, ttlSeconds: number,
   options: { accountIds?: string[]; mode?: McpPermissionMode } = {}) {
   if (!Number.isSafeInteger(ttlSeconds) || ttlSeconds < 60 || ttlSeconds > 31_536_000) throw new Error("Invalid token TTL");
   const token = `mcp_${randomBytes(32).toString("base64url")}`;
   const db = await getDb();
   return withDbWriteRetry("mintMcpToken", () => db.transaction(() => {
-    const proof = db.prepare(`SELECT 1 FROM auth_session s JOIN auth_session_security ss ON ss.sessionId=s.id AND ss.userId=s.userId
-      JOIN auth_security_state st ON st.userId=s.userId WHERE s.id=? AND s.userId=? AND ss.assurance='mfa'
-      AND ss.generation=st.generation AND st.generation=? AND ss.authenticatedAt=?
-      AND julianday(s.expiresAt)>julianday('now') AND ss.authenticatedAt<=?`)
-      .get(session.sessionId, session.userId, session.generation, session.authenticatedAt, Date.now());
-    if (!proof || session.assurance !== "mfa" || session.expiresAt <= Date.now() || !roleAtLeast(resolveAccountRoleRow(db, session.userId, accountId), "editor")) throw new Error("MFA session and editor membership required");
-    const accountIds = [...new Set(options.accountIds ?? [accountId])];
-    if (!accountIds.length || !accountIds.includes(accountId) || accountIds.some(id => !resolveAccountRoleRow(db, session.userId, id))) {
-      throw new Error("Mailbox membership required for every selected mailbox");
-    }
+    const accountIds = assertMcpTokenWriter(db, session, accountId, options.accountIds ?? [accountId]);
     const id = randomUUID(), now = Date.now();
     db.prepare(`INSERT INTO mcp_tokens(id,accountId,createdByUserId,label,tokenHash,tokenSuffix,createdAt,expiresAt,securityGeneration,scopes)
       VALUES (?,?,?,?,?,?,?,?,?,?)`).run(id, accountId, session.userId, label.trim().slice(0, 128), hashMcpToken(token), token.slice(-6), now, now + ttlSeconds * 1000, session.generation, JSON.stringify(scopesForMcpMode(options.mode ?? "drafts")));
@@ -122,5 +127,23 @@ export async function mintMcpToken(session: ActiveUserSession, accountId: string
     const context = liveToken(db, "t.id", id);
     if (!context) throw new Error("MFA enrollment required");
     return { token, tokenRecord: context.tokenRecord };
+  }).immediate());
+}
+/** Replaces a live token's mailbox set; only its creator may, from a mailbox it covers. The secret is unchanged.
+ *  Null: no such live token for this creator and mailbox. Throws when the session or a membership proof fails. */
+export async function updateMcpTokenAccounts(session: ActiveUserSession, accountId: string, tokenId: string, selected: string[]): Promise<McpTokenMetadata | null> {
+  const db = await getDb();
+  return withDbWriteRetry("updateMcpTokenAccounts", () => db.transaction(() => {
+    const accountIds = assertMcpTokenWriter(db, session, accountId, selected);
+    const current = liveToken(db, "t.id", tokenId)?.tokenRecord;
+    if (!current || current.createdByUserId !== session.userId || !current.accountIds?.includes(accountId)) return null;
+    // Keep the default mailbox MCP clients rely on; re-pick only when it is deselected. Legacy primary-only tokens get rows.
+    const primary = accountIds.includes(current.accountId) ? current.accountId : pickMcpTokenPrimary(db, session.userId, accountIds);
+    db.prepare("DELETE FROM mcp_token_accounts WHERE tokenId=?").run(tokenId);
+    for (const id of accountIds) db.prepare("INSERT INTO mcp_token_accounts(tokenId,accountId) VALUES (?,?)").run(tokenId, id);
+    db.prepare("UPDATE mcp_tokens SET accountId=? WHERE id=?").run(primary, tokenId);
+    const context = liveToken(db, "t.id", tokenId);
+    if (!context) throw new Error("MFA enrollment required");
+    return context.tokenRecord;
   }).immediate());
 }

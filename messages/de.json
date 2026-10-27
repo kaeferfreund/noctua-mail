@@ -282,7 +282,11 @@
       "createFailed": "MCP-Token konnte nicht erstellt werden.",
       "deleteConfirm": "Dieses MCP-Token löschen?",
       "deleteConfirmShared": "Dieses MCP-Token löschen? Es wird für alle abgedeckten Postfächer widerrufen, auch für: {mailboxes}",
-      "deleteFailed": "MCP-Token konnte nicht gelöscht werden."
+      "deleteFailed": "MCP-Token konnte nicht gelöscht werden.",
+      "editMailboxes": "Postfächer bearbeiten",
+      "editMailboxesHint": "Das Token bleibt gleich, nur seine Postfächer ändern sich. Dieses Postfach kann hier nicht abgewählt werden.",
+      "mailboxesUpdated": "Postfächer aktualisiert",
+      "updateFailed": "Postfächer konnten nicht aktualisiert werden."
     },
     "calendar": {
       "appearance": "Darstellung",
