@@ -384,7 +384,9 @@ the active connection and returns accepted delivery with `sentCopy:"failed"` and
 Attribution is recorded immediately after SMTP acceptance, before IMAP work.
 SMTP is never retried after success. Draft wire copies strip Bcc while their Sent copies retain it.
 Replies/forwards record reply activity with the authenticated actor before updating
-`\Answered`/`$Forwarded` server-side. Every outbound Message-ID, including new mail, gets shard
+`\Answered`/`$Forwarded` server-side. A reply to an original carrying `$Todo` also marks it done
+(`$Todo` removed, `$Done` added); forwards leave the to-do state alone, and a failed flag update only
+sets `postSendWarning`. Every outbound Message-ID, including new mail, gets shard
 `sent_by(accountId,messageId,userId,sentAt)` attribution. Sending never changes thread status.
 
 ## AI reply draft

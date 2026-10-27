@@ -5,6 +5,7 @@ import { recordReplySent, listReplySourceMessageIds } from "@/lib/threadCollab";
 import { getFolders, getMessageById, saveFoldersForAccount, resolveThreadingForAccountMessages, upsertMessages } from "@/lib/serverDb";
 import { appendImapMessage, findImapMessageUid, listImapFolders, syncImapMessage } from "@/lib/serverImap";
 import { applyFlagMutationsToMessage } from "@/lib/messageFlagMutation";
+import { DONE_FLAG, TODO_FLAG, hasDoneFlag, hasTodoFlag } from "@/lib/messageFlags";
 import { findSentFolder } from "@/lib/specialFolders";
 import { folderMailboxPath } from "@/lib/mailboxPaths";
 import { sanitizeSyncedMessage } from "./syncMessageSanitizer";
@@ -103,13 +104,20 @@ export async function completeSend(params: {
           for (const row of rows) {
             const message = await getMessageById(account.id, row.id);
             if (!message) continue;
-            await applyFlagMutationsToMessage({ accountId: account.id, account, messageId: row.id, message,
+            const flags = await applyFlagMutationsToMessage({ accountId: account.id, account, messageId: row.id, message,
               ...(flag === "answered" ? { flag } : { keyword: flag }), value: true, clientId });
+            // Replying to a to-do completes it, the same transition as marking it done by hand.
+            if (flag === "answered" && hasTodoFlag(flags)) {
+              const withoutTodo = await applyFlagMutationsToMessage({ accountId: account.id, account, messageId: row.id,
+                message: { ...message, flags }, keyword: TODO_FLAG, value: false, clientId });
+              if (!hasDoneFlag(withoutTodo)) await applyFlagMutationsToMessage({ accountId: account.id, account,
+                messageId: row.id, message: { ...message, flags: withoutTodo }, keyword: DONE_FLAG, value: true, clientId });
+            }
           }
         } catch (error) {
           throwIfImapCancelled();
           console.warn("[send] reply flag update failed after SMTP acceptance", { accountId: account.id, error });
-          result.postSendWarning = "Email sent, but updating reply or forward flags failed.";
+          result.postSendWarning = "Email sent, but updating reply, forward or to-do flags failed.";
         }
       }
     });
@@ -117,7 +125,7 @@ export async function completeSend(params: {
     console.warn("[send] post-send deadline exceeded", { accountId: account.id, error });
     result.sentCopy = "failed";
     result.sentCopyWarning = "Email sent, but post-send processing timed out. Do not send it again.";
-    result.postSendWarning = [result.postSendWarning, "Email sent, but updating reply or forward flags may be incomplete."].filter(Boolean).join(" ");
+    result.postSendWarning = [result.postSendWarning, "Email sent, but updating reply, forward or to-do flags may be incomplete."].filter(Boolean).join(" ");
   }
   return { ...result };
 }
