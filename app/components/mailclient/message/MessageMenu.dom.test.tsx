@@ -8,11 +8,13 @@ import { TooltipProvider } from "@/app/components/ui/tooltip";
 import type { Message } from "@/lib/data";
 import { bindRowReadAction, resolveSelectionActionTargets } from "../messagelist/selectionActions";
 import MessageMenu from "./MessageMenu";
+import { MessageReaderActionsProvider, type MessageReaderActions } from "./MessageReaderActions";
 
 afterEach(cleanup);
 const noop = () => {};
 
-function setup({ collapsed = true, allRead = false, origin = "list", single = false, supportsThreads = true, inTrash = false }: {
+function setup({ collapsed = true, allRead = false, origin = "list", single = false, supportsThreads = true, inTrash = false, readerActions }: {
+  readerActions?: MessageReaderActions;
   collapsed?: boolean;
   inTrash?: boolean;
   allRead?: boolean;
@@ -76,7 +78,10 @@ function setup({ collapsed = true, allRead = false, origin = "list", single = fa
     onMoveTo: noop, isTrashFolder: () => inTrash, isSpamFolder: () => false
   };
   let rowClicks = 0;
-  const tree = () => <Theme><TooltipProvider><div onClick={() => { rowClicks++; }}><MessageMenu {...props} /></div></TooltipProvider></Theme>;
+  const menu = <div onClick={() => { rowClicks++; }}><MessageMenu {...props} /></div>;
+  const tree = () => <Theme><TooltipProvider>
+    {readerActions ? <MessageReaderActionsProvider value={readerActions}>{menu}</MessageReaderActionsProvider> : menu}
+  </TooltipProvider></Theme>;
   const view = render(tree());
   const open = async () => {
     await act(async () => {
@@ -212,6 +217,25 @@ describe("row menu focus return", () => {
     } finally {
       Element.prototype.matches = originalMatches;
     }
+  });
+});
+
+describe("row menu AI reply", () => {
+  it("opens the instruction prompt at ⋮ once the menu has closed and drafts from it", async () => {
+    const calls: Array<[string, string | undefined]> = [];
+    const readerActions: MessageReaderActions = { canAiReply: () => true, isAiReplyPending: () => false,
+      draftAiReply: async (target, instruction) => { calls.push([target.id, instruction]); }, copyLink: async () => {}, copyContent: async () => {} };
+    const menu = setup({ origin: "thread", readerActions });
+    await menu.open();
+    await menu.choose("Draft AI reply");
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
+    expect(menu.view.queryByRole("menu")).toBeNull();
+    const field = menu.view.getByRole("textbox", { name: "Instruction for the AI reply" });
+    expect(document.activeElement).toBe(field);
+    expect(calls).toEqual([]);
+    await act(async () => { fireEvent.change(field, { target: { value: "Absage, leider keine Zeit" } }); });
+    await act(async () => { fireEvent.click(menu.view.getByRole("button", { name: "Draft" })); });
+    expect(calls).toEqual([["root", "Absage, leider keine Zeit"]]);
   });
 });
 

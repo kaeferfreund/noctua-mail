@@ -391,10 +391,14 @@ sets `postSendWarning`. Every outbound Message-ID, including new mail, gets shar
 
 ## AI reply draft
 
-`POST /api/accounts/{accountId}/messages/{messageId}/ai-reply`, body `{"locale":"de"}`
-(optional, `de`/`en`). Editor or manager, same origin, JSON. The model writes a short
-closing reply that is saved as a reply draft (never sent), flagged `$NoctuaAI`.
-Success: `{ok:true,draftId,message,url}`. Errors: 400 for a draft message, 403 for viewers,
+`POST /api/accounts/{accountId}/messages/{messageId}/ai-reply`, body
+`{"locale":"de","instruction":"Zusage für Donnerstag"}` (both optional; `locale` `de`/`en`;
+`instruction` is what the reply should say, trimmed with whitespace collapsed, at most 200
+characters, blank = none). Editor or manager, same origin, JSON. The model writes a short
+reply that is saved as a reply draft (never sent), flagged `$NoctuaAI`.
+Success: `{ok:true,draftId,message,url}`. Errors: 400 for a draft message, 400
+`{code:"instruction_too_long"}` beyond 200 characters after trimming, 400
+`{code:"invalid_instruction"}` for a non-string, 403 for viewers,
 404 unknown message, 429 `{code:"rate_limited"}` (10 per user and minute), 502
 `{code:"ai_failed",reason}`, 503 `{code:"ai_unavailable"}` without `ANTHROPIC_API_KEY`.
 Details: [AI-REPLY.md](AI-REPLY.md).

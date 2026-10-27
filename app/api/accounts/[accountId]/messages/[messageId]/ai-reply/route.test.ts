@@ -58,10 +58,12 @@ const viewer = await createAuthenticatedTestSession();
 await viewer.addMembership(viewer.user.id, accountId, "viewer");
 
 let modelCalls = 0;
+let lastPrompt = "";
 let answer: () => string = () => "Hallo Erika,\n\nvielen Dank, das passt so!\n\nViele Grüße\nMax";
 const stub = new MockLanguageModelV4({
-  doGenerate: async () => {
+  doGenerate: async (options) => {
     modelCalls += 1;
+    lastPrompt = JSON.stringify(options.prompt.filter(part => part.role === "user"));
     return { content: [{ type: "text", text: answer() }], finishReason: { unified: "stop", raw: undefined },
       usage: { inputTokens: { total: 50, noCache: 50, cacheRead: undefined, cacheWrite: undefined }, outputTokens: { total: 20, text: 20, reasoning: undefined } },
       warnings: [] };
@@ -96,6 +98,24 @@ describe("POST ai-reply", () => {
     expect(lastMail!.text).toContain("schrieb Erika Beispiel <erika@example.test>:\n> Hallo,\n> anbei die Unterlagen.");
     const stored = await api.getMessageById(accountId, data.draftId);
     expect(stored?.flags).toContain(AI_MODIFIED_FLAG);
+  });
+
+  test("forwards the instruction to the model; whitespace only is no instruction", async () => {
+    expect((await call(editor.jar.header(), incoming.id, { locale: "de", instruction: "  Zusage für\n Donnerstag " })).status).toBe(200);
+    expect(lastPrompt).toContain("<instruction>\\nZusage für Donnerstag\\n</instruction>");
+    expect((await call(editor.jar.header(), incoming.id, { locale: "de", instruction: " \n\t " })).status).toBe(200);
+    expect(lastPrompt).not.toContain("<instruction>");
+  });
+
+  test("400 instruction_too_long beyond 200 characters after trimming; the model is not called", async () => {
+    const before = modelCalls;
+    const tooLong = await call(editor.jar.header(), incoming.id, { locale: "de", instruction: "a".repeat(201) });
+    expect(tooLong.status).toBe(400);
+    expect(await tooLong.json()).toMatchObject({ ok: false, code: "instruction_too_long" });
+    expect((await call(editor.jar.header(), incoming.id, { locale: "de", instruction: 42 })).status).toBe(400);
+    expect(modelCalls).toBe(before);
+    expect((await call(editor.jar.header(), incoming.id, { locale: "de", instruction: `  ${"a".repeat(200)}  ` })).status).toBe(200);
+    expect(modelCalls).toBe(before + 1);
   });
 
   test("503 ai_unavailable without an API key; the model is not called", async () => {

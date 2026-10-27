@@ -1514,6 +1514,22 @@
     "aiReplyUnavailable": "KI-Antwort ist nicht eingerichtet (kein API-Schlüssel)",
     "aiReplyRateLimited": "Zu viele KI-Antworten in kurzer Zeit. Bitte in einer Minute erneut versuchen.",
     "aiReplyFailed": "KI-Antwort konnte nicht erstellt werden",
+    "aiReplyPrompt": {
+      "label": "Hinweis für die KI-Antwort",
+      "placeholder": "Worum soll es gehen? (optional)",
+      "submit": "Entwerfen",
+      "withoutHint": "Ohne Hinweis",
+      "dictate": "Diktieren",
+      "stopDictation": "Diktat beenden",
+      "listening": "Hört zu …",
+      "counter": "{count}/{limit}",
+      "dictationErrors": {
+        "not-allowed": "Mikrofon ist nicht freigegeben.",
+        "no-speech": "Nichts verstanden – bitte noch einmal.",
+        "network": "Spracherkennung ist gerade nicht erreichbar.",
+        "failed": "Diktieren hat nicht geklappt."
+      }
+    },
     "focus": {
       "expand": "Vergrößern",
       "showList": "Liste anzeigen",

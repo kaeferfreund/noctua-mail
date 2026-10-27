@@ -6,6 +6,7 @@ import { hasSendableRecipients } from "../utils/messageHelpers";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 import { useDraftScheduleAction } from "../scheduledSend/ScheduledSend";
 import { useMessageReaderActions } from "./MessageReaderActions";
+import { useAiReplyPrompt } from "./AiReplyPrompt";
 
 type ComposeMode = "new" | "reply" | "replyAll" | "forward" | "edit" | "editAsNew";
 type MessageQuickAction =
@@ -52,6 +53,7 @@ export default function MessageQuickActions({
   const tSchedule = useTranslations("Compose.schedule");
   const scheduleDraft = useDraftScheduleAction(message);
   const readerActions = useMessageReaderActions();
+  const aiReplyPrompt = useAiReplyPrompt();
   const allowThreadDeletion = origin !== "thread";
   const buttonSize = origin === "thread" ? "2" : "1";
   const isVisible = (action: MessageQuickAction, defaultValue = true) =>
@@ -234,7 +236,7 @@ export default function MessageQuickActions({
         </TooltipIconButton>
       ) : null}
       {/* Reader only: list rows keep their short hover set; the ⋮ menu has it everywhere. */}
-      {origin === "thread" && isVisible("aiReply") && readerActions?.canAiReply(message) ? (
+      {origin === "thread" && isVisible("aiReply") && readerActions?.canAiReply(message) && aiReplyPrompt ? (
         <TooltipIconButton
           size={buttonSize}
           variant="ghost"
@@ -247,7 +249,7 @@ export default function MessageQuickActions({
           disabled={pendingMessageActions.has(message.id) || readerActions.isAiReplyPending(message.id)}
           onClick={(event) => {
             event.stopPropagation();
-            void readerActions.draftAiReply(message);
+            aiReplyPrompt.open(message, event.currentTarget);
           }}
         >
           <Sparkles size={iconSize} />

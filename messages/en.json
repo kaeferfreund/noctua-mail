@@ -1514,6 +1514,22 @@
     "aiReplyUnavailable": "AI reply is not set up (no API key)",
     "aiReplyRateLimited": "Too many AI replies in a short time. Please try again in a minute.",
     "aiReplyFailed": "Could not write the AI reply",
+    "aiReplyPrompt": {
+      "label": "Instruction for the AI reply",
+      "placeholder": "What should the reply say? (optional)",
+      "submit": "Draft",
+      "withoutHint": "Without instruction",
+      "dictate": "Dictate",
+      "stopDictation": "Stop dictation",
+      "listening": "Listening …",
+      "counter": "{count}/{limit}",
+      "dictationErrors": {
+        "not-allowed": "Microphone access is not allowed.",
+        "no-speech": "Nothing heard – please try again.",
+        "network": "Speech recognition is not reachable right now.",
+        "failed": "Dictation did not work."
+      }
+    },
     "focus": {
       "expand": "Expand reading view",
       "showList": "Show message list",
