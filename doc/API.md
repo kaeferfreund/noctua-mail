@@ -144,7 +144,9 @@ server `instructions` (`MCP_SERVER_INSTRUCTIONS` in `lib/mcpServer.ts`). Clients
 instructions to the model context: the server is the user's personal and shared e-mail; use it
 whenever the user asks to write, answer, forward, find, organise or triage e-mail; typical flow
 `list_accounts` → `search_messages`/`list_messages_by_folder` → `create_draft_message`; drafts are
-never sent by MCP; every created, changed or listed item carries a `url`. Every tool has a
+never sent by MCP; every created, changed or listed item carries a `url`; a pasted Noctua Mail
+link (query with `a=` and usually `m=`) is resolved with `resolve_link` first and can be passed as
+`url` to the draft and flag tools. Every tool has a
 task-first description, a `title` and `annotations` (`readOnlyHint`, `destructiveHint`,
 `idempotentHint`; `check_new_mail` also `openWorldHint`). Tool names and input schemas are stable.
 
@@ -166,6 +168,24 @@ The text content repeats them (`Open in Noctua Mail: <url>`, or one line per lis
 | `list_topics`, `list_mailing_list_aliases`, `list_mailbox_members` | `settings=topics`, `recipient-aliases`, `members` |
 
 Links contain ids only, never subjects, recipients, bodies or search text.
+
+#### Pasted links
+
+The reader's „Link kopieren“ copies the same URL, so a user can paste it into an MCP
+conversation. `resolve_link` (`read` / viewer, read-only) takes `{url}`: an absolute URL of
+any origin, or just its query (`?a=…&m=…`, `a=…&m=…`); `a` is required. The link's mailbox is
+authorized exactly like `accountId` (an uncovered or unknown mailbox returns the same
+`Mailbox is not covered by MCP token` error). Output
+`{ok,accountId,account:{name,email},folderId,messageId,message,isDraft,draft?,url}`: `message`
+has the `search_messages` item shape with `url`; a draft (Drafts folder, `\Draft`) adds
+`draft` in the `get_draft_message` shape; a link without `m` returns the mailbox and folder only
+(`folderId:null` when the folder does not belong to that mailbox).
+
+`create_draft_message` (mode reply/forward), `get_draft_message`, `update_draft_message`,
+`flag_message`, `unflag_message`, `mark_message_todo`, `mark_message_done` and
+`clear_message_todo` accept an optional `url` instead of `messageId`/`draftId`. Passing both,
+an `accountId` other than the link's, or a link without `m` is an error; `messageId`/`draftId`
+are optional on these tools but one of id or `url` is required.
 
 `GET /api/accounts/{accountId}/mcp-tokens` returns `tokens` plus selectable `mailboxes`
 from the creator's accessible own/shared mailboxes. Managers see all tokens covering
@@ -248,9 +268,9 @@ old one. The tool descriptions say so, so AI clients stop proposing that workaro
 | Tool | Scope / role | Input | Structured success |
 | --- | --- | --- | --- |
 | `list_draft_messages` | `read` / viewer | `{accountId?,page?,pageSize?}` | `{ok:true,folderId,drafts:[{draftId,subject,to,cc,updatedAt,editable,url}],total,hasMore,page,pageSize}` |
-| `get_draft_message` | `read` / viewer | `{accountId?,draftId}` | `{ok:true,draft:{draftId,identityId,from,to,cc,bcc,subject,composeFormat,text,html,markdown,inReplyTo,references,forwardedMessageId,attachments:[{id,filename,contentType,size,inline}],updatedAt},url}` |
+| `get_draft_message` | `read` / viewer | `{accountId?,draftId}` or `{url}` | `{ok:true,draft:{draftId,identityId,from,to,cc,bcc,subject,composeFormat,text,html,markdown,inReplyTo,references,forwardedMessageId,attachments:[{id,filename,contentType,size,inline}],updatedAt},url}` |
 | `create_draft_message` | `drafts` / editor | see [MCP sender tools](#mcp-sender-tools) | `{ok:true,mode,referenceMessageId,identityId,draftId,message,url,warning?}` |
-| `update_draft_message` | `drafts` / editor | `{accountId?,draftId,expectedUpdatedAt?,identityId?,to?,cc?,bcc?,subject?,text?,markdown?,html?,composeFormat?,appendBody?}` | `{ok:true,mode,identityId,draftId,previousDraftId,draftIdChanged,message,url,warning?}` |
+| `update_draft_message` | `drafts` / editor | `{accountId?,draftId` (or `url`)`,expectedUpdatedAt?,identityId?,to?,cc?,bcc?,subject?,text?,markdown?,html?,composeFormat?,appendBody?}` | `{ok:true,mode,identityId,draftId,previousDraftId,draftIdChanged,message,url,warning?}` |
 
 - Only messages in the mailbox's Drafts folder with the IMAP `\Draft` flag count as drafts
   (the draft-send guard); any other id returns `{ok:false,code:"invalid_draft"}` with
@@ -535,7 +555,7 @@ detection, `account.update` audit); their token needs the `manage` scope.
 | `save_signature_template` | `{accountId?,signatureId?,name,body}` | `{ok:true,signature,signatures,defaultSignatureId?}`; manager; without `signatureId` creates a template, otherwise replaces its name/body (`signature_not_found` if absent) |
 | `delete_signature_template` | `{accountId?,signatureId}` | `{ok:true,signatures,defaultSignatureId?}`; manager; `signature_in_use` while an identity references it; clears the mailbox default if it pointed there |
 | `set_default_signature_template` | `{accountId?,signatureId:string\|null}` | `{ok:true,signatures,defaultSignatureId?}`; manager; null clears the mailbox default; blank/whitespace-only ids are rejected |
-| `create_draft_message` | Existing new/reply/forward/body/attachment/reference fields plus `identityId?` | `{ok:true,mode,referenceMessageId,identityId,draftId,message,warning?}`; editor |
+| `create_draft_message` | Existing new/reply/forward/body/attachment/reference fields plus `identityId?` and `url?` (pasted link to the original, reply/forward only) | `{ok:true,mode,referenceMessageId,identityId,draftId,message,warning?}`; editor |
 | `update_draft_message` | `{accountId?,draftId,expectedUpdatedAt?,identityId?,…}`, see [MCP draft tools](#mcp-draft-tools) | `{ok:true,mode,identityId,draftId,previousDraftId,draftIdChanged,message,warning?}`; editor |
 
 Unknown mutation keys are rejected. Signature references must be in this mailbox;

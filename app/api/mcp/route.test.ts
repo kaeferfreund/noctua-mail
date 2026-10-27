@@ -8,7 +8,7 @@ import { dbModulePromise } from "@/lib/testDbHarness";
 import { createTopic, setThreadTopics } from "@/lib/topics";
 import { createRecipientAlias } from "@/lib/recipientAliases";
 import { AI_MODIFIED_FLAG, hasAiModifiedFlag } from "@/lib/messageFlags";
-import { parseDeepLink } from "@/lib/navigation/deepLinks";
+import { appDeepLink, messageDeepLink, parseDeepLink } from "@/lib/navigation/deepLinks";
 
 type BuiltDraftMail = {
   to?: string;
@@ -1212,6 +1212,99 @@ describe("/api/mcp", () => {
     };
     expect(body.result?.isError).toBe(true);
     expect(body.result?.content?.[0]?.text).toContain('Topic selector "shared" is ambiguous');
+  });
+
+  test("resolve_link resolves pasted links in own and shared mailboxes, never foreign ones", async () => {
+    const accountId = uniqueAccountId("acc-mcp-link");
+    const sharedId = uniqueAccountId("acc-mcp-link-shared");
+    const foreignId = uniqueAccountId("acc-mcp-link-foreign");
+    await seedMailbox(accountId);
+    await seedMailbox(sharedId);
+    await seedMailbox(foreignId);
+    const fixture = await createAuthenticatedTestSession(accountId);
+    await fixture.addMembership(fixture.user.id, sharedId, "editor");
+    const session = await requireActiveUserSession(new Request("http://localhost:3000", { headers: fixture.jar.headers() }));
+    if (session instanceof Response) throw new Error("Fixture session missing");
+    const token = (await mintMcpToken(session, accountId, "Synthetic links", 86400, { accountIds: [accountId, sharedId] })).token;
+    const link = (id: string, message: string, origin = "https://mail.example.test") =>
+      messageDeepLink({ accountId: id, folderId: `${id}-inbox`, id: message }, origin);
+
+    const own = await callTool(token, "resolve_link", { url: link(accountId, `${accountId}-msg-1`) });
+    expect(own.result.isError).toBeUndefined();
+    expect(own.result.structuredContent).toMatchObject({ ok: true, accountId, account: { name: "MCP Route Test", email: "owner@example.test" },
+      folderId: `${accountId}-inbox`, messageId: `${accountId}-msg-1`, isDraft: false, message: { subject: "Project Alpha kickoff" } });
+    expect(own.result.structuredContent.url).toBe(own.result.structuredContent.message.url);
+    expect(own.result.structuredContent.draft).toBeUndefined();
+
+    // Another origin, or only the query part, resolves the same message.
+    const shared = await callTool(token, "resolve_link", { url: new URL(link(sharedId, `${sharedId}-msg-3`)).search.slice(1) }, 2);
+    expect(shared.result.structuredContent).toMatchObject({ ok: true, accountId: sharedId, messageId: `${sharedId}-msg-3`, message: { subject: "Budget Review" } });
+
+    for (const url of [link(foreignId, `${foreignId}-msg-1`), link("missing-mailbox", "missing-message")]) {
+      const foreign = await callTool(token, "resolve_link", { url }, 3);
+      expect(foreign.result.isError).toBe(true);
+      expect(foreign.result.content[0]!.text).toContain("Mailbox is not covered by MCP token");
+    }
+    for (const url of ["https://mail.example.test/inbox", "not a link", "https://mail.example.test/?m=~x"]) {
+      const garbage = await callTool(token, "resolve_link", { url }, 4);
+      expect(garbage.result.isError).toBe(true);
+      expect(garbage.result.content[0]!.text).toContain("Not a Noctua Mail link");
+    }
+
+    const folder = await callTool(token, "resolve_link", { url: appDeepLink({ accountId, folderId: `${accountId}-inbox` }, "https://mail.example.test") }, 5);
+    expect(folder.result.structuredContent).toMatchObject({ ok: true, accountId, folderId: `${accountId}-inbox`, messageId: null, message: null, isDraft: false });
+    // A folder id of another mailbox in the link is dropped, not resolved.
+    const crossFolder = await callTool(token, "resolve_link", { url: appDeepLink({ accountId, folderId: `${foreignId}-inbox` }, "https://mail.example.test") }, 6);
+    expect(crossFolder.result.structuredContent).toMatchObject({ ok: true, accountId, folderId: null });
+  });
+
+  test("draft and flag tools accept a pasted link as url; resolve_link returns draft details", async () => {
+    const accountId = uniqueAccountId("acc-mcp-link-tools");
+    await seedMailbox(accountId);
+    const { token } = await createScopedToken(accountId);
+    const original = messageDeepLink({ accountId, folderId: `${accountId}-inbox`, id: `${accountId}-msg-1` }, "https://mail.example.test");
+
+    const created = await callTool(token, "create_draft_message", { mode: "reply", url: original, text: "Danke!" });
+    expect(created.result.isError).toBeUndefined();
+    expect(created.result.structuredContent).toMatchObject({ ok: true, mode: "reply", referenceMessageId: `${accountId}-msg-1` });
+    expect(lastBuiltDraftMail).toMatchObject({ to: "alice@example.test", subject: "Re: Project Alpha kickoff", inReplyTo: `<${accountId}-msg-1@example.test>` });
+
+    const draftUrl = created.result.structuredContent.url as string;
+    const resolved = await callTool(token, "resolve_link", { url: draftUrl }, 2);
+    expect(resolved.result.structuredContent).toMatchObject({ ok: true, isDraft: true, messageId: created.result.structuredContent.draftId,
+      draft: { draftId: created.result.structuredContent.draftId, subject: "Re: Project Alpha kickoff" } });
+    const read = await callTool(token, "get_draft_message", { url: draftUrl }, 3);
+    expect(read.result.structuredContent).toMatchObject({ ok: true, draft: { draftId: created.result.structuredContent.draftId } });
+
+    const flagged = await callTool(token, "flag_message", { url: original }, 4);
+    expect(flagged.result.structuredContent).toMatchObject({ ok: true, messageId: `${accountId}-msg-1` });
+    expect((await getMessageById(accountId, `${accountId}-msg-1`))?.flagged).toBe(true);
+    const todo = await callTool(token, "mark_message_todo", { url: original }, 5);
+    expect(todo.result.structuredContent).toMatchObject({ ok: true, messageId: `${accountId}-msg-1`, state: "todo" });
+
+    const both = await callTool(token, "flag_message", { url: original, messageId: `${accountId}-msg-1` }, 6);
+    expect(both.result.isError).toBe(true);
+    expect(both.result.content[0]!.text).toContain("Pass either messageId or url");
+    const mismatch = await callTool(token, "flag_message", { url: original, accountId: "other-mailbox" }, 7);
+    expect(mismatch.result.content[0]!.text).toContain("accountId does not match");
+    const newDraft = await callTool(token, "create_draft_message", { url: original, text: "Hallo" }, 8);
+    expect(newDraft.result.content[0]!.text).toContain('pass mode "reply" or "forward"');
+    const none = await callTool(token, "unflag_message", {}, 9);
+    expect(none.result.content[0]!.text).toContain("Provide messageId or url");
+  });
+
+  test("server instructions tell clients to resolve pasted links first", async () => {
+    const accountId = uniqueAccountId("acc-mcp-link-hint");
+    await seedMailbox(accountId);
+    const { token } = await createScopedToken(accountId, "read");
+    const response = await postMcp({ jsonrpc: "2.0", id: 1, method: "initialize",
+      params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "test-client", version: "1.0.0" } } }, token);
+    const instructions = ((await response.json()) as { result?: { instructions?: string } }).result?.instructions ?? "";
+    expect(instructions).toContain("pastes a Noctua Mail link");
+    expect(instructions).toContain("call resolve_link with it first");
+    const tools = await postMcp({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }, token);
+    const listed = ((await tools.json()) as { result: { tools: Array<{ name: string; annotations?: { readOnlyHint?: boolean } }> } }).result.tools;
+    expect(listed.find(tool => tool.name === "resolve_link")?.annotations?.readOnlyHint).toBe(true);
   });
 });
 
