@@ -154,4 +154,64 @@ describe("rapid mailbox switching on the real MailClient", () => {
       expect(h.shown).not.toContain("account-b");
     }, 20_000);
   }
+
+  it("A -> B -> A on cached views reads no topic counts, aliases or virtual counts of B; A reads each once when settled", async () => {
+    // Idle tasks run only when the test says so.
+    const idleTasks = new Map<number, IdleRequestCallback>();
+    let nextIdle = 0;
+    const originalIdle = { request: window.requestIdleCallback, cancel: window.cancelIdleCallback };
+    window.requestIdleCallback = (task) => { idleTasks.set(++nextIdle, task); return nextIdle; };
+    window.cancelIdleCallback = (id) => { idleTasks.delete(id); };
+    const runIdle = () => act(async () => {
+      for (const [id, task] of [...idleTasks]) { idleTasks.delete(id); task({ didTimeout: false, timeRemaining: () => 50 }); }
+      await delay(250);
+    });
+    try {
+      switchDelayMs = () => 10;
+      const h = await mount();
+      const showAndSettle = async (id: string) => {
+        await act(async () => { fireEvent.click(h.row(names[id])!); });
+        await waitFor(() => expect(h.active()).toContain(names[id]));
+        await waitFor(() => expect(pendingWrites).toBe(0));
+        await runIdle();
+      };
+      // Visit B once, so both mailboxes are shown from their cached views on the next clicks.
+      await showAndSettle("account-b");
+      await showAndSettle("account-a");
+      const mark = calls.length;
+      const reads = (id: string) => {
+        const since = calls.slice(mark);
+        return {
+          topicCounts: since.filter(url => url.startsWith(`/api/accounts/${id}/topics/stats`)).length,
+          aliases: since.filter(url => url.startsWith(`/api/accounts/${id}/recipient-aliases`)).length,
+          virtualCounts: since.filter(url => url.startsWith(`/api/accounts/${id}/messages?`) && url.includes("badges=")).length
+        };
+      };
+
+      switchDelayMs = target => target === "account-b" ? 800 : 10;
+      await act(async () => { fireEvent.click(h.row(names["account-b"])!); });
+      // B is shown from its cache while its switch is still pending; idle time passes.
+      expect(h.active()).toContain(names["account-b"]);
+      await runIdle();
+      await runIdle();
+      expect(pendingWrites).toBe(1);
+      await act(async () => { fireEvent.click(h.row(names["account-a"])!); });
+      expect(h.active()).toContain(names["account-a"]);
+      await waitFor(() => expect(pendingWrites).toBe(0), { timeout: 5_000 });
+      await runIdle();
+      await runIdle();
+      clearInterval(tick);
+
+      expect(applied.slice(-2)).toEqual(["account-b", "account-a"]);
+      expect(h.active()).toContain(names["account-a"]);
+      expect(reads("account-b")).toEqual({ topicCounts: 0, aliases: 0, virtualCounts: 0 });
+      // One round of the five virtual folder counts.
+      expect(reads("account-a")).toEqual({ topicCounts: 1, aliases: 1, virtualCounts: 5 });
+    } finally {
+      // Unmount while the stub still owns the scheduled idle ids.
+      cleanup();
+      window.requestIdleCallback = originalIdle.request;
+      window.cancelIdleCallback = originalIdle.cancel;
+    }
+  }, 20_000);
 });

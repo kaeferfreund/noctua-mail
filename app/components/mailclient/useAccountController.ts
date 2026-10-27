@@ -86,6 +86,8 @@ export type UseAccountControllerParams = {
   dropFirstPagePrefetch?: () => void;
   // Optional: show a mailbox visited earlier from its cached folders at once.
   viewCache?: MailboxViewCache;
+  // Optional: told when the first switch starts and the last one settles.
+  setSwitchPending?: (pending: boolean) => void;
 };
 
 export function useAccountController({
@@ -129,7 +131,8 @@ export function useAccountController({
   setDeletingFolderIds,
   prefetchFirstPage,
   dropFirstPagePrefetch,
-  viewCache
+  viewCache,
+  setSwitchPending
 }: UseAccountControllerParams) {
   const [mailboxState, setMailboxState] = useState<MailboxState | null>(null);
   const [security, setSecurity] = useState<AuthSecurity | null>(null);
@@ -294,6 +297,7 @@ export function useAccountController({
       if (reselect && switchesInFlight.current === 0) return;
       const version = ++switchVersion.current;
       switchEpoch.current++; switchesInFlight.current++;
+      if (switchesInFlight.current === 1) setSwitchPending?.(true);
       let rebootstrap = false;
       const resetMailboxView = () => {
         setExceptionEntries([]);
@@ -381,6 +385,7 @@ export function useAccountController({
         // A switch that did not commit leaves nothing to take its first page.
         if (!committed && version === switchVersion.current) dropFirstPagePrefetch?.();
         switchesInFlight.current--; switchEpoch.current++;
+        if (switchesInFlight.current === 0) setSwitchPending?.(false);
         const deferred = switchesInFlight.current === 0 ? deferredSelection.current : null;
         if (deferred) deferredSelection.current = null;
         if (rebootstrap) await loadInitialData();
@@ -417,7 +422,8 @@ export function useAccountController({
       defaultSearchFields,
       prefetchFirstPage,
       dropFirstPagePrefetch,
-      viewCache
+      viewCache,
+      setSwitchPending
     ]
   );
 

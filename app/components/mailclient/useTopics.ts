@@ -10,6 +10,8 @@ type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respon
 type UseTopicsOptions = {
   activeAccountId: string;
   apiFetch: ApiFetch;
+  /** False while a mailbox switch is pending: the message counts wait for it. */
+  secondaryReadsReady?: boolean;
 };
 
 type TopicStatsResponse = {
@@ -22,7 +24,7 @@ type TopicStatsResponse = {
 
 const NO_TOPICS: Topic[] = [];
 
-export function useTopics({ activeAccountId, apiFetch }: UseTopicsOptions) {
+export function useTopics({ activeAccountId, apiFetch, secondaryReadsReady = true }: UseTopicsOptions) {
   // Keyed by mailbox: one mailbox's topics are never shown under another.
   const [storedTopics, setStoredTopics] = useState({ accountId: "", topics: NO_TOPICS });
   const [topicStats, setTopicStats] = useState({
@@ -30,9 +32,9 @@ export function useTopics({ activeAccountId, apiFetch }: UseTopicsOptions) {
   });
   const statsVersionRef = useRef(0);
 
-  const fetchTopicMessageCounts = useCallback(async (accountId: string) => {
+  const fetchTopicMessageCounts = useCallback(async (accountId: string, signal?: AbortSignal) => {
     try {
-      const res = await apiFetch(buildAccountTopicStatsPath(accountId), { cache: "no-store" });
+      const res = await apiFetch(buildAccountTopicStatsPath(accountId), { cache: "no-store", signal });
       const data: TopicStatsResponse = await res.json();
       if (!data.ok || !Array.isArray(data.stats)) {
         return new Map<string, number>();
@@ -67,22 +69,30 @@ export function useTopics({ activeAccountId, apiFetch }: UseTopicsOptions) {
         }
       })
       .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [activeAccountId, apiFetch]);
+
+  useEffect(() => {
+    if (!activeAccountId || !secondaryReadsReady) return;
+    const controller = new AbortController();
     const statsVersion = ++statsVersionRef.current;
     const cancelStats = deferUntilIdle(() => {
       // An explicit refresh supersedes this scheduled startup read.
       if (statsVersion !== statsVersionRef.current) return;
-      void fetchTopicMessageCounts(activeAccountId).then((counts) => {
-        if (!cancelled && statsVersion === statsVersionRef.current) {
+      void fetchTopicMessageCounts(activeAccountId, controller.signal).then((counts) => {
+        if (!controller.signal.aborted && statsVersion === statsVersionRef.current) {
           setTopicStats({ accountId: activeAccountId, counts });
         }
       });
     });
     return () => {
-      cancelled = true;
       cancelStats();
+      controller.abort();
       statsVersionRef.current += 1;
     };
-  }, [activeAccountId, apiFetch, fetchTopicMessageCounts]);
+  }, [activeAccountId, secondaryReadsReady, fetchTopicMessageCounts]);
 
   const allTopics = activeAccountId && storedTopics.accountId === activeAccountId ? storedTopics.topics : NO_TOPICS;
   const topicMessageCountById = activeAccountId && topicStats.accountId === activeAccountId

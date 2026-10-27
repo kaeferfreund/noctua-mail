@@ -20,7 +20,7 @@ const noop = () => {};
 function mount(apiFetch: UseAccountControllerParams["apiFetch"], firstSync?: (accountId: string, folderId?: string) => void,
   localeRef?: { current: UiLocale }, viewCache?: MailboxViewCache) {
   const errors: string[] = [];
-  const renders: Array<{ accountId: string; folderId: string }> = [];
+  const renders: Array<{ accountId: string; folderId: string; switchPending: boolean }> = [];
   const defaults: UseAccountControllerParams = {
     activeAccountId: "", accounts: [], accountFolders: [], activeFolderId: "",
     deletingFolderIds: new Set(), refreshFolders: async () => null, runSyncJob: async () => ({ count: 0 }),
@@ -64,13 +64,14 @@ function mount(apiFetch: UseAccountControllerParams["apiFetch"], firstSync?: (ac
     const [folders, setFolders] = useState<Folder[]>([]);
     const [initialFoldersLoadedAccountId, setInitialFoldersLoadedAccountId] = useState<string | null>(null);
     const [auth, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
-    renders.push({ accountId: activeAccountId, folderId: activeFolderId });
+    const [switchPending, setSwitchPending] = useState(false);
+    renders.push({ accountId: activeAccountId, folderId: activeFolderId, switchPending });
     // With a locale, use the production error resolver under a switchable provider.
     const productionReadErrorMessage = useApiErrorMessage({ setAuthState, setReloginAccountId: noop, setReloginDescription: noop });
     const readErrorMessage = localeRef ? productionReadErrorMessage : defaults.readErrorMessage;
     const controller = useAccountController({ ...defaults, readErrorMessage, activeAccountId, setActiveAccountId,
       accounts: loadedAccounts, setAccounts, setInitialDataReady, setAuthState,
-      activeFolderId, setActiveFolderId, setLastFolderId, setFolders, setInitialFoldersLoadedAccountId, viewCache });
+      activeFolderId, setActiveFolderId, setLastFolderId, setFolders, setInitialFoldersLoadedAccountId, viewCache, setSwitchPending });
     const syncAccountRef = useRef<Parameters<typeof useStartupSync>[0]["syncAccountRef"]["current"]>(undefined);
     syncAccountRef.current = async folderId => { firstSync?.(activeAccountId, folderId); };
     useStartupSync({ initialDataReady: ready, activeAccountId, initialFoldersLoadedAccountId,
@@ -81,7 +82,7 @@ function mount(apiFetch: UseAccountControllerParams["apiFetch"], firstSync?: (ac
         setActiveFolderId(findInboxFolder(folders, activeAccountId)?.id ?? "");
       }
     }, [activeAccountId, activeFolderId, folders, ready]);
-    return { ...controller, readErrorMessage, activeAccountId, setActiveAccountId, ready, auth, loadedAccounts, activeFolderId, setActiveFolderId, lastFolderId, setLastFolderId, folders };
+    return { ...controller, readErrorMessage, switchPending, activeAccountId, setActiveAccountId, ready, auth, loadedAccounts, activeFolderId, setActiveFolderId, lastFolderId, setLastFolderId, folders };
   }, { wrapper: ({ children }) => <I18nTestProvider locale={localeRef?.current ?? "en"}>{children}</I18nTestProvider> });
   return { ...hook, errors, renders };
 }
@@ -459,6 +460,26 @@ describe("parallel atomic mailbox switch", () => {
     expect(h.renders.some(render => render.accountId === "account-b")).toBe(false);
     expect(h.calls.filter(url => url.endsWith("switch-account"))).toHaveLength(2);
     expect(h.calls).not.toContain("/api/auth/me");
+  });
+
+  it("reports a pending switch from the first click until the last overlapping switch settled", async () => {
+    const h = await booted({ selected: "account-a" });
+    expect(h.result.current.switchPending).toBe(false);
+    void switchTo(h, "account-b");
+    expect(h.result.current.switchPending).toBe(true);
+    const done = switchTo(h, "account-c");
+    await h.release("/account-c/folders", () => json(foldersOf("account-c")));
+    await h.release("switch-account", h.persist);
+    // B's switch settled, C's still runs.
+    expect(h.result.current.switchPending).toBe(true);
+    await h.release("switch-account", h.persist);
+    await act(async () => { await done; });
+    expect(h.result.current.activeAccountId).toBe("account-c");
+    expect(h.result.current.switchPending).toBe(false);
+    // The commit and the settled flag render together: C is never shown as pending.
+    expect(h.renders.some(render => render.accountId === "account-c" && render.switchPending)).toBe(false);
+    await h.release("/account-b/folders", () => json(foldersOf("account-b")));
+    expect(h.result.current.switchPending).toBe(false);
   });
 
   it("A -> B -> A -> B ends on B", async () => {

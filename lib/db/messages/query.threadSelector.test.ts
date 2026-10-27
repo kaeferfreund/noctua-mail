@@ -1,4 +1,5 @@
-import { beforeAll, describe, expect, spyOn, test } from "bun:test";
+import { beforeAll, describe, expect, setSystemTime, spyOn, test } from "bun:test";
+import { buildMessageGroupKey } from "../../messageGrouping";
 import { createSharedShardFixture } from "../../testSharedShardHarness";
 import { getDb } from "../connection";
 import { updateThreadCollabState } from "../threadCollab";
@@ -212,7 +213,7 @@ describe("thread selector flagged EXISTS differential", () => {
     let plan: string[] = [];
     const spy = spyOn(fixture.db, "prepare").mockImplementation((sql: string) => {
       const statement = prepare(sql);
-      if (!sql.includes("INDEXED BY idx_messages_account_thread_date")) return statement;
+      if (!sql.includes("INDEXED BY idx_messages_account_thread_date") || !sql.includes("COUNT(*)")) return statement;
       return {
         get(...args: unknown[]) {
           plan = (prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args) as Array<{ detail: string }>).map(row => row.detail);
@@ -236,6 +237,77 @@ describe("thread selector flagged EXISTS differential", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  test("message rows seek the page threads and keep the date-walk order and payload", async () => {
+    const prepare = fixture.db.prepare.bind(fixture.db);
+    const rowsSql = /FROM messages m INDEXED BY idx_messages_account_thread_date\s+WHERE[\s\S]*ORDER BY m\.dateValue DESC, m\.rowid ASC/;
+    const capture = async (params: Params, legacy: boolean) => {
+      let plan: string[] = [];
+      let rows: Array<{ id: string }> = [];
+      const spy = spyOn(fixture.db, "prepare").mockImplementation((sql: string) => {
+        if (!rowsSql.test(sql)) return prepare(sql);
+        // Frozen pre-change shape: no index hint, no explicit tie-break.
+        if (legacy) sql = sql.replace(" INDEXED BY idx_messages_account_thread_date", "").replace(", m.rowid ASC", "");
+        const statement = prepare(sql);
+        return {
+          all(...args: unknown[]) {
+            plan = (prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args) as Array<{ detail: string }>).map(row => row.detail);
+            rows = statement.all(...args) as Array<{ id: string }>;
+            return rows;
+          }
+        };
+      });
+      try {
+        return { result: await listThreads(params), plan, rows };
+      } finally {
+        spy.mockRestore();
+      }
+    };
+    let checked = 0;
+    for (const options of [
+      {}, { folderId: "inbox" }, { folderId: "archive" }, { excludedFolderIds: ["archive"] },
+      { folderId: "inbox", excludedFolderIds: ["sent", "archive"] }, { query: "needle" }, { query: "topic:none" },
+      { badges: ["assigned-to-me"], viewerUserId }, { groupBy: "sender" }, { threadDateSource: "latestDateValue" as const }
+    ] satisfies Array<Partial<Params>>) {
+      for (const page of [1, 2]) {
+        const params = { accountId: fixture.a.accountId, page, pageSize: 8, ...options };
+        const current = await capture(params, false);
+        const legacy = await capture(params, true);
+        expect(current.result).toEqual(legacy.result);
+        if (current.result.items.length === 0) continue;
+        checked++;
+        expect(current.plan[0]).toContain("USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)");
+        expect(legacy.plan[0]).toContain("USING INDEX idx_messages_account_date (accountId=?)");
+        expect(current.rows.length).toBeGreaterThan(0);
+        expect(current.rows.map(row => row.id)).toEqual(legacy.rows.map(row => row.id));
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(15);
+  });
+
+  test("thread date group keys equal the uncached keys around midnight (frozen clock)", async () => {
+    const seen = new Set<string>();
+    try {
+      for (const nowMs of [Date.UTC(2026, 0, 1, 12), Date.UTC(2025, 11, 31, 23), Date.UTC(2026, 0, 1, 22, 59, 59, 999),
+        Date.UTC(2026, 0, 1, 23), Date.UTC(2026, 0, 6, 12), Date.UTC(2026, 1, 1)]) {
+        setSystemTime(new Date(nowMs));
+        for (const groupBy of ["date", "week", "year"]) {
+          for (const threadDateSource of ["latestDateValue", "latestReceivedDateValue"] as const) {
+            const result = await listThreads({ accountId: fixture.a.accountId, page: 1, pageSize: 24, groupBy, threadDateSource });
+            expect(result.items.length).toBeGreaterThan(0);
+            for (const item of result.items) {
+              expect(item.groupKey).toBe(buildMessageGroupKey(item, groupBy, item.threadSortDateValue));
+              seen.add(item.groupKey!);
+            }
+          }
+        }
+      }
+    } finally {
+      setSystemTime();
+    }
+    expect([...seen].filter(key => ["Today", "Yesterday", "This Week", "Older"].includes(key)).sort())
+      .toEqual(["Older", "This Week", "Today", "Yesterday"]);
   });
 
   test("an empty query does not read the own addresses; from:me still does", async () => {

@@ -546,6 +546,12 @@ type TopicLearningMatchRow = {
   signalValue?: string | null;
 };
 
+/** Learning rows of one topic for one signal key, counted per learning thread. */
+type TopicSignalMatches = {
+  rowsByThreadId: Map<string, number>;
+  maxRows: number;
+};
+
 function topicSuggestionSignalKey(type: string, value: string) {
   return `${type}\u0000${value}`;
 }
@@ -628,13 +634,35 @@ function getTopicSuggestionsForThreadSignalBatch(
     });
   }
 
+  // Aggregate the learning rows once per batch: per signal key and topic
+  // (in first-match order), how many rows each learning thread has.
+  const matchesBySignalKey = new Map<string, Map<string, TopicSignalMatches>>();
+  const topicRowsById = new Map<string, TopicLearningMatchRow>();
+  const learningThreadIds = new Set<string>();
+  rowsBySignalKey.forEach((rows, key) => {
+    const byTopicId = new Map<string, TopicSignalMatches>();
+    rows.forEach((row) => {
+      const learningThreadId = (row.learningThreadId ?? "").trim();
+      if (!learningThreadId) return;
+      learningThreadIds.add(learningThreadId);
+      let matches = byTopicId.get(row.id);
+      if (!matches) {
+        matches = { rowsByThreadId: new Map(), maxRows: 0 };
+        byTopicId.set(row.id, matches);
+        if (!topicRowsById.has(row.id)) topicRowsById.set(row.id, row);
+      }
+      const count = (matches.rowsByThreadId.get(learningThreadId) ?? 0) + 1;
+      matches.rowsByThreadId.set(learningThreadId, count);
+      if (count > matches.maxRows) matches.maxRows = count;
+    });
+    matchesBySignalKey.set(key, byTopicId);
+  });
+  const signalWeight = (key: string) =>
+    getTopicSuggestionWeight(key.slice(0, key.indexOf("\u0000")) as TopicSuggestionSignal);
+
   // Page threads often share the same signals (one sender, one list). Their
   // score only differs when the thread itself is a learning thread, so the
   // result is reused per signal-key sequence for every other thread.
-  const learningThreadIds = new Set<string>();
-  rowsBySignalKey.forEach((rows) =>
-    rows.forEach((row) => learningThreadIds.add((row.learningThreadId ?? "").trim()))
-  );
   const suggestionsBySignalKeys = new Map<string, Topic[]>();
 
   const result = new Map<string, Topic[]>();
@@ -642,11 +670,9 @@ function getTopicSuggestionsForThreadSignalBatch(
     const signals = signalsByThreadId.get(threadId);
     const keys = signalKeysByThreadId.get(threadId);
     if (!signals || !keys || keys.size === 0) return;
-    const excludeThreadId = (signals.threadId ?? "").trim();
-    const memoKey =
-      excludeThreadId && learningThreadIds.has(excludeThreadId)
-        ? null
-        : Array.from(keys).join("\u0001");
+    const ownThreadId = (signals.threadId ?? "").trim();
+    const excludeThreadId = ownThreadId && learningThreadIds.has(ownThreadId) ? ownThreadId : "";
+    const memoKey = excludeThreadId ? null : Array.from(keys).join("\u0001");
     const memoized = memoKey === null ? undefined : suggestionsBySignalKeys.get(memoKey);
     if (memoized) {
       if (memoized.length > 0) {
@@ -654,39 +680,66 @@ function getTopicSuggestionsForThreadSignalBatch(
       }
       return;
     }
-    const byTopicId = new Map<
-      string,
-      { topic: Topic; threadScores: Map<string, number> }
-    >();
 
-    keys.forEach((key) => {
-      const weight = getTopicSuggestionWeight(key.slice(0, key.indexOf("\u0000")) as TopicSuggestionSignal);
+    // Every learning thread of the key with the most rows (usually the shared
+    // sender domain) scores at least that key's weight; only the threads the
+    // other keys reach need their own sum.
+    const signalKeys = Array.from(keys);
+    let baseKey = signalKeys[0];
+    signalKeys.forEach((key) => {
+      if ((rowsBySignalKey.get(key)?.length ?? 0) > (rowsBySignalKey.get(baseKey)?.length ?? 0)) baseKey = key;
+    });
+    const baseWeight = signalWeight(baseKey);
+
+    // Topics in the order their first non-excluded row appears, key by key.
+    const topicIds = new Set<string>();
+    signalKeys.forEach((key) => {
+      if (!excludeThreadId) {
+        matchesBySignalKey.get(key)?.forEach((_, topicId) => topicIds.add(topicId));
+        return;
+      }
       (rowsBySignalKey.get(key) ?? []).forEach((row) => {
         const learningThreadId = (row.learningThreadId ?? "").trim();
-        if (!learningThreadId) return;
-        if (excludeThreadId && learningThreadId === excludeThreadId) return;
-        const state = byTopicId.get(row.id) ?? {
-          topic: rowToTopic(row),
-          threadScores: new Map<string, number>()
-        };
-        state.threadScores.set(
-          learningThreadId,
-          (state.threadScores.get(learningThreadId) ?? 0) + weight
-        );
-        byTopicId.set(row.id, state);
+        if (learningThreadId && learningThreadId !== excludeThreadId) topicIds.add(row.id);
       });
     });
 
     const suggestions: Topic[] = [];
-    byTopicId.forEach((state) => {
-      let suggestionScore = 0;
-      state.threadScores.forEach((score) => {
+    topicIds.forEach((topicId) => {
+      const base = matchesBySignalKey.get(baseKey)?.get(topicId);
+      let matchCount = base?.rowsByThreadId.size ?? 0;
+      let suggestionScore = (base?.maxRows ?? 0) * baseWeight;
+      if (base && excludeThreadId && base.rowsByThreadId.has(excludeThreadId)) {
+        matchCount--;
+        suggestionScore = 0;
+        base.rowsByThreadId.forEach((count, learningThreadId) => {
+          if (learningThreadId !== excludeThreadId) suggestionScore = Math.max(suggestionScore, count * baseWeight);
+        });
+      }
+      const threadScores = new Map<string, number>();
+      signalKeys.forEach((key) => {
+        if (key === baseKey) return;
+        const matches = matchesBySignalKey.get(key)?.get(topicId);
+        if (!matches) return;
+        const weight = signalWeight(key);
+        matches.rowsByThreadId.forEach((count, learningThreadId) => {
+          if (learningThreadId === excludeThreadId) return;
+          let score = threadScores.get(learningThreadId);
+          if (score === undefined) {
+            const baseRows = base?.rowsByThreadId.get(learningThreadId) ?? 0;
+            if (baseRows === 0) matchCount++;
+            score = baseRows * baseWeight;
+          }
+          threadScores.set(learningThreadId, score + count * weight);
+        });
+      });
+      threadScores.forEach((score) => {
         if (score > suggestionScore) suggestionScore = score;
       });
-      const matchCount = state.threadScores.size;
       if (matchCount === 0) return;
+      // Every row of a topic carries the same joined topic columns.
       suggestions.push({
-        ...state.topic,
+        ...rowToTopic(topicRowsById.get(topicId)),
         suggestionScore,
         matchCount
       });

@@ -16,6 +16,8 @@ function createResource(apiFetch: ApiFetch, accountId: string) {
   let loaded = false;
   let revision = 0;
   let pending: Promise<RecipientAlias[]> | undefined;
+  // A caller that joined the pending read keeps it alive past the starter's abort.
+  let pendingJoined = false;
   const listeners = new Set<() => void>();
   const publish = () => listeners.forEach((listener) => listener());
   const set: Dispatch<SetStateAction<RecipientAlias[]>> = (update) => {
@@ -24,15 +26,26 @@ function createResource(apiFetch: ApiFetch, accountId: string) {
     aliases = typeof update === "function" ? update(aliases) : update;
     publish();
   };
-  const load = (refresh = false): Promise<RecipientAlias[]> => {
+  // `signal` aborts the read only while no other caller waits for it; an
+  // aborted read leaves the aliases unloaded, so the next load retries.
+  const load = (refresh = false, signal?: AbortSignal): Promise<RecipientAlias[]> => {
     if (!accountId) return Promise.resolve(emptyAliases);
-    if (pending) return pending;
+    if (pending) {
+      pendingJoined = true;
+      return pending;
+    }
     if (loaded && !refresh) return Promise.resolve(aliases);
+    if (signal?.aborted) return Promise.resolve(aliases);
     const requestRevision = revision;
+    const controller = new AbortController();
+    const abort = () => { if (!pendingJoined) controller.abort(); };
+    pendingJoined = false;
+    signal?.addEventListener("abort", abort, { once: true });
     pending = Promise.resolve().then(async () => {
       try {
         const response = await apiFetch(buildAccountRecipientAliasesPath(accountId), {
-          cache: "no-store"
+          cache: "no-store",
+          signal: controller.signal
         });
         const data = await response.json() as { ok?: boolean; aliases?: RecipientAlias[] };
         const next = response.ok && data.ok && Array.isArray(data.aliases) ? data.aliases : [];
@@ -43,7 +56,10 @@ function createResource(apiFetch: ApiFetch, accountId: string) {
         // Leave a failed read retryable on the next explicit refresh/open.
         return aliases;
       }
-    }).finally(() => { pending = undefined; });
+    }).finally(() => {
+      pending = undefined;
+      signal?.removeEventListener("abort", abort);
+    });
     return pending;
   };
   return {

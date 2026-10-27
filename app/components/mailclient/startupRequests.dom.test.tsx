@@ -149,4 +149,56 @@ describe("secondary startup requests", () => {
     act(() => { setTopicsOfA(prev => [...prev, { id: "topic-new", name: "Synthetic new" } as never]); });
     expect(result.current.allTopics.map(topic => topic.id)).toEqual(["topic-account-b"]);
   });
+
+  it("holds topic counts and aliases while a switch is pending and aborts in-flight reads on account change", async () => {
+    const requests: Array<{ url: string; signal?: AbortSignal | null }> = [];
+    const apiFetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({ url: String(input), signal: init?.signal });
+      // Secondary reads stay in flight; topic lists answer at once.
+      return String(input).endsWith("/topics") ? Promise.resolve(Response.json({ ok: true, topics: [] })) : new Promise<Response>(() => {});
+    };
+    const { rerender } = renderHook(({ accountId, ready }) => {
+      useTopics({ activeAccountId: accountId, apiFetch, secondaryReadsReady: ready });
+      useRecipientAliases({ activeAccountId: accountId, apiFetch, secondaryReadsReady: ready });
+    }, { initialProps: { accountId: "account-a", ready: false } });
+    expect(idleTasks.size).toBe(0);
+    await runIdle();
+    expect(requests.map(request => request.url)).toEqual(["/api/accounts/account-a/topics"]);
+    rerender({ accountId: "account-a", ready: true });
+    await runIdle();
+    const secondary = () => requests.filter(request => !request.url.endsWith("/topics"));
+    expect(secondary().map(request => request.url)).toEqual([
+      "/api/accounts/account-a/topics/stats", "/api/accounts/account-a/recipient-aliases"
+    ]);
+    expect(secondary().every(request => request.signal && !request.signal.aborted)).toBe(true);
+    // A switch to B starts: A's reads are aborted and B's wait for the switch to settle.
+    rerender({ accountId: "account-b", ready: false });
+    expect(secondary().every(request => request.signal?.aborted)).toBe(true);
+    await runIdle();
+    expect(secondary()).toHaveLength(2);
+    rerender({ accountId: "account-b", ready: true });
+    await runIdle();
+    expect(secondary().slice(2).map(request => request.url)).toEqual([
+      "/api/accounts/account-b/topics/stats", "/api/accounts/account-b/recipient-aliases"
+    ]);
+  });
+
+  it("keeps an alias read that compose joined when the mailbox changes", async () => {
+    const signals: Array<AbortSignal | null | undefined> = [];
+    let resolve!: (response: Response) => void;
+    const apiFetch = (_input: RequestInfo | URL, init?: RequestInit) => {
+      signals.push(init?.signal);
+      return new Promise<Response>(done => { resolve = done; });
+    };
+    const { rerender } = renderHook(({ accountId }) => useRecipientAliases({ activeAccountId: accountId, apiFetch }),
+      { initialProps: { accountId: "account-a" } });
+    await runIdle();
+    const composeReady = ensureRecipientAliasesReady(apiFetch, "account-a");
+    rerender({ accountId: "account-b" });
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(false);
+    await act(async () => { resolve(Response.json({ ok: true, aliases: [alias] })); });
+    expect(await composeReady).toEqual([alias]);
+  });
 });
+
