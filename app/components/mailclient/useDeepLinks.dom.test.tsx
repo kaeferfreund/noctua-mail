@@ -27,7 +27,8 @@ afterEach(async () => {
 });
 const message = { id: "imap-one", accountId: "a", folderId: "a:INBOX" } as Message;
 function Harness({ switcher, resolver, resolution, expired, deferFolder = false, notice = () => {}, onTransaction, accountIds = ["a", "b"], onForbidden }: {
-  switcher?: (id: string) => Promise<void>; resolver?: (account: string, id: string, signal: AbortSignal) => Promise<Message | null>;
+  /** Resolving to false: the switch did not commit, the controller kept the mailbox on screen. */
+  switcher?: (id: string) => Promise<void | boolean>; resolver?: (account: string, id: string, signal: AbortSignal) => Promise<Message | null>;
   deferFolder?: boolean; accountIds?: string[]; onForbidden?: () => void;
   resolution?: () => Promise<MessageResolution>; expired?: () => void;
   notice?: (kind: string) => void; onTransaction?: (event: DeepLinkTransaction) => void;
@@ -36,12 +37,14 @@ function Harness({ switcher, resolver, resolution, expired, deferFolder = false,
   const version = useRef(0);
   const [messages, setMessages] = useState([message, { ...message, id: "imap-two" }]);
   const [ready, setReady] = useState(true);
+  const [authenticated, setAuthenticated] = useState(true);
+  const [, rerender] = useState(0);
   const [overlay, setOverlay] = useState(false);
   useMobileOverlayHistory(overlay, () => setOverlay(false));
-  const { navigateAccount, navigateMessage, queueFolderChoice } = useDeepLinks({ ready, state, messages, accountIds, onForbidden,
-    switchAccount: async id => { const epoch = ++version.current; await switcher?.(id); if (epoch === version.current) setState(old => ({ ...old, accountId: id })); },
+  const { navigateAccount, navigateMessage, queueFolderChoice } = useDeepLinks({ ready, authenticated, state, messages, accountIds, onForbidden,
+    switchAccount: async id => { const epoch = ++version.current; const committed = await switcher?.(id); if (committed !== false && epoch === version.current) setState(old => ({ ...old, accountId: id })); },
     applyPlace: target => { const applied = { ...target, folderId: target.folderId || `${target.accountId}:INBOX`, messageId: "" }; if (deferFolder) { setState({ ...applied, folderId: "" }); setTimeout(() => setState(applied), 0); } else setState(applied); return applied; },
-    onUnauthenticated: () => { setReady(false); expired?.(); },
+    onUnauthenticated: () => { setReady(false); setAuthenticated(false); expired?.(); },
     resolveMessage: resolution ?? (async (account, id, signal) => { const value = await (resolver ?? (async () => message))(account, id, signal); return value ? { status: "ready", message: value } : { status: "missing" }; }), openMessage: value => setState(old => ({ ...old, messageId: value.id })), notice, onTransaction });
   const { back } = useMobileNavigation(true, state.messageId || null, () => setState(old => ({ ...old, messageId: "" })), true);
   return <><output data-testid="state">{JSON.stringify(state)}</output>
@@ -56,6 +59,10 @@ function Harness({ switcher, resolver, resolution, expired, deferFolder = false,
     <button onClick={() => { if (!queueFolderChoice("b:Drafts")) setState(old => ({ ...old, folderId: "b:Drafts" })); }}>Destination drafts</button>
     <button onClick={() => setOverlay(true)}>Show overlay</button><output data-testid="overlay">{String(overlay)}</output>
     <button onClick={back}>Back</button><button onClick={() => setReady(value => !value)}>Ready</button>
+    <button onClick={() => { setAuthenticated(false); setReady(false); }}>Expire</button>
+    <button onClick={() => rerender(value => value + 1)}>Render</button>
+    {/* The sign-in's bootstrap restores the server's mailbox selection, here A. */}
+    <button onClick={() => { setState({ ...emptyDeepLink(), accountId: "a", folderId: "a:INBOX" }); setAuthenticated(true); setReady(true); }}>Sign in</button>
     <input aria-label="Search" onChange={event => setState(old => ({ ...old, query: event.target.value }))} />
   </>;
 }
@@ -138,6 +145,55 @@ it("retains an expired-session destination until authentication resumes; network
   await waitFor(() => expect(notice).toHaveBeenCalledWith("failed"));
   expect(notice).not.toHaveBeenCalledWith("missing");
   expect(parseDeepLink(window.location.search).messageId).toBe("retry-message");
+});
+it("reopens a notified message after a sign-in that restored another mailbox, waiting for the new switch", async () => {
+  // The message read finds the session expired after the switch to B had finished.
+  // The app renders while the switch after the sign-in still runs (its own state updates).
+  let page: ReturnType<typeof render>;
+  const switcher = mock((_id: string) => new Promise<void>(resolve => {
+    setTimeout(() => fireEvent.click(page.getByText("Render")), 0);
+    setTimeout(resolve, 20);
+  }));
+  const result = mock<() => Promise<MessageResolution>>(async () => ({ status: "unauthenticated" }));
+  page = render(<Harness switcher={switcher} resolution={result} />); await settled();
+  fireEvent.click(page.getByText("Notification"));
+  await waitFor(() => expect(result).toHaveBeenCalledTimes(1));
+  result.mockImplementation(async () => ({ status: "ready", message: { ...message, accountId: "b", folderId: "b:INBOX" } }));
+  fireEvent.click(page.getByText("Sign in"));
+  await waitFor(() => expect(page.getByTestId("state").textContent).toContain('"messageId":"imap-one"'));
+  expect(page.getByTestId("state").textContent).toContain('"accountId":"b"');
+  expect(switcher.mock.calls.filter(([id]) => id === "b")).toHaveLength(2);
+  await waitFor(() => expect(parseDeepLink(window.location.search)).toMatchObject({ accountId: "b", messageId: "imap-one" }));
+});
+it("keeps a notified message whose mailbox switch the expired session interrupted", async () => {
+  let page: ReturnType<typeof render>;
+  // First switch: the selection write gets 401, the app shows the sign-in, nothing commits.
+  const switcher = mock(async (id: string) => {
+    if (id !== "b") return true;
+    fireEvent.click(page.getByText("Expire")); return false;
+  });
+  const resolver = mock(async (account: string) => ({ ...message, accountId: account, folderId: `${account}:INBOX` }));
+  page = render(<Harness switcher={switcher} resolver={resolver} />); await settled();
+  fireEvent.click(page.getByText("Notification"));
+  await waitFor(() => expect(switcher).toHaveBeenCalledWith("b"));
+  for (let i = 0; i < 3; i += 1) await act(() => new Promise<void>(resolve => setTimeout(resolve, 0)));
+  expect(resolver).not.toHaveBeenCalled();
+  switcher.mockImplementation(async () => true);
+  fireEvent.click(page.getByText("Sign in"));
+  await waitFor(() => expect(page.getByTestId("state").textContent).toContain('"messageId":"imap-one"'));
+  expect(page.getByTestId("state").textContent).toContain('"accountId":"b"');
+  expect(resolver).toHaveBeenCalledTimes(1);
+});
+it("falls back to the mailbox on screen once when a switch is denied with a live session", async () => {
+  const switcher = mock(async (id: string) => id !== "b");
+  const resolver = mock(async () => message);
+  const page = render(<Harness switcher={switcher} resolver={resolver} />); await settled();
+  fireEvent.click(page.getByText("Notification"));
+  await waitFor(() => expect(switcher).toHaveBeenCalledWith("b"));
+  await waitFor(() => expect(parseDeepLink(window.location.search)).toMatchObject({ accountId: "a", messageId: "" }));
+  for (let i = 0; i < 3; i += 1) await act(() => new Promise<void>(resolve => setTimeout(resolve, 0)));
+  expect(switcher.mock.calls.filter(([id]) => id === "b")).toHaveLength(1); expect(resolver).not.toHaveBeenCalled();
+  expect(page.getByTestId("state").textContent).toContain('"accountId":"a"');
 });
 it("shares the warm notification destination lifecycle, while transient overlays intercept Back before the reader", async () => {
   const page = render(<Harness resolver={async account => ({ ...message, accountId: account, folderId: `${account}:INBOX` })} />); await settled();
@@ -302,7 +358,7 @@ it("leaves the switching phase only in a render that carries the switch's commit
     const [tick, setTick] = useState(0);
     const respond = useRef<() => void>(() => {});
     useLayoutEffect(() => { if (tick === 1) respond.current(); }, [tick]);
-    useDeepLinks({ ready: true, state, messages: [], accountIds: ["a", "b"],
+    useDeepLinks({ ready: true, authenticated: true, state, messages: [], accountIds: ["a", "b"],
       switchAccount: id => new Promise<void>(resolve => {
         respond.current = () => { void Promise.resolve().then(() => { setState(old => ({ ...old, accountId: id })); resolve(); }); };
         setTimeout(() => setTick(1), 0);

@@ -9,6 +9,8 @@ import { readerShortcut } from "@/lib/ui/readerFocus";
 
 type Options = {
   ready: boolean;
+  /** False while the session has expired and the sign-in screen is shown. */
+  authenticated: boolean;
   state: DeepLinkState;
   accountIds: string[];
   messages: Message[];
@@ -32,6 +34,18 @@ let entrySequence = 0;
 /** Identifies one history entry, so two visits of the same place keep their own state. */
 const nextHistoryEntry = () => `${Date.now().toString(36)}.${(++entrySequence).toString(36)}`;
 
+/**
+ * An expired session interrupts a transaction wherever it is. The target stays and the
+ * transaction starts over once the session is back: the mailbox the sign-in restores is
+ * not a fallback the link chose. Reads and switches of the interrupted attempt end with its signal.
+ */
+function rewind(work: Pending) {
+  work.controller.abort();
+  work.controller = new AbortController();
+  work.phase = "requested";
+  work.expected = undefined; work.forbidden = undefined; work.keepMessage = undefined;
+}
+
 /** URL → UI is an explicit transaction. UI → URL never initiates account loads. */
 export function useDeepLinks(options: Options) {
   const latest = useRef(options);
@@ -42,10 +56,11 @@ export function useDeepLinks(options: Options) {
   const initialized = useRef(false);
   const [, refresh] = useState(0);
   const update = useCallback(() => refresh(value => value + 1), []);
-  // The transaction whose mailbox switch has finished. State rather than a phase write:
-  // an effect of a render committed before the switch's own updates can still run after
-  // the switch resolved, and must not read that render's mailbox as the switch's result.
-  const [switched, setSwitched] = useState<Pending | null>(null);
+  // The transaction attempt (its signal) whose mailbox switch has finished. State rather than
+  // a phase write: an effect of a render committed before the switch's own updates can still
+  // run after the switch resolved, and must not read that render's mailbox as the switch's result.
+  // Per attempt, so a transaction started over after a sign-in waits for its new switch.
+  const [switched, setSwitched] = useState<AbortSignal | null>(null);
   const request = useCallback((target: DeepLinkState, origin: Pending["origin"] = "link", historyMode: "push" | "replace" = "replace", keepShell = false) => {
     pending.current?.controller.abort();
     pending.current?.done();
@@ -93,6 +108,10 @@ export function useDeepLinks(options: Options) {
     };
   }, [request]);
   useEffect(() => {
+    const work = pending.current;
+    if (!options.authenticated && work && work.phase !== "requested") rewind(work);
+  }, [options.authenticated]);
+  useEffect(() => {
     if (!options.ready || !initialized.current) return;
     const work = pending.current;
     if (!work) return;
@@ -115,9 +134,10 @@ export function useDeepLinks(options: Options) {
       request({ ...emptyDeepLink(), accountId: options.state.accountId });
       return;
     }
-    const current = () => pending.current === work && !work.controller.signal.aborted;
+    const signal = work.controller.signal;
+    const current = () => pending.current === work && !signal.aborted;
     if (work.phase === "switching") {
-      if (switched !== work) return;
+      if (switched !== signal) return;
       work.phase = "account";
     }
     if (work.phase === "requested") {
@@ -129,11 +149,12 @@ export function useDeepLinks(options: Options) {
       work.phase = "switching";
       // Even reselecting the currently visible mailbox cancels an older in-flight switch.
       void options.switchAccount(work.target.accountId).then(() => {
-        if (current()) setSwitched(work);
+        if (current()) setSwitched(signal);
       });
     } else if (work.phase === "account") {
       if (options.state.accountId !== work.target.accountId) {
-        // Controller failed/rebootstrap selected a fallback. Never keep retrying a denied link.
+        // The switch was denied or failed and the controller kept or reloaded another mailbox.
+        // Never keep retrying a denied link. (An expired session never gets here: it rewinds.)
         work.target = { ...emptyDeepLink(), accountId: options.state.accountId };
       }
       if (work.keepShell) {
@@ -152,7 +173,7 @@ export function useDeepLinks(options: Options) {
       void options.resolveMessage(work.target.accountId, work.target.messageId, work.controller.signal).then(result => {
         if (!current()) return;
         if (result.status === "unauthenticated") {
-          work.phase = "requested";
+          rewind(work);
           latest.current.onUnauthenticated?.();
           return;
         }
