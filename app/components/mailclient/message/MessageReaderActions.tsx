@@ -10,12 +10,14 @@ import { messageDeepLink } from "@/lib/navigation/deepLinks";
 import { buildMessageCopyText } from "@/lib/ui/messageCopyText";
 import { isMessageContentUnloaded } from "@/lib/ui/messageView";
 import type { NoticeInput } from "../types";
+import { AiReplyPromptProvider } from "./AiReplyPrompt";
 
 /** Reader actions that need the mail client (notices, compose, API); absent in hosts without them. */
 export type MessageReaderActions = {
   canAiReply: (message: Message) => boolean;
   isAiReplyPending: (messageId: string) => boolean;
-  draftAiReply: (message: Message) => Promise<void>;
+  /** `instruction`: what the reply should say (already normalized, max 200 characters); absent = the plain closing reply. */
+  draftAiReply: (message: Message, instruction?: string) => Promise<void>;
   /** The message's shell URL: opens it in the browser and resolves in MCP (`resolve_link`). */
   copyLink: (message: Message) => Promise<void>;
   /** Headers, text body and attachment names as plain text. */
@@ -25,7 +27,11 @@ export type MessageReaderActions = {
 const MessageReaderActionsContext = createContext<MessageReaderActions | null>(null);
 
 export function MessageReaderActionsProvider({ value, children }: { value: MessageReaderActions; children: ReactNode }) {
-  return <MessageReaderActionsContext.Provider value={value}>{children}</MessageReaderActionsContext.Provider>;
+  return (
+    <MessageReaderActionsContext.Provider value={value}>
+      <AiReplyPromptProvider draft={value.draftAiReply}>{children}</AiReplyPromptProvider>
+    </MessageReaderActionsContext.Provider>
+  );
 }
 
 export function useMessageReaderActions() {
@@ -56,13 +62,13 @@ export function useMessageReaderActionsValue(input: {
   const canAiReply = useCallback((message: Message) => aiReplyAvailable && !message.draft &&
     roleAtLeast(accounts.find(account => account.id === message.accountId)?.accessRole, "editor"), [accounts, aiReplyAvailable]);
 
-  const draftAiReply = useCallback(async (message: Message) => {
+  const draftAiReply = useCallback(async (message: Message, instruction?: string) => {
     if (inFlight.current.has(message.id)) return;
     inFlight.current.add(message.id);
     setPending(new Set(inFlight.current));
     try {
       const response = await apiFetch(buildAccountMessageActionPath(message.accountId, message.id, "ai-reply"), {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ locale })
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(instruction ? { locale, instruction } : { locale })
       }).catch(() => null);
       const data = (await response?.json().catch(() => null)) as { ok?: boolean; draftId?: string | null; message?: Message | null } | null;
       if (!response?.ok || !data?.ok) {

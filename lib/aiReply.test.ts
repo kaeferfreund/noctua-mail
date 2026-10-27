@@ -95,6 +95,7 @@ describe("AI reply instruction", () => {
     expect(appendAiReplyInstruction("Zusage ", "für Donnerstag")).toBe("Zusage für Donnerstag");
     expect(appendAiReplyInstruction("x".repeat(195), "abcdefgh")).toBe(`${"x".repeat(195)} abcd`);
     expect(appendAiReplyInstruction("Zusage", "  ")).toBe("Zusage");
+    expect(appendAiReplyInstruction("x".repeat(190), "ja gerne bis")).toBe(`${"x".repeat(190)} ja gerne`);
   });
 
   test("the system prompt allows four sentences and the instruction's facts, and keeps the e-mail as data", () => {

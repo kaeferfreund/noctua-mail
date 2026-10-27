@@ -1,7 +1,7 @@
 import { messageDeepLink } from "@/lib/navigation/deepLinks";
 import { useTranslations } from "next-intl";
 import type React from "react";
-import { Fragment, useContext, useState } from "react";
+import { Fragment, useContext, useRef, useState } from "react";
 import {
   Archive,
   ArrowRightLeft,
@@ -54,6 +54,7 @@ import { useMessageMenuPrimitives } from "./messageMenuPrimitives";
 import { MessageMenuControlContext } from "./messageMenuControl";
 import { useDraftScheduleAction } from "../scheduledSend/ScheduledSend";
 import { useMessageReaderActions } from "./MessageReaderActions";
+import { useAiReplyPromptFromMenu } from "./AiReplyPrompt";
 
 type ComposeMode = "new" | "reply" | "replyAll" | "forward" | "edit" | "editAsNew";
 type MessageMenuAction =
@@ -181,6 +182,8 @@ export default function MessageMenu({
   const tSchedule = useTranslations("Compose.schedule");
   const scheduleDraft = useDraftScheduleAction(message);
   const readerActions = useMessageReaderActions();
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const aiReplyPrompt = useAiReplyPromptFromMenu(message, triggerRef);
   const { isMobile, DropdownMenu } = useMessageMenuPrimitives();
   const control = useContext(MessageMenuControlContext);
   const quietFocusReturn = useQuietMenuFocusReturn();
@@ -266,6 +269,7 @@ export default function MessageMenu({
     >
       <DropdownMenu.Trigger asChild>
         <TooltipIconButton
+          ref={triggerRef}
           variant="ghost"
           size="1"
           tooltip={t("messageActions")}
@@ -284,7 +288,9 @@ export default function MessageMenu({
         onClick={event => event.stopPropagation()}
         onKeyDown={event => event.stopPropagation()}
         sideOffset={6}
-        onCloseAutoFocus={quietFocusReturn.onCloseAutoFocus}
+        onCloseAutoFocus={(event) => {
+          if (!aiReplyPrompt.onCloseAutoFocus(event)) quietFocusReturn.onCloseAutoFocus();
+        }}
         className={`${styles.menuContent} ${isMobile ? mobileStyles.messageMenu : ""}`}
       >
         {[
@@ -334,10 +340,8 @@ export default function MessageMenu({
                   openCompose("forward", message)
                 , isDisabled("forward"))
               : null,
-            !isDraft && isVisible("aiReply") && readerActions?.canAiReply(message)
-              ? buildItem("aiReply", t(readerActions.isAiReplyPending(message.id) ? "aiReplyBusy" : "aiReply"), <Sparkles size={14} />, () =>
-                  void readerActions.draftAiReply(message)
-                , isDisabled("aiReply", readerActions.isAiReplyPending(message.id)))
+            !isDraft && isVisible("aiReply") && readerActions?.canAiReply(message) && aiReplyPrompt.available
+              ? buildItem("aiReply", t(readerActions.isAiReplyPending(message.id) ? "aiReplyBusy" : "aiReply"), <Sparkles size={14} />, aiReplyPrompt.request, isDisabled("aiReply", readerActions.isAiReplyPending(message.id)))
               : null,
             isVisible("editAsNew")
               ? buildItem("editAsNew", t("editAsNew"), <FileText size={14} />, () =>

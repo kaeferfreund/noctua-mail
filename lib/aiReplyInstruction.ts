@@ -14,5 +14,5 @@ export function appendAiReplyInstruction(current: string, addition: string) {
   const next = normalizeAiReplyInstruction(addition);
   if (!next) return current;
   const joined = current.trim() ? `${current.replace(/\s+$/, "")} ${next}` : next;
-  return joined.slice(0, AI_REPLY_INSTRUCTION_LIMIT);
+  return joined.slice(0, AI_REPLY_INSTRUCTION_LIMIT).trimEnd();
 }

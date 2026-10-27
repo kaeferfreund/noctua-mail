@@ -37,21 +37,144 @@ describe("AI reply button", () => {
     expect(aiButton(render(wrap(<MessageReaderActionsProvider value={available}>{quickActions({ isDraft: true })}</MessageReaderActionsProvider>)).container)).toBeNull();
   });
 
-  it("starts one draft per click and is disabled while it runs", async () => {
-    const calls: string[] = [];
-    function Host() {
-      const [pending, setPending] = useState(false);
-      const value: MessageReaderActions = { ...copyActions, canAiReply: () => true, isAiReplyPending: () => pending,
-        draftAiReply: async (target) => { calls.push(target.id); setPending(true); } };
-      return <MessageReaderActionsProvider value={value}>{quickActions()}</MessageReaderActionsProvider>;
-    }
-    const view = render(wrap(<Host />));
+  it("starts one draft per prompt and is disabled while it runs", async () => {
+    const { view, calls, openPrompt, prompt } = promptHarness();
     const button = aiButton(view.container)!;
     expect(button.getAttribute("aria-label")).toBe("Draft AI reply");
     expect(button.disabled).toBe(false);
-    await act(async () => { fireEvent.click(button); });
-    expect(calls).toEqual(["msg-1"]);
+    await openPrompt();
+    await act(async () => { fireEvent.click(view.getByRole("button", { name: "Without instruction" })); });
+    expect(calls).toEqual([["msg-1", undefined]]);
     expect(aiButton(view.container)!.disabled).toBe(true);
+    await settle();
+    expect(prompt()).toBeNull();
+  });
+});
+
+// Radix popovers mount and unmount through timers and animation frames.
+const settle = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); });
+
+function promptHarness() {
+  const calls: Array<[string, string | undefined]> = [];
+  function Host() {
+    const [pending, setPending] = useState(false);
+    const value: MessageReaderActions = { ...copyActions, canAiReply: () => true, isAiReplyPending: () => pending,
+      draftAiReply: async (target, instruction) => { calls.push([target.id, instruction]); setPending(true); } };
+    return <MessageReaderActionsProvider value={value}>{quickActions()}</MessageReaderActionsProvider>;
+  }
+  const view = render(wrap(<Host />));
+  const prompt = () => document.querySelector<HTMLElement>('[data-ai-reply-prompt="popover"]');
+  const field = () => view.getByRole("textbox", { name: "Instruction for the AI reply" }) as HTMLInputElement;
+  const openPrompt = async () => {
+    await act(async () => { fireEvent.click(aiButton(view.container)!); });
+    await settle();
+    expect(prompt()).not.toBeNull();
+  };
+  const type = (value: string) => act(() => { fireEvent.change(field(), { target: { value } }); });
+  return { view, calls, prompt, field, openPrompt, type };
+}
+
+type ResultInput = Array<[string, boolean]>;
+/** Minimal Web Speech recognizer: the test drives results, errors and the end event. */
+class StubRecognition extends EventTarget {
+  static instances: StubRecognition[] = [];
+  lang = "";
+  interimResults = false;
+  continuous = true;
+  started = false;
+  onresult: ((event: unknown) => void) | null = null;
+  onerror: ((event: unknown) => void) | null = null;
+  onend: (() => void) | null = null;
+  constructor() { super(); StubRecognition.instances.push(this); }
+  start() { this.started = true; }
+  stop() { this.onend?.(); }
+  abort() { this.onend?.(); }
+  emit(results: ResultInput) {
+    this.onresult?.({ resultIndex: 0, results: results.map(([transcript, isFinal]) => Object.assign([{ transcript, confidence: 1 }], { isFinal })) });
+  }
+  fail(error: string) { this.onerror?.({ error }); this.onend?.(); }
+}
+
+async function withSpeechRecognition(run: () => Promise<void>) {
+  StubRecognition.instances = [];
+  Object.defineProperty(window, "webkitSpeechRecognition", { configurable: true, value: StubRecognition });
+  try { await run(); } finally { Reflect.deleteProperty(window, "webkitSpeechRecognition"); }
+}
+
+describe("AI reply prompt", () => {
+  it("opens on click; Enter drafts with the normalized instruction and closes it", async () => {
+    const { calls, prompt, field, openPrompt, type } = promptHarness();
+    await openPrompt();
+    expect(field().maxLength).toBe(200);
+    expect(field().placeholder).toBe("What should the reply say? (optional)");
+    await type("  Zusage   für Donnerstag, 14 Uhr ");
+    // happy-dom has no implicit submission; the form submit is what Enter triggers in a browser (QA spec presses it).
+    await act(async () => { fireEvent.submit(field().form!); });
+    expect(calls).toEqual([["msg-1", "Zusage für Donnerstag, 14 Uhr"]]);
+    await settle();
+    expect(prompt()).toBeNull();
+  });
+
+  it("„Without instruction“ drafts like before, a blank field counts as none, Escape closes without drafting", async () => {
+    const { calls, prompt, field, openPrompt, type, view } = promptHarness();
+    await openPrompt();
+    await act(async () => { fireEvent.keyDown(field(), { key: "Escape" }); });
+    await settle();
+    expect(prompt()).toBeNull();
+    expect(calls).toEqual([]);
+    await openPrompt();
+    expect(field().value).toBe("");
+    await type("   ");
+    await act(async () => { fireEvent.click(view.getByRole("button", { name: "Draft" })); });
+    expect(calls).toEqual([["msg-1", undefined]]);
+  });
+
+  it("shows the counter from 150 characters on", async () => {
+    const { openPrompt, type } = promptHarness();
+    await openPrompt();
+    const counter = () => document.querySelector("[data-ai-reply-counter]");
+    await type("x".repeat(149));
+    expect(counter()).toBeNull();
+    await type("x".repeat(150));
+    expect(counter()?.textContent).toBe("150/200");
+  });
+
+  it("hides the microphone without SpeechRecognition", async () => {
+    const { openPrompt, view } = promptHarness();
+    await openPrompt();
+    expect(view.queryByRole("button", { name: "Dictate" })).toBeNull();
+  });
+
+  it("dictates: interim text in grey, the final text appended and capped at 200", async () => {
+    await withSpeechRecognition(async () => {
+      const { openPrompt, view, field, type } = promptHarness();
+      await openPrompt();
+      await type("x".repeat(191));
+      await act(async () => { fireEvent.click(view.getByRole("button", { name: "Dictate" })); });
+      const recognition = StubRecognition.instances[0]!;
+      expect(recognition).toMatchObject({ started: true, lang: "en-US", interimResults: true, continuous: false });
+      expect(view.getByRole("button", { name: "Stop dictation" }).getAttribute("aria-pressed")).toBe("true");
+      expect(view.getByRole("status").textContent).toBe("Listening …");
+      await act(async () => { recognition.emit([["ja gerne", false]]); });
+      expect(document.querySelector("[data-ai-reply-interim]")?.textContent).toContain("ja gerne");
+      expect(field().value).toBe("x".repeat(191));
+      await act(async () => { recognition.emit([["ja gerne bis Donnerstag", true]]); recognition.stop(); });
+      expect(field().value).toBe(`${"x".repeat(191)} ja gerne`);
+      expect(field().value).toHaveLength(200);
+      expect(document.querySelector("[data-ai-reply-interim]")).toBeNull();
+      expect(view.getByRole("button", { name: "Dictate" }).getAttribute("aria-pressed")).toBe("false");
+    });
+  });
+
+  it("shows a short inline hint when the microphone is not allowed", async () => {
+    await withSpeechRecognition(async () => {
+      const { openPrompt, view } = promptHarness();
+      await openPrompt();
+      await act(async () => { fireEvent.click(view.getByRole("button", { name: "Dictate" })); });
+      await act(async () => { StubRecognition.instances[0]!.fail("not-allowed"); });
+      expect(view.getByRole("status").textContent).toBe("Microphone access is not allowed.");
+      expect(document.querySelector('[data-ai-reply-hint="not-allowed"]')).not.toBeNull();
+    });
   });
 });
 
@@ -88,6 +211,13 @@ describe("useMessageReaderActionsValue", () => {
     expect(requests[0]).toEqual({ url: "/api/accounts/acc/messages/msg-1/ai-reply", body: JSON.stringify({ locale: "en" }) });
     expect(opened.map(item => item.id)).toEqual(["draft-1"]);
     expect(notices).toEqual([]);
+  });
+
+  it("sends the instruction in the body when there is one", async () => {
+    const draft = { ...message, id: "draft-2", draft: true };
+    const { requests, actions } = harness(() => Response.json({ ok: true, draftId: "draft-2", message: draft }));
+    await act(async () => { await actions().draftAiReply(message, "Donnerstag passt"); });
+    expect(requests[0]!.body).toBe(JSON.stringify({ locale: "en", instruction: "Donnerstag passt" }));
   });
 
   it("shows the setup notice on 503 and keeps one request per message in flight", async () => {
