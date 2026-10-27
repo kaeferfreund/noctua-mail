@@ -4067,6 +4067,13 @@ export default function MailClient({
     // Backspace for nothing; they must not reach the message shortcuts.
     const isMenuTarget = (target: EventTarget | null) =>
       target instanceof HTMLElement && Boolean(target.closest('[role="menu"], [role="listbox"]'));
+    // Dialogs (the AI prompt popover/sheet, confirmations) own the keyboard
+    // while open, like readerShortcut: Backspace on a focused dialog button
+    // must not trash the selected message. Radix portals need not contain
+    // the event target, so check the document too.
+    const isDialogOpen = (target: EventTarget | null) =>
+      (target instanceof HTMLElement && Boolean(target.closest('[role="dialog"], [role="alertdialog"]'))) ||
+      Boolean(document.querySelector('[role="dialog"], [role="alertdialog"]'));
     const isMessageListShortcutTarget = (target: EventTarget | null) =>
       target instanceof HTMLElement &&
       Boolean(target.closest('[data-message-list-row="true"]'));
@@ -4085,7 +4092,7 @@ export default function MailClient({
       const isTodoKey = key === "t" && !event.metaKey && !event.ctrlKey && !event.altKey;
       const isActionShortcut = isMarkReadKey || isMarkUnreadKey || isFlagKey || isTodoKey;
       if (!isDeleteKey && !isActionShortcut && !isSelectAllKey) return;
-      if (isTypingTarget(event.target) || isMenuTarget(event.target)) return;
+      if (isTypingTarget(event.target) || isMenuTarget(event.target) || isDialogOpen(event.target)) return;
       if (isSelectAllKey) {
         if (!isMessageListShortcutTarget(event.target)) return;
         event.preventDefault();

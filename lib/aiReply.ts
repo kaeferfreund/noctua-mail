@@ -79,7 +79,15 @@ export function aiReplyMailText(message: Pick<Message, "body" | "htmlBody">) {
 
 /** Keeps the e-mail and the instruction from closing or opening a block early. */
 function data(value: string) {
-  return value.replace(/<\/?(?:email|instruction)>/gi, "");
+  // Strip until stable: a single pass would turn `<inst<email>ruction>` into a real tag.
+  // Whitespace and attributes inside the tag count as the tag too.
+  const pattern = /<\s*\/?\s*(?:email|instruction)\b[^<>]*>/gi;
+  let text = value;
+  for (;;) {
+    const next = text.replace(pattern, "");
+    if (next === text) return text;
+    text = next;
+  }
 }
 
 /** The user's own intent, ahead of the e-mail; normalized and capped like the route does. */
