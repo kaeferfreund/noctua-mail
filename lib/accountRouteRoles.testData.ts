@@ -183,6 +183,11 @@ export const accountRouteRoles: Array<{ method: string; path: string; minRole: A
     "minRole": "editor"
   },
   {
+    "method": "PATCH",
+    "path": "mcp-tokens/[tokenId]",
+    "minRole": "editor"
+  },
+  {
     "method": "DELETE",
     "path": "mcp-tokens/[tokenId]",
     "minRole": "editor"
@@ -236,6 +241,11 @@ export const accountRouteRoles: Array<{ method: string; path: string; minRole: A
     "method": "GET",
     "path": "messages/[messageId]",
     "minRole": "viewer"
+  },
+  {
+    "method": "POST",
+    "path": "messages/[messageId]/ai-reply",
+    "minRole": "editor"
   },
   {
     "method": "POST",
