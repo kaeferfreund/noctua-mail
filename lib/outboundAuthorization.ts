@@ -1,5 +1,3 @@
-import { isScheduledSendAuthorization, type ScheduledSendAuthorization } from "./scheduledSend";
-import { DraftSendError } from "./drafts";
 import { NextResponse } from "next/server";
 import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { forwardAuthHeaders } from "./auth";
@@ -20,7 +18,7 @@ import { collabActorFromSession, type CollabActor } from "./threadCollab";
  * is the server-side scheduled-send job acting for the user who planned the send: no session
  * exists then, so the user's live mailbox role (lib/db/accountAccess.ts) is the whole check.
  */
-export type OutboundAuthorization = { request: Request } | { tokenId: string } | ScheduledSendAuthorization;
+export type OutboundAuthorization = { request: Request } | { tokenId: string } | { scheduledByUserId: string };
 export type AuthorizedOutboundActor = CollabActor & { assertCurrent: (db: Database) => void };
 export type OutboundWriteAuthorization = () => Promise<AuthorizedOutboundActor>;
 export class OutboundAuthorizationError extends Error {
@@ -58,17 +56,9 @@ export async function authorizeOutbound(
       assertCurrent: db => { resolveMcpToolContextRow(db, source.tokenId, input.accountId, input.minRole, checkIdentity, scope); } };
   }
   if ("scheduledByUserId" in source) {
-    if (!isScheduledSendAuthorization(source)) {
-      throw new OutboundAuthorizationError(NextResponse.json({ ok: false, message: "Invalid scheduler authorization" }, { status: 403 }));
-    }
     const userId = source.scheduledByUserId;
     const assertCurrent = (db: Database) => {
       db.transaction(() => {
-        const claim = db.query(`SELECT lastError FROM scheduled_sends
-          WHERE id=? AND accountId=? AND userId=? AND status='sending' AND leaseOwner=?`)
-          .get(source.scheduleId, input.accountId, userId, source.leaseOwner) as { lastError: string | null } | null;
-        if (!claim) throw new DraftSendError(409, "Scheduler claim was lost.", "scheduled_send_claim_lost");
-        if (claim.lastError === "security_revoked") throw new DraftSendError(409, "User security changed.", "scheduled_send_security_revoked");
         const role = resolveAccountRoleRow(db, userId, input.accountId);
         if (!role) throw new OutboundAuthorizationError(NextResponse.json({ ok: false, message: "Forbidden" }, { status: 403 }));
         if (!roleAtLeast(role, input.minRole)) {

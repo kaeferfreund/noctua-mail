@@ -69,11 +69,3 @@ describe("custom time (15-minute steps)", () => {
     expect(resolveCustomTime("2027-03-28", "02:30", utc(3, 27, 12, 0, 2027), TZ)).toEqual({ ok: false, reason: "nonexistent" });
   });
 });
-
-test("the minimum lead time is one minute, including quarter-hour and preset boundaries", () => {
-  const atEight = Date.UTC(2026, 9, 26, 8);
-  expect(resolveCustomTime("2026-10-26", "08:00", atEight - 60_000, "UTC")).toEqual({ ok: true, sendAt: atEight });
-  expect(resolveCustomTime("2026-10-26", "08:00", atEight - 59_999, "UTC")).toEqual({ ok: false, reason: "tooSoon" });
-  expect(customTimeOptions({ year: 2026, month: 10, day: 26 }, atEight - 59_999, "UTC")[0].value).toBe("08:15");
-  expect(computeSchedulePresets(atEight - 59_999, "UTC")[0].kind).toBe("tomorrowMorning");
-});

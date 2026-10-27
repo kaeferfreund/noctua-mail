@@ -306,7 +306,7 @@ export default function MessageMenu({
                   tSchedule("open"),
                   <Clock size={14} />,
                   scheduleDraft.open,
-                  !canSendDraft || scheduleDraft.busy || pendingMessageActions.has(message.id)
+                  !canSendDraft || scheduleDraft.busy
                 )
               : null,
             isDraft && onDiscardDraft && isVisible("discardDraft")

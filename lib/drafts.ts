@@ -1,5 +1,3 @@
-import { getDb } from "./db/connection";
-import { scheduledDraftFingerprint } from "./scheduledSendFingerprint";
 import { authorizeOutbound, prepareOutboundAssertion, type OutboundAuthorization } from "./outboundAuthorization";
 import { SenderIdentityError } from "./senderIdentities";
 import { resolveSendIdentity, IDENTITY_HEADER } from "./sendIdentity";
@@ -56,7 +54,6 @@ import { randomUUID } from "node:crypto";
 import {
   finishDraftScheduleHold,
   holdDraftSchedules,
-  SCHEDULED_SEND_LEASE_MAX_MS,
   processScheduleOwner,
   ScheduledSendAlreadySentError,
   ScheduledSendBusyError,
@@ -146,8 +143,6 @@ export class DraftSendError extends Error {
 export type SendDraftResult = SentCopyResult & { identityId: string };
 
 export type DraftScheduleHold = {
-  /** Re-check immediately at SMTP/APPEND: an expired or replaced hold must never resume. */
-  assertCurrent: () => void;
   /** The manual change happened: close the draft's schedule (and an old failure). */
   complete: () => Promise<void>;
   /** It did not: queue the schedule again, or fail it as `send_uncertain` if a send may have gone out. */
@@ -163,8 +158,7 @@ export type DraftScheduleHold = {
  */
 export async function holdScheduleForDraftChange(accountId: string, draftId: string, reason: ScheduledSendReason): Promise<DraftScheduleHold> {
   const owner = `${processScheduleOwner()}/manual:${randomUUID()}`;
-  const held = await holdDraftSchedules(accountId, draftId, owner, reason === "sent_now");
-  const master = await getDb();
+  await holdDraftSchedules(accountId, draftId, owner, reason === "sent_now");
   let finished = false;
   const finish = async (outcome: Parameters<typeof finishDraftScheduleHold>[3]) => {
     if (finished) return;
@@ -178,12 +172,6 @@ export async function holdScheduleForDraftChange(accountId: string, draftId: str
     }
   };
   return {
-    assertCurrent: () => {
-      if (!held) return;
-      if (!master.query(`SELECT 1 FROM scheduled_sends WHERE accountId=? AND draftId=? AND status='sending'
-        AND leaseOwner=? AND leaseStartedAt>? AND COALESCE(lastError,'')<>'security_revoked'`)
-        .get(accountId, draftId, owner, Date.now() - SCHEDULED_SEND_LEASE_MAX_MS)) throw new ScheduledSendBusyError();
-    },
     complete: () => finish({ kind: "done", reason }),
     abort: (error) => finish(smtpOutcomeUncertain(error) ? { kind: "uncertain" } : { kind: "restore" })
   };
@@ -534,7 +522,7 @@ export async function saveDraftForAccount(params: {
     if (existingDraft && payload.expectedUpdatedAt !== undefined) {
       assertDraftVersion(await getMessageById(accountId, existingDraft.id));
     }
-    uid = await appendImapMessage(account, draftsMailbox, raw, APPENDED_DRAFT_FLAGS, clientId, undefined, { beforeAppend: () => { assertCurrent(); scheduleHold?.assertCurrent(); } });
+    uid = await appendImapMessage(account, draftsMailbox, raw, APPENDED_DRAFT_FLAGS, clientId, undefined, { beforeAppend: assertCurrent });
   } catch (error) {
     await scheduleHold?.abort(error);
     throw error;
@@ -689,23 +677,9 @@ export async function sendDraftForAccount(params: {
   draftId: string;
   actor: CollabActor;
   authorization?: OutboundAuthorization;
-  /** Required content snapshot for a scheduler send; null is an untrusted legacy schedule. */
-  scheduledFingerprint?: string | null;
-  assertScheduleHold?: () => void;
 }): Promise<SendDraftResult> {
   const { account, accountId, clientId, draftId } = params;
   const { draft, rawSource, messageId, identity } = await loadSendableDraft(accountId, draftId);
-  if (params.scheduledFingerprint !== undefined) {
-    const draftsFolder = findDraftsFolder(await getFolders(accountId), accountId);
-    if (!draftsFolder || draft.folderId !== draftsFolder.id) {
-      throw new DraftSendError(409, "The draft left Drafts.", "scheduled_send_draft_deleted");
-    }
-    // Compare the exact source/envelope we will relay, not a preflight read that another
-    // IMAP sync could replace before this load. No changed content reaches SMTP.
-    if (!params.scheduledFingerprint || scheduledDraftFingerprint(draft, rawSource) !== params.scheduledFingerprint) {
-      throw new DraftSendError(409, "The scheduled draft changed. Review and schedule it again.", "scheduled_send_draft_changed");
-    }
-  }
   // Prepare the wire copy:
   //   - `stripBccHeader` removes the `Bcc:` header that's in the cached
   //     draft (saved with `keepBcc: true`). Relaying that unchanged would
@@ -723,9 +697,8 @@ export async function sendDraftForAccount(params: {
   const wireSource = stripBccHeader(sentSource);
   const envelopeRecipients = buildDraftSendEnvelopeRecipients(draft);
   const authorization = params.authorization ? await authorizeOutbound(params.authorization, { accountId, minRole: "editor", identity }) : undefined;
-  const assertAuthorized = authorization ? await prepareOutboundAssertion(authorization) : undefined;
-  const beforeSend = () => { assertAuthorized?.(); params.assertScheduleHold?.(); };
-  beforeSend();
+  const beforeSend = authorization ? await prepareOutboundAssertion(authorization) : undefined;
+  beforeSend?.();
   await sendRawSmtpMessage(account, wireSource, {
     from: identity.email,
     to: envelopeRecipients

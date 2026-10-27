@@ -7,9 +7,9 @@ export type ScheduledSendStatus = "queued" | "sending" | "sent" | "failed" | "ca
 
 /** Reason codes stored in `lastError`; the UI translates them, raw upstream text is never stored. */
 export type ScheduledSendReason =
-  | "rescheduled" | "cancelled" | "edited" | "discarded" | "sent_now" | "manual_send"
+  | "rescheduled" | "cancelled" | "edited" | "discarded" | "sent_now"
   | "permission_revoked" | "identity_unavailable" | "draft_missing" | "draft_invalid"
-  | "manual_interrupted" | "draft_changed" | "draft_deleted" | "security_revoked" | "account_missing" | "smtp_rejected" | "send_failed" | "send_uncertain" | "interrupted";
+  | "account_missing" | "smtp_rejected" | "send_failed" | "send_uncertain" | "interrupted";
 
 export type ScheduledSend = {
   id: string;
@@ -23,7 +23,6 @@ export type ScheduledSend = {
   lastError: ScheduledSendReason | null;
   leaseOwner: string | null;
   leaseStartedAt: number | null;
-  sourceFingerprint: string | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -45,9 +44,9 @@ export class ScheduledSendAlreadySentError extends Error {
 }
 
 /** Statuses shown to members: the active schedule and an unresolved failure. */
-const VISIBLE_PREDICATE = `(status IN ('queued','sending','failed') OR
-  (status='cancelled' AND lastError IN ('security_revoked','permission_revoked','identity_unavailable',
-    'draft_missing','draft_invalid','account_missing','interrupted','draft_changed','draft_deleted')))`;
+const VISIBLE_STATUSES = "('queued','sending','failed')";
+/** Settling a draft (edit, discard, manual send) closes these; `sending` is never touched. */
+const OPEN_STATUSES = "('queued','failed')";
 
 const ownerKey = Symbol.for("noctua.scheduledSendProcessOwner");
 const processHost = globalThis as typeof globalThis & { [ownerKey]?: string };
@@ -77,7 +76,7 @@ function expireStaleLeases(db: any, now: number, scope?: { accountId: string; dr
   if (scope) { filters.push("accountId=?"); values.push(scope.accountId); }
   if (scope?.draftId) { filters.push("draftId=?"); values.push(scope.draftId); }
   if (scope?.id) { filters.push("id=?"); values.push(scope.id); }
-  return db.query(`UPDATE scheduled_sends SET status='failed',lastError=CASE WHEN instr(leaseOwner,'/manual:')>0 THEN 'manual_interrupted' ELSE 'interrupted' END,leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=?
+  return db.query(`UPDATE scheduled_sends SET status='failed',lastError='interrupted',leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=?
     WHERE ${filters.join(" AND ")}`).run(now, ...values).changes as number;
 }
 
@@ -90,24 +89,21 @@ function hasSendingRow(db: any, accountId: string, draftId: string) {
  * `assertCurrent` runs inside the write transaction (live outbound authorization).
  */
 export function createScheduledSend(input: {
-  accountId: string; userId: string; draftId: string; sendAt: number; now?: number; sourceFingerprint?: string; assertCurrent?: (db: any) => void;
+  accountId: string; userId: string; draftId: string; sendAt: number; now?: number; assertCurrent?: (db: any) => void;
 }) {
   return write("createScheduledSend", db => {
     input.assertCurrent?.(db);
     const now = input.now ?? Date.now();
     expireStaleLeases(db, now, { accountId: input.accountId, draftId: input.draftId });
     if (hasSendingRow(db, input.accountId, input.draftId)) throw new ScheduledSendBusyError();
-    if (db.query("SELECT 1 FROM scheduled_sends WHERE accountId=? AND draftId=? AND status='sent'").get(input.accountId, input.draftId)) {
-      throw new ScheduledSendAlreadySentError();
-    }
     db.query(`UPDATE scheduled_sends SET status='cancelled',lastError='rescheduled',updatedAt=?
-      WHERE accountId=? AND draftId=? AND ${VISIBLE_PREDICATE}`).run(now, input.accountId, input.draftId);
+      WHERE accountId=? AND draftId=? AND status IN ${OPEN_STATUSES}`).run(now, input.accountId, input.draftId);
     const row: ScheduledSend = { id: randomUUID(), accountId: input.accountId, userId: input.userId, draftId: input.draftId,
       sendAt: input.sendAt, status: "queued", attempts: 0, nextAttemptAt: input.sendAt, lastError: null, leaseOwner: null,
-      leaseStartedAt: null, sourceFingerprint: input.sourceFingerprint ?? null, createdAt: now, updatedAt: now };
-    db.query(`INSERT INTO scheduled_sends (id,accountId,userId,draftId,sendAt,status,attempts,nextAttemptAt,lastError,leaseOwner,leaseStartedAt,sourceFingerprint,createdAt,updatedAt)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(row.id, row.accountId, row.userId, row.draftId, row.sendAt, row.status,
-      row.attempts, row.nextAttemptAt, row.lastError, row.leaseOwner, row.leaseStartedAt, row.sourceFingerprint, row.createdAt, row.updatedAt);
+      leaseStartedAt: null, createdAt: now, updatedAt: now };
+    db.query(`INSERT INTO scheduled_sends (id,accountId,userId,draftId,sendAt,status,attempts,nextAttemptAt,lastError,leaseOwner,leaseStartedAt,createdAt,updatedAt)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(row.id, row.accountId, row.userId, row.draftId, row.sendAt, row.status,
+      row.attempts, row.nextAttemptAt, row.lastError, row.leaseOwner, row.leaseStartedAt, row.createdAt, row.updatedAt);
     return row;
   });
 }
@@ -116,8 +112,8 @@ export function createScheduledSend(input: {
 export async function listScheduledSends(accountId: string, draftId?: string): Promise<ScheduledSend[]> {
   const db = await getDb();
   return (draftId
-    ? db.query(`SELECT * FROM scheduled_sends WHERE accountId=? AND draftId=? AND ${VISIBLE_PREDICATE} ORDER BY sendAt, id`).all(accountId, draftId)
-    : db.query(`SELECT * FROM scheduled_sends WHERE accountId=? AND ${VISIBLE_PREDICATE} ORDER BY sendAt, id`).all(accountId)) as ScheduledSend[];
+    ? db.query(`SELECT * FROM scheduled_sends WHERE accountId=? AND draftId=? AND status IN ${VISIBLE_STATUSES} ORDER BY sendAt, id`).all(accountId, draftId)
+    : db.query(`SELECT * FROM scheduled_sends WHERE accountId=? AND status IN ${VISIBLE_STATUSES} ORDER BY sendAt, id`).all(accountId)) as ScheduledSend[];
 }
 
 export async function getScheduledSend(id: string): Promise<ScheduledSend | null> {
@@ -130,9 +126,7 @@ export function cancelScheduledSend(accountId: string, id: string, now = Date.no
   return write("cancelScheduledSend", db => {
     expireStaleLeases(db, now, { accountId, id });
     const row = db.query("SELECT * FROM scheduled_sends WHERE id=? AND accountId=?").get(id, accountId) as ScheduledSend | null;
-    if (!row) return null;
-    const visible = db.query(`SELECT 1 FROM scheduled_sends WHERE id=? AND ${VISIBLE_PREDICATE}`).get(id);
-    if (!visible) return null;
+    if (!row || !["queued", "failed", "sending"].includes(row.status)) return null;
     if (row.status === "sending") throw new ScheduledSendBusyError();
     db.query("UPDATE scheduled_sends SET status='cancelled',lastError='cancelled',updatedAt=? WHERE id=?").run(now, id);
     return { ...row, status: "cancelled" as const, lastError: "cancelled" as const, updatedAt: now };
@@ -152,18 +146,8 @@ export function holdDraftSchedules(accountId: string, draftId: string, owner: st
     if (rejectSent && db.query("SELECT 1 FROM scheduled_sends WHERE accountId=? AND draftId=? AND status='sent'").get(accountId, draftId)) {
       throw new ScheduledSendAlreadySentError();
     }
-    const held = db.query(`UPDATE scheduled_sends SET status='sending',leaseOwner=?,leaseStartedAt=?,updatedAt=?
+    return db.query(`UPDATE scheduled_sends SET status='sending',leaseOwner=?,leaseStartedAt=?,updatedAt=?
       WHERE accountId=? AND draftId=? AND status='queued'`).run(owner, now, now, accountId, draftId).changes as number;
-    // Opening compose may already have cancelled the schedule. Still serialize sends of this
-    // draft, and retain a durable receipt before Sent-copy work can leave the draft visible.
-    if (rejectSent && !held) {
-      db.query(`INSERT INTO scheduled_sends
-        (id,accountId,userId,draftId,sendAt,status,attempts,nextAttemptAt,lastError,leaseOwner,leaseStartedAt,createdAt,updatedAt)
-        VALUES (?,?,?, ?,?,'sending',0,?,'manual_send',?,?,?,?)`)
-        .run(randomUUID(), accountId, "", draftId, now, now, owner, now, now, now);
-      return 1;
-    }
-    return held;
   });
 }
 
@@ -177,18 +161,15 @@ export function finishDraftScheduleHold(accountId: string, draftId: string, owne
   return write("finishDraftScheduleHold", db => {
     const held = "accountId=? AND draftId=? AND status='sending' AND leaseOwner=?";
     if (outcome.kind === "restore") {
-      return db.query(`UPDATE scheduled_sends SET status=CASE WHEN lastError IN ('manual_send','security_revoked') THEN 'cancelled' ELSE 'queued' END,
-        lastError=CASE WHEN lastError='manual_send' THEN 'cancelled' ELSE lastError END,
-        leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=? WHERE ${held}`)
+      return db.query(`UPDATE scheduled_sends SET status='queued',leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=? WHERE ${held}`)
         .run(now, accountId, draftId, owner).changes as number;
     }
     if (outcome.kind === "uncertain") {
       return db.query(`UPDATE scheduled_sends SET status='failed',lastError='send_uncertain',leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=? WHERE ${held}`)
         .run(now, accountId, draftId, owner).changes as number;
     }
-    const status = outcome.reason === "sent_now" ? "sent" : "cancelled";
-    const closed = db.query(`UPDATE scheduled_sends SET status=?,lastError=?,leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=? WHERE ${held}`)
-      .run(status, outcome.reason, now, accountId, draftId, owner).changes as number;
+    const closed = db.query(`UPDATE scheduled_sends SET status='cancelled',lastError=?,leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=? WHERE ${held}`)
+      .run(outcome.reason, now, accountId, draftId, owner).changes as number;
     return closed + (db.query(`UPDATE scheduled_sends SET status='cancelled',lastError=?,updatedAt=? WHERE accountId=? AND draftId=? AND status='failed'`)
       .run(outcome.reason, now, accountId, draftId).changes as number);
   });
@@ -214,8 +195,6 @@ export function settleScheduledSend(id: string, owner: string, outcome:
   { status: "sent" | "failed" | "cancelled"; reason: ScheduledSendReason | null } |
   { status: "queued"; reason: ScheduledSendReason; nextAttemptAt: number }, now = Date.now()) {
   return write("settleScheduledSend", db => {
-    const row = db.query("SELECT lastError FROM scheduled_sends WHERE id=? AND leaseOwner=? AND status='sending'").get(id, owner) as { lastError: string | null } | null;
-    if (row?.lastError === "security_revoked" && outcome.status !== "sent") outcome = { status: "cancelled", reason: "security_revoked" };
     const nextAttemptAt = outcome.status === "queued" ? outcome.nextAttemptAt : null;
     const result = db.query(`UPDATE scheduled_sends SET status=?,lastError=?,leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=?,
       nextAttemptAt=COALESCE(?,nextAttemptAt) WHERE id=? AND leaseOwner=? AND status='sending'`)
@@ -234,7 +213,7 @@ export function failInterruptedScheduledSends(ownerAlive: (leaseOwner: string) =
     const rows = db.query("SELECT id,leaseOwner FROM scheduled_sends WHERE status='sending'").all() as Array<{ id: string; leaseOwner: string | null }>;
     for (const row of rows) {
       if (row.leaseOwner && ownerAlive(row.leaseOwner)) continue;
-      failed += db.query(`UPDATE scheduled_sends SET status='failed',lastError=CASE WHEN instr(leaseOwner,'/manual:')>0 THEN 'manual_interrupted' ELSE 'interrupted' END,leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=?
+      failed += db.query(`UPDATE scheduled_sends SET status='failed',lastError='interrupted',leaseOwner=NULL,leaseStartedAt=NULL,updatedAt=?
         WHERE id=? AND status='sending'`).run(now, row.id).changes as number;
     }
     return failed;
@@ -250,5 +229,5 @@ export async function nextScheduledSendAttemptAt(): Promise<number | null> {
 /** Drops settled history (sent/cancelled) older than `before`; failures stay until the draft is settled. */
 export function pruneScheduledSends(before: number) {
   return write("pruneScheduledSends", db =>
-    db.query(`DELETE FROM scheduled_sends WHERE (status='sent' OR (status='cancelled' AND NOT ${VISIBLE_PREDICATE})) AND updatedAt<?`).run(before).changes as number);
+    db.query("DELETE FROM scheduled_sends WHERE status IN ('sent','cancelled') AND updatedAt<?").run(before).changes as number);
 }

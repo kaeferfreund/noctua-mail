@@ -7,14 +7,12 @@ import { Theme } from "@radix-ui/themes";
 import { TooltipProvider } from "@/app/components/ui/tooltip";
 import type { Message } from "@/lib/data";
 import { bindRowReadAction, resolveSelectionActionTargets } from "../messagelist/selectionActions";
-import { ScheduledSendProvider } from "../scheduledSend/ScheduledSend";
 import MessageMenu from "./MessageMenu";
 
 afterEach(cleanup);
 const noop = () => {};
 
-function setup({ collapsed = true, allRead = false, origin = "list", single = false, supportsThreads = true, inTrash = false, isDraft = false }: {
-  isDraft?: boolean;
+function setup({ collapsed = true, allRead = false, origin = "list", single = false, supportsThreads = true, inTrash = false }: {
   collapsed?: boolean;
   inTrash?: boolean;
   allRead?: boolean;
@@ -29,7 +27,7 @@ function setup({ collapsed = true, allRead = false, origin = "list", single = fa
     folderId: "acc:INBOX", accountId: "acc", body: ""
   });
   // The representative is read even when another message is unread.
-  const root = { ...makeMessage("root", true), draft: isDraft };
+  const root = makeMessage("root", true);
   const reply = makeMessage("reply", allRead);
   const messages = single ? [root] : [root, reply];
   let resolutions = 0;
@@ -59,7 +57,7 @@ function setup({ collapsed = true, allRead = false, origin = "list", single = fa
   const deletes: Array<[string, boolean | undefined]> = [];
   const archives: string[] = [];
   const props: ComponentProps<typeof MessageMenu> = {
-    message: root, origin, isDraft, readAction, pendingMessageActions: new Set(),
+    message: root, origin, isDraft: false, readAction, pendingMessageActions: new Set(),
     openCompose: noop,
     updateFlagState: (message, flag, value) => {
       flags.push([message.id, flag, value]);
@@ -78,10 +76,8 @@ function setup({ collapsed = true, allRead = false, origin = "list", single = fa
     onMoveTo: noop, isTrashFolder: () => inTrash, isSpamFolder: () => false
   };
   let rowClicks = 0;
-  const tree = () => <Theme><TooltipProvider><ScheduledSendProvider value={{ byDraftId: new Map(),
-    unschedule: async () => {}, sendNow: async () => {}, schedule: noop }}><div onClick={() => { rowClicks++; }}><MessageMenu {...props} /></div></ScheduledSendProvider></TooltipProvider></Theme>;
+  const tree = () => <Theme><TooltipProvider><div onClick={() => { rowClicks++; }}><MessageMenu {...props} /></div></TooltipProvider></Theme>;
   const view = render(tree());
-  const markPending = () => { props.pendingMessageActions.add(root.id); view.rerender(tree()); };
   const open = async () => {
     await act(async () => {
       fireEvent.keyDown(view.getByRole("button", { name: "Message actions" }), { key: "Enter" });
@@ -95,7 +91,7 @@ function setup({ collapsed = true, allRead = false, origin = "list", single = fa
       await new Promise(resolve => setTimeout(resolve, 0));
     });
   };
-  return { view, open, choose, markPending, messages, calls, flags, todos, deletes, archives, resolutions: () => resolutions, rowClicks: () => rowClicks };
+  return { view, open, choose, messages, calls, flags, todos, deletes, archives, resolutions: () => resolutions, rowClicks: () => rowClicks };
 }
 
 describe("row read/unread menu", () => {
@@ -217,15 +213,6 @@ describe("row menu focus return", () => {
       Element.prototype.matches = originalMatches;
     }
   });
-});
-
-
-it("disables scheduling when an action becomes pending while the draft menu is open", async () => {
-  const menu = setup({ single: true, isDraft: true });
-  await menu.open();
-  expect(menu.view.getByRole("menuitem", { name: "Schedule send …" }).getAttribute("aria-disabled")).not.toBe("true");
-  menu.markPending();
-  expect(menu.view.getByRole("menuitem", { name: "Schedule send …" }).getAttribute("aria-disabled")).toBe("true");
 });
 
 it("portal menu actions never bubble into the owning message row", async () => {
