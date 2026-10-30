@@ -93,7 +93,7 @@ import { useScrollAnchors } from "./mailclient/useScrollAnchors";
 import { UrlHistoryContext } from "@/app/hooks/UrlHistoryContext";
 import { settingsTabVisible } from "./account-settings/settingsAccess";
 import { resolveDeepLinkMessage } from "@/lib/navigation/resolveMessage";
-import { notificationDeepLink, type DeepLinkState } from "@/lib/navigation/deepLinks";
+import type { DeepLinkState } from "@/lib/navigation/deepLinks";
 import { parseMailto } from "@/lib/mailto";
 import {
   buildSavedDraftListMessage,
@@ -203,6 +203,7 @@ import { openDetachedWindow } from "@/lib/ui/openDetachedWindow";
 import { useWindowTitle } from "@/lib/ui/windowTitle";
 import { setAppBadge, unreadBadgeCount } from "@/lib/push/badge";
 import { useCurrentPushDeviceSettings } from "@/app/hooks/useCurrentPushDeviceSettings";
+import { usePendingNotificationOpen } from "@/app/hooks/usePendingNotificationOpen";
 import {
   formatMailboxPageTitle,
   formatMessageHtmlPageTitle,
@@ -4234,13 +4235,15 @@ export default function MailClient({
       });
   }, [swRegistrationRef]);
 
+  // Notification taps: the worker's message and the target it stores.
+  usePendingNotificationOpen(navigateMessageRef);
+
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
     const handleServiceWorkerMessage = (event: MessageEvent) => {
       const payload = event.data as
         | {
             type?: string;
-            url?: string;
             messageId?: string | null;
             accountId?: string;
             reminderId?: string;
@@ -4248,11 +4251,6 @@ export default function MailClient({
           }
         | null;
       if (!payload?.type) return;
-      if (payload.type === "noctua:notification-open") {
-        const target = notificationDeepLink(payload);
-        if (target.messageId) navigateMessageRef.current(target.messageId, target.accountId);
-        return;
-      }
       if (
         payload.type === "noctua:reminder-delivered" &&
         typeof payload.accountId === "string" &&

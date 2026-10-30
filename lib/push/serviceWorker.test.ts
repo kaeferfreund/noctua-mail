@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { NOTIFICATION_BADGE_ICON, NOTIFICATION_ICON } from "@/lib/appBranding";
+import { PENDING_OPEN_CACHE, PENDING_OPEN_URL } from "@/lib/push/pendingOpen";
 
 const workerSource = readFileSync(new URL("../../public/sw.js", import.meta.url), "utf8");
 const origin = "https://noctua.example.test";
@@ -12,7 +13,7 @@ type FetchCall = { url: string; method: string; body: unknown };
 
 function loadWorker(options: {
   setAppBadge?: boolean;
-  clients?: Array<{ url: string; focusFails?: boolean; noPostMessage?: boolean }>;
+  clients?: Array<{ url: string; focusFails?: boolean; focusHangs?: boolean; noPostMessage?: boolean }>;
   fetchResponses?: Record<string, Response>;
 } = {}) {
   const listeners = new Map<string, Listener>();
@@ -23,13 +24,29 @@ function loadWorker(options: {
   const posted: Array<{ client: string; message: unknown }> = [];
   const focused: string[] = [];
   const opened: string[] = [];
-  const windows = (options.clients ?? []).map(({ url, focusFails, noPostMessage }) => ({
+  // Order of the click's side effects: store, focus, post, open.
+  const steps: string[] = [];
+  const stored = new Map<string, Map<string, string>>();
+  const caches = {
+    open: async (name: string) => {
+      const entries = stored.get(name) ?? new Map<string, string>();
+      stored.set(name, entries);
+      return {
+        put: async (key: string, response: Response) => { entries.set(key, await response.text()); steps.push("store"); },
+        match: async (key: string) => entries.has(key) ? new Response(entries.get(key)) : undefined
+      };
+    }
+  };
+  const windows = (options.clients ?? []).map(({ url, focusFails, focusHangs, noPostMessage }) => ({
     url,
-    focus: async () => {
-      if (focusFails) throw new DOMException("Not allowed to focus", "InvalidAccessError");
+    focus: () => {
+      steps.push("focus");
+      if (focusHangs) return new Promise<void>(() => {});
+      if (focusFails) return Promise.reject(new DOMException("Not allowed to focus", "InvalidAccessError"));
       focused.push(url);
+      return Promise.resolve();
     },
-    ...noPostMessage ? {} : { postMessage: (message: unknown) => { posted.push({ client: url, message }); } }
+    ...noPostMessage ? {} : { postMessage: (message: unknown) => { steps.push("post"); posted.push({ client: url, message }); } }
   }));
   const navigator: Record<string, unknown> = { userAgent: "SyntheticAgent/1.0" };
   if (options.setAppBadge !== false) {
@@ -37,7 +54,7 @@ function loadWorker(options: {
     navigator.clearAppBadge = async () => { badges.push("cleared"); };
   }
   const context = {
-    btoa, URL, URLSearchParams, Response,
+    btoa, URL, URLSearchParams, Response, caches, setTimeout, clearTimeout,
     fetch: async (url: string, init: RequestInit = {}) => {
       fetches.push({ url, method: init.method ?? "GET", body: init.body ? JSON.parse(String(init.body)) : undefined });
       return options.fetchResponses?.[`${init.method ?? "GET"} ${url}`] ?? Response.json({ ok: true });
@@ -46,7 +63,7 @@ function loadWorker(options: {
       navigator,
       location: { origin },
       addEventListener: (type: string, callback: Listener) => listeners.set(type, callback),
-      clients: { matchAll: async () => windows, openWindow: async (url: string) => { opened.push(url); } },
+      clients: { matchAll: async () => windows, openWindow: async (url: string) => { steps.push("open"); opened.push(url); } },
       registration: {
         showNotification: async (title: string, notificationOptions: Record<string, unknown>) => {
           notifications.push({ title, options: notificationOptions });
@@ -70,7 +87,11 @@ function loadWorker(options: {
   const push = (data: unknown) => dispatch("push", {
     data: data === undefined ? null : { json: () => (typeof data === "string" ? JSON.parse(data) : data) }
   });
-  return { dispatch, push, notifications, badges, fetches, subscribed, posted, focused, opened };
+  const pendingOpen = () => {
+    const value = stored.get(PENDING_OPEN_CACHE)?.get(PENDING_OPEN_URL);
+    return value === undefined ? undefined : JSON.parse(value) as { url: string; at: number };
+  };
+  return { dispatch, push, notifications, badges, fetches, subscribed, posted, focused, opened, steps, pendingOpen };
 }
 
 const mail = {
@@ -166,7 +187,7 @@ describe("service worker notification click", () => {
     const worker = loadWorker({ clients: [{ url: `${origin}/compose/window` }, { url: `${origin}/?f=INBOX` }] });
     await worker.dispatch("notificationclick", { notification: { data: { url: mail.url }, close() {} } });
     expect(worker.focused).toEqual([`${origin}/?f=INBOX`]);
-    expect(worker.posted).toEqual([{ client: `${origin}/?f=INBOX`, message: { type: "noctua:notification-open", url: mail.url } }]);
+    expect(worker.posted).toEqual([{ client: `${origin}/?f=INBOX`, message: { type: "noctua:notification-open", url: mail.url, at: expect.any(Number) } }]);
     const cold = loadWorker();
     await cold.dispatch("notificationclick", { notification: { data: { url: mail.url }, close() {} } });
     expect(cold.opened).toEqual([mail.url]);
@@ -177,7 +198,7 @@ describe("service worker notification click on a window that cannot take it", ()
   it("still posts the message when focus is refused", async () => {
     const worker = loadWorker({ clients: [{ url: `${origin}/?f=INBOX`, focusFails: true }] });
     await worker.dispatch("notificationclick", { notification: { data: { url: mail.url }, close() {} } });
-    expect(worker.posted).toEqual([{ client: `${origin}/?f=INBOX`, message: { type: "noctua:notification-open", url: mail.url } }]);
+    expect(worker.posted).toEqual([{ client: `${origin}/?f=INBOX`, message: { type: "noctua:notification-open", url: mail.url, at: expect.any(Number) } }]);
     expect(worker.opened).toEqual([]);
   });
 
@@ -193,6 +214,42 @@ describe("service worker notification click on a window that cannot take it", ()
   });
 });
 
+describe("service worker notification click stores the target for the page", () => {
+  const click = { notification: { data: { url: mail.url }, close() {} } };
+
+  it("stores the target before it focuses and posts, with the same tap id in both", async () => {
+    const before = Date.now();
+    const worker = loadWorker({ clients: [{ url: `${origin}/?f=INBOX` }] });
+    await worker.dispatch("notificationclick", click);
+    expect(worker.steps).toEqual(["store", "focus", "post"]);
+    const pending = worker.pendingOpen()!;
+    expect(pending.url).toBe(mail.url);
+    expect(pending.at).toBeGreaterThanOrEqual(before);
+    expect(worker.posted[0].message).toEqual({ type: "noctua:notification-open", url: mail.url, at: pending.at });
+  });
+
+  it("stores and still posts when focus never settles", async () => {
+    const worker = loadWorker({ clients: [{ url: `${origin}/`, focusHangs: true }] });
+    const started = Date.now();
+    await worker.dispatch("notificationclick", click);
+    expect(Date.now() - started).toBeLessThan(5000);
+    expect(worker.steps).toEqual(["store", "focus", "post"]);
+    expect(worker.pendingOpen()?.url).toBe(mail.url);
+  });
+
+  it("stores before openWindow when no window is open", async () => {
+    const worker = loadWorker();
+    await worker.dispatch("notificationclick", click);
+    expect(worker.steps).toEqual(["store", "open"]);
+    expect(worker.pendingOpen()?.url).toBe(mail.url);
+  });
+
+  it("uses the cache names the page reads", () => {
+    expect(workerSource).toContain(`const PENDING_OPEN_CACHE = "${PENDING_OPEN_CACHE}";`);
+    expect(workerSource).toContain(`const PENDING_OPEN_URL = "${PENDING_OPEN_URL}";`);
+  });
+});
+
 describe("service worker notification click on a foreign target", () => {
   it("opens only same-origin windows, whatever the notification data says", async () => {
     for (const url of ["//evil.example.invalid/x", "https://evil.example.invalid/x", `${origin}//evil.example.invalid/x`]) {
@@ -201,7 +258,7 @@ describe("service worker notification click on a foreign target", () => {
       expect(cold.opened).toEqual(["/"]);
       const warm = loadWorker({ clients: [{ url: `${origin}/` }] });
       await warm.dispatch("notificationclick", { notification: { data: { url }, close() {} } });
-      expect(warm.posted).toEqual([{ client: `${origin}/`, message: { type: "noctua:notification-open", url: "/" } }]);
+      expect(warm.posted).toEqual([{ client: `${origin}/`, message: { type: "noctua:notification-open", url: "/", at: expect.any(Number) } }]);
     }
   });
 });
