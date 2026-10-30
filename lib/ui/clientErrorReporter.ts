@@ -27,7 +27,7 @@ function isStandalone() {
 }
 
 /** Never throws: it runs on error paths, including inside an error boundary. */
-export function reportClientError(source: ClientErrorSource, error: unknown, now = Date.now(), detail?: Pick<ClientErrorReport, "kind" | "count" | "blank">) {
+export function reportClientError(source: ClientErrorSource, error: unknown, now = Date.now(), detail?: Pick<ClientErrorReport, "kind" | "count" | "blank" | "notificationOpen">) {
   try {
     const { message, stack, digest } = describe(error);
     if (!message) return;

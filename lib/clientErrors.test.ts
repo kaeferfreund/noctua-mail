@@ -53,3 +53,15 @@ test("blank-screen reports keep the search without a search text, the state keys
   expect(sanitizeClientErrorReport({ source: "watchdog", message: "x", kind: "blank-screen", blank: { visibilityState: "<b>", trigger: 1 } })!.blank)
     .toEqual({ search: "", historyStateKeys: [], visibilityState: "", navigationType: "", trigger: "" });
 });
+
+test("notification-open reports keep only the path and the age, no ids, URLs or stack", () => {
+  const report = sanitizeClientErrorReport({ source: "notification", message: "Notification open", kind: "notification-open", stack: "private stack",
+    notificationOpen: { path: "store", ageMs: 1234.4, url: "/?a=~qa&m=~secret", messageId: "secret" } });
+  expect(report).toMatchObject({ source: "notification", kind: "notification-open", stack: "", notificationOpen: { path: "store", ageMs: 1234 } });
+  expect(Object.keys(report!.notificationOpen!).sort()).toEqual(["ageMs", "path"]);
+  expect(JSON.stringify(report)).not.toContain("secret");
+  expect(sanitizeClientErrorReport({ source: "notification", message: "x", kind: "notification-open", notificationOpen: { path: "elsewhere", ageMs: 1 } }))
+    .not.toHaveProperty("notificationOpen");
+  expect(sanitizeClientErrorReport({ source: "notification", message: "x", kind: "notification-open", notificationOpen: { path: "url", ageMs: -5 } })!.notificationOpen)
+    .toEqual({ path: "url", ageMs: 0 });
+});
