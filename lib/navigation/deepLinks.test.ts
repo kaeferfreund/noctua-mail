@@ -67,12 +67,12 @@ describe("mail URL state", () => {
   it.each([true, false])("generates compact reminder URLs for warm/cold clicks (reminder includes account: %s)", async includesAccount => {
     const listeners = new Map<string, (event: unknown) => void>();
     const notifications: Array<{ data: { url: string } }> = [];
-    const posted: Array<{ type: string; url: string }> = [];
+    const posted: Array<{ type: string; url: string; at: number }> = [];
     const opened: string[] = [];
-    const client = { url: "http://localhost/", focus: async () => {}, postMessage: (value: { type: string; url: string }) => posted.push(value) };
+    const client = { url: "http://localhost/", focus: async () => {}, postMessage: (value: { type: string; url: string; at: number }) => posted.push(value) };
     let windows: typeof client[] = [];
     const context = {
-      btoa, URL, URLSearchParams, Response,
+      btoa, URL, URLSearchParams, Response, setTimeout, clearTimeout,
       caches: { open: async () => ({ match: async () => Response.json({ accountIds: [accountId], deliveredByAccount: {} }), put: async () => {} }) },
       fetch: async () => Response.json({ items: [{ id: "synthetic-reminder", accountId: includesAccount ? accountId : undefined, messageId,
         triggerAtMs: Date.now() - 1000, eventStartAtMs: Date.now() + 60000, eventTitle: "Synthetic event" }] }),
@@ -95,7 +95,7 @@ describe("mail URL state", () => {
     expect(opened).toEqual([url]);
     windows = [client];
     click(); await pending;
-    expect(posted).toEqual([{ type: "noctua:notification-open", url }]);
+    expect(posted).toEqual([{ type: "noctua:notification-open", url, at: expect.any(Number) }]);
     expect(notificationDeepLink(posted[0])).toMatchObject({ accountId, messageId });
   });
   it("round trips ids, unicode search, filters and every shell place without draft content", () => {

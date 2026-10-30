@@ -3,16 +3,19 @@
  * which builds and truncates the report, and the route, which accepts only these
  * fields and truncates again. Never carries a search text, mail content or tokens; query
  * values only in the blank-screen context (deep-link ids and folder, `q` emptied).
+ * A notification tap reports how its message was opened, without ids or URLs.
  */
-export const CLIENT_ERROR_SOURCES = ["boundary", "global", "error", "unhandledrejection", "watchdog"] as const;
+export const CLIENT_ERROR_SOURCES = ["boundary", "global", "error", "unhandledrejection", "watchdog", "notification"] as const;
 export type ClientErrorSource = (typeof CLIENT_ERROR_SOURCES)[number];
 
 export type ClientErrorReport = {
   source: ClientErrorSource;
-  kind?: "overlay-back-fallback" | "blank-screen";
+  kind?: "overlay-back-fallback" | "blank-screen" | "notification-open";
   count?: number;
   /** Blank-screen watchdog only: the context of an app root that stayed empty. */
   blank?: BlankScreenContext;
+  /** Notification taps only: which path opened the message. */
+  notificationOpen?: NotificationOpenContext;
   message: string;
   stack: string;
   /** Next.js digest of a server-rendered error, if any. */
@@ -36,6 +39,14 @@ export type BlankScreenContext = {
   navigationType: string;
   /** What started the check: load, pageshow or popstate. */
   trigger: string;
+};
+
+export const NOTIFICATION_OPEN_PATHS = ["message", "store", "url"] as const;
+export type NotificationOpenContext = {
+  /** message: the worker's message; store: the target the worker stored; url: the page was opened with it. */
+  path: (typeof NOTIFICATION_OPEN_PATHS)[number];
+  /** Time from the tap to the open. */
+  ageMs: number;
 };
 
 export const CLIENT_ERROR_LIMITS = { message: 1024, stack: 4096, digest: 64, path: 256, queryKeys: 24, build: 128, userAgent: 512, search: 512, stateKeys: 24 } as const;
@@ -71,6 +82,15 @@ function sanitizeBlankScreen(input: unknown): BlankScreenContext | null {
   };
 }
 
+function sanitizeNotificationOpen(input: unknown): NotificationOpenContext | null {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const raw = input as Record<string, unknown>;
+  const path = NOTIFICATION_OPEN_PATHS.find(item => item === raw.path);
+  if (!path) return null;
+  const ageMs = typeof raw.ageMs === "number" && Number.isFinite(raw.ageMs) && raw.ageMs > 0 ? Math.min(Math.round(raw.ageMs), 86_400_000) : 0;
+  return { path, ageMs };
+}
+
 /** The accepted report, or null when the body is not a report. Unknown fields are dropped. */
 export function sanitizeClientErrorReport(input: unknown): ClientErrorReport | null {
   if (!input || typeof input !== "object" || Array.isArray(input)) return null;
@@ -79,12 +99,14 @@ export function sanitizeClientErrorReport(input: unknown): ClientErrorReport | n
   const message = clip(raw.message, CLIENT_ERROR_LIMITS.message);
   if (!source || !message) return null;
   const blank = raw.kind === "blank-screen" ? sanitizeBlankScreen(raw.blank) : null;
+  const notificationOpen = raw.kind === "notification-open" ? sanitizeNotificationOpen(raw.notificationOpen) : null;
   return {
     source, message,
     ...(blank ? { kind: "blank-screen" as const, blank } : {}),
+    ...(notificationOpen ? { kind: "notification-open" as const, notificationOpen } : {}),
     ...(raw.kind === "overlay-back-fallback" && Number.isSafeInteger(raw.count) && Number(raw.count) > 0
       ? { kind: "overlay-back-fallback" as const, count: Math.min(Number(raw.count), 100_000) } : {}),
-    stack: raw.kind === "overlay-back-fallback" || blank ? "" : clip(raw.stack, CLIENT_ERROR_LIMITS.stack),
+    stack: raw.kind === "overlay-back-fallback" || blank || notificationOpen ? "" : clip(raw.stack, CLIENT_ERROR_LIMITS.stack),
     digest: clip(raw.digest, CLIENT_ERROR_LIMITS.digest),
     path: clip(raw.path, CLIENT_ERROR_LIMITS.path).split("?")[0],
     queryKeys: (Array.isArray(raw.queryKeys) ? raw.queryKeys : [])

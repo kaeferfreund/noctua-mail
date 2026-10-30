@@ -2,6 +2,7 @@ import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { mkdirSync, readFileSync } from "node:fs";
 import { signInQa } from "./qaRound2Session";
 import { parseDeepLink, serializeDeepLink, emptyDeepLink } from "../../../lib/navigation/deepLinks";
+import { PENDING_OPEN_CACHE, PENDING_OPEN_URL } from "../../../lib/push/pendingOpen";
 import { totpFromUri } from "../../helpers/totp";
 
 // Notification tap in the phone app opens the notified message, also across a sign-in
@@ -37,6 +38,13 @@ async function notificationClick(page: Page, url: string) {
     navigator.serviceWorker.dispatchEvent(new MessageEvent("message", { data: { type: "noctua:notification-open", url: target } }));
   }, url);
 }
+/** What public/sw.js `notificationclick` stores before it focuses or opens a window. */
+async function storeTap(page: Page, url: string) {
+  await page.evaluate(async ([name, key, target]) => {
+    await (await caches.open(name)).put(key, new Response(JSON.stringify({ url: target, at: Date.now() })));
+  }, [PENDING_OPEN_CACHE, PENDING_OPEN_URL, url] as const);
+}
+const storedTap = (page: Page) => page.evaluate(async ([name, key]) => Boolean(await (await caches.open(name)).match(key)), [PENDING_OPEN_CACHE, PENDING_OPEN_URL] as const);
 /** The phone app comes back to the foreground, as it does when a notification is tapped. */
 async function foreground(page: Page) {
   await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
@@ -121,6 +129,34 @@ test.describe("phone", () => {
     await signInForm(page);
     await expectReader(page, "qa-second", ids["qa-second"][1]);
     await shot(page, "c-cold-start-expired-phone");
+  });
+
+  // iOS can lose the worker's message (inert window, page reloaded on resume); the stored
+  // target opens the message (briefs/fix/pwa-notification-pending-open.md).
+  test("d: page reloaded after the tap, the target only in the store — the reader opens", async ({ page }) => {
+    await page.context().addCookies(cookies);
+    await openMailbox(page, "qa-second");
+    await storeTap(page, notificationUrl("qa-shared", ids["qa-shared"][1]));
+    await page.reload();
+    await expectReader(page, "qa-shared", ids["qa-shared"][1]);
+    expect(await storedTap(page)).toBe(false);
+    await shot(page, "d-reloaded-store-phone");
+  });
+
+  test("d: app in the foreground, the message lost — becoming visible opens the stored target once", async ({ page }) => {
+    await page.context().addCookies(cookies);
+    await openMailbox(page, "qa-third");
+    await storeTap(page, notificationUrl("qa-third", ids["qa-third"][1]));
+    await foreground(page);
+    await expectReader(page, "qa-third", ids["qa-third"][1]);
+    expect(await storedTap(page)).toBe(false);
+    // Back to the list; a later foreground does not open the message again.
+    await page.getByRole("button", { name: "Back to messages", exact: true }).click();
+    await expect.poll(() => state(page).messageId).toBe("");
+    await foreground(page);
+    await page.waitForTimeout(1500);
+    expect(state(page).messageId).toBe("");
+    await shot(page, "d-foreground-store-phone");
   });
 
   test("forbidden: a notification for a mailbox without membership keeps the notice and stays put", async ({ page }) => {

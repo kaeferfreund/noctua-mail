@@ -248,25 +248,63 @@ function isMainWindow(client) {
   return new URL(client.url).pathname === "/";
 }
 
+// The tapped target, kept until the page takes it (app/hooks/usePendingNotificationOpen.ts
+// reads and deletes it). In the iOS home-screen app the window that matchAll() returns
+// can be inert, and a page that iOS reloads on resume never sees a posted message
+// (WebKit bugs 252544, 263687). Must equal lib/push/pendingOpen.ts (serviceWorker.test.ts checks it).
+const PENDING_OPEN_CACHE = "noctua-pending-open-v1";
+const PENDING_OPEN_URL = "/__noctua/pending-open";
+// A focus() that never settles must not hold back the message.
+const NOTIFICATION_FOCUS_TIMEOUT_MS = 1000;
+
+async function storePendingOpen(pending) {
+  try {
+    const cache = await caches.open(PENDING_OPEN_CACHE);
+    await cache.put(
+      PENDING_OPEN_URL,
+      new Response(JSON.stringify(pending), {
+        headers: { "Content-Type": "application/json", "Cache-Control": "no-store" }
+      })
+    );
+  } catch {
+    // The message and openWindow below still carry the target.
+  }
+}
+
+async function focusBriefly(client) {
+  if (!("focus" in client)) return;
+  let timer;
+  try {
+    await Promise.race([
+      client.focus(),
+      new Promise((resolve) => { timer = setTimeout(resolve, NOTIFICATION_FOCUS_TIMEOUT_MS); })
+    ]);
+  } catch {
+    // A window that refuses focus (seen in home-screen apps) still opens the message;
+    // the tap brings the app to the foreground anyway.
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // samePushUrl keeps the target on this origin, so only same-origin windows can take it.
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const targetUrl = samePushUrl(event.notification?.data?.url);
+  const pending = { url: targetUrl, at: Date.now() };
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (clients) => {
+    (async () => {
+      await storePendingOpen(pending);
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
       const client = [...clients]
         .filter((candidate) => new URL(candidate.url).origin === self.location.origin && "postMessage" in candidate)
         .sort((a, b) => Number(isMainWindow(b)) - Number(isMainWindow(a)))[0];
       if (!client) return self.clients.openWindow ? self.clients.openWindow(targetUrl) : undefined;
-      // A window that refuses focus (seen in home-screen apps) still opens the message.
-      try {
-        if ("focus" in client) await client.focus();
-      } catch {
-        // The tap brings the app to the foreground anyway.
-      }
-      client.postMessage({ type: "noctua:notification-open", url: targetUrl });
+      await focusBriefly(client);
+      // `at` identifies the tap, so the page never opens it twice (message and store).
+      client.postMessage({ type: "noctua:notification-open", ...pending });
       return undefined;
-    })
+    })()
   );
 });
 

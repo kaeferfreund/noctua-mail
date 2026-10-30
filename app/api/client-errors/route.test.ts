@@ -86,3 +86,20 @@ test("a blank-screen report logs as [client] blank, once per minute and session"
     blank: { search: "?a=%7Eqa&q=", historyStateKeys: ["noctuaRoot"], navigationType: "navigate", trigger: "load" } });
   expect(line).not.toContain("private search");
 });
+
+test("a notification-open report logs as [client] notification-open, once per minute and session", async () => {
+  const f = await createAuthenticatedTestSession();
+  const open = { ...report, source: "notification", message: "Notification open", kind: "notification-open", stack: "ignored",
+    notificationOpen: { path: "store", ageMs: 850, url: "/?a=~qa&m=~private" } };
+  expect((await POST(request(f.jar.header(), open))).status).toBe(204);
+  expect((await POST(request(f.jar.header(), open))).status).toBe(429);
+  // Crash reports keep their own budget.
+  expect((await POST(request(f.jar.header()))).status).toBe(204);
+  const openLines = logged.mock.calls.filter(call => call[0] === "[client] notification-open");
+  expect(openLines).toHaveLength(1);
+  expect(crashLines()).toHaveLength(1);
+  const line = openLines[0][1] as string;
+  expect(JSON.parse(line)).toMatchObject({ kind: "notification-open", stack: "", standalone: true, userId: f.user.id,
+    notificationOpen: { path: "store", ageMs: 850 } });
+  expect(line).not.toContain("private");
+});
