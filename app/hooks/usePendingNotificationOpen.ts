@@ -69,10 +69,12 @@ export function usePendingNotificationOpen(navigateMessageRef: RefObject<Navigat
       const url = typeof payload.url === "string" ? payload.url : "";
       const at = typeof payload.at === "number" ? payload.at : undefined;
       run(async () => {
-        // The stored copy of this tap is done; never open it again from the store.
-        await takePendingOpen();
+        // The stored copy of this tap is done; never open it again from the store. A tap
+        // stored after this one stays, and opens right after it, so the latest tap wins.
+        await takePendingOpen({ upTo: at });
         open({ url, at }, "message", search);
       });
+      check();
     };
     const serviceWorker = "serviceWorker" in navigator ? navigator.serviceWorker : null;
     checkSoon();

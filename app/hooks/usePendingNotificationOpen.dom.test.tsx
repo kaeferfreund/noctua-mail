@@ -107,6 +107,20 @@ test("the worker's message and the stored copy of the same tap open it once", as
   expect(navigations).toHaveLength(2);
 });
 
+test("an older delivered message leaves a newer stored tap in place, which then opens last", async () => {
+  render();
+  await settle();
+  const older = Date.now() - 800;
+  const newerUrl = serializeDeepLink({ ...emptyDeepLink(), ...target, messageId: "imap-fedcba98765432100fedcba9", folderId: "qa-shared:INBOX" });
+  entries.set(PENDING_OPEN_URL, JSON.stringify({ url: newerUrl, at: older + 500 }));
+  await act(async () => {
+    serviceWorker.dispatchEvent(new MessageEvent("message", { data: { type: "noctua:notification-open", url, at: older } }));
+  });
+  await waitFor(() => expect(navigations).toHaveLength(2));
+  expect(navigations).toEqual([[target.messageId, target.accountId], ["imap-fedcba98765432100fedcba9", target.accountId]]);
+  expect(entries.size).toBe(0);
+});
+
 test("a target stored after the app became visible is picked up by the re-check", async () => {
   render();
   await settle();
