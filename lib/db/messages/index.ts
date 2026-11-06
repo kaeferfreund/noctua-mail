@@ -5,6 +5,7 @@
  * write-side modules that follow).
  */
 export {
+  countMessagesByBadgeSets,
   listMessages,
   listRelatedMessages,
   listThreads,

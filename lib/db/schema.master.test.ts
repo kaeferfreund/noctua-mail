@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { Database } from "bun:sqlite";
+import { mkdtempSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import path from "path";
 import { initMasterSchema } from "./schema";
 
 // Each test gets its own in-memory master DB so legacy layouts can be
@@ -278,4 +281,40 @@ test("push_subscriptions migration is additive on a legacy master and idempotent
   expect(db.prepare("SELECT failures FROM push_subscriptions WHERE id='a'").get()).toEqual({ failures: 0 });
   expect(() => db.exec("INSERT INTO push_subscriptions (id,userId,endpoint,p256dh,auth,settings) VALUES ('b','legacy-user','https://push.example.test/1','k','s','{}')"))
     .toThrow("UNIQUE constraint");
+});
+
+// Every sync worker is its own process and runs initMasterSchema on start
+// (thousands per day). On an up-to-date master it must not take the writer
+// lock: the master handles run with busy_timeout 0, so each such lock made
+// the server's own lease and session writes fail with SQLITE_BUSY and retry.
+describe("initMasterSchema on an up-to-date master", () => {
+  test("needs no writer lock while another connection holds one", () => {
+    const dir = mkdtempSync(path.join(tmpdir(), "noctua-master-lock-"));
+    const file = path.join(dir, "main.db");
+    try {
+      const first = new Database(file);
+      first.exec("PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 0;");
+      initMasterSchema(first);
+      first.prepare(`INSERT INTO users (id, email, role, createdAt) VALUES ('synthetic-user', 'user@example.test', 'admin', 1)`).run();
+      first.prepare(`INSERT INTO accounts (id, name, email, avatar, imapHost, imapPort, imapSecure, imapUser, imapPassword,
+        smtpHost, smtpPort, smtpSecure, smtpUser, smtpPassword) VALUES ('synthetic-account', 'Synthetic', 'box@example.test', '',
+        'imap.example.test', 993, 1, 'box@example.test', 'x', 'smtp.example.test', 465, 1, 'box@example.test', 'x')`).run();
+      initMasterSchema(first);
+      first.close();
+
+      const holder = new Database(file);
+      holder.exec("PRAGMA busy_timeout = 0; BEGIN IMMEDIATE;");
+      const worker = new Database(file);
+      worker.exec("PRAGMA busy_timeout = 0;");
+      try {
+        expect(() => initMasterSchema(worker)).not.toThrow();
+      } finally {
+        holder.exec("ROLLBACK");
+        holder.close();
+        worker.close();
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

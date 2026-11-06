@@ -1807,6 +1807,30 @@ async function getTotalCount(params: {
  * bucket is listed, so the client keeps the collapse state of buckets that
  * are not on the loaded pages.
  */
+/**
+ * Message totals for several badge sets over the whole mailbox (search scope
+ * "all", no query): the same count `listMessages` reports as `total`, without
+ * its page rows, group counts and enrichment. Virtual-folder badges refresh
+ * after every switch and sync, so they must not pay for a full list each.
+ */
+export async function countMessagesByBadgeSets(params: {
+  accountId: string;
+  badgeSets: string[][];
+  viewerUserId?: string | null;
+  excludedFolderIds?: string[] | null;
+}): Promise<number[]> {
+  const counts: number[] = [];
+  for (const badges of params.badgeSets) {
+    counts.push(await getTotalCount({
+      accountId: params.accountId,
+      badges,
+      viewerUserId: params.viewerUserId,
+      excludedFolderIds: params.excludedFolderIds
+    }));
+  }
+  return counts;
+}
+
 function getLoadedDateGroups(items: Message[]): GroupMeta[] {
   const counts = new Map<string, number>();
   items.forEach((item) => {

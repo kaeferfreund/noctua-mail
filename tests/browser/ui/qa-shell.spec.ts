@@ -172,11 +172,10 @@ async function routeViewCounts(page: Page) {
     const response = await route.fetch(), body = await response.json();
     await route.fulfill({ response, json: { ...body, mailboxes: body.mailboxes.map((mailbox: object) => ({ ...mailbox, ...collab })) } });
   });
-  await page.route(url => url.pathname.endsWith("/messages") && url.searchParams.get("pageSize") === "1" && url.searchParams.has("badges"), async route => {
-    const total = virtual[new URL(route.request().url()).searchParams.get("badges")!];
-    if (total === undefined) return route.fallback();
-    const response = await route.fetch();
-    await route.fulfill({ response, json: { ...await response.json(), total } });
+  await page.route(url => url.pathname.endsWith("/messages/counts"), async route => {
+    const sets = new URL(route.request().url()).searchParams.getAll("set");
+    const response = await route.fetch(), body = await response.json() as { counts: number[] };
+    await route.fulfill({ response, json: { ...body, counts: sets.map((set, index) => virtual[set] ?? body.counts[index]) } });
   });
 }
 const countedViewRows = (page: Page) => page.locator("[data-view-id]").evaluateAll(buttons =>
