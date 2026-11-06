@@ -184,7 +184,7 @@ describe("rapid mailbox switching on the real MailClient", () => {
         return {
           topicCounts: since.filter(url => url.startsWith(`/api/accounts/${id}/topics/stats`)).length,
           aliases: since.filter(url => url.startsWith(`/api/accounts/${id}/recipient-aliases`)).length,
-          virtualCounts: since.filter(url => url.startsWith(`/api/accounts/${id}/messages?`) && url.includes("badges=")).length
+          virtualCounts: since.filter(url => url.startsWith(`/api/accounts/${id}/messages/counts?`)).length
         };
       };
 
@@ -206,7 +206,7 @@ describe("rapid mailbox switching on the real MailClient", () => {
       expect(h.active()).toContain(names["account-a"]);
       expect(reads("account-b")).toEqual({ topicCounts: 0, aliases: 0, virtualCounts: 0 });
       // One round of the five virtual folder counts.
-      expect(reads("account-a")).toEqual({ topicCounts: 1, aliases: 1, virtualCounts: 5 });
+      expect(reads("account-a")).toEqual({ topicCounts: 1, aliases: 1, virtualCounts: 1 });
     } finally {
       // Unmount while the stub still owns the scheduled idle ids.
       cleanup();
