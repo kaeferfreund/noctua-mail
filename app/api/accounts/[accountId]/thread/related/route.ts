@@ -13,6 +13,7 @@ import { enrichMessagesWithThreadTopics } from "@/app/api/_helpers/enrichMessage
 import { listThreadMessages, listThreadMessageWindow, ThreadWindowCursorError } from "@/lib/db";
 import { normalizeThreadDateSource } from "@/lib/threadDate";
 import type { Message } from "@/lib/data";
+import { listDomainLinkedMessages } from "@/lib/domainConversations";
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
@@ -25,6 +26,8 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     /** `headers` omits body/htmlBody (read per message from the detail route). */
     projection?: string;
     excludeFolderIds?: string[];
+    /** `false` skips messages of other mailboxes of the domain (first window only). */
+    linked?: boolean;
     /** Bounded reader window over exactly one thread (headers only). */
     window?: {
       anchorMessageId?: string;
@@ -104,7 +107,19 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
         for (const item of data.items) {
           if (item.id !== data.window.anchorId) delete item.topicSuggestions;
         }
-        return compressedJsonResponse(request, data);
+        // Messages of this conversation in other mailboxes of the domain the
+        // user may open; read once with the first window, never paged.
+        const linked = firstWindow && payload.linked !== false
+          ? await listDomainLinkedMessages({
+              userId: context.userId,
+              account: context.account,
+              threadId: threadIds[0],
+              excludeFolderIds,
+              groupBy,
+              threadDateSource
+            })
+          : [];
+        return compressedJsonResponse(request, { ...data, linked });
       } catch (error) {
         if (error instanceof ThreadWindowCursorError) {
           return NextResponse.json({ ok: false, message: error.message }, { status: 400 });

@@ -18,6 +18,20 @@ async function listAccountIdsFromMaster() {
   return rows.map((row) => row.id).filter(Boolean);
 }
 
+function toFolder(row: any, counts?: { total?: number; unread?: number }): Folder {
+  return {
+    id: row.id,
+    name: row.name,
+    parentId: row.parentId ?? undefined,
+    accountId: row.accountId,
+    count: counts?.total ?? row.count ?? 0,
+    specialUse: row.specialUse ?? undefined,
+    flags: safeParseJson<string[]>(row.flags),
+    delimiter: row.delimiter ?? undefined,
+    unreadCount: counts?.unread ?? 0
+  } as Folder;
+}
+
 async function getFoldersForAccount(accountId: string) {
   const db = await getAccountDb(accountId);
   const rows = db.prepare(`SELECT * FROM folders WHERE accountId = ?`).all(accountId) as any[];
@@ -39,17 +53,14 @@ async function getFoldersForAccount(accountId: string) {
       countMap.set(row.folderId, row.unreadCount ?? 0);
     }
   });
-  return rows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    parentId: row.parentId ?? undefined,
-    accountId: row.accountId,
-    count: totalMap.get(row.id) ?? row.count ?? 0,
-    specialUse: row.specialUse ?? undefined,
-    flags: safeParseJson<string[]>(row.flags),
-    delimiter: row.delimiter ?? undefined,
-    unreadCount: countMap.get(row.id) ?? 0
-  })) as Folder[];
+  return rows.map((row) => toFolder(row, { total: totalMap.get(row.id), unread: countMap.get(row.id) }));
+}
+
+/** Folder rows of one mailbox without message counts (role lookups). */
+export async function getFolderRecords(accountId: string): Promise<Folder[]> {
+  const db = await getAccountDb(accountId);
+  const rows = db.prepare(`SELECT * FROM folders WHERE accountId = ?`).all(accountId) as any[];
+  return rows.map((row) => toFolder(row));
 }
 
 export async function getFolders(accountId?: string) {

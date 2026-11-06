@@ -1501,6 +1501,10 @@ function initAccountSchemaBody(db: any, inTransaction: boolean) {
       ON messages(accountId, lower(messageId), dateValue DESC);
     CREATE INDEX IF NOT EXISTS idx_messages_account_folder_unread
       ON messages(accountId, folderId, unread);
+    -- Conversations across mailboxes of one domain: replies stored in another
+    -- mailbox are found by the Message-ID they answer (linkedConversation.ts).
+    CREATE INDEX IF NOT EXISTS idx_messages_account_inreplyto_lower
+      ON messages(accountId, lower(inReplyTo));
   `);
   ensureThreadOptionalColumns(db);
   ensureTopicOptionalColumns(db);

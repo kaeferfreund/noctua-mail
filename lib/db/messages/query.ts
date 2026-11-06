@@ -1807,7 +1807,7 @@ async function getTotalCount(params: {
  * bucket is listed, so the client keeps the collapse state of buckets that
  * are not on the loaded pages.
  */
-function getLoadedDateGroups(items: Message[]): GroupMeta[] {
+export function getLoadedDateGroups(items: Message[]): GroupMeta[] {
   const counts = new Map<string, number>();
   items.forEach((item) => {
     if (item.groupKey) counts.set(item.groupKey, (counts.get(item.groupKey) ?? 0) + 1);
