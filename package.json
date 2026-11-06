@@ -55,7 +55,7 @@
     "class-variance-authority": "^0.7.1",
     "cmdk": "^1.1.1",
     "cn": "^0.5.2",
-    "entities": "^8.1.0",
+    "entities": "^9.0.0",
     "html-to-text": "^10.0.1",
     "imapflow": "^2.10.2",
     "lexical": "^0.53.0",
