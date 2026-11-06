@@ -13,7 +13,7 @@ import {reauthenticate} from '../lib/authSecurity';
 import {createRateLimiter} from '../lib/rateLimit';
 import {persistAccountRow} from '../lib/db/rowParsers';
 import {hashMcpToken,validateMcpTokenRow} from '../lib/mcpAuth';
-import {RAW_DISABLED_PATHS} from '../lib/authPolicyHandler';
+import {RAW_DISABLED_PATHS,recordVerifiedPasskey} from '../lib/authPolicyHandler';
 import {requireActiveUserSession} from '../lib/auth';
 import {acquireAuthLifetimeLock} from '../lib/authLifetimeLock';
 import {POST as signup} from '../app/api/auth/signup/route';
@@ -185,4 +185,10 @@ test('empty-install desktop-tagged HTTP signup cannot use mailbox credentials wi
   `],{cwd:process.cwd(),env:{NODE_ENV:'test',PATH:process.env.PATH!,TMPDIR:process.env.TMPDIR!,NOCTUA_DATA_DIR:data,BETTER_AUTH_URL:'http://localhost:3785',BETTER_AUTH_SECRET:'synthetic-desktop-secret-0123456789abcdef',IMAP_SECRET_KEY:'test-imap-secret-key-32-chars-minimum__',IMAP_CREDENTIALS_STORAGE:'db',BETTER_AUTH_TELEMETRY:'0'},encoding:'utf8',timeout:15000});
   expect(result.status,result.stderr).toBe(0);expect(JSON.parse(result.stdout.trim().split('\n').at(-1)!)).toEqual({status:403,body:{ok:false,code:'invalid_invite'},identities:0,reservations:0});
  }finally{rmSync(data,{recursive:true,force:true});}
+});
+// Since @better-auth/passkey 1.7.13 the library itself rejects UV=false ceremonies (requireUserVerification
+// follows authenticatorSelection), so the browser suite no longer reaches this callback guard over HTTP.
+test('passkey callbacks reject registration and assertion results without user verification',()=>{
+ for(const registration of [true,false]){let error:unknown;try{recordVerifiedPasskey(undefined,false,registration);}catch(e){error=e;}
+  expect((error as {body?:{code?:string}}|undefined)?.body?.code).toBe('passkey_uv_required');}
 });

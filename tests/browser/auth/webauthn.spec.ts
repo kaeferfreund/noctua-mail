@@ -47,12 +47,19 @@ test(SCENARIOS.uv,async({page,seed,authenticator})=>{
   await authenticator.setUV(false);
   // Production hints require UV; preferred here permits an actual non-UV attestation to reach the callback.
   const badRegistration=await ceremony(page,options.body,true,true);
-  expect((await api(page,"/api/ba/passkey/verify-registration",{response:badRegistration},token)).body.code).toBe("passkey_uv_required");
+  // @better-auth/passkey >=1.7.13 enforces the configured userVerification:"required" inside SimpleWebAuthn, so the
+  // library rejects before Noctua's UV callback (which keeps its own unit test in teamAuthSecurityControls).
+  const rejectedRegistration=await api(page,"/api/ba/passkey/verify-registration",{response:badRegistration},token);
+  expect(rejectedRegistration.status).toBe(400);
+  expect(rejectedRegistration.body.code).toBe("FAILED_TO_VERIFY_REGISTRATION");
   invalidate(seed,"revoke");
   await page.context().clearCookies();
   const assertionOptions=await api(page,"/api/ba/passkey/generate-authenticate-options");
-  const badAssertion=await ceremony(page,{...assertionOptions.body,allowCredentials:[{id:enrolled.response.id,type:"public-key"}]},false);
-  expect((await api(page,"/api/ba/passkey/verify-authentication",{response:badAssertion})).body.code).toBe("passkey_uv_required");
+  // Server options now carry userVerification:"required" for assertions too; preferred lets the browser return a non-UV assertion.
+  const badAssertion=await ceremony(page,{...assertionOptions.body,allowCredentials:[{id:enrolled.response.id,type:"public-key"}]},false,true);
+  const rejectedAssertion=await api(page,"/api/ba/passkey/verify-authentication",{response:badAssertion});
+  expect(rejectedAssertion.status).toBe(400);
+  expect(rejectedAssertion.body.code).toBe("AUTHENTICATION_FAILED");
   expect((await api(page,"/api/auth/me")).status).toBe(401);
 });
 

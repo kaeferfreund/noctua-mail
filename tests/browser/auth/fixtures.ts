@@ -83,7 +83,10 @@ export async function ceremony(page:Page,options:Record<string,unknown>,register
       publicKey.user.id=decode(publicKey.user.id);
       publicKey.excludeCredentials=(publicKey.excludeCredentials??[]).map((entry:any)=>({...entry,id:decode(entry.id)}));
       if(preferred){publicKey.authenticatorSelection={...publicKey.authenticatorSelection,userVerification:"preferred"};publicKey.excludeCredentials=[];}
-    } else publicKey.allowCredentials=(publicKey.allowCredentials??[]).map((entry:any)=>({...entry,id:decode(entry.id)}));
+    } else {
+      publicKey.allowCredentials=(publicKey.allowCredentials??[]).map((entry:any)=>({...entry,id:decode(entry.id)}));
+      if(preferred)publicKey.userVerification="preferred";
+    }
     const result=(register?await navigator.credentials.create({publicKey}):await navigator.credentials.get({publicKey})) as PublicKeyCredential;
     const response=result.response as AuthenticatorAttestationResponse & AuthenticatorAssertionResponse;
     return {id:result.id,rawId:encode(result.rawId),type:result.type,clientExtensionResults:result.getClientExtensionResults(),authenticatorAttachment:result.authenticatorAttachment,
