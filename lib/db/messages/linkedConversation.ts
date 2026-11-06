@@ -8,8 +8,9 @@
  *
  * The lookup per peer shard is two indexed reads: matching rows by
  * `lower(messageId)` (idx_messages_account_msgid_date), `lower(inReplyTo)`
- * (idx_messages_account_inreplyto_lower) or `threadId`
- * (idx_messages_account_thread_date), then the peer's matched threads.
+ * (idx_messages_account_inreplyto_lower) and `threadId`
+ * (idx_messages_account_thread_date) in separate `UNION ALL` branches, then
+ * the peer's matched threads (see `buildPeerConversationQueries`).
  */
 import type { Message } from "../../data";
 import type { ThreadDateSource } from "../../threadDate";
@@ -116,6 +117,63 @@ function excludedPeerFolderIds(db: any, accountId: string) {
     .map((row) => row.id);
 }
 
+type PeerQuery = { sql: string; args: unknown[] };
+
+/**
+ * The two reads of one peer mailbox, as SQL (exported for the query-plan test).
+ *
+ * `match` finds the peer's conversations that share a header id. It is one
+ * `UNION ALL` branch per key column, so each branch uses its own index
+ * (an OR across the three columns would walk the whole shard by `accountId`).
+ * `rows(threadIds)` reads the matched conversations; `+m.dateValue` keeps the
+ * planner on idx_messages_account_thread_date instead of walking the shard
+ * newest-first via idx_messages_account_date until enough rows match.
+ */
+export function buildPeerConversationQueries(
+  peerAccountId: string,
+  source: Pick<LinkedConversationSource, "keys" | "rawKeys">,
+  excludedFolderIds: string[]
+) {
+  const filterArgs: unknown[] = [];
+  const filters = applyExcludedFolderFilters(
+    applyVisibleMessageFilters("COALESCE(m.draft, 0) = 0"),
+    filterArgs,
+    excludedFolderIds
+  );
+  const placeholders = (values: readonly unknown[]) => values.map(() => "?").join(",");
+  // Stored Message-IDs normally keep their brackets; query both spellings.
+  const messageIdKeys = Array.from(new Set(source.keys.flatMap((key) => [key, `<${key}>`])));
+  const branches: Array<[column: string, values: readonly string[]]> = [
+    ["lower(m.messageId)", messageIdKeys],
+    ["lower(m.inReplyTo)", messageIdKeys],
+    ["m.threadId", source.rawKeys]
+  ];
+  const parts = branches.filter(([, values]) => values.length > 0);
+  const match: PeerQuery = {
+    sql: `SELECT threadId, MAX(dateValue) AS latest FROM (
+      ${parts
+        .map(([column, values]) => `SELECT m.threadId, m.dateValue FROM messages m
+        WHERE m.accountId = ? AND ${column} IN (${placeholders(values)}) AND ${filters}`)
+        .join("\n      UNION ALL\n      ")}
+    )
+    GROUP BY threadId
+    ORDER BY latest DESC
+    LIMIT ?`,
+    args: [
+      ...parts.flatMap(([, values]) => [peerAccountId, ...values, ...filterArgs]),
+      MAX_PEER_THREADS
+    ]
+  };
+  const rows = (threadIds: readonly string[]): PeerQuery => ({
+    sql: `SELECT ${threadMessageSelectColumns("headers")} FROM messages m
+      WHERE m.accountId = ? AND m.threadId IN (${placeholders(threadIds)}) AND ${filters}
+      ORDER BY +m.dateValue DESC, m.id DESC
+      LIMIT ?`,
+    args: [peerAccountId, ...threadIds, ...filterArgs, MAX_LINKED_MESSAGES]
+  });
+  return { match, rows };
+}
+
 /** Header rows of one peer mailbox that belong to the source conversation. */
 async function readPeerConversationRows(
   peerAccountId: string,
@@ -124,36 +182,12 @@ async function readPeerConversationRows(
 ) {
   if (source.keys.length === 0) return [];
   const db = await getAccountDb(peerAccountId);
-  const baseArgs: unknown[] = [peerAccountId];
-  let baseWhere = applyVisibleMessageFilters("m.accountId = ? AND COALESCE(m.draft, 0) = 0");
-  baseWhere = applyExcludedFolderFilters(baseWhere, baseArgs, excludedPeerFolderIds(db, peerAccountId));
-
-  // Stored Message-IDs normally keep their brackets; query both spellings.
-  const messageIdKeys = Array.from(new Set(source.keys.flatMap((key) => [key, `<${key}>`])));
-  const matchArgs = [...baseArgs, ...messageIdKeys, ...messageIdKeys, ...source.rawKeys];
-  const idList = messageIdKeys.map(() => "?").join(",");
-  const threadRows = db
-    .prepare(
-      `SELECT m.threadId, MAX(m.dateValue) AS latest FROM messages m
-       WHERE ${baseWhere}
-         AND (lower(m.messageId) IN (${idList})
-           OR lower(m.inReplyTo) IN (${idList})
-           OR m.threadId IN (${source.rawKeys.map(() => "?").join(",")}))
-       GROUP BY m.threadId
-       ORDER BY latest DESC
-       LIMIT ?`
-    )
-    .all(...matchArgs, MAX_PEER_THREADS) as Array<{ threadId: string }>;
+  const queries = buildPeerConversationQueries(peerAccountId, source, excludedPeerFolderIds(db, peerAccountId));
+  const threadRows = db.prepare(queries.match.sql).all(...queries.match.args) as Array<{ threadId: string }>;
   const threadIds = threadRows.map((row) => String(row.threadId)).filter(Boolean);
   if (threadIds.length === 0) return [];
-  const rows = db
-    .prepare(
-      `SELECT ${threadMessageSelectColumns("headers")} FROM messages m
-       WHERE ${baseWhere} AND m.threadId IN (${threadIds.map(() => "?").join(",")})
-       ORDER BY m.dateValue DESC, m.id DESC
-       LIMIT ?`
-    )
-    .all(...baseArgs, ...threadIds, MAX_LINKED_MESSAGES) as any[];
+  const read = queries.rows(threadIds);
+  const rows = db.prepare(read.sql).all(...read.args) as any[];
   return hydrateThreadMessageRows(db, peerAccountId, rows, { ...options, projection: "headers" });
 }
 

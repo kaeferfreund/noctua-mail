@@ -7,7 +7,12 @@ import {
   listDomainThreads,
   listReadableDomainAccounts
 } from "./domainConversations";
-import { normalizeConversationHeaderId } from "./db/messages/linkedConversation";
+import {
+  buildPeerConversationQueries,
+  normalizeConversationHeaderId,
+  readLinkedConversationSource
+} from "./db/messages/linkedConversation";
+import { getAccountDb } from "./db/connection";
 import { GET as getDomainThreads } from "@/app/api/domains/[domain]/threads/route";
 import { POST as postThreadRelated } from "@/app/api/accounts/[accountId]/thread/related/route";
 
@@ -200,6 +205,27 @@ describe("conversation across mailboxes of one domain", () => {
     expect((await listDomainLinkedMessages({ userId: f.principal.user.id, account: f.accounts.A, threadId: f.X })).length).toBe(2);
     f.principal.master.prepare("DELETE FROM user_accounts WHERE userId=? AND accountId=?").run(f.principal.user.id, f.ids.B);
     expect(await listDomainLinkedMessages({ userId: f.principal.user.id, account: f.accounts.A, threadId: f.X })).toEqual([]);
+  });
+});
+
+describe("peer lookup query plan", () => {
+  test("every branch of the match and the thread read use an index beyond accountId", async () => {
+    const source = await readLinkedConversationSource({ accountId: base.ids.A, threadId: base.X });
+    const queries = buildPeerConversationQueries(base.ids.B, source, [`${base.ids.B}:Trash`]);
+    const db = await getAccountDb(base.ids.B);
+    const plan = (query: { sql: string; args: unknown[] }) =>
+      (db.prepare(`EXPLAIN QUERY PLAN ${query.sql}`).all(...query.args) as Array<{ detail: string }>).map((row) => row.detail);
+    const match = plan(queries.match);
+    const read = plan(queries.rows([base.X, `<other-root-${base.tag}>`]));
+    expect(match.filter((detail) => detail.startsWith("SEARCH m"))).toEqual([
+      "SEARCH m USING INDEX idx_messages_account_msgid_date (accountId=? AND <expr>=?)",
+      "SEARCH m USING INDEX idx_messages_account_inreplyto_lower (accountId=? AND <expr>=?)",
+      "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)"
+    ]);
+    expect(read.filter((detail) => detail.startsWith("SEARCH m"))).toEqual([
+      "SEARCH m USING INDEX idx_messages_account_thread_date (accountId=? AND threadId=?)"
+    ]);
+    for (const detail of [...match, ...read]) expect(detail).not.toMatch(/^SCAN m\b|\(accountId=\?\)$/);
   });
 });
 
