@@ -82,6 +82,27 @@ describe("GET /messages/counts", () => {
     expect((await getCounts(setsQuery(""))).body.counts).toEqual([4, 2, 3, 2, 2]);
   });
 
+  test("flag badge counts read the covering flags index, not the message rows", async () => {
+    const statements: string[] = [];
+    await withAccountDb(accountId, async (db: any) => {
+      const prepare = db.prepare;
+      db.prepare = function (sql: string, ...rest: unknown[]) {
+        if (/COUNT\(\*\)/.test(sql)) statements.push(sql);
+        return prepare.call(this, sql, ...rest);
+      };
+      try {
+        expect((await getCounts(`set=todo&set=calendar&set=${encodeURIComponent("calendar,unread")}&excludeFolderIds=${encodeURIComponent(trash.id)}`)).status).toBe(200);
+      } finally {
+        db.prepare = prepare;
+      }
+      expect(statements).toHaveLength(3);
+      for (const sql of statements) {
+        const plan = (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...(sql.match(/\?/g) ?? []).map(() => "synthetic")).map((row: { detail: string }) => row.detail)).join(" | ");
+        expect(plan).toMatch(/COVERING INDEX idx_messages_account_flags\b/);
+      }
+    });
+  });
+
   test("rejects a missing or oversized set list", async () => {
     expect((await getCounts("excludeFolderIds=")).status).toBe(400);
     expect((await getCounts(Array.from({ length: 9 }, () => "set=unread").join("&"))).status).toBe(400);

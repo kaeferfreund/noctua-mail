@@ -1501,6 +1501,10 @@ function initAccountSchemaBody(db: any, inTransaction: boolean) {
       ON messages(accountId, lower(messageId), dateValue DESC);
     CREATE INDEX IF NOT EXISTS idx_messages_account_folder_unread
       ON messages(accountId, folderId, unread);
+    -- Virtual-folder badge counts (To-do, invitations) filter on flags: covering,
+    -- so counting reads this index instead of every message row and its bodies.
+    CREATE INDEX IF NOT EXISTS idx_messages_account_flags
+      ON messages(accountId, flags, folderId, unread, deleted);
   `);
   ensureThreadOptionalColumns(db);
   ensureTopicOptionalColumns(db);
