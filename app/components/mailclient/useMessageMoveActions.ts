@@ -176,7 +176,12 @@ export function useMessageMoveActions({
             : activeMessageId
               ? [activeMessageId]
               : [];
-      const uniqueIds = Array.from(new Set(ids));
+      // Rows of other mailboxes (domain view) are moved in their own mailbox only:
+      // their ids never reach this mailbox's move route.
+      const otherMailboxIds = new Set(
+        messages.filter((item) => item.accountId !== activeAccountId).map((item) => item.id)
+      );
+      const uniqueIds = Array.from(new Set(ids)).filter((id) => !otherMailboxIds.has(id));
       const threadMove = options?.threadMove;
       if (uniqueIds.length === 0 && !threadMove) return null;
       const idSet = new Set(uniqueIds);

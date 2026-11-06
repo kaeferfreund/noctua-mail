@@ -109,6 +109,7 @@ export default function MessageThreadList({
     getThreadLatestDate,
     getGroupLabel,
     renderFolderBadges,
+    renderMailboxBadge,
     handleShowRelated,
     isTrashFolder,
     renderMessageMenu
@@ -380,6 +381,7 @@ export default function MessageThreadList({
 
                 <span data-message-cell="subject" className={styles.cellSubject}>
                   <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><SpamBadge message={message} /><ScheduledSendBadge message={message} /><span data-mobile-collab=""><CollabRowBadges message={message} /></span></span>
+                  {renderMailboxBadge?.(message)}
                   {renderFolderBadges(item.folderIds)}
                   {(threadBadgeUnion.threadHasAttachments ||
                     shouldShowAttachmentIcon(message)) && (

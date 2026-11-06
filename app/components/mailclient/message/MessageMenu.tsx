@@ -57,7 +57,7 @@ import { useMessageReaderActions } from "./MessageReaderActions";
 import { useAiReplyPromptFromMenu } from "./AiReplyPrompt";
 
 type ComposeMode = "new" | "reply" | "replyAll" | "forward" | "edit" | "editAsNew";
-type MessageMenuAction =
+export type MessageMenuAction =
   | "editDraft"
   | "sendDraft"
   | "scheduleDraft"

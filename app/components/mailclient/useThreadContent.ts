@@ -41,6 +41,8 @@ export type ThreadWindowState = {
 
 type ThreadWindowResponse = {
   items?: Message[];
+  /** Messages of this conversation in other mailboxes of the domain (first window only). */
+  linked?: Message[];
   placeholders?: Message[];
   window?: Omit<ThreadWindowState, "placeholders" | "loading" | "error">;
 };
@@ -48,6 +50,8 @@ type ThreadWindowResponse = {
 export type ThreadReadRequest = {
   /** Requests with the same key share one in-flight read; a new key aborts the previous one. */
   key: string;
+  /** Mailbox of the opened message (the domain view lists several); default: the active one. */
+  accountId?: string;
   threadId: string;
   anchorMessageId: string;
   /** Bounded header window over the thread; otherwise headers for `messageIds` only. */
@@ -56,13 +60,15 @@ export type ThreadReadRequest = {
   excludeFolderIds: string[];
   /** Only rows of this folder in a windowed read (a conversation read in trash or spam). */
   folderId?: string | null;
+  /** The server leaves out the mailbox's trash and spam (its folders are not loaded here). */
+  excludeSpecialFolders?: boolean;
   groupBy: string;
   threadDateSource: string;
 };
 
 export type ThreadPageRequest = Pick<
   ThreadReadRequest,
-  "threadId" | "excludeFolderIds" | "folderId" | "groupBy" | "threadDateSource"
+  "accountId" | "threadId" | "excludeFolderIds" | "excludeSpecialFolders" | "folderId" | "groupBy" | "threadDateSource"
 > & { direction: "older" | "newer" };
 
 const bodyCacheKey = (message: Pick<Message, "accountId" | "id">) =>
@@ -638,7 +644,7 @@ export function useThreadContent({
       clearThreadContentError(threadId);
       entry.promise = (async () => {
         try {
-          const res = await apiFetch(buildAccountApiPath(activeAccountId, "/thread/related"), {
+          const res = await apiFetch(buildAccountApiPath(request.accountId || activeAccountId, "/thread/related"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -648,6 +654,7 @@ export function useThreadContent({
               threadDateSource: request.threadDateSource,
               projection: "headers",
               excludeFolderIds: request.excludeFolderIds,
+              ...(request.excludeSpecialFolders ? { excludeSpecialFolders: true } : {}),
               ...(request.windowed
                 ? { window: { anchorMessageId: request.anchorMessageId, ...(request.folderId ? { folderId: request.folderId } : {}) } }
                 : {})
@@ -662,7 +669,11 @@ export function useThreadContent({
           const data = (await res.json()) as ThreadWindowResponse;
           if (!isCurrent()) return;
           const items = Array.isArray(data?.items) ? data.items : [];
-          upsertThreadCache(threadId, items);
+          // Messages of other mailboxes join the conversation under its thread id; a row
+          // id the mailbox itself returned is never replaced by another mailbox's copy.
+          const ownIds = new Set(items.map((item) => item.id));
+          const linked = (Array.isArray(data?.linked) ? data.linked : []).filter((item) => !ownIds.has(item.id));
+          upsertThreadCache(threadId, linked.length > 0 ? mergeThreadWindowItems(items, linked) : items);
           if (request.windowed && data.window) {
             const windowInfo = data.window;
             setThreadWindowById((prev) => ({
@@ -728,7 +739,7 @@ export function useThreadContent({
         );
       patchWindow({ loading: direction, error: null });
       try {
-        const res = await apiFetch(buildAccountApiPath(activeAccountId, "/thread/related"), {
+        const res = await apiFetch(buildAccountApiPath(request.accountId || activeAccountId, "/thread/related"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -737,6 +748,7 @@ export function useThreadContent({
             threadDateSource: request.threadDateSource,
             projection: "headers",
             excludeFolderIds: request.excludeFolderIds,
+            ...(request.excludeSpecialFolders ? { excludeSpecialFolders: true } : {}),
             window: { cursor, ...(request.folderId ? { folderId: request.folderId } : {}) }
           }),
           signal: controller.signal

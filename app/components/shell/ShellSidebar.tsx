@@ -66,6 +66,10 @@ export type ShellSidebarProps = {
     domainIcons?: DomainIconVersions;
     /** May return the switch promise; the clicked row shows a pending state until it settles. */
     onSwitch: (accountId: string) => void | Promise<unknown>;
+    /** Domain of the open domain view („Sammler“), if any. */
+    activeDomain?: string | null;
+    /** Opens the domain view; with it, a domain heading's name opens the view and its chevron collapses the group. */
+    onOpenDomain?: (domain: string) => void | Promise<unknown>;
     onAdd?: () => void;
   };
   views: ShellViews;
@@ -104,6 +108,8 @@ const DOMAIN_GROUP_GUIDE_CLASS = "relative isolate before:pointer-events-none be
 /** The domain heading toggles its group: menu-row hover and focus ring, and
  * the active fill while it hides the active mailbox. */
 const DOMAIN_HEADER_CLASS = "flex w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium text-sidebar-foreground ring-sidebar-ring outline-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2";
+/** The chevron of a domain heading that also opens the domain view: collapse/expand only. */
+const DOMAIN_TOGGLE_CLASS = "flex shrink-0 items-center justify-center rounded-md px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2";
 
 type MailboxRowProps = {
   account: ShellAccount;
@@ -241,12 +247,16 @@ export function MailboxRows({
   onSwitch,
   summaries,
   userId,
-  domainIcons
-}: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "summaries" | "userId" | "domainIcons"> & {
+  domainIcons,
+  activeDomain = null,
+  onOpenDomain
+}: Pick<ShellSidebarProps["mailboxes"], "accounts" | "activeAccountId" | "summaries" | "userId" | "domainIcons" | "activeDomain"> & {
   pendingAccountId?: string | null;
   onSwitch: (accountId: string) => void;
+  onOpenDomain?: (domain: string) => void;
 }) {
   const t = useTranslations("Shell");
+  const td = useTranslations("Domain");
   const listId = useId();
   const summaryById = useMemo(() => new Map(summaries?.map(summary => [summary.accountId, summary])), [summaries]);
   const groups = useMemo(() => groupMailboxes(accounts), [accounts]);
@@ -264,9 +274,55 @@ export function MailboxRows({
         const isCollapsed = grouped && collapsed.has(domainKey);
         const hidesActive = isCollapsed && group.accounts.some(account => account.id === activeAccountId);
         const groupListId = `${listId}-${index}`;
+        const domain = group.domain;
+        const domainActive = Boolean(domain) && domain === activeDomain;
+        const headingContent = (
+          <>
+            {/* The slot keeps the heading text in line with the rows'
+                names while the icon loads, and when there is none. */}
+            <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
+              {domain ? <DomainIcon domain={domain} accounts={group.accounts} version={domainIconVersionFor(domainIcons ?? {}, domain)} /> : null}
+            </span>
+            {/* A long domain ellipsizes before the counters, which never
+                shrink; the full name stays available as a tooltip. */}
+            <span className="min-w-0 truncate" title={domain ?? t("mailboxes.other")} data-domain-name="">{domain ?? t("mailboxes.other")}</span>
+          </>
+        );
         return (
           <Fragment key={group.domain ?? "all"}>
-            {grouped ? (
+            {grouped && domain && onOpenDomain ? (
+              <div className={cn("flex w-full items-center gap-0.5", index > 0 && "mt-2")} data-slot="domain-group-heading">
+                {/* The name opens the domain view; the chevron collapses the group. */}
+                <button
+                  type="button"
+                  data-slot="domain-group-open"
+                  className={cn(DOMAIN_HEADER_CLASS, MAILBOX_ROW_HEIGHT_CLASS, FLUSH_ROW_RING_CLASS, ACTIVE_ROW_CLASS, "min-w-0 flex-1")}
+                  data-active={domainActive || hidesActive ? "true" : undefined}
+                  aria-current={domainActive ? "true" : undefined}
+                  aria-label={td("openDomain", { domain })}
+                  onClick={() => onOpenDomain(domain)}
+                >
+                  {headingContent}
+                  {isCollapsed ? (
+                    <span className="ml-auto flex shrink-0 items-center gap-1.5">
+                      <DomainCounts accounts={group.accounts} summaryById={summaryById} />
+                    </span>
+                  ) : null}
+                </button>
+                <button
+                  type="button"
+                  data-slot="domain-group-toggle"
+                  className={cn(DOMAIN_TOGGLE_CLASS, MAILBOX_ROW_HEIGHT_CLASS, FLUSH_ROW_RING_CLASS)}
+                  aria-expanded={!isCollapsed}
+                  aria-controls={groupListId}
+                  aria-label={td(isCollapsed ? "expand" : "collapse", { domain })}
+                  title={td(isCollapsed ? "expand" : "collapse", { domain })}
+                  onClick={() => toggle(domainKey)}
+                >
+                  {isCollapsed ? <ChevronRight className="size-3.5" aria-hidden="true" /> : <ChevronDown className="size-3.5" aria-hidden="true" />}
+                </button>
+              </div>
+            ) : grouped ? (
               <button
                 type="button"
                 data-slot="domain-group-toggle"
@@ -276,14 +332,7 @@ export function MailboxRows({
                 data-active={hidesActive ? "true" : undefined}
                 onClick={() => toggle(domainKey)}
               >
-                {/* The slot keeps the heading text in line with the rows'
-                    names while the icon loads, and when there is none. */}
-                <span className="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
-                  {group.domain ? <DomainIcon domain={group.domain} accounts={group.accounts} version={domainIconVersionFor(domainIcons ?? {}, group.domain)} /> : null}
-                </span>
-                {/* A long domain ellipsizes before the counters, which never
-                    shrink; the full name stays available as a tooltip. */}
-                <span className="min-w-0 truncate" title={group.domain ?? t("mailboxes.other")} data-domain-name="">{group.domain ?? t("mailboxes.other")}</span>
+                {headingContent}
                 <span className="ml-auto flex shrink-0 items-center gap-1.5">
                   {isCollapsed ? <DomainCounts accounts={group.accounts} summaryById={summaryById} /> : null}
                   {isCollapsed ? <ChevronRight className="size-3.5" aria-hidden="true" /> : <ChevronDown className="size-3.5" aria-hidden="true" />}
@@ -296,7 +345,7 @@ export function MailboxRows({
                   key={account.id}
                   account={account}
                   summary={summaryById.get(account.id)}
-                  isActive={account.id === activeAccountId}
+                  isActive={!activeDomain && account.id === activeAccountId}
                   isPending={account.id === pendingAccountId}
                   grouped={grouped}
                   onSwitch={onSwitch}
@@ -372,7 +421,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
   // the newer one.
   const [pendingAccountId, setPendingAccountId] = useState<string | null>(null);
   const switchToken = useRef(0);
-  const { switchMailbox } = useStableHandlers({
+  const { switchMailbox, openDomain } = useStableHandlers({
     switchMailbox: (id: string) => {
       setOpenMobile(false);
       onNavigate?.();
@@ -381,6 +430,11 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
       void Promise.resolve(mailboxes.onSwitch(id)).finally(() => {
         if (switchToken.current === token) setPendingAccountId(null);
       });
+    },
+    openDomain: (domain: string) => {
+      setOpenMobile(false);
+      onNavigate?.();
+      void mailboxes.onOpenDomain?.(domain);
     }
   });
   const viewRows: ShellView[] = [
@@ -433,6 +487,8 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                     domainIcons={mailboxes.domainIcons}
                     pendingAccountId={pendingAccountId}
                     onSwitch={switchMailbox}
+                    activeDomain={mailboxes.activeDomain ?? null}
+                    onOpenDomain={mailboxes.onOpenDomain ? openDomain : undefined}
                   />
                 ) : (
                   <>

@@ -59,12 +59,15 @@ export function getRenderedThreadMessages(params: {
 export function getThreadWindowPageControls(params: {
   threadWindow: Pick<ThreadWindowState, "total" | "hasOlder" | "hasNewer"> | null | undefined;
   threadId: string;
-  renderedThread: Pick<Message, "id" | "threadId">[];
+  renderedThread: Pick<Message, "id" | "threadId" | "linkedThreadId">[];
 }) {
   const { threadWindow, threadId, renderedThread } = params;
   if (!threadWindow) return { older: false, newer: false };
+  // Messages of other mailboxes are not part of this mailbox's window total.
   const renderedIds = new Set(
-    renderedThread.filter((message) => message.threadId === threadId).map((message) => message.id)
+    renderedThread
+      .filter((message) => message.threadId === threadId && !message.linkedThreadId)
+      .map((message) => message.id)
   );
   const complete = renderedIds.size >= threadWindow.total;
   return {

@@ -229,7 +229,21 @@ export function useDeepLinks(options: Options) {
   });
   const navigateAccount = useCallback((accountId: string) => {
     const current = latest.current.state;
-    const target = accountId === current.accountId ? { ...current, messageId: "" } : { ...emptyDeepLink(), accountId };
+    // A mailbox click also leaves the domain view.
+    const target = accountId === current.accountId && !current.domain
+      ? { ...current, messageId: "" }
+      : { ...emptyDeepLink(), accountId };
+    return new Promise<void>(resolve => {
+      afterMobileOverlayNavigation(() => { write(target, "push"); void request(target).then(resolve); });
+    });
+  }, [request, write]);
+  // The domain view lists the domain's mailboxes; the active mailbox stays one of them
+  // (the caller picks it), so its folders, compose identity and stream stay as they are.
+  const navigateDomain = useCallback((domain: string, accountId: string, role: DeepLinkState["domainRole"] = "inbox") => {
+    const current = latest.current.state;
+    const target = accountId === current.accountId
+      ? { ...current, messageId: "", query: "", scope: "folder" as const, view: null, badges: [], domain, domainRole: role }
+      : { ...emptyDeepLink(), accountId, domain, domainRole: role };
     return new Promise<void>(resolve => {
       afterMobileOverlayNavigation(() => { write(target, "push"); void request(target).then(resolve); });
     });
@@ -248,5 +262,5 @@ export function useDeepLinks(options: Options) {
     work.target = { ...work.target, folderId, messageId: "", scope: "folder", query: "", badges: [], view: null };
     return true;
   }, []);
-  return { navigateAccount, navigateMessage, queueFolderChoice };
+  return { navigateAccount, navigateDomain, navigateMessage, queueFolderChoice };
 }

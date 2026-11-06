@@ -92,6 +92,7 @@ export default function MessageCardList({
     getGroupLabel,
     renderSelectIndicators,
     renderFolderBadges,
+    renderMailboxBadge,
     renderQuickActions,
     renderMessageMenu,
     handleShowRelated,
@@ -194,7 +195,8 @@ export default function MessageCardList({
           activeThreadKey === item.threadGroupId &&
           message.id !== activeMessage?.id;
         const isDragging = draggingMessageIds.has(message.id);
-        const folderBadgeKey = item.folderIds.length ? item.folderIds.join("|") : "";
+        const mailboxBadge = renderMailboxBadge?.(message) ?? null;
+        const folderBadgeKey = `${mailboxBadge ? message.accountId : ""}|${item.folderIds.join("|")}`;
         const {
           isThreadSelectionRoot,
           threadSelectionIds,
@@ -411,7 +413,7 @@ export default function MessageCardList({
               showRecipientIcon={item.showRecipientIcon}
               iconFrom={item.iconFrom}
               iconFromEmail={item.iconFromEmail}
-              folderBadges={renderFolderBadges(item.folderIds)}
+              folderBadges={<>{mailboxBadge}{renderFolderBadges(item.folderIds)}</>}
               folderBadgeKey={folderBadgeKey}
               showFolderBadgesInSubjectMeta
               showFolderBadgesInMeta={false}

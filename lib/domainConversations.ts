@@ -82,6 +82,17 @@ export async function resolveDomainRoleFolder(accountId: string, role: DomainFol
   return ROLE_FINDERS[role](await getFolderRecords(accountId), accountId) ?? null;
 }
 
+/**
+ * Trash and spam folders of one mailbox, which a conversation leaves out (as
+ * `isThreadExcludedFolder`: by special use only). For a reader that does not
+ * hold this mailbox's folder list, e.g. a domain view row of another mailbox.
+ */
+export async function threadExcludedFolderIds(accountId: string) {
+  return (await getFolderRecords(accountId))
+    .filter((folder) => ["\\trash", "\\junk", "\\spam"].includes((folder.specialUse ?? "").toLowerCase()))
+    .map((folder) => folder.id);
+}
+
 const threadSortValue = (item: Message) => item.threadSortDateValue ?? item.dateValue;
 
 /**

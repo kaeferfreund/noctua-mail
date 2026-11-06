@@ -73,6 +73,12 @@ type ThreadMessageCardProps = {
   activeFolderId: string;
   threadPathById: (folderId: string) => string;
   folderById: (folderId: string) => Folder | undefined;
+  /**
+   * Badge of the mailbox a message of another mailbox lives in (merged
+   * conversation, domain view); it replaces the folder badge, whose folders
+   * belong to the active mailbox. Null for the active mailbox's own messages.
+   */
+  renderMailboxBadge?: (message: Message) => React.ReactNode;
   setSearchScope: React.Dispatch<React.SetStateAction<"folder" | "all">>;
   setActiveFolderId: React.Dispatch<React.SetStateAction<string>>;
   getImapFlagBadges: (message: Message, locale?: import("@/lib/i18n/config").UiLocale) => ImapFlagBadge[];
@@ -153,6 +159,7 @@ function ThreadMessageCard({
   activeFolderId,
   threadPathById,
   folderById,
+  renderMailboxBadge,
   setSearchScope,
   setActiveFolderId,
   getImapFlagBadges,
@@ -283,6 +290,7 @@ function ThreadMessageCard({
     return Boolean(translationResultFor(format) || translationLoadingFor(format));
   };
   const folderBadgeIds = message.folderId ? [message.folderId] : [];
+  const mailboxBadge = renderMailboxBadge?.(message) ?? null;
   const dateDisplay = getMessageDateDisplay(message.dateValue, message.date, dateFormat, locale);
 
   const handleFolderBadgeSelect = (folderId: string) => {
@@ -649,12 +657,14 @@ function ThreadMessageCard({
               className={styles.compactBadges}
               onClick={(e) => e.stopPropagation()}
             >
-              <FolderBadges
-                folderIds={folderBadgeIds}
-                folderById={folderById}
-                threadPathById={threadPathById}
-                onSelectFolder={handleFolderBadgeSelect}
-              />
+              {mailboxBadge ?? (
+                <FolderBadges
+                  folderIds={folderBadgeIds}
+                  folderById={folderById}
+                  threadPathById={threadPathById}
+                  onSelectFolder={handleFolderBadgeSelect}
+                />
+              )}
               {imapBadges.map((badge) => {
                 if (badge.kind === "flagged")
                   return <FlagBadge key="flagged" onClick={() => toggleFlaggedFlag(message)} />;
@@ -779,12 +789,14 @@ function ThreadMessageCard({
                   )}
                   <SpamBadge message={message} />
                   <SpamCorrectionButton message={message} />
-                  <FolderBadges
-                    folderIds={folderBadgeIds}
-                    folderById={folderById}
-                    threadPathById={threadPathById}
-                    onSelectFolder={handleFolderBadgeSelect}
-                  />
+                  {mailboxBadge ?? (
+                    <FolderBadges
+                      folderIds={folderBadgeIds}
+                      folderById={folderById}
+                      threadPathById={threadPathById}
+                      onSelectFolder={handleFolderBadgeSelect}
+                    />
+                  )}
                   {message.recent && (
                     <Badge size="1" variant="soft" color={badgeColors.recent}>{t("flags.new")}</Badge>
                   )}

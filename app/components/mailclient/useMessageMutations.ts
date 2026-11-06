@@ -143,13 +143,15 @@ export function useMessageMutations({
     reportError(message, { requestPath, status: res.status });
   }, [readErrorMessage, reportError]);
 
+  // Commands go to the message's own mailbox: a conversation or the domain view can
+  // show messages of other mailboxes next to the active one's.
   const requestMessageFlagMutation = useCallback(async (
-    messageId: string,
+    message: Pick<Message, "id" | "accountId">,
     payload: { value: boolean; flag?: SystemFlag; keyword?: string },
     shouldRetry?: () => boolean
   ) => {
     const request = async () => {
-      const response = await apiFetch(buildAccountMessageActionPath(activeAccountId, messageId, "flags"), {
+      const response = await apiFetch(buildAccountMessageActionPath(message.accountId || activeAccountId, message.id, "flags"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -170,30 +172,41 @@ export function useMessageMutations({
   }, [activeAccountId, apiFetch, reportResponseError]);
 
   const requestBulkFlagMutation = useCallback(async (
-    messageIds: string[],
+    messages: Array<Pick<Message, "id" | "accountId">>,
     payload: { value: boolean; flag?: SystemFlag; keyword?: string }
   ) => {
-    const res = await apiFetch(buildAccountMessagesActionPath(activeAccountId, "flags/bulk"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, messageIds })
-    });
-    if (!res.ok) {
-      await reportResponseError(res);
-      return null;
+    const idsByAccount = new Map<string, string[]>();
+    for (const message of messages) {
+      const accountId = message.accountId || activeAccountId;
+      idsByAccount.set(accountId, [...(idsByAccount.get(accountId) ?? []), message.id]);
     }
-    const data = (await res.json()) as {
-      results?: Array<{ messageId: string; flags: string[] }>;
-      skipped?: Array<{ messageId: string; reason: string }>;
-    };
-    if (data.skipped && data.skipped.length > 0) {
-      pushNotice({
-        type: "warning",
-        title: tn("skipped", { count: data.skipped.length }),
-        description: data.skipped[0]?.reason
+    const results: Array<{ messageId: string; flags: string[] }> = [];
+    let failed = false;
+    for (const [accountId, messageIds] of idsByAccount) {
+      const res = await apiFetch(buildAccountMessagesActionPath(accountId, "flags/bulk"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, messageIds })
       });
+      if (!res.ok) {
+        await reportResponseError(res);
+        failed = true;
+        continue;
+      }
+      const data = (await res.json()) as {
+        results?: Array<{ messageId: string; flags: string[] }>;
+        skipped?: Array<{ messageId: string; reason: string }>;
+      };
+      if (data.skipped && data.skipped.length > 0) {
+        pushNotice({
+          type: "warning",
+          title: tn("skipped", { count: data.skipped.length }),
+          description: data.skipped[0]?.reason
+        });
+      }
+      results.push(...(data.results ?? []));
     }
-    return data.results ?? [];
+    return failed && results.length === 0 ? null : results;
   }, [activeAccountId, apiFetch, pushNotice, reportResponseError, tn]);
 
   const reconcileMoveMutation = useCallback((
@@ -255,7 +268,7 @@ export function useMessageMutations({
       actionKind: destinationFolderId ? "undo" : undefined,
       onAction:
         destinationFolderId
-          ? () => undoMoveOperation([undoTarget], activeAccountId, undoSuccessMessage)
+          ? () => undoMoveOperation([undoTarget], message.accountId || activeAccountId, undoSuccessMessage)
           : undefined,
       durationMs: NOTICE_TIMEOUTS.success
     });
@@ -276,8 +289,8 @@ export function useMessageMutations({
 
   // Explicit JSON keeps bodyless commands valid when the browser/Next transport
   // presents an empty request stream to requireMutationSameOrigin.
-  const requestMessageCommand = useCallback((messageId: string, action: string) =>
-    apiFetch(buildAccountMessageActionPath(activeAccountId, messageId, action), {
+  const requestMessageCommand = useCallback((message: Pick<Message, "id" | "accountId">, action: string) =>
+    apiFetch(buildAccountMessageActionPath(message.accountId || activeAccountId, message.id, action), {
       method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
     }), [activeAccountId, apiFetch]);
 
@@ -285,7 +298,7 @@ export function useMessageMutations({
     try {
       const navigationRows = getNavigationRows?.();
       applyMoveReconcileSuppression([message]);
-      const res = await requestMessageCommand(message.id, "archive");
+      const res = await requestMessageCommand(message, "archive");
       if (!res.ok) {
         reportError(await readErrorMessage(res));
         return;
@@ -345,7 +358,7 @@ export function useMessageMutations({
 
       setPendingMessageActions((prev) => new Set(prev).add(message.id));
       try {
-        const res = await requestMessageCommand(message.id, "unsubscribe");
+        const res = await requestMessageCommand(message, "unsubscribe");
 
         if (!res.ok) {
           const errMsg = await readErrorMessage(res);
@@ -389,7 +402,7 @@ export function useMessageMutations({
     try {
       const navigationRows = getNavigationRows?.();
       applyMoveReconcileSuppression([message]);
-      const res = await requestMessageCommand(message.id, "spam");
+      const res = await requestMessageCommand(message, "spam");
       if (!res.ok) {
         reportError(await readErrorMessage(res));
         return;
@@ -437,7 +450,7 @@ export function useMessageMutations({
     try {
       const navigationRows = getNavigationRows?.();
       applyMoveReconcileSuppression([message]);
-      const res = await requestMessageCommand(message.id, "not-spam");
+      const res = await requestMessageCommand(message, "not-spam");
       if (!res.ok) {
         reportError(await readErrorMessage(res));
         return;
@@ -517,7 +530,7 @@ export function useMessageMutations({
     shouldRetry?: () => boolean
   ) => {
     try {
-      const flags = await requestMessageFlagMutation(message.id, { flag, value }, shouldRetry);
+      const flags = await requestMessageFlagMutation(message, { flag, value }, shouldRetry);
       if (!flags) return;
       applyFlagsResults([{ message, nextFlags: flags }], "update-flag-state");
       queueFilteredSearchRefresh(hasFilteredSearchCriteria);
@@ -535,7 +548,7 @@ export function useMessageMutations({
     value: boolean
   ) => {
     try {
-      const flags = await requestMessageFlagMutation(message.id, { keyword, value });
+      const flags = await requestMessageFlagMutation(message, { keyword, value });
       if (!flags) return;
       applyFlagsResults([{ message, nextFlags: flags }], "update-keyword-flag");
       queueFilteredSearchRefresh(hasFilteredSearchCriteria);
@@ -569,7 +582,7 @@ export function useMessageMutations({
   ) => {
     if (messages.length === 0) return;
     try {
-      const results = await requestBulkFlagMutation(messages.map((m) => m.id), { flag, value });
+      const results = await requestBulkFlagMutation(messages, { flag, value });
       if (!results) return;
       applyBulkFlagResults(messages, results, "update-flag-state-bulk");
       queueFilteredSearchRefresh(hasFilteredSearchCriteria);
@@ -588,7 +601,7 @@ export function useMessageMutations({
   ) => {
     if (messages.length === 0) return;
     try {
-      const results = await requestBulkFlagMutation(messages.map((m) => m.id), { keyword, value });
+      const results = await requestBulkFlagMutation(messages, { keyword, value });
       if (!results) return;
       applyBulkFlagResults(messages, results, "update-keyword-flag-bulk");
       queueFilteredSearchRefresh(hasFilteredSearchCriteria);
@@ -692,13 +705,13 @@ export function useMessageMutations({
     fromKeyword: string,
     toKeyword: string
   ): Promise<void> => {
-    const removeFlags = await requestMessageFlagMutation(msg.id, {
+    const removeFlags = await requestMessageFlagMutation(msg, {
       keyword: fromKeyword,
       value: false
     });
     if (!removeFlags) return;
 
-    const finalFlags = await requestMessageFlagMutation(msg.id, {
+    const finalFlags = await requestMessageFlagMutation(msg, {
       keyword: toKeyword,
       value: true
     });
@@ -747,33 +760,33 @@ export function useMessageMutations({
       let finalFlags = message.flags ?? [];
 
       if (hasTodo) {
-        const removeFlags = await requestMessageFlagMutation(message.id, {
+        const removeFlags = await requestMessageFlagMutation(message, {
           keyword: TODO_FLAG,
           value: false
         });
         if (!removeFlags) return;
 
-        const addFlags = await requestMessageFlagMutation(message.id, {
+        const addFlags = await requestMessageFlagMutation(message, {
           keyword: DONE_FLAG,
           value: true
         });
         if (!addFlags) return;
         finalFlags = addFlags;
       } else if (hasDone) {
-        const removeFlags = await requestMessageFlagMutation(message.id, {
+        const removeFlags = await requestMessageFlagMutation(message, {
           keyword: DONE_FLAG,
           value: false
         });
         if (!removeFlags) return;
 
-        const addFlags = await requestMessageFlagMutation(message.id, {
+        const addFlags = await requestMessageFlagMutation(message, {
           keyword: TODO_FLAG,
           value: true
         });
         if (!addFlags) return;
         finalFlags = addFlags;
       } else {
-        const flags = await requestMessageFlagMutation(message.id, {
+        const flags = await requestMessageFlagMutation(message, {
           keyword: TODO_FLAG,
           value: true
         });

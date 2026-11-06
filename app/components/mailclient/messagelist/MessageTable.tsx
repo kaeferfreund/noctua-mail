@@ -105,6 +105,7 @@ export default function MessageTable({
     getGroupLabel,
     renderSelectIndicators,
     renderFolderBadges,
+    renderMailboxBadge,
     isTrashFolder,
     renderMessageMenu,
     handleShowRelated
@@ -527,6 +528,7 @@ export default function MessageTable({
                     });
                   }}
                 >
+                  {renderMailboxBadge?.(message)}
                   {renderFolderBadges(item.folderIds)}
                   <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><SpamBadge message={message} /><ScheduledSendBadge message={message} /><span data-mobile-collab=""><CollabRowBadges message={message} /></span></span>
                   {messageTopicsById?.get(message.threadId)?.map((topic) => (

@@ -9,7 +9,7 @@ import { useMessageReaderActions } from "./MessageReaderActions";
 import { useAiReplyPrompt } from "./AiReplyPrompt";
 
 type ComposeMode = "new" | "reply" | "replyAll" | "forward" | "edit" | "editAsNew";
-type MessageQuickAction =
+export type MessageQuickAction =
   | "editDraft"
   | "sendDraft"
   | "scheduleDraft"

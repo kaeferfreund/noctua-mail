@@ -5,6 +5,7 @@ import {
   buildAccountThreadsPath
 } from "@/lib/accountApiPaths";
 import type { MessageListSortBy } from "@/lib/messageListSort";
+import { buildDomainThreadsPath, type DomainFolderRole } from "@/lib/domainView";
 import { INVITE_DECK_GROUP_BY } from "@/lib/messageGrouping";
 import type { ThreadDateSource } from "@/lib/threadDate";
 import type { SearchBadgesState } from "./useSearchState";
@@ -44,6 +45,8 @@ export type BuildMessageListQueryUrlOptions = {
   searchBadges: Pick<SearchBadgesState, "attachments">;
   effectiveSearchBadges: string[];
   sortBy: MessageListSortBy;
+  /** Domain view: one thread list across the domain's readable mailboxes (threads, date order). */
+  domainView?: { domain: string; role: DomainFolderRole } | null;
 };
 
 export function resolveMessageListPageSize(
@@ -58,6 +61,21 @@ export function resolveMessageListPageSize(
 export function buildMessageListQueryUrl(opts: BuildMessageListQueryUrlOptions): string {
   const trimmedQuery = opts.query.trim();
   const pageSize = resolveMessageListPageSize(opts.groupBy, opts.searchScope);
+
+  if (opts.domainView) {
+    const params = new URLSearchParams({
+      page: String(opts.page),
+      pageSize: String(pageSize),
+      groupBy: opts.groupBy,
+      threadDateSource: opts.threadDateSource,
+      role: opts.domainView.role
+    });
+    if (trimmedQuery) {
+      params.set("q", trimmedQuery);
+      params.set("fields", opts.selectedSearchFields.join(","));
+    }
+    return buildDomainThreadsPath(opts.domainView.domain, params);
+  }
 
   const params = new URLSearchParams({
     page: String(opts.page),

@@ -4,8 +4,8 @@ import { Inbox, Send, FileText, Trash2, ShieldOff, Archive } from "lucide-react"
 import type { Message, Folder, Topic } from "@/lib/data";
 import type { ComposeMode } from "./composition/composeTypes";
 import type { RowReadAction } from "./messagelist/selectionActions";
-import MessageQuickActions from "./message/MessageQuickActions";
-import MessageMenu from "./message/MessageMenu";
+import MessageQuickActions, { type MessageQuickAction } from "./message/MessageQuickActions";
+import MessageMenu, { type MessageMenuAction } from "./message/MessageMenu";
 import MessageSourcePanel from "./message/MessageSourcePanel";
 import { getFolderSpecialKind } from "@/lib/specialFolders";
 
@@ -23,12 +23,14 @@ export const renderQuickActions = (
   isTrashFolder: (folderId?: string | null) => boolean,
   handleSendDraft?: (msg: Message) => Promise<void>,
   iconSize = 12,
-  origin: "list" | "thread" | "table" = "list"
+  origin: "list" | "thread" | "table" = "list",
+  actionVisibility?: Partial<Record<MessageQuickAction, boolean>>
 ) => (
   <MessageQuickActions
     message={message}
     iconSize={iconSize}
     origin={origin}
+    actionVisibility={actionVisibility}
     isDraft={isDraftItem(message)}
     pendingMessageActions={pendingMessageActions}
     openCompose={openCompose}
@@ -75,12 +77,14 @@ export const renderMessageMenu = (
   hasOtherAccounts?: boolean,
   handleCopyToAccount?: (target: Message) => void,
   handleMoveToAccount?: (target: Message) => void,
-  readAction?: RowReadAction
+  readAction?: RowReadAction,
+  actionVisibility?: Partial<Record<MessageMenuAction, boolean>>
 ) => (
   <MessageMenu
     message={message}
     origin={origin}
     readAction={readAction}
+    actionVisibility={actionVisibility}
     isDraft={isDraftItem(message)}
     pendingMessageActions={pendingMessageActions}
     openCompose={openCompose}
