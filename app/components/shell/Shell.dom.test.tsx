@@ -144,7 +144,7 @@ describe("shell sidebar", () => {
     expect(view.getByText("Example Person")).toBeTruthy();
   });
 
-  it("renders domain headings only for sections with more than six mailboxes", () => {
+  it("renders domain headings for sections with more than six mailboxes or a domain with two", () => {
     // A shared mailbox counts towards the list and sits in its domain's group.
     const accounts = Array.from({ length: 7 }, (_, i) => account(`box${i}`, `Box ${6 - i}`, i % 2 ? "b.example.test" : "a.example.test", i === 2));
     const view = renderSidebar(accounts, () => {});
@@ -167,8 +167,9 @@ describe("shell sidebar", () => {
     expect(heading.parentElement!.parentElement!.className).toContain("md:px-0");
     for (const element of [heading, ...rows]) expect(element.className).toContain("h-8");
     view.unmount();
-    const short = renderSidebar(accounts.slice(0, 6), () => {});
-    expect(short.queryByText("a.example.test")).toBeNull();
+    // Six mailboxes on six domains: no domain holds two, so no headings.
+    const short = renderSidebar(Array.from({ length: 6 }, (_, i) => account(`solo${i}`, `Solo ${i}`, `d${i}.example.test`)), () => {});
+    expect(short.queryByText("d0.example.test")).toBeNull();
     // Ungrouped rows keep the plain layout: no guide, no indent.
     const plainRows = [...short.container.querySelectorAll<HTMLButtonElement>("button[title$='.example.test']")];
     expect(plainRows).toHaveLength(6);
@@ -342,10 +343,54 @@ describe("collapsible domain groups", () => {
     expect(stored).not.toContain('"brand.example.test"');
   });
 
-  it("keeps ungrouped sections without a toggle", () => {
-    const view = renderSidebar(brand, () => {}, undefined, undefined, undefined, undefined, undefined, undefined, undefined, { userId: "user-1", summaries });
-    expect(view.container.querySelector("button[aria-expanded][aria-controls]")).toBeNull();
+  it("with a domain view, the name opens it and the chevron alone collapses the group", () => {
+    const opened: string[] = [];
+    const view = renderSidebar([...brand, ...plain], () => {}, undefined, undefined, undefined, undefined, undefined, undefined, plain[0].id,
+      { userId: "user-1", summaries, onOpenDomain: (domain) => { opened.push(domain); } });
+    const open = view.getByRole("button", { name: "Show all mailboxes of brand.example.test" });
+    const toggle = view.getByRole("button", { name: "Collapse brand.example.test" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(open);
+    expect(opened).toEqual(["brand.example.test"]);
+    // Opening the view keeps the group as it is; the chevron keeps the stored collapsed state.
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
     expect(rowTitles(view, "brand.example.test")).toHaveLength(4);
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.getAttribute("aria-label")).toBe("Expand brand.example.test");
+    expect(window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1")).toBe('["brand.example.test"]');
+    expect(rowTitles(view, "brand.example.test")).toHaveLength(0);
+    // Collapsed: the totals move onto the name button.
+    expect(open.querySelector("[data-domain-counts]")).toBeTruthy();
+    view.unmount();
+  });
+
+  it("marks the open domain view's heading, not the active mailbox row", () => {
+    const view = renderSidebar([...brand, ...plain], () => {}, undefined, undefined, undefined, undefined, undefined, undefined, brand[1].id,
+      { userId: "user-2", summaries, onOpenDomain: () => {}, activeDomain: "brand.example.test" });
+    const open = view.getByRole("button", { name: "Show all mailboxes of brand.example.test" });
+    expect(open.getAttribute("aria-current")).toBe("true");
+    expect(open.getAttribute("data-active")).toBe("true");
+    expect(view.getByRole("button", { name: /Brand b/ }).hasAttribute("aria-current")).toBe(false);
+    expect(view.getByRole("button", { name: "Show all mailboxes of plain.example.test" }).hasAttribute("aria-current")).toBe(false);
+    view.unmount();
+  });
+
+  it("keeps ungrouped sections without a toggle", () => {
+    const solo = ["a", "b", "c"].map(id => account(`solo-${id}`, `Solo ${id}`, `${id}.solo.example.test`));
+    const view = renderSidebar(solo, () => {}, undefined, undefined, undefined, undefined, undefined, undefined, undefined, { userId: "user-1", summaries });
+    expect(view.container.querySelector("button[aria-expanded][aria-controls]")).toBeNull();
+    expect(solo.map(row => rowTitles(view, row.email.split("@")[1]).length)).toEqual([1, 1, 1]);
+  });
+
+  it("groups a short section once one domain holds two mailboxes; a single-mailbox domain gets no domain view", () => {
+    const pair = ["a", "b"].map(id => account(`pair-${id}`, `Pair ${id}`, "pair.example.test"));
+    const single = account("single", "Single", "single.example.test");
+    const view = renderSidebar([...pair, single], () => {}, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      { userId: "user-1", summaries, onOpenDomain: () => {} });
+    expect(view.getByRole("button", { name: "Show all mailboxes of pair.example.test" })).toBeTruthy();
+    expect(view.queryByRole("button", { name: "Show all mailboxes of single.example.test" })).toBeNull();
+    expect(view.getByText("single.example.test")).toBeTruthy();
   });
 });
 
@@ -389,10 +434,10 @@ describe("mailbox avatars and domain icons", () => {
   it("shows a row avatar only for a custom image URL, never initials", async () => {
     const images = stubAvatarImages();
     try {
-      const custom = { ...account("a", "Alpha"), avatar: "https://avatars.example.test/alpha.png" };
-      const literal = { ...account("b", "Bravo"), avatar: "NW" };
-      const view = renderSidebar([custom, literal, account("c", "Charlie")], () => {});
-      // Up to six mailboxes: no domain headers, so the custom avatar is the only image request.
+      const custom = { ...account("a", "Alpha", "a.example.test"), avatar: "https://avatars.example.test/alpha.png" };
+      const literal = { ...account("b", "Bravo", "b.example.test"), avatar: "NW" };
+      const view = renderSidebar([custom, literal, account("c", "Charlie", "c.example.test")], () => {});
+      // Up to six mailboxes and no domain with two: no domain headers, so the custom avatar is the only image request.
       expect(images.probes.map(probe => probe.src)).toEqual([custom.avatar]);
       await images.settle(custom.avatar, true);
       await waitFor(() => expect(rowOf(view, "Alpha").querySelector("[data-slot=avatar] img")?.getAttribute("src")).toBe(custom.avatar));

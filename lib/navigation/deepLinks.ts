@@ -1,5 +1,6 @@
 /** Public, version-independent URL state for the single-page mail shell. */
 import { withoutInviteFragment } from "@/lib/inviteLink";
+import { normalizeDomainKey, parseDomainFolderRole, type DomainFolderRole } from "@/lib/domainView";
 export const SETTINGS_SECTIONS = ["account", "identities", "signatures", "preferences", "notifications", "categorization", "calendar", "topics", "translation", "mcp", "recipient-aliases", "members", "spam"] as const;
 export const ADMIN_SECTIONS = ["users", "mailboxes", "invites", "audit", "spam", "domains"] as const;
 export const GROUPS = ["none", "date", "week", "sender", "domain", "year", "folder", "event"] as const;
@@ -21,13 +22,16 @@ export type DeepLinkState = {
   panel: (typeof PANELS)[number] | null;
   calendar: boolean;
   compose: boolean;
+  /** Domain view („Sammler“): all readable mailboxes of this domain. */
+  domain: string | null;
+  domainRole: DomainFolderRole;
 };
 export const FIELD_KEYS = ["sender", "participants", "subject", "body", "attachments"];
 export const BADGE_KEYS = ["unread", "unanswered", "flagged", "todo", "calendar", "attachments", "newsletter", "notification", "transactional", "ai-modified"];
 export function emptyDeepLink(): DeepLinkState {
   return { accountId: "", folderId: "", messageId: "", query: "", scope: "folder", view: null,
     group: "date", badges: [], fields: [...FIELD_KEYS], settings: null, admin: null, security: false,
-    panel: null, calendar: false, compose: false };
+    panel: null, calendar: false, compose: false, domain: null, domainRole: "inbox" };
 }
 function member<T extends string>(values: readonly T[], value: string | null): T | null {
   return values.includes(value as T) ? value as T : null;
@@ -61,9 +65,10 @@ export function parseDeepLink(search: string): DeepLinkState {
     fields: p.has("fields") ? FIELD_KEYS.filter(key => p.get("fields")!.split(",").includes(key)) : [...FIELD_KEYS],
     settings: member(SETTINGS_SECTIONS, p.get("settings")), admin: member(ADMIN_SECTIONS, p.get("admin")),
     security: p.get("security") === "1", panel: member(PANELS, p.get("panel")),
-    calendar: p.get("calendar") === "1", compose: p.has("c") };
+    calendar: p.get("calendar") === "1", compose: p.has("c"),
+    domain: normalizeDomainKey(p.get("d")), domainRole: parseDomainFolderRole(p.get("dr")) };
 }
-const OWNED_PARAMS = ["a", "f", "m", "s", "g", "q", "view", "filter", "fields", "settings", "admin", "security", "panel", "calendar", "c"];
+const OWNED_PARAMS = ["a", "f", "m", "s", "g", "q", "view", "filter", "fields", "settings", "admin", "security", "panel", "calendar", "c", "d", "dr"];
 export function serializeDeepLink(state: DeepLinkState, current = "/"): string {
   const url = new URL(current, "http://localhost");
   OWNED_PARAMS.forEach(key => url.searchParams.delete(key));
@@ -82,6 +87,7 @@ export function serializeDeepLink(state: DeepLinkState, current = "/"): string {
   put("panel", state.panel); put("calendar", state.calendar && "1");
   // An outgoing link may reopen a blank composer; never serialize its draft or recipients.
   put("c", state.compose && "mailto:");
+  put("d", state.domain); put("dr", state.domain && state.domainRole !== "inbox" && state.domainRole);
   // A one-time invite code must never be copied into later history entries.
   return `${url.pathname}${url.search}${withoutInviteFragment(url.hash)}`;
 }

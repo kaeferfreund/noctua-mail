@@ -150,7 +150,8 @@ async function checkShardConfiguration(cacheOverride: string, expectedCacheKib: 
       const indexNames = [
         "idx_messages_account_folder_messageid",
         "idx_messages_account_msgid_date",
-        "idx_messages_account_folder_unread"
+        "idx_messages_account_folder_unread",
+        "idx_messages_account_inreplyto_lower"
       ];
       function assertIndexes(db) {
         const indexes = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'messages'").all();

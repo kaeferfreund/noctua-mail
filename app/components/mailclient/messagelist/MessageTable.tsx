@@ -105,6 +105,7 @@ export default function MessageTable({
     getGroupLabel,
     renderSelectIndicators,
     renderFolderBadges,
+    renderMailboxBadge,
     isTrashFolder,
     renderMessageMenu,
     handleShowRelated
@@ -277,6 +278,7 @@ export default function MessageTable({
         getRowSwipe={getRowSwipe}
         renderRow={({ item, index }) => {
           const message = item.message;
+          const mailboxBadge = renderMailboxBadge?.(message) ?? null;
           const isSuggestionRow = isTopicSuggestionGroupKey(item.groupKey);
           const showAddSuggestionAction =
             isSuggestionRow && item.threadIndex === 0 && item.depth === 0;
@@ -504,6 +506,7 @@ export default function MessageTable({
                       {item.fromText}
                     </span>
                   </FromAddressHoverCard>
+                  {mailboxBadge ? <span className={styles.cellFromMailbox}>{mailboxBadge}</span> : null}
                 </span>
                 <span
                   data-message-cell="subject" className={styles.cellSubject}

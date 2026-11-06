@@ -700,6 +700,8 @@ export function useMessageDeleteActions({
 
   const handleDeleteMessage = useCallback(
     async (message: Message, options?: { allowThreadDeletion?: boolean }) => {
+      // A message of another mailbox (domain view, merged conversation) is deleted in its own mailbox.
+      if (message.accountId !== activeAccountId) return;
       const threadId = getThreadKey(message);
       const { targets, kind } = resolveDeleteTargets({
         message,
@@ -758,7 +760,8 @@ export function useMessageDeleteActions({
             threadScopeMessages.find((item) => item.id === id) ??
             messages.find((item) => item.id === id)
         )
-        .filter((message): message is Message => Boolean(message));
+        .filter((message): message is Message => Boolean(message) && message?.accountId === activeAccountId);
+      if (targets.length === 0) return;
       const selectedIds = new Set(options?.selectedIds ?? uniqueIds);
       const hiddenTargets = targets.filter((target) => !selectedIds.has(target.id));
       const deleteConfirm = await buildDeleteConfirmState(
@@ -795,6 +798,7 @@ export function useMessageDeleteActions({
       });
     },
     [
+      activeAccountId,
       buildDeleteConfirmState,
       confirmDelete,
       deleteLinkedCalendarAssociations,

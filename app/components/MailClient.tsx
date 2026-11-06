@@ -433,6 +433,12 @@ import { useApiErrorMessage } from "./mailclient/useApiErrorMessage";
 import { useFolderRefresh } from "./mailclient/useFolderRefresh";
 import { getFolderDisplayName } from "@/lib/i18n/folderNames";
 import { takeInviteCodeFromLocation } from "@/lib/inviteLink";
+import { mailboxGroupDomain } from "@/lib/senderIdentity";
+import type { DomainFolderRole } from "@/lib/domainView";
+import MailboxBadge from "./mailclient/domain/MailboxBadge";
+import DomainViewBar from "./mailclient/domain/DomainViewBar";
+import { mailboxLabel } from "./shell/types";
+import { OTHER_MAILBOX_MENU_VISIBILITY, OTHER_MAILBOX_QUICK_ACTION_VISIBILITY } from "./mailclient/domain/otherMailboxActions";
 
 const skipReaderRowsSubscription = () => () => {};
 const NO_READER_ROWS: Message[] = [];
@@ -445,6 +451,7 @@ export default function MailClient({
 }: MailClientProps) {
   const tn = useTranslations("Notifications");
   const tv = useTranslations("Views");
+  const td = useTranslations("Domain");
   const tshell = useTranslations("Shell");
   const ts = useTranslations("Search");
   const tl = useTranslations("List");
@@ -461,6 +468,9 @@ export default function MailClient({
   }, []);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
+  // Domain view („Sammler“): one list across the readable mailboxes of a domain.
+  // The active mailbox stays one of them; the deep link (`d`, `dr`) owns this state.
+  const [domainView, setDomainView] = useState<{ domain: string; role: DomainFolderRole } | null>(null);
   const [activeAccountId, setActiveAccountId] = useState("");
   // True while a mailbox switch runs: per-mailbox side reads wait for it to settle.
   const [switchPending, setSwitchPending] = useState(false);
@@ -806,6 +816,17 @@ export default function MailClient({
     [getInitialSyncSessionKey]
   );
   const isRelatedSearch = relatedQueryId.length > 0;
+  // Mailboxes of the open domain view the user may read (the account list is the
+  // user's readable mailboxes); outside it, only the active mailbox.
+  const domainAccounts = useMemo(
+    () => (domainView ? accounts.filter((account) => mailboxGroupDomain(account.email) === domainView.domain) : []),
+    [accounts, domainView]
+  );
+  const listAccountIds = useMemo(
+    () => new Set(domainView ? domainAccounts.map((account) => account.id) : [activeAccountId]),
+    [activeAccountId, domainAccounts, domainView]
+  );
+  const accountById = useMemo(() => new Map(accounts.map((account) => [account.id, account])), [accounts]);
   const accountFolders = useMemo(
     () => folders.filter((folder) => folder.accountId === activeAccountId),
     [activeAccountId, folders]
@@ -1004,7 +1025,7 @@ export default function MailClient({
   );
   const messagesKey = useMemo(
     () =>
-      `${activeAccountId}|${searchScope}|${everywhereExclusionKey}|${activeFolderId}|${activeVirtualFolder?.id ?? ""}|${trimmedQuery}|${groupBy}|${threadDateSource}|sort-${messageSort}|threads-${threadsMode}|${searchFieldKey}|${Object.entries(searchBadges)
+      `${domainView ? `domain:${domainView.domain}:${domainView.role}|` : ""}${activeAccountId}|${searchScope}|${everywhereExclusionKey}|${activeFolderId}|${activeVirtualFolder?.id ?? ""}|${trimmedQuery}|${groupBy}|${threadDateSource}|sort-${messageSort}|threads-${threadsMode}|${searchFieldKey}|${Object.entries(searchBadges)
         .filter(([, enabled]) => enabled)
         .map(([key]) => key)
         .join(",")}`,
@@ -1012,6 +1033,7 @@ export default function MailClient({
       activeAccountId,
       activeFolderId,
       activeVirtualFolder?.id,
+      domainView,
       everywhereExclusionKey,
       groupBy,
       messageSort,
@@ -1251,6 +1273,7 @@ export default function MailClient({
     authoritativeRevision,
     prefetchFirstPage,
     dropFirstPagePrefetch,
+    domainFolderIds,
   } = useMessageData({
     messagesKey,
     activeAccountId,
@@ -1276,7 +1299,9 @@ export default function MailClient({
     setCollapsedGroups,
     setCollapsedThreads,
     currentKeyRef,
-    viewCache
+    viewCache,
+    domainView,
+    listAccountIds
   });
   useCommittedRef(refreshMailboxDataRef, refreshMailboxData);
   useCommittedRef(setMessagesRef, setMessages);
@@ -1293,7 +1318,7 @@ export default function MailClient({
     return next;
   }, [messages]);
 
-  const deduplication = useMemo(() => dedupeAccountMessages(messages, activeAccountId), [messages, activeAccountId]);
+  const deduplication = useMemo(() => dedupeAccountMessages(messages, listAccountIds), [messages, listAccountIds]);
   const accountMessages = deduplication.deduped;
   useEffect(() => {
     const { duplicates } = deduplication;
@@ -1379,11 +1404,11 @@ export default function MailClient({
   const listMessageById = useMemo(() => {
     const map = new Map([...messageById]);
     activeTopicSuggestionRankedMessages.forEach((message) => {
-      if (message.accountId !== activeAccountId) return;
+      if (!listAccountIds.has(message.accountId)) return;
       map.set(message.id, message);
     });
     return map;
-  }, [activeAccountId, activeTopicSuggestionRankedMessages, messageById]);
+  }, [activeTopicSuggestionRankedMessages, listAccountIds, messageById]);
   const suggestedThreadIds = useMemo(
     () => new Set(activeTopicSuggestions.map((item) => item.threadId)),
     [activeTopicSuggestions]
@@ -1931,6 +1956,13 @@ export default function MailClient({
     asNew = false,
     prefill?: ComposeOpenPrefill
   ) => {
+    // The domain view lists several mailboxes, but compose writes from the active one.
+    // A message of another mailbox is answered in its own mailbox: open it there.
+    // (Inside one mailbox, a merged message of another mailbox is answered from this one.)
+    if (domainView && message && message.accountId !== activeAccountId && mode !== "new") {
+      navigateMessageRef.current(message.id, message.accountId);
+      return;
+    }
     // „Bearbeiten hebt die Planung auf“: the draft's schedule, read fresh from the server (other
     // tabs and members included), is cancelled before the draft opens.
     if (mode === "edit" && !asNew && message && isDraftItem(message) && roleAtLeast(currentAccount?.accessRole, "editor")) {
@@ -1953,7 +1985,10 @@ export default function MailClient({
     return message.topics ?? [];
   }, [messageTopicsById]);
 
+  // Topics belong to one mailbox (catalog and thread_topics in its shard): a
+  // message of another mailbox is tagged there, never through the active one.
   const handleAssignTopics = useCallback((message: Message) => {
+    if (message.accountId !== activeAccountId) return;
     setTopicPickerMessage(message);
     setTopicSuggestions([]);
     setTopicPickerOpen(true);
@@ -2286,6 +2321,7 @@ export default function MailClient({
   }, [activeTopicId, persistThreadTopics, refreshActiveTopicModeResults, topicPickerMessage]);
 
   const handleToggleTopic = useCallback(async (message: Message, topicId: string) => {
+    if (message.accountId !== activeAccountId) return;
     const currentTopics = messageTopicsById.get(message.threadId) ?? [];
     const isAssigned = currentTopics.some((t) => t.id === topicId);
     const newTopicIds = isAssigned
@@ -2295,7 +2331,7 @@ export default function MailClient({
     if (activeTopicId) {
       await refreshActiveTopicModeResults();
     }
-  }, [activeTopicId, messageTopicsById, persistThreadTopics, refreshActiveTopicModeResults]);
+  }, [activeAccountId, activeTopicId, messageTopicsById, persistThreadTopics, refreshActiveTopicModeResults]);
 
   const handleAddActiveTopicSuggestion = useCallback(async (threadId: string) => {
     if (!activeTopicId || !threadId) return;
@@ -2654,19 +2690,19 @@ export default function MailClient({
     if (activeTopicSuggestionRankedMessages.length === 0) return threadScopeMessages;
     const seen = new Set(threadScopeMessages.map((message) => message.id));
     const extras = activeTopicSuggestionRankedMessages.filter(
-      (message) => message.accountId === activeAccountId && !seen.has(message.id)
+      (message) => listAccountIds.has(message.accountId) && !seen.has(message.id)
     );
     return extras.length > 0 ? [...threadScopeMessages, ...extras] : threadScopeMessages;
-  }, [activeAccountId, activeTopicSuggestionRankedMessages, threadScopeMessages]);
+  }, [activeTopicSuggestionRankedMessages, listAccountIds, threadScopeMessages]);
 
   const activeMessage = useMemo(() => {
     // A shown new message takes the reader's place. Minimized (selecting a row minimizes
     // it), it must not hide the message the user just selected.
     if (composeOpen && composeMode === "new" && composeView !== "minimized") return undefined;
     if (!viewMessage) return undefined;
-    if (viewMessage.accountId !== activeAccountId) return undefined;
+    if (!listAccountIds.has(viewMessage.accountId)) return undefined;
     return filteredMessages.find((m) => m.id === viewMessage.id) ?? viewMessage;
-  }, [viewMessage, filteredMessages, composeOpen, composeMode, composeView, activeAccountId]);
+  }, [viewMessage, filteredMessages, composeOpen, composeMode, composeView, listAccountIds]);
   // The saved preference applies only while a message is open; every list
   // behaviour (paging, scroll capture, notice anchor) follows the shown layout.
   const readerFocused = !isMobile && readerLayout === "focus" && Boolean(activeMessage);
@@ -2900,7 +2936,10 @@ export default function MailClient({
     invalidateThreadCollab(activeAccountId);
   }
   const threadCollabById = useMemo(() => threadCollabCache.get(activeAccountId) ?? new Map<string, CollabSummary>(), [threadCollabCache, activeAccountId]);
-  const collab = useThreadCollab(activeAccountId, activeMessage?.threadId, {
+  // Assignment, status and notes belong to the opened message's mailbox: a domain view
+  // row of another mailbox is never assigned in the active one.
+  const collabAccountId = activeMessage?.accountId ?? activeAccountId;
+  const collab = useThreadCollab(collabAccountId, activeMessage?.threadId, {
     apiFetch, sessionKey: currentUser?.id, currentUserId: currentUser?.id, refreshVersion: authoritativeRevision + activeCollabRevision,
     onUpdate: handleThreadCollabUpdate, onReadDenied: invalidateThreadCollab,
     onCommit: (accountId) => {
@@ -2936,7 +2975,7 @@ export default function MailClient({
     if (authState === "unauth") setAppBadge(0);
     else if (mailboxSummaries.length > 0) setAppBadge(unreadBadgeCount(mailboxSummaries, pushDeviceSettings));
   }, [authState, mailboxSummaries, pushDeviceSettings]);
-  const collabRole = collab.readDenied ? undefined : (currentAccount as ShellAccount | null)?.accessRole ?? collab.members.find(member => member.userId === collab.me && !member.disabled)?.role;
+  const collabRole = collab.readDenied ? undefined : (accountById.get(collabAccountId) as ShellAccount | undefined)?.accessRole ?? collab.members.find(member => member.userId === collab.me && !member.disabled)?.role;
   const activeMessageRef = useRef<Message | null>(null);
   useCommittedRef(activeMessageRef, activeMessage ?? null);
   const activeMessageThreadKey = (() => {
@@ -3043,10 +3082,15 @@ export default function MailClient({
 
   const evaluateMessageInCurrentResults = useCallback(
     (message: Message): CurrentResultDecision => {
-      if (message.accountId !== activeAccountId) {
+      if (!listAccountIds.has(message.accountId)) {
         return { keep: false, reason: `account-mismatch:${message.accountId}` };
       }
-      if (searchScope === "folder") {
+      if (domainView) {
+        // The domain list shows the role folder of each mailbox (known once page 1 is read).
+        if (domainFolderIds.length > 0 && !domainFolderIds.includes(message.folderId)) {
+          return { keep: false, reason: `domain-folder-mismatch:${message.folderId}` };
+        }
+      } else if (searchScope === "folder") {
         if (!activeFolderId) {
           return { keep: false, reason: "missing-active-folder" };
         }
@@ -3119,12 +3163,14 @@ export default function MailClient({
       return { keep: true };
     },
     [
-      activeAccountId,
       activeFolderId,
       checkIsThreadExcludedFolder,
       currentSearchExcludedFolderIds,
+      domainFolderIds,
+      domainView,
       effectiveSearchBadges,
       includeThreadAcrossFoldersForList,
+      listAccountIds,
       searchScope,
     ]
   );
@@ -3477,7 +3523,13 @@ export default function MailClient({
     },
     [autoReadCoordinator]
   );
-  const autoMarkReadDelayMs = useAutoMarkReadDelay(currentAccount, Boolean(activeMessage), apiFetch);
+  // Role gate and dwell come from the opened message's own mailbox (in the
+  // domain view that can be another mailbox than the active one).
+  const autoMarkReadDelayMs = useAutoMarkReadDelay(
+    activeMessage ? accountById.get(activeMessage.accountId) : null,
+    Boolean(activeMessage),
+    apiFetch
+  );
   const handleAutoMarkRead = useCallback(
     (message: Message) => autoReadCoordinator.autoRead(message, shouldRetry =>
       listHandleRef.current?.updateFlagState(message, "seen", true, shouldRetry) ?? Promise.resolve()),
@@ -3766,7 +3818,8 @@ export default function MailClient({
     isTrashFolder,
     handleSendDraft,
     iconSize,
-    origin
+    origin,
+    message.accountId !== activeAccountId ? OTHER_MAILBOX_QUICK_ACTION_VISIBILITY : undefined
   ]} />;
 
   const { handleMessageDragStart, handleMessageDragEnd } = useMessageDragDrop({
@@ -3893,7 +3946,12 @@ export default function MailClient({
     // wiping flags off the minority).
     const isMajority = <T,>(items: T[], predicate: (item: T) => boolean) =>
       items.filter(predicate).length > items.length / 2;
-    const resolveIds = (ids: string[]) => resolveMessagesByIds(ids).map((m) => m.id);
+    // Read state, flags and to-dos go to each message's own mailbox. Moves, deletions,
+    // topics and copies use the active mailbox's folders and ids: rows of other
+    // mailboxes (domain view) are left out, they are changed in their own mailbox.
+    const resolveOwnMessages = (ids: string[]) =>
+      resolveMessagesByIds(ids).filter((message) => message.accountId === activeAccountId);
+    const resolveIds = (ids: string[]) => resolveOwnMessages(ids).map((m) => m.id);
     return {
       markRead: ({ threadIds }) => setSeen(threadIds, true),
       markUnread: ({ threadIds }) => setSeen(threadIds, false),
@@ -3934,7 +3992,7 @@ export default function MailClient({
         recordAndMove(folderId, { messageIds });
       },
       moveToOther: ({ threadIds }) => {
-        const targets = resolveMessagesByIds(threadIds);
+        const targets = resolveOwnMessages(threadIds);
         if (targets.length === 0) return;
         setMoveToDialogState({
           message: targets[0],
@@ -3942,9 +4000,9 @@ export default function MailClient({
         });
       },
       addTopic: ({ threadIds }, topicId) =>
-        addTopicToMessages(resolveMessagesByIds(threadIds), topicId),
+        addTopicToMessages(resolveOwnMessages(threadIds), topicId),
       archive: ({ threadIds }) => {
-        const targets = resolveMessagesByIds(threadIds);
+        const targets = resolveOwnMessages(threadIds);
         void (async () => {
           for (const target of targets) {
             await handleArchiveMessage(target);
@@ -3955,11 +4013,13 @@ export default function MailClient({
         // A single message takes the per-message path, which asks before
         // deleting the thread behind a collapsed row.
         if (ids.length === 1) {
-          const [message] = resolveMessagesByIds(ids);
+          const [message] = resolveOwnMessages(ids);
           if (message) void handleDeleteMessage(message);
           return;
         }
-        void handleDeleteMessagesByIds(threadIds, { selectedIds: ids });
+        const ownThreadIds = resolveIds(threadIds);
+        if (ownThreadIds.length === 0) return;
+        void handleDeleteMessagesByIds(ownThreadIds, { selectedIds: resolveIds(ids) });
       },
       copyToAccount: ({ threadIds }) =>
         handleCopyMessagesToAccount("copy", resolveIds(threadIds)),
@@ -3967,6 +4027,7 @@ export default function MailClient({
         handleCopyMessagesToAccount("move", resolveIds(threadIds))
     };
   }, [
+    activeAccountId,
     addTopicToMessages,
     handleArchiveMessage,
     handleCopyMessagesToAccount,
@@ -4043,7 +4104,8 @@ export default function MailClient({
     (target) => handleMoveToAccount(target, origin),
     origin !== "thread" && collapsedThreadSeen !== undefined
       ? { seen: collapsedThreadSeen, onSelect: () => bindRowReadAction(message.id, collapsedThreadSeen, selectionActions, getSelectionActionTargets).onSelect() }
-      : undefined
+      : undefined,
+    message.accountId !== activeAccountId ? OTHER_MAILBOX_MENU_VISIBILITY : undefined
   ]} />;
 
 
@@ -4486,13 +4548,21 @@ export default function MailClient({
   ]);
 
   const getReaderFolderScope = useCallback(
-    (active: Message) =>
-      getReaderFolderScopeFor({
+    (active: Message): ReturnType<typeof getReaderFolderScopeFor> & { excludeSpecialFolders?: boolean } => {
+      if (active.accountId !== activeAccountId) {
+        // A domain view row of another mailbox: its folders are not loaded here. In the
+        // trash or spam view only that folder's rows are shown, as in the mailbox itself.
+        return domainView?.role === "trash" || domainView?.role === "spam"
+          ? { folderId: active.folderId, excludeFolderIds: [] }
+          : { folderId: null, excludeFolderIds: [], excludeSpecialFolders: true };
+      }
+      return getReaderFolderScopeFor({
         activeMessage: active,
         activeFolderId,
         threadExcludedFolderIds: excludedFolderIdsForThreads
-      }),
-    [activeFolderId, excludedFolderIdsForThreads]
+      });
+    },
+    [activeAccountId, activeFolderId, domainView?.role, excludedFolderIdsForThreads]
   );
 
   // Reader content: a bounded header window around the selected message.
@@ -4531,9 +4601,10 @@ export default function MailClient({
       });
       return;
     }
-    const { folderId, excludeFolderIds } = getReaderFolderScope(active);
+    const { folderId, excludeFolderIds, excludeSpecialFolders } = getReaderFolderScope(active);
     const key = [
       activeAccountId,
+      active.accountId,
       threadId,
       active.id,
       threadEvictVersion,
@@ -4550,11 +4621,13 @@ export default function MailClient({
     });
     void loadThreadContent({
       key,
+      accountId: active.accountId,
       threadId,
       anchorMessageId: active.id,
       windowed: supportsThreads,
       messageIds: [active.id],
       excludeFolderIds,
+      excludeSpecialFolders,
       folderId,
       groupBy,
       threadDateSource
@@ -4583,6 +4656,7 @@ export default function MailClient({
       const active = activeMessageRef.current;
       if (!active) return;
       void loadThreadPage({
+        accountId: active.accountId,
         threadId: active.threadId ?? active.messageId ?? active.id,
         direction,
         ...getReaderFolderScope(active),
@@ -4875,9 +4949,10 @@ export default function MailClient({
     fields: Object.keys(searchFields).filter(key => searchFields[key as keyof typeof searchFields]),
     settings: manageOpen ? manageTab : null, admin: adminOpen ? adminSection : null,
     security: securityOpen, panel: openBottomStatusPanel === "exceptions" ? "exception" : openBottomStatusPanel === "reminders" ? "reminder" : openBottomStatusPanel,
-    calendar: calendarSidebarOpen, compose: composeOpen && composeMode === "new" && composeView !== "minimized"
+    calendar: calendarSidebarOpen, compose: composeOpen && composeMode === "new" && composeView !== "minimized",
+    domain: domainView?.domain ?? null, domainRole: domainView?.role ?? "inbox"
   };
-  const { navigateAccount: navigateLinkedAccount, navigateMessage, queueFolderChoice } = useDeepLinks({
+  const { navigateAccount: navigateLinkedAccount, navigateDomain, navigateMessage, queueFolderChoice } = useDeepLinks({
     ready: authState === "ok" && initialDataReady &&
       (initialFoldersLoadedAccountId === activeAccountId || foldersUnavailableAccountId === activeAccountId),
     authenticated: authState !== "unauth",
@@ -4891,8 +4966,14 @@ export default function MailClient({
         messageId: "", view: targetView,
         group: requested.group === "event" && !calendarAvailable ? "date" : requested.group,
         settings: requested.settings && currentAccount ? settingsTabVisible(requested.settings, currentAccount.accessRole) ? requested.settings : "preferences" : null,
-        admin: isAdminUser ? requested.admin : null
+        admin: isAdminUser ? requested.admin : null,
+        // The domain view needs the active mailbox to be one of the domain's.
+        domain: requested.domain && currentAccount && mailboxGroupDomain(currentAccount.email) === requested.domain
+          ? requested.domain : null,
+        domainRole: requested.domain ? requested.domainRole : "inbox"
       };
+      if (target.domain) target.view = null;
+      setDomainView(target.domain ? { domain: target.domain, role: target.domainRole } : null);
       deepLinkSelectionRef.current = null;
       setViewMessage(null); setActiveMessageId(""); clearSelection(); resetReaderLayout();
       setSearchScope(target.scope); setQuery(target.query); setActiveVirtualFolderId(target.view);
@@ -4949,6 +5030,50 @@ export default function MailClient({
   }, [activeAccountId, activeVirtualFolderId, authoritativeRevision, filteredMessages, hasMoreMessages, loadingMessages, messageListError, messagesPage, query, refreshingMessages, selectionStore, setMessagesPage, viewMessageId]);
 
   useLayoutEffect(() => { navigateMessageRef.current = navigateMessage; }, [navigateMessage]);
+
+  // Mailbox badge of a message: in the domain view on every row and card, elsewhere on
+  // messages of another mailbox merged into a conversation. It opens the message in
+  // its own mailbox, where it can be moved, deleted, assigned or answered as that mailbox.
+  const renderMailboxBadge = useCallback(
+    (message: Message, options: { always: boolean; openable: boolean }) => {
+      if (!options.always && message.accountId === activeAccountId) return null;
+      const account = accountById.get(message.accountId);
+      if (!account) return null;
+      return (
+        <MailboxBadge
+          label={mailboxLabel(account)}
+          email={account.email}
+          onOpen={options.openable ? () => navigateMessage(message.id, message.accountId) : undefined}
+        />
+      );
+    },
+    [accountById, activeAccountId, navigateMessage]
+  );
+  // List rows open in the reader on click; their badge only names the mailbox.
+  const renderListMailboxBadge = useMemo(
+    () => (domainView ? (message: Message) => renderMailboxBadge(message, { always: true, openable: false }) : undefined),
+    [domainView, renderMailboxBadge]
+  );
+  // Folder badges name the active mailbox's folders only; a domain view row of another
+  // mailbox carries its mailbox badge instead.
+  const renderListFolderBadges = useMemo(
+    () => (domainView ? (folderIds: string[]) => renderFolderBadges(folderIds.filter((id) => folderById.has(id))) : renderFolderBadges),
+    [domainView, folderById, renderFolderBadges]
+  );
+  const renderReaderMailboxBadge = useCallback(
+    (message: Message) => renderMailboxBadge(message, { always: Boolean(domainView), openable: true }),
+    [domainView, renderMailboxBadge]
+  );
+  const openDomainView = useCallback(
+    (domain: string) => {
+      const members = accounts.filter((account) => mailboxGroupDomain(account.email) === domain);
+      if (members.length === 0) return;
+      // The active mailbox stays when it belongs to the domain.
+      const accountId = members.some((account) => account.id === activeAccountId) ? activeAccountId : members[0].id;
+      return navigateDomain(domain, accountId);
+    },
+    [accounts, activeAccountId, navigateDomain]
+  );
   const handleNoticeOpen = (notice: InAppNotice) => {
     const jumpTarget = notice.messageId ?? notice.ids?.[0];
     if (jumpTarget) {
@@ -5285,6 +5410,8 @@ export default function MailClient({
             // Deep links own mailbox navigation (history + URL); the sidebar shows the
             // clicked row as pending until the returned value settles.
             onSwitch: navigateLinkedAccount,
+            activeDomain: domainView?.domain ?? null,
+            onOpenDomain: openDomainView,
             onAdd: isAdminUser ? () => setNewMailboxOpen(true) : undefined
           },
           views: {
@@ -5343,7 +5470,9 @@ export default function MailClient({
           }
         }}
         header={{
-          title: [currentAccount?.name || currentAccount?.email, activeVirtualFolder?.name || activeFolderName].filter((part): part is string => Boolean(part)),
+          title: domainView
+            ? [domainView.domain, td(`roles.${domainView.role}`)]
+            : [currentAccount?.name || currentAccount?.email, activeVirtualFolder?.name || activeFolderName].filter((part): part is string => Boolean(part)),
           search: {
             state: {
               query,
@@ -5426,6 +5555,15 @@ export default function MailClient({
               searchActive={searchActive}
               isRelatedSearch={isRelatedSearch}
               relatedNotice={relatedNotice}
+              listBanner={domainView ? (
+                <DomainViewBar
+                  domain={domainView.domain}
+                  role={domainView.role}
+                  mailboxCount={domainAccounts.length}
+                  onRoleChange={(role) => { void navigateDomain(domainView.domain, activeAccountId, role); }}
+                  onClose={() => { void navigateLinkedAccount(activeAccountId); }}
+                />
+              ) : null}
               searchCriteriaLabel={searchCriteriaLabel}
               searchCriteriaBadges={searchCriteriaBadges}
               onClearSearch={clearSearch}
@@ -5480,7 +5618,8 @@ export default function MailClient({
                 getThreadLatestDate,
                 getGroupLabel,
                 renderSelectIndicators,
-                renderFolderBadges,
+                renderFolderBadges: renderListFolderBadges,
+                renderMailboxBadge: renderListMailboxBadge,
                 renderQuickActions,
                 renderMessageMenu,
                 handleShowRelated,
@@ -5556,9 +5695,13 @@ export default function MailClient({
                   archive={() => { void handleArchiveMessage(activeMessage); }}
                   spam={() => { void (isSpamFolder(activeMessage.folderId) ? handleMarkNotSpam(activeMessage) : handleMarkSpam(activeMessage)); }}
                   inSpam={isSpamFolder(activeMessage.folderId)}
-                  remove={() => { void handleDeleteMessage(activeMessage, { allowThreadDeletion: false }); }}
-                  move={() => handleMoveTo(activeMessage, "thread")}
-                  topics={() => handleAssignTopics(activeMessage)}
+                  // As in the message menu (OTHER_MAILBOX_MENU_VISIBILITY): a row of another
+                  // mailbox in the domain view is deleted, moved and tagged in its own mailbox.
+                  {...(activeMessage.accountId === activeAccountId ? {
+                    remove: () => { void handleDeleteMessage(activeMessage, { allowThreadDeletion: false }); },
+                    move: () => handleMoveTo(activeMessage, "thread"),
+                    topics: () => handleAssignTopics(activeMessage)
+                  } : {})}
                   done={() => {
                     if (hasTodoFlag(activeMessage) || hasDoneFlag(activeMessage)) void toggleTodoFlag(activeMessage);
                     else void updateKeywordFlag(activeMessage, DONE_FLAG, true);
@@ -5614,6 +5757,7 @@ export default function MailClient({
                   activeFolderId,
                   threadPathById,
                   folderById: (folderId: string) => folderById.get(folderId),
+                  renderMailboxBadge: renderReaderMailboxBadge,
                   setSearchScope,
                   setActiveFolderId,
                   getImapFlagBadges,

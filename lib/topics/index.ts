@@ -20,6 +20,7 @@ export {
   getTopicStats,
   getTopicsForThread,
   getTopicsForThreads,
+  hasThreadInAccount,
   listTopics,
   removeThreadTopic,
   setThreadTopics,

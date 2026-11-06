@@ -15,20 +15,33 @@ const row = {
   flags: [], groupKey: "Today", threadSortDateValue: Date.UTC(2026, 9, 23, 9), topics: [], topicSuggestions: []
 };
 const FLAGS = "/api/accounts/account-a/messages/open-message/flags";
+// A reply stored in another mailbox of the same domain, merged into the opened conversation.
+const linkedRow = {
+  ...row, id: "peer-message", accountId: "account-b", folderId: "account-b:INBOX", threadId: "open-thread", linkedThreadId: "peer-thread",
+  messageId: "<peer-message@example.test>", inReplyTo: "<open-message@example.test>", parentId: "open-message",
+  subject: "Peer synthetic reply", preview: "Peer synthetic preview", to: "account-b@example.test", dateValue: row.dateValue + 60_000
+};
 
 let flagBodies: { flag: string; value: boolean }[];
+let peerFlagBodies: { flag: string; value: boolean }[];
 let holdAutoRead: Promise<void> | null;
 let failures = 0;
 const originals = { fetch: globalThis.fetch, eventSource: globalThis.EventSource };
 
-function setup(role: AccountRole, mode: AutoMarkReadMode) {
-  flagBodies = [];
-  holdAutoRead = null;
-  failures = 0;
-  const account = {
-    id: "account-a", name: "Synthetic Alpha", email: "account-a@example.test", avatar: "", accessRole: role, settings: {},
+function syntheticAccount(id: string, role: AccountRole) {
+  return {
+    id, name: `Synthetic ${id}`, email: `${id}@example.test`, avatar: "", accessRole: role, settings: {},
     imap: { host: "", port: 993, secure: true, user: "", password: "" }, smtp: { host: "", port: 465, secure: true, user: "", password: "" }
   };
+}
+
+/** `peerRole`: the user is also a member of account-b, whose reply joins the opened conversation. */
+function setup(role: AccountRole, mode: AutoMarkReadMode, peerRole?: AccountRole) {
+  flagBodies = [];
+  peerFlagBodies = [];
+  holdAutoRead = null;
+  failures = 0;
+  const accounts = [syntheticAccount("account-a", role), ...(peerRole ? [syntheticAccount("account-b", peerRole)] : [])];
   (window as unknown as { happyDOM: { setURL: (url: string) => void } }).happyDOM.setURL("http://localhost:4000/?a=~account-a&f=INBOX&m=~open-message");
   globalThis.EventSource = class extends EventTarget {
     url: string;
@@ -39,9 +52,23 @@ function setup(role: AccountRole, mode: AutoMarkReadMode) {
     const url = (typeof input === "string" ? input : input instanceof URL ? input.href : input.url).replace(/^https?:\/\/[^/]+/, "");
     const path = url.split("?")[0];
     if (path === "/api/auth/me") return Response.json({ user: { id: "synthetic-user", email: "user@example.test", role: "user" },
-      accounts: [account], accountId: "account-a", mailboxState: "selected", security: {}, ttlSeconds: 3600 });
+      accounts, accountId: "account-a", mailboxState: "selected", security: {}, ttlSeconds: 3600 });
     if (path === "/api/me/events") return new Response(new ReadableStream<Uint8Array>(), { headers: { "content-type": "text/event-stream" } });
     if (path === "/api/me/mailboxes/summary") return Response.json({ ok: true, mailboxes: [] });
+    if (path === "/api/accounts/account-b/prefs") return Response.json({ ok: true, prefs: { reading: { autoMarkRead: "immediate" } } });
+    if (path === "/api/accounts/account-b/messages/peer-message/flags") {
+      peerFlagBodies.push(JSON.parse(String(init?.body)) as { flag: string; value: boolean });
+      return peerRole === "viewer"
+        ? Response.json({ ok: false, message: "Insufficient mailbox role" }, { status: 403 })
+        : Response.json({ ok: true, flags: ["\\Seen"] });
+    }
+    if (path === "/api/accounts/account-b/messages/peer-message") {
+      return Response.json({ ok: true, message: { ...linkedRow, body: "Synthetic peer body", contentState: "stored" } });
+    }
+    if (path === "/api/accounts/account-a/thread/related" && peerRole) {
+      return Response.json({ items: [row], linked: [linkedRow], placeholders: [],
+        window: { total: 1, anchorId: "open-message", hasOlder: false, olderCursor: null, hasNewer: false, newerCursor: null } });
+    }
     if (path === "/api/accounts/account-a/prefs") return Response.json({ ok: true, prefs: { reading: { autoMarkRead: mode } } });
     if (path === "/api/accounts/account-a/folders") {
       return Response.json([{ id: "account-a:INBOX", accountId: "account-a", name: "Inbox", specialUse: "\\Inbox", count: 1, unreadCount: 1 }]);
@@ -150,4 +177,31 @@ it("manual unread cancels the automatic retry during its delay", async () => {
   fireEvent.keyDown(window, { key: "u" });
   await wait(1200);
   await waitFor(() => expect(flagBodies).toEqual([{ flag: "seen", value: true }, { flag: "seen", value: false }]));
+});
+
+/** Opens the merged reply's card (it renders collapsed next to the opened message). */
+async function expandPeerReply(view: Awaited<ReturnType<typeof openClient>>) {
+  fireEvent.click(await view.findByRole("button", { name: /Peer synthetic preview/ }));
+  await waitFor(() => expect(view.queryAllByText("Synthetic peer body").length).toBeGreaterThan(0));
+}
+
+describe("auto-read in a conversation merged across the domain's mailboxes", () => {
+  it("never asks to mark the reply of a mailbox the user only views", async () => {
+    setup("editor", "immediate", "viewer");
+    const view = await openClient();
+    await waitFor(() => expect(flagBodies).toEqual([{ flag: "seen", value: true }]));
+    await expandPeerReply(view);
+    await wait(800);
+    expect(peerFlagBodies).toEqual([]);
+    expect(view.queryByText(/Insufficient mailbox role/)).toBeNull();
+  });
+
+  it("leaves the reply of another mailbox unread for an editor of both mailboxes", async () => {
+    setup("editor", "immediate", "editor");
+    const view = await openClient();
+    await waitFor(() => expect(flagBodies).toEqual([{ flag: "seen", value: true }]));
+    await expandPeerReply(view);
+    await wait(800);
+    expect(peerFlagBodies).toEqual([]);
+  });
 });

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { Account, Folder, Message } from "@/lib/data";
 import { authenticatedTestCookie } from "@/lib/testAuthHarness";
 import { dbModulePromise } from "@/lib/testDbHarness";
-import { clampThreadListPageSize } from "./route";
+import { clampThreadListPageSize } from "@/app/api/_helpers/threadList";
 
 const { saveFoldersForAccount, upsertAccount, upsertMessages } = await dbModulePromise;
 const { GET } = await import("./route");

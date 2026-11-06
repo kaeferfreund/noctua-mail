@@ -109,6 +109,7 @@ export default function MessageThreadList({
     getThreadLatestDate,
     getGroupLabel,
     renderFolderBadges,
+    renderMailboxBadge,
     handleShowRelated,
     isTrashFolder,
     renderMessageMenu
@@ -199,6 +200,7 @@ export default function MessageThreadList({
       getRowSwipe={getRowSwipe}
       renderRow={({ item, index }) => {
         const message = item.message;
+        const mailboxBadge = renderMailboxBadge?.(message) ?? null;
         const isSuggestionRow = isTopicSuggestionGroupKey(item.groupKey);
         const showAddSuggestionAction =
           isSuggestionRow && item.threadIndex === 0 && item.depth === 0;
@@ -375,6 +377,7 @@ export default function MessageThreadList({
                       </span>
                     )}
                     <span className={styles.cellFromText}>{item.fromText}</span>
+                    {mailboxBadge ? <span className={styles.cellFromMailbox}>{mailboxBadge}</span> : null}
                   </span>
                 </FromAddressHoverCard>
 

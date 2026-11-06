@@ -2292,5 +2292,24 @@
         "fullscreen": "Vollbild umschalten ({shortcut})"
       }
     }
+  },
+  "Domain": {
+    "mailbox": "Postfach {mailbox}",
+    "openInMailbox": "Im Postfach {mailbox} öffnen",
+    "openDomain": "Alle Postfächer von {domain} anzeigen",
+    "collapse": "{domain} einklappen",
+    "expand": "{domain} ausklappen",
+    "allMailboxes": "Alle Postfächer",
+    "mailboxCount": "{count, plural, one {# Postfach} other {# Postfächer}}",
+    "folderSwitch": "Ordner im Sammler",
+    "close": "Sammler schließen",
+    "roles": {
+      "inbox": "Posteingang",
+      "sent": "Gesendet",
+      "drafts": "Entwürfe",
+      "archive": "Archiv",
+      "trash": "Papierkorb",
+      "spam": "Spam"
+    }
   }
 }

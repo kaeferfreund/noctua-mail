@@ -16,7 +16,8 @@ export const badgeColors = {
   priorityHigh: "red" as BadgeColor,
   priorityLow: "gray" as BadgeColor,
   priorityDefault: "amber" as BadgeColor,
-  suspicious: "red" as BadgeColor
+  suspicious: "red" as BadgeColor,
+  mailbox: "cyan" as BadgeColor
 };
 
 const flagColorMap: Record<string, BadgeColor> = {

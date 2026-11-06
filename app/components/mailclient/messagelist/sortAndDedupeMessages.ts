@@ -40,7 +40,8 @@ export type MessageDedupeResult = {
 };
 
 /**
- * Filter `messages` to the given `accountId` and dedupe by `id`. The
+ * Filter `messages` to the given mailbox (or mailboxes, in the domain view)
+ * and dedupe by `id`. The
  * first occurrence of each id keeps its original id; later occurrences
  * are reassigned to `<id>-<indexInFiltered>`.
  *
@@ -48,9 +49,11 @@ export type MessageDedupeResult = {
  */
 export function dedupeAccountMessages(
   messages: Message[],
-  accountId: string
+  accountIds: string | ReadonlySet<string>
 ): MessageDedupeResult {
-  const filtered = messages.filter((message) => message.accountId === accountId);
+  const filtered = messages.filter((message) =>
+    typeof accountIds === "string" ? message.accountId === accountIds : accountIds.has(message.accountId)
+  );
   const seen = new Set<string>();
   const duplicates: MessageDedupeDuplicate[] = [];
   const deduped: Message[] = new Array(filtered.length);

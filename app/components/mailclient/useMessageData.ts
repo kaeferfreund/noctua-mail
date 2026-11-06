@@ -16,6 +16,7 @@ import { buildMessageListQueryUrl } from "./messageListQueryUrl";
 import type { ThreadDateSource } from "@/lib/threadDate";
 import type { MessageListSortBy } from "@/lib/messageListSort";
 import type { MailboxViewCache } from "./mailboxViewCache";
+import type { DomainFolderRole } from "@/lib/domainView";
 
 type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -48,6 +49,10 @@ export type UseMessageDataParams = {
   currentKeyRef: React.MutableRefObject<string>;
   // Recently visited lists: a revisit shows the cached first page while it is re-read.
   viewCache?: MailboxViewCache;
+  /** Domain view: the list spans the domain's readable mailboxes. */
+  domainView?: { domain: string; role: DomainFolderRole } | null;
+  /** Mailboxes whose rows the list may show (the active one, or the domain's). */
+  listAccountIds?: ReadonlySet<string>;
 };
 
 export function useMessageData({
@@ -75,8 +80,14 @@ export function useMessageData({
   setCollapsedGroups,
   setCollapsedThreads,
   currentKeyRef,
-  viewCache
+  viewCache,
+  domainView = null,
+  listAccountIds
 }: UseMessageDataParams) {
+  const inListScope = (accountId: string) =>
+    listAccountIds ? listAccountIds.has(accountId) : accountId === activeAccountId;
+  // Domain view: the role folder of each listed mailbox, from the list response.
+  const [domainFolderIds, setDomainFolderIds] = useState<string[]>([]);
   const [authoritativeRevision, setAuthoritativeRevision] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [groupMeta, setGroupMeta] = useState<MessageGroupMeta[]>([]);
@@ -139,11 +150,11 @@ export function useMessageData({
     prevMessages: Message[],
     nextMessages: Message[]
   ) => {
-    const prevScoped = prevMessages.filter((msg) => msg.accountId === activeAccountId);
-    const nextScoped = nextMessages.filter((msg) => msg.accountId === activeAccountId);
+    const prevScoped = prevMessages.filter((msg) => inListScope(msg.accountId));
+    const nextScoped = nextMessages.filter((msg) => inListScope(msg.accountId));
     const nextIds = new Set(nextScoped.map((msg) => msg.id));
     const removed = prevScoped.filter((msg) => !nextIds.has(msg.id));
-    const foreign = nextMessages.filter((msg) => msg.accountId !== activeAccountId);
+    const foreign = nextMessages.filter((msg) => !inListScope(msg.accountId));
     if (removed.length === 0 && foreign.length === 0) return;
     const removedSample = removed
       .slice(0, LIST_DEBUG_SAMPLE_LIMIT)
@@ -192,12 +203,14 @@ export function useMessageData({
       query,
       selectedSearchFields,
       searchBadges: { attachments: searchBadges.attachments },
-      effectiveSearchBadges
+      effectiveSearchBadges,
+      domainView
     });
 
   // Free-text and related searches are not cached: every query is a new key and
-  // would push the visited mailboxes out.
-  const cacheableView = Boolean(viewCache) && !query.trim();
+  // would push the visited mailboxes out. The domain view is never cached: its rows
+  // come from several mailboxes and are re-read with each visit's access.
+  const cacheableView = Boolean(viewCache) && !query.trim() && !domainView;
   const firstPageUrl = buildQueryUrl(1);
 
   // Reset list state when the query key changes; a list visited earlier starts from
@@ -299,6 +312,7 @@ export function useMessageData({
       effectiveSearchBadges: []
     });
   const plainInboxView =
+    !domainView &&
     searchScope === "folder" &&
     !isRelatedSearch &&
     !query.trim() &&
@@ -380,9 +394,10 @@ export function useMessageData({
             total?: number;
             baseCount?: number;
             relatedSubject?: string;
+            folders?: Array<{ accountId: string; folderId: string }>;
           };
           const items = Array.isArray(data?.items) ? data.items.filter(Boolean) : [];
-          const foreignItems = items.filter((item) => item.accountId !== activeAccountId);
+          const foreignItems = items.filter((item) => !inListScope(item.accountId));
           if (foreignItems.length > 0) {
             logListDebug("error", "list API returned foreign-account rows", {
               source: "loadMessages",
@@ -434,6 +449,7 @@ export function useMessageData({
           setHasMoreMessages(Boolean(data?.hasMore));
           setTotalMessages(typeof data?.total === "number" ? data.total : null);
           if (page === 1) {
+            setDomainFolderIds(Array.isArray(data?.folders) ? data.folders.map((entry) => entry.folderId) : []);
             shownPageKeyRef.current = requestKey;
             shownPageUrlRef.current = url;
             firstPageSizeRef.current = {
@@ -507,11 +523,12 @@ export function useMessageData({
         total?: number;
         baseCount?: number;
         relatedSubject?: string;
+        folders?: Array<{ accountId: string; folderId: string }>;
       };
       const nextMessages = Array.isArray(messageData?.items)
         ? messageData.items.filter(Boolean)
         : [];
-      const foreignItems = nextMessages.filter((item) => item.accountId !== activeAccountId);
+      const foreignItems = nextMessages.filter((item) => !inListScope(item.accountId));
       if (foreignItems.length > 0) {
         logListDebug("error", "refresh returned foreign-account rows", {
           source: "refreshMailboxData",
@@ -528,6 +545,7 @@ export function useMessageData({
       if (messageMutationVersionRef.current !== requestMutationVersion) {
         return false;
       }
+      setDomainFolderIds(Array.isArray(messageData?.folders) ? messageData.folders.map((entry) => entry.folderId) : []);
       shownPageKeyRef.current = requestKey;
       shownPageUrlRef.current = requestUrl;
       firstPageSizeRef.current = {
@@ -600,6 +618,7 @@ export function useMessageData({
     currentKeyRef,
     markMessagesMutated,
     prefetchFirstPage,
-    dropFirstPagePrefetch
+    dropFirstPagePrefetch,
+    domainFolderIds
   };
 }

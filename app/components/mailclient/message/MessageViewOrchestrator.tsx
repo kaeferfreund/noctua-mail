@@ -289,6 +289,8 @@ function MessageViewOrchestratorImpl(
   const [messageTranslations, setMessageTranslations] = useState<
     Record<string, MessageTranslationEntry>
   >({});
+  const activeThreadRef = useRef(header.activeThread);
+  useEffect(() => { activeThreadRef.current = header.activeThread; }, [header.activeThread]);
   // Ref mirror so the async translate handler reads the latest results/target
   // language without being rebuilt on every state change.
   const messageTranslationsRef = useRef(messageTranslations);
@@ -542,7 +544,9 @@ function MessageViewOrchestratorImpl(
       });
       if (cached) return;
       try {
-        const res = await apiFetch(buildAccountMessageTranslatePath(activeAccountId, messageId), {
+        // A message of another mailbox (merged conversation, domain view) is translated there.
+        const accountId = activeThreadRef.current.find((item) => item.id === messageId)?.accountId || activeAccountId;
+        const res = await apiFetch(buildAccountMessageTranslatePath(accountId, messageId), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ targetLang, format })
@@ -704,8 +708,12 @@ function MessageViewOrchestratorImpl(
   });
   // Expanded cards are the opened messages. A selection whose sibling
   // collapse is still pending shows no settled layout yet, so nothing starts.
+  // Only the opened message's mailbox is auto-read (its role and dwell gate
+  // `autoMarkReadDelayMs`); messages merged in from other mailboxes of the
+  // domain keep their read state unless the user changes it.
   const autoReadMessages = activeMessage && pendingSelectionCollapseMessageId !== activeMessage.id
     ? getExpandedThreadMessages(renderedThread, collapsedMessages, activeMessage.id)
+      .filter(message => message.accountId === activeMessage.accountId)
     : [];
   useAutoMarkRead({
     messages: autoReadMessages,
@@ -747,8 +755,10 @@ function MessageViewOrchestratorImpl(
               const rootSubject =
                 activeThread[0]?.subject ?? activeMessage?.subject ?? "";
               const threadTopics = getAssignedThreadTopics(activeMessage);
+              // Topics are the active mailbox's: a message of another mailbox (domain view)
+              // gets no suggestions to accept here.
               const threadSuggestions =
-                threadTopics.length > 0
+                threadTopics.length > 0 || activeMessage.accountId !== body.activeAccountId
                   ? []
                   : activeThread.find(
                       (item) =>

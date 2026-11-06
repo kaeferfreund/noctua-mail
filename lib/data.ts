@@ -142,6 +142,11 @@ export type Message = {
   };
   id: string;
   threadId: string;
+  /**
+   * Set on a message of another mailbox shown inside this conversation
+   * (same domain, matched by header ids): its thread id in its own mailbox.
+   */
+  linkedThreadId?: string;
   parentId?: string;
   messageId?: string;
   inReplyTo?: string;

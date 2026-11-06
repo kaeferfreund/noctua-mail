@@ -73,6 +73,9 @@ type MessageRowProps = {
   iconFromEmail?: string;
   folderBadges: React.ReactNode;
   folderBadgeKey?: string;
+  /** Mailbox of the row in a list across mailboxes (domain view), on the sender line. */
+  mailboxBadge?: React.ReactNode;
+  mailboxBadgeKey?: string;
   showFolderBadgesInSubjectMeta: boolean;
   showFolderBadgesInMeta: boolean;
   quickActions?: React.ReactNode;
@@ -149,6 +152,7 @@ function MessageRow({
   iconFromEmail,
   folderBadges,
   folderBadgeKey,
+  mailboxBadge,
   showFolderBadgesInSubjectMeta,
   showFolderBadgesInMeta,
   quickActions,
@@ -376,6 +380,7 @@ function MessageRow({
                 </span>
               )}
               <span className={styles.fromText}>{fromLine}</span>
+              {mailboxBadge ? <span className={styles.fromMailbox}>{mailboxBadge}</span> : null}
             </span>
           </Text>
         </FromAddressHoverCard>
@@ -596,6 +601,7 @@ const areEqual = (prev: MessageRowProps, next: MessageRowProps) =>
   prev.checkboxState === next.checkboxState &&
   prev.deleteTitle === next.deleteTitle &&
   prev.folderBadgeKey === next.folderBadgeKey &&
+  prev.mailboxBadgeKey === next.mailboxBadgeKey &&
   prev.categoryIcon === next.categoryIcon &&
   prev.threadHasFlagged === next.threadHasFlagged &&
   prev.threadHasTodo === next.threadHasTodo &&

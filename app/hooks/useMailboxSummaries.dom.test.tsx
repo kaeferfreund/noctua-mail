@@ -16,7 +16,7 @@ import type { UserMailboxSummary } from "@/lib/mailboxSummary";
 afterEach(cleanup);
 const mailbox: UserMailboxSummary = { accountId: "synthetic-mailbox", name: "Synthetic", email: "team@example.test",
   accessRole: "viewer", isOwner: false, shared: true, unread: 2, assignedToMe: 3, unassignedOpen: 4, open: 6, watcher: { state: "disabled" } };
-const personal = { ...mailbox, accountId: "synthetic-personal", shared: false, unread: null, watcher: { state: "idling" as const } };
+const personal = { ...mailbox, accountId: "synthetic-personal", email: "me@personal.example.test", shared: false, unread: null, watcher: { state: "idling" as const } };
 const response = (rows: UserMailboxSummary[]) => Response.json({ ok: true, mailboxes: rows, generatedAt: 1 });
 function harness() {
   const requests: string[] = [];

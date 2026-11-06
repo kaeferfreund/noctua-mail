@@ -126,6 +126,8 @@ export type MessageListViewHelpers = {
   getGroupLabel: (group: MessageGroup) => React.ReactNode;
   renderSelectIndicators: (message: Message) => React.ReactNode;
   renderFolderBadges: (folderIds: string[]) => React.ReactNode;
+  /** Mailbox badge of a row listed next to rows of other mailboxes (domain view). */
+  renderMailboxBadge?: (message: Message) => React.ReactNode;
   renderQuickActions: (message: Message) => React.ReactNode;
   renderMessageMenu: (
     message: Message,

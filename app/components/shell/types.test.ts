@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { Account } from "@/lib/data";
-import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxInitials, mailboxLabel, sortMailboxes } from "./types";
+import { MAILBOX_GROUPING_MIN, groupMailboxes, shouldGroupMailboxes, mailboxAvatarUrl, mailboxInitials, mailboxLabel, sortMailboxes } from "./types";
 
 function account(overrides: Partial<Account> & { id: string }): Account {
   return {
@@ -65,12 +65,28 @@ describe("mailboxAvatarUrl", () => {
 });
 
 describe("groupMailboxes", () => {
-  test("keeps six rows ungrouped and groups seven by normalized domain", () => {
+  test("keeps sections of single-mailbox domains ungrouped below seven rows", () => {
+    const accounts = Array.from({ length: 6 }, (_, i) => account({ id: String(i), email: `box@d${i}.example` }));
+    expect(shouldGroupMailboxes(accounts)).toBe(false);
+    expect(groupMailboxes(accounts)).toEqual([{ domain: null, accounts }]);
+  });
+  test("groups a short section once one domain holds two mailboxes", () => {
+    const accounts = [
+      account({ id: "a", email: "anna@team.example" }),
+      account({ id: "b", email: "info@team.example" }),
+      account({ id: "c", email: "me@other.example" })
+    ];
+    expect(shouldGroupMailboxes(accounts.slice(0, 1).concat(accounts[2]))).toBe(false);
+    expect(groupMailboxes(accounts).map((group) => [group.domain, group.accounts.map((row) => row.id)])).toEqual([
+      ["other.example", ["c"]],
+      ["team.example", ["a", "b"]]
+    ]);
+  });
+  test("groups seven by normalized domain", () => {
     const accounts = Array.from({ length: 7 }, (_, i) => account({
       id: String(i), email: `box${i}@${i % 2 ? "Z.EXAMPLE" : "a.example"}`
     }));
     expect(MAILBOX_GROUPING_MIN).toBe(7);
-    expect(groupMailboxes(accounts.slice(0, 6))[0].domain).toBeNull();
     const grouped = groupMailboxes(accounts);
     expect(grouped.map((group) => group.domain)).toEqual(["a.example", "z.example"]);
     expect(grouped[0].accounts.map((row) => row.id)).toEqual(["0", "2", "4", "6"]);

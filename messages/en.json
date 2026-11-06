@@ -2292,5 +2292,24 @@
         "fullscreen": "Toggle fullscreen ({shortcut})"
       }
     }
+  },
+  "Domain": {
+    "mailbox": "Mailbox {mailbox}",
+    "openInMailbox": "Open in mailbox {mailbox}",
+    "openDomain": "Show all mailboxes of {domain}",
+    "collapse": "Collapse {domain}",
+    "expand": "Expand {domain}",
+    "allMailboxes": "All mailboxes",
+    "mailboxCount": "{count, plural, one {# mailbox} other {# mailboxes}}",
+    "folderSwitch": "Folder in the domain view",
+    "close": "Close domain view",
+    "roles": {
+      "inbox": "Inbox",
+      "sent": "Sent",
+      "drafts": "Drafts",
+      "archive": "Archive",
+      "trash": "Trash",
+      "spam": "Spam"
+    }
   }
 }

@@ -256,6 +256,8 @@ export type MessageListOrchestratorProps = {
   searchActive: boolean;
   isRelatedSearch: boolean;
   relatedNotice: string;
+  /** Shown above the list, e.g. the domain view's heading and folder switch. */
+  listBanner?: React.ReactNode;
   searchCriteriaLabel: string;
   searchCriteriaBadges: Array<{ key: string; label: string }>;
   onClearSearch: () => void;
@@ -296,6 +298,7 @@ export default function MessageListOrchestrator({
   searchActive,
   isRelatedSearch,
   relatedNotice,
+  listBanner,
   searchCriteriaLabel,
   searchCriteriaBadges,
   onClearSearch,
@@ -519,6 +522,7 @@ export default function MessageListOrchestrator({
       <div
         className={`${listPaneStyles.list} ${isCompactView ? listPaneStyles.listCompact : ""}`}
       >
+        {listBanner}
         {(searchActive || isRelatedSearch) && (
           <Card size="1" className={listMetaStyles.searchCard}>
             <Flex

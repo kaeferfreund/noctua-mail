@@ -1801,13 +1801,6 @@ async function getTotalCount(params: {
 }
 
 /**
- * Group meta for the thread list's "date" grouping without a count query.
- * The client shows the loaded rows per date bucket, never SQL bucket counts
- * (SQL day boundaries would be host-local, see buildGroupedMessages). Every
- * bucket is listed, so the client keeps the collapse state of buckets that
- * are not on the loaded pages.
- */
-/**
  * Message totals for several badge sets over the whole mailbox (search scope
  * "all", no query): the same count `listMessages` reports as `total`, without
  * its page rows, group counts and enrichment. Virtual-folder badges refresh
@@ -1831,7 +1824,14 @@ export async function countMessagesByBadgeSets(params: {
   return counts;
 }
 
-function getLoadedDateGroups(items: Message[]): GroupMeta[] {
+/**
+ * Group meta for the thread list's "date" grouping without a count query.
+ * The client shows the loaded rows per date bucket, never SQL bucket counts
+ * (SQL day boundaries would be host-local, see buildGroupedMessages). Every
+ * bucket is listed, so the client keeps the collapse state of buckets that
+ * are not on the loaded pages.
+ */
+export function getLoadedDateGroups(items: Message[]): GroupMeta[] {
   const counts = new Map<string, number>();
   items.forEach((item) => {
     if (item.groupKey) counts.set(item.groupKey, (counts.get(item.groupKey) ?? 0) + 1);

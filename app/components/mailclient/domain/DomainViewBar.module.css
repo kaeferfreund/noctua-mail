@@ -1,0 +1,42 @@
+.bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.close {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Six folders do not fit at 390 px: the row scrolls instead of wrapping. */
+.roles {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.roles::-webkit-scrollbar {
+  display: none;
+}
+
+.role {
+  flex-shrink: 0;
+}

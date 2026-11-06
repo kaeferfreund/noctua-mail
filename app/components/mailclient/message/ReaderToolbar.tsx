@@ -8,7 +8,9 @@ import styles from "./ReaderToolbar.module.css";
 
 type Props = {
   layout: ReaderLayout; toggleLayout: () => void; back: () => void;
-  archive: () => void; spam: () => void; inSpam: boolean; remove: () => void; move: () => void; topics: () => void;
+  archive: () => void; spam: () => void; inSpam: boolean;
+  /** Left out for a message of another mailbox (domain view): its folders and topics are not the active mailbox's. */
+  remove?: () => void; move?: () => void; topics?: () => void;
   done: () => void; isDone: boolean; busy: boolean; renderMenu: () => ReactNode; openWindow: () => void;
   position: number; total: number; hasMore: boolean; previous: () => void; next: () => void;
   canPrevious: boolean; canNext: boolean; navigating: boolean;
@@ -30,9 +32,9 @@ export default function ReaderToolbar(props: Props) {
         <div className={styles.actions}>
           {action(t("archive"), <Archive size={17} />, props.archive)}
           {action(t(props.inSpam ? "notSpam" : "markSpam"), props.inSpam ? <ShieldOff size={17} /> : <Shield size={17} />, props.spam)}
-          {action(t("delete"), <Trash2 size={17} />, props.remove)}
-          {action(t("moveTo"), <ArrowRightLeft size={17} />, props.move)}
-          {action(t("topics"), <Tags size={17} />, props.topics)}
+          {props.remove && action(t("delete"), <Trash2 size={17} />, props.remove)}
+          {props.move && action(t("moveTo"), <ArrowRightLeft size={17} />, props.move)}
+          {props.topics && action(t("topics"), <Tags size={17} />, props.topics)}
           {action(t(props.isDone ? "focus.markUndone" : "markDone"), <CheckCheck size={17} />, props.done)}
           {props.renderMenu()}
         </div>
