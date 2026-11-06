@@ -515,7 +515,9 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 1;
+  /* Content-sized basis, so a row too narrow for everything shrinks the
+     badges (weighted below) before the name. */
+  flex: 1 1 auto;
   min-width: 0;
 }
 
@@ -547,6 +549,14 @@
   text-overflow: ellipsis;
 }
 
+/* At phone width the address never gets room, yet its gap and margin would
+   stay as dead space beside the name. */
+@media (max-width: 767px) {
+  .compactSenderEmail {
+    display: none;
+  }
+}
+
 .compactRecipientIcon {
   display: inline-flex;
   align-items: center;
@@ -576,12 +586,28 @@
   min-width: 0;
 }
 
+/* Gives way before the sender name; it stops at its min-content width, which
+   the mailbox badge below keeps down to its @ icon. */
 .compactBadges {
   display: inline-flex;
   align-items: center;
   gap: 3px;
   color: var(--gray-9);
+  flex: 0 1000 auto;
+}
+
+.compactBadges > * {
   flex-shrink: 0;
+}
+
+/* The label column has no minimum (min-content stays icon + padding) but
+   still takes its full width when there is room, so the label truncates
+   before the name does and the icon stays. */
+.compactBadges > [data-mailbox-badge] {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-template-columns: auto minmax(0, max-content);
+  flex-shrink: 1;
 }
 
 .compactPreview {
