@@ -708,8 +708,12 @@ function MessageViewOrchestratorImpl(
   });
   // Expanded cards are the opened messages. A selection whose sibling
   // collapse is still pending shows no settled layout yet, so nothing starts.
+  // Only the opened message's mailbox is auto-read (its role and dwell gate
+  // `autoMarkReadDelayMs`); messages merged in from other mailboxes of the
+  // domain keep their read state unless the user changes it.
   const autoReadMessages = activeMessage && pendingSelectionCollapseMessageId !== activeMessage.id
     ? getExpandedThreadMessages(renderedThread, collapsedMessages, activeMessage.id)
+      .filter(message => message.accountId === activeMessage.accountId)
     : [];
   useAutoMarkRead({
     messages: autoReadMessages,

@@ -3519,7 +3519,13 @@ export default function MailClient({
     },
     [autoReadCoordinator]
   );
-  const autoMarkReadDelayMs = useAutoMarkReadDelay(currentAccount, Boolean(activeMessage), apiFetch);
+  // Role gate and dwell come from the opened message's own mailbox (in the
+  // domain view that can be another mailbox than the active one).
+  const autoMarkReadDelayMs = useAutoMarkReadDelay(
+    activeMessage ? accountById.get(activeMessage.accountId) : null,
+    Boolean(activeMessage),
+    apiFetch
+  );
   const handleAutoMarkRead = useCallback(
     (message: Message) => autoReadCoordinator.autoRead(message, shouldRetry =>
       listHandleRef.current?.updateFlagState(message, "seen", true, shouldRetry) ?? Promise.resolve()),
