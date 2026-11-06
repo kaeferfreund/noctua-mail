@@ -209,6 +209,17 @@ export async function getTopicsForThreads(
   });
 }
 
+/**
+ * Whether the mailbox holds a conversation with this thread id. Topic
+ * assignments are only written for its own conversations, so a thread id of
+ * another mailbox never creates a stray `thread_topics` row here.
+ */
+export async function hasThreadInAccount(accountId: string, threadId: string): Promise<boolean> {
+  return withAccountDb(accountId, (db) => Boolean(
+    db.prepare(`SELECT 1 FROM messages WHERE accountId = ? AND threadId = ? LIMIT 1`).get(accountId, threadId.trim())
+  ));
+}
+
 export async function setThreadTopics(
   accountId: string,
   threadId: string,

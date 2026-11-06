@@ -1985,7 +1985,10 @@ export default function MailClient({
     return message.topics ?? [];
   }, [messageTopicsById]);
 
+  // Topics belong to one mailbox (catalog and thread_topics in its shard): a
+  // message of another mailbox is tagged there, never through the active one.
   const handleAssignTopics = useCallback((message: Message) => {
+    if (message.accountId !== activeAccountId) return;
     setTopicPickerMessage(message);
     setTopicSuggestions([]);
     setTopicPickerOpen(true);
@@ -2318,6 +2321,7 @@ export default function MailClient({
   }, [activeTopicId, persistThreadTopics, refreshActiveTopicModeResults, topicPickerMessage]);
 
   const handleToggleTopic = useCallback(async (message: Message, topicId: string) => {
+    if (message.accountId !== activeAccountId) return;
     const currentTopics = messageTopicsById.get(message.threadId) ?? [];
     const isAssigned = currentTopics.some((t) => t.id === topicId);
     const newTopicIds = isAssigned
@@ -2327,7 +2331,7 @@ export default function MailClient({
     if (activeTopicId) {
       await refreshActiveTopicModeResults();
     }
-  }, [activeTopicId, messageTopicsById, persistThreadTopics, refreshActiveTopicModeResults]);
+  }, [activeAccountId, activeTopicId, messageTopicsById, persistThreadTopics, refreshActiveTopicModeResults]);
 
   const handleAddActiveTopicSuggestion = useCallback(async (threadId: string) => {
     if (!activeTopicId || !threadId) return;
@@ -5691,9 +5695,13 @@ export default function MailClient({
                   archive={() => { void handleArchiveMessage(activeMessage); }}
                   spam={() => { void (isSpamFolder(activeMessage.folderId) ? handleMarkNotSpam(activeMessage) : handleMarkSpam(activeMessage)); }}
                   inSpam={isSpamFolder(activeMessage.folderId)}
-                  remove={() => { void handleDeleteMessage(activeMessage, { allowThreadDeletion: false }); }}
-                  move={() => handleMoveTo(activeMessage, "thread")}
-                  topics={() => handleAssignTopics(activeMessage)}
+                  // As in the message menu (OTHER_MAILBOX_MENU_VISIBILITY): a row of another
+                  // mailbox in the domain view is deleted, moved and tagged in its own mailbox.
+                  {...(activeMessage.accountId === activeAccountId ? {
+                    remove: () => { void handleDeleteMessage(activeMessage, { allowThreadDeletion: false }); },
+                    move: () => handleMoveTo(activeMessage, "thread"),
+                    topics: () => handleAssignTopics(activeMessage)
+                  } : {})}
                   done={() => {
                     if (hasTodoFlag(activeMessage) || hasDoneFlag(activeMessage)) void toggleTodoFlag(activeMessage);
                     else void updateKeywordFlag(activeMessage, DONE_FLAG, true);

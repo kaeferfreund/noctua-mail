@@ -9,6 +9,7 @@ import {
 } from "@/app/api/_helpers/accountContext";
 import {
   getTopicsForThreads,
+  hasThreadInAccount,
   setThreadTopics,
   addThreadTopic,
   removeThreadTopic
@@ -59,6 +60,10 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     }
 
     const action = body?.action ?? "set";
+    // Assignments are written only for this mailbox's own conversations.
+    if ((action === "set" || action === "add") && !(await hasThreadInAccount(accountId, threadId))) {
+      return NextResponse.json({ ok: false, message: "Thread not found" }, { status: 404 });
+    }
 
     if (action === "set") {
       const topicIds = body?.topicIds ?? [];
