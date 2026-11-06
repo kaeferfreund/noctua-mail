@@ -200,6 +200,7 @@ export default function MessageThreadList({
       getRowSwipe={getRowSwipe}
       renderRow={({ item, index }) => {
         const message = item.message;
+        const mailboxBadge = renderMailboxBadge?.(message) ?? null;
         const isSuggestionRow = isTopicSuggestionGroupKey(item.groupKey);
         const showAddSuggestionAction =
           isSuggestionRow && item.threadIndex === 0 && item.depth === 0;
@@ -376,12 +377,12 @@ export default function MessageThreadList({
                       </span>
                     )}
                     <span className={styles.cellFromText}>{item.fromText}</span>
+                    {mailboxBadge ? <span className={styles.cellFromMailbox}>{mailboxBadge}</span> : null}
                   </span>
                 </FromAddressHoverCard>
 
                 <span data-message-cell="subject" className={styles.cellSubject}>
                   <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><SpamBadge message={message} /><ScheduledSendBadge message={message} /><span data-mobile-collab=""><CollabRowBadges message={message} /></span></span>
-                  {renderMailboxBadge?.(message)}
                   {renderFolderBadges(item.folderIds)}
                   {(threadBadgeUnion.threadHasAttachments ||
                     shouldShowAttachmentIcon(message)) && (

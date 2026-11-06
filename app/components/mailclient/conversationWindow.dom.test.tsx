@@ -332,6 +332,60 @@ describe("useThreadContent conversation reads", () => {
     expect(windowState?.placeholders).toEqual([]);
   });
 
+  test("messages of other mailboxes join the conversation once, and paging keeps them", async () => {
+    const other = "synthetic-window-other";
+    // The other mailbox's copy of window-m4 never replaces the opened mailbox's own row.
+    const linked = [
+      header(4, { accountId: other, folderId: `${other}:INBOX`, linkedThreadId: "other-thread", subject: "Other copy" }),
+      header(6, { id: "other-m6", accountId: other, folderId: `${other}:Sent`, linkedThreadId: "other-thread", messageId: "<other-m6@example.test>" })
+    ];
+    const { apiFetch, calls } = fakeApi((call) =>
+      call.body.window?.cursor
+        ? Response.json({
+            items: [header(1), header(2)],
+            placeholders: [],
+            window: { total: 4, anchorId: null, hasOlder: false, olderCursor: null, hasNewer: false, newerCursor: null }
+          })
+        : Response.json({
+            items: [header(3), header(4)],
+            linked,
+            placeholders: [],
+            window: { total: 4, anchorId: "window-m4", hasOlder: true, olderCursor: "cursor-older", hasNewer: false, newerCursor: null }
+          })
+    );
+    const { result } = renderThreadContent(apiFetch);
+    await act(async () => {
+      await result.current.loadThreadContent({ ...threadRequest("window-thread", "window-m4"), accountId: ACCOUNT });
+    });
+    expect(calls[0].url).toContain(`/api/accounts/${ACCOUNT}/thread/related`);
+    const loaded = result.current.threadContentById["window-thread"] ?? [];
+    expect(loaded.map((m) => [m.accountId, m.id])).toEqual([
+      [ACCOUNT, "window-m3"],
+      [ACCOUNT, "window-m4"],
+      [other, "other-m6"]
+    ]);
+    expect(loaded.find((m) => m.id === "window-m4")?.subject).toBe("Synthetic conversation");
+    await act(async () => {
+      await result.current.loadThreadPage({ threadId: "window-thread", direction: "older", excludeFolderIds: [], groupBy: "date", threadDateSource: "received" });
+    });
+    expect(result.current.threadContentById["window-thread"]?.map((m) => m.id)).toEqual([
+      "window-m1", "window-m2", "window-m3", "window-m4", "other-m6"
+    ]);
+  });
+
+  test("a message of another mailbox is read from that mailbox, without its trash and spam", async () => {
+    const other = "synthetic-window-other";
+    const { apiFetch, calls } = fakeApi(() =>
+      Response.json({ items: [], placeholders: [], window: { total: 0, anchorId: null, hasOlder: false, olderCursor: null, hasNewer: false, newerCursor: null } })
+    );
+    const { result } = renderThreadContent(apiFetch);
+    await act(async () => {
+      await result.current.loadThreadContent({ ...threadRequest("other-thread", "other-m1"), accountId: other, excludeSpecialFolders: true });
+    });
+    expect(calls[0].url).toContain(`/api/accounts/${other}/thread/related`);
+    expect(calls[0].body.excludeSpecialFolders).toBe(true);
+  });
+
   test("a conversation read in trash asks for trash rows only, also when paging", async () => {
     const trash = `${ACCOUNT}:Trash`;
     const { apiFetch, calls } = fakeApi((call) =>

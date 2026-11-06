@@ -331,6 +331,12 @@
   white-space: nowrap;
 }
 
+/* Mailbox of the row in a list across mailboxes (domain view). */
+.cellFromMailbox {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
 .recipientIcon {
   display: inline-flex;
   align-items: center;

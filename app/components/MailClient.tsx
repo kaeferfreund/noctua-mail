@@ -5015,26 +5015,33 @@ export default function MailClient({
   // messages of another mailbox merged into a conversation. It opens the message in
   // its own mailbox, where it can be moved, deleted, assigned or answered as that mailbox.
   const renderMailboxBadge = useCallback(
-    (message: Message, always: boolean) => {
-      if (!always && message.accountId === activeAccountId) return null;
+    (message: Message, options: { always: boolean; openable: boolean }) => {
+      if (!options.always && message.accountId === activeAccountId) return null;
       const account = accountById.get(message.accountId);
       if (!account) return null;
       return (
         <MailboxBadge
           label={mailboxLabel(account)}
           email={account.email}
-          onOpen={() => navigateMessage(message.id, message.accountId)}
+          onOpen={options.openable ? () => navigateMessage(message.id, message.accountId) : undefined}
         />
       );
     },
     [accountById, activeAccountId, navigateMessage]
   );
+  // List rows open in the reader on click; their badge only names the mailbox.
   const renderListMailboxBadge = useMemo(
-    () => (domainView ? (message: Message) => renderMailboxBadge(message, true) : undefined),
+    () => (domainView ? (message: Message) => renderMailboxBadge(message, { always: true, openable: false }) : undefined),
     [domainView, renderMailboxBadge]
   );
+  // Folder badges name the active mailbox's folders only; a domain view row of another
+  // mailbox carries its mailbox badge instead.
+  const renderListFolderBadges = useMemo(
+    () => (domainView ? (folderIds: string[]) => renderFolderBadges(folderIds.filter((id) => folderById.has(id))) : renderFolderBadges),
+    [domainView, folderById, renderFolderBadges]
+  );
   const renderReaderMailboxBadge = useCallback(
-    (message: Message) => renderMailboxBadge(message, Boolean(domainView)),
+    (message: Message) => renderMailboxBadge(message, { always: Boolean(domainView), openable: true }),
     [domainView, renderMailboxBadge]
   );
   const openDomainView = useCallback(
@@ -5591,7 +5598,7 @@ export default function MailClient({
                 getThreadLatestDate,
                 getGroupLabel,
                 renderSelectIndicators,
-                renderFolderBadges,
+                renderFolderBadges: renderListFolderBadges,
                 renderMailboxBadge: renderListMailboxBadge,
                 renderQuickActions,
                 renderMessageMenu,

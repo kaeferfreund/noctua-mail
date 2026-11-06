@@ -13,6 +13,19 @@ describe("mail URL state", () => {
     expect(parseDeepLink(url.slice(1))).toEqual(state);
     expect(serializeDeepLink(state, "/?a=old&f=old&m=old&s=all&g=sender")).toBe(url);
   });
+  it("round trips the domain view and its folder, dropping invalid domains", () => {
+    const state = { ...emptyDeepLink(), accountId, folderId: `${accountId}:INBOX`, domain: "praxis.example.test", domainRole: "sent" as const };
+    const url = serializeDeepLink(state);
+    expect(url).toBe("/?a=A1fm3AepO-ADwzIb&f=INBOX&d=praxis.example.test&dr=sent");
+    expect(parseDeepLink(url.slice(1))).toEqual(state);
+    // The inbox is the default folder and is not written.
+    expect(serializeDeepLink({ ...state, domainRole: "inbox" })).toBe("/?a=A1fm3AepO-ADwzIb&f=INBOX&d=praxis.example.test");
+    expect(parseDeepLink("d=PRAXIS.Example.Test&dr=bogus")).toMatchObject({ domain: "praxis.example.test", domainRole: "inbox" });
+    expect(parseDeepLink("d=not%20a%20domain").domain).toBeNull();
+    expect(parseDeepLink("d=a/b.example.test").domain).toBeNull();
+    // Leaving the domain view removes both keys.
+    expect(serializeDeepLink({ ...state, domain: null }, url)).toBe("/?a=A1fm3AepO-ADwzIb&f=INBOX");
+  });
   it("builds absolute links for a mailbox or one of its settings sections", () => {
     expect(appDeepLink({ accountId }, "https://mail.example.test")).toBe("https://mail.example.test/?a=A1fm3AepO-ADwzIb");
     expect(appDeepLink({ accountId, settings: "identities" }, "https://mail.example.test")).toBe("https://mail.example.test/?a=A1fm3AepO-ADwzIb&settings=identities");

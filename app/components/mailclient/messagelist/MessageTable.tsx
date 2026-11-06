@@ -278,6 +278,7 @@ export default function MessageTable({
         getRowSwipe={getRowSwipe}
         renderRow={({ item, index }) => {
           const message = item.message;
+          const mailboxBadge = renderMailboxBadge?.(message) ?? null;
           const isSuggestionRow = isTopicSuggestionGroupKey(item.groupKey);
           const showAddSuggestionAction =
             isSuggestionRow && item.threadIndex === 0 && item.depth === 0;
@@ -505,6 +506,7 @@ export default function MessageTable({
                       {item.fromText}
                     </span>
                   </FromAddressHoverCard>
+                  {mailboxBadge ? <span className={styles.cellFromMailbox}>{mailboxBadge}</span> : null}
                 </span>
                 <span
                   data-message-cell="subject" className={styles.cellSubject}
@@ -528,7 +530,6 @@ export default function MessageTable({
                     });
                   }}
                 >
-                  {renderMailboxBadge?.(message)}
                   {renderFolderBadges(item.folderIds)}
                   <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><SpamBadge message={message} /><ScheduledSendBadge message={message} /><span data-mobile-collab=""><CollabRowBadges message={message} /></span></span>
                   {messageTopicsById?.get(message.threadId)?.map((topic) => (

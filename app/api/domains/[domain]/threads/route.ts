@@ -5,7 +5,7 @@ import { rejectOverlongSearchQuery } from "@/app/api/_helpers/searchQueryLength"
 import { errorResponse } from "@/app/api/_helpers/response";
 import { enrichMessagesWithThreadTopics } from "@/app/api/_helpers/enrichMessagesWithThreadTopics";
 import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
-import { clampThreadListPageSize, slimThreadListItem } from "@/app/api/accounts/[accountId]/threads/route";
+import { clampThreadListPageSize, slimThreadListItem } from "@/app/api/_helpers/threadList";
 import { listDomainThreads, listReadableDomainAccounts } from "@/lib/domainConversations";
 import { normalizeDomainKey, parseDomainFolderRole } from "@/lib/domainView";
 import { getOwnAddresses } from "@/lib/ownAddresses";

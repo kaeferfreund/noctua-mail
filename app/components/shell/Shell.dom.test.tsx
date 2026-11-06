@@ -342,6 +342,39 @@ describe("collapsible domain groups", () => {
     expect(stored).not.toContain('"brand.example.test"');
   });
 
+  it("with a domain view, the name opens it and the chevron alone collapses the group", () => {
+    const opened: string[] = [];
+    const view = renderSidebar([...brand, ...plain], () => {}, undefined, undefined, undefined, undefined, undefined, undefined, plain[0].id,
+      { userId: "user-1", summaries, onOpenDomain: (domain) => { opened.push(domain); } });
+    const open = view.getByRole("button", { name: "Show all mailboxes of brand.example.test" });
+    const toggle = view.getByRole("button", { name: "Collapse brand.example.test" });
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    fireEvent.click(open);
+    expect(opened).toEqual(["brand.example.test"]);
+    // Opening the view keeps the group as it is; the chevron keeps the stored collapsed state.
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(rowTitles(view, "brand.example.test")).toHaveLength(4);
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.getAttribute("aria-label")).toBe("Expand brand.example.test");
+    expect(window.localStorage.getItem("noctua:sidebarDomainsCollapsed:user-1")).toBe('["brand.example.test"]');
+    expect(rowTitles(view, "brand.example.test")).toHaveLength(0);
+    // Collapsed: the totals move onto the name button.
+    expect(open.querySelector("[data-domain-counts]")).toBeTruthy();
+    view.unmount();
+  });
+
+  it("marks the open domain view's heading, not the active mailbox row", () => {
+    const view = renderSidebar([...brand, ...plain], () => {}, undefined, undefined, undefined, undefined, undefined, undefined, brand[1].id,
+      { userId: "user-2", summaries, onOpenDomain: () => {}, activeDomain: "brand.example.test" });
+    const open = view.getByRole("button", { name: "Show all mailboxes of brand.example.test" });
+    expect(open.getAttribute("aria-current")).toBe("true");
+    expect(open.getAttribute("data-active")).toBe("true");
+    expect(view.getByRole("button", { name: /Brand b/ }).hasAttribute("aria-current")).toBe(false);
+    expect(view.getByRole("button", { name: "Show all mailboxes of plain.example.test" }).hasAttribute("aria-current")).toBe(false);
+    view.unmount();
+  });
+
   it("keeps ungrouped sections without a toggle", () => {
     const view = renderSidebar(brand, () => {}, undefined, undefined, undefined, undefined, undefined, undefined, undefined, { userId: "user-1", summaries });
     expect(view.container.querySelector("button[aria-expanded][aria-controls]")).toBeNull();

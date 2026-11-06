@@ -196,7 +196,7 @@ export default function MessageCardList({
           message.id !== activeMessage?.id;
         const isDragging = draggingMessageIds.has(message.id);
         const mailboxBadge = renderMailboxBadge?.(message) ?? null;
-        const folderBadgeKey = `${mailboxBadge ? message.accountId : ""}|${item.folderIds.join("|")}`;
+        const folderBadgeKey = item.folderIds.length ? item.folderIds.join("|") : "";
         const {
           isThreadSelectionRoot,
           threadSelectionIds,
@@ -413,8 +413,10 @@ export default function MessageCardList({
               showRecipientIcon={item.showRecipientIcon}
               iconFrom={item.iconFrom}
               iconFromEmail={item.iconFromEmail}
-              folderBadges={<>{mailboxBadge}{renderFolderBadges(item.folderIds)}</>}
+              folderBadges={renderFolderBadges(item.folderIds)}
               folderBadgeKey={folderBadgeKey}
+              mailboxBadge={mailboxBadge}
+              mailboxBadgeKey={mailboxBadge ? message.accountId : ""}
               showFolderBadgesInSubjectMeta
               showFolderBadgesInMeta={false}
               quickActions={renderQuickActions(message)}

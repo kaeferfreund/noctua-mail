@@ -97,10 +97,14 @@ const threadSortValue = (item: Message) => item.threadSortDateValue ?? item.date
 
 /**
  * One thread list across mailboxes: each mailbox's own list of the role
- * folder, merged newest first. A row that is the same message in two
- * mailboxes (equal row id, i.e. equal Message-ID) is listed once, for the
- * first mailbox in display order. Paging reads the first `page * pageSize`
- * threads of every mailbox, so deep pages cost more than in one mailbox.
+ * folder, merged newest first. One conversation is listed once:
+ * - a row that is the same message in two mailboxes (equal row id, i.e. equal
+ *   Message-ID) is kept for the first mailbox in display order;
+ * - a thread id listed by several mailboxes is kept for the mailbox with its
+ *   newest message (the reader merges the other mailboxes' messages, see
+ *   listDomainLinkedMessages), so the list never groups rows of two mailboxes.
+ * Paging reads the first `page * pageSize` threads of every mailbox, so deep
+ * pages cost more than in one mailbox.
  */
 export async function listDomainThreads(params: {
   accounts: readonly Account[];
@@ -136,14 +140,20 @@ export async function listDomainThreads(params: {
   );
   const results = perAccount.filter((entry): entry is NonNullable<typeof entry> => entry !== null);
   const seen = new Set<string>();
-  const merged: Message[] = [];
+  const rows: Message[] = [];
   for (const { data } of results) {
     for (const item of data.items) {
       if (seen.has(item.id)) continue;
       seen.add(item.id);
-      merged.push(item);
+      rows.push(item);
     }
   }
+  const threadOwner = new Map<string, Message>();
+  for (const item of rows) {
+    const owner = threadOwner.get(item.threadId);
+    if (!owner || threadSortValue(item) > threadSortValue(owner)) threadOwner.set(item.threadId, item);
+  }
+  const merged = rows.filter((item) => threadOwner.get(item.threadId)?.accountId === item.accountId);
   merged.sort((a, b) => threadSortValue(b) - threadSortValue(a) || b.dateValue - a.dateValue || a.id.localeCompare(b.id));
   const offset = (page - 1) * pageSize;
   const items = merged.slice(offset, offset + pageSize);

@@ -245,3 +245,16 @@ describe("sortMessages", () => {
     expect(messages.map((m) => m.id)).toEqual(snapshot);
   });
 });
+
+describe("dedupeAccountMessages across mailboxes", () => {
+  test("keeps the rows of every listed mailbox and drops other mailboxes", () => {
+    const rows = [
+      { id: "m1", accountId: "acc-a" },
+      { id: "m2", accountId: "acc-b" },
+      { id: "m3", accountId: "acc-c" }
+    ] as Message[];
+    const result = dedupeAccountMessages(rows, new Set(["acc-a", "acc-b"]));
+    expect(result.deduped.map((row) => row.id)).toEqual(["m1", "m2"]);
+    expect(result.duplicates).toEqual([]);
+  });
+});

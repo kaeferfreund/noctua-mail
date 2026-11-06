@@ -225,3 +225,29 @@ describe("buildMessageListQueryUrl — query whitespace handling", () => {
     expect(params.q).toBe("quarterly report");
   });
 });
+
+describe("domain view", () => {
+  test("reads the domain endpoint with the folder role, never a folder id or exclusions", () => {
+    const url = buildMessageListQueryUrl({
+      ...baseOpts,
+      supportsThreads: true,
+      currentSearchExcludedFolderIds: ["acc-1:Trash"],
+      domainView: { domain: "praxis.example.test", role: "sent" }
+    });
+    expect(url.startsWith("/api/domains/praxis.example.test/threads?")).toBe(true);
+    const query = parseQuery(url);
+    expect(query).toMatchObject({ page: "1", groupBy: "date", role: "sent", threadDateSource: "latestDateValue" });
+    expect(query.folderId).toBeUndefined();
+    expect(query.excludeFolderIds).toBeUndefined();
+    expect(query.q).toBeUndefined();
+  });
+
+  test("passes a search across the domain's mailboxes", () => {
+    const query = parseQuery(buildMessageListQueryUrl({
+      ...baseOpts,
+      query: "  termin  ",
+      domainView: { domain: "praxis.example.test", role: "inbox" }
+    }));
+    expect(query).toMatchObject({ q: "termin", fields: "subject,from", role: "inbox" });
+  });
+});

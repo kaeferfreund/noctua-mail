@@ -6,6 +6,7 @@ import {
   getInlineComposePlacement,
   getReaderFolderScope,
   getRenderedThreadMessages,
+  getThreadWindowPageControls,
   getVisibleThreadMessages,
   pinThreadCollapseState
 } from "./threadViewState";
@@ -242,5 +243,18 @@ describe("auto-read thread helpers", () => {
     expect(pinThreadCollapseState(thread, pinned, "active")).toBe(pinned);
     const single = { active: false };
     expect(pinThreadCollapseState(thread.slice(0, 1), single, "active")).toBe(single);
+  });
+});
+
+describe("getThreadWindowPageControls with messages of other mailboxes", () => {
+  it("does not count linked messages towards the mailbox's own window total", () => {
+    const own = [makeMessage({ id: "a1", threadId: "t" }), makeMessage({ id: "a2", threadId: "t" })];
+    const linked = [makeMessage({ id: "b1", threadId: "t", accountId: "acc-b", linkedThreadId: "t-b" })];
+    const threadWindow = { total: 3, hasOlder: true, hasNewer: false };
+    // Two own rows of three: the older page is still offered although three rows render.
+    expect(getThreadWindowPageControls({ threadWindow, threadId: "t", renderedThread: [...own, ...linked] }))
+      .toEqual({ older: true, newer: false });
+    expect(getThreadWindowPageControls({ threadWindow: { ...threadWindow, total: 2 }, threadId: "t", renderedThread: [...own, ...linked] }))
+      .toEqual({ older: false, newer: false });
   });
 });

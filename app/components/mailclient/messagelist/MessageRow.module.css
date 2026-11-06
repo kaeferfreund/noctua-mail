@@ -186,6 +186,11 @@
   white-space: nowrap;
 }
 
+.fromMailbox {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
 .actions {
   display: inline-flex;
   align-items: center;
