@@ -1,7 +1,7 @@
 # Authentication
 
 Team-Auth slices 5–7 and the administration UI are integrated. Better Auth and its passkey plugin
-are pinned at 1.7.12. The public mount uses the reviewed policy handler; no activation bypass remains.
+are pinned at 1.7.18 (updated from 1.7.12 on 2026-11-06). The public mount uses the reviewed policy handler; no activation bypass remains.
 This document consolidates the current contracts. Earlier verification records describe their
 historical snapshots and do not override this contract. Stage 1 integration is not household go-live.
 
@@ -368,7 +368,10 @@ contention uses 409. Proof limits return HTTP 429 `{ok:false,code:"proof_rate_li
 uses `Retry-After: 900`). Wait that interval before requesting fresh proof. These conventions cover
 Noctua wrappers; raw Better Auth login forms retain their library-local error codes/statuses. Stable policy codes include
 `reauth_required`, `invalid_proof`, `invalid_credentials`, `factor_proof_required`,
-`backup_proof_not_allowed`, `another_passkey_required`, `passkey_uv_required`,
+`backup_proof_not_allowed`, `another_passkey_required`, `passkey_uv_required` (since passkey plugin
+1.7.13 the library already rejects non-UV ceremonies with `FAILED_TO_VERIFY_REGISTRATION` or
+`AUTHENTICATION_FAILED`, because it enforces the configured `userVerification: "required"`; the
+callback code remains as a second barrier),
 `invalid_challenge`, `security_state_changed`, `security_operation_pending` and
 `mfa_state_inconsistent`. Library codes remain local to their form. Do not globally log out on
 an incorrect password/TOTP/code. `SESSION_NOT_FRESH` requires full login, never changing createdAt.
@@ -798,15 +801,15 @@ and household go-live stay Stage 4 (TEAM-INBOX.md §11).
 
 ### Browser acceptance
 
-Pinned Playwright 1.64.1 uses synthetic isolated identities and real Chromium/CDP CTAP2 ceremonies.
+Pinned Playwright 1.65.0 uses synthetic isolated identities and real Chromium/CDP CTAP2 ceremonies.
 The suite exercises actual compiled login/enrollment/reset/security screens and retains real
 registration/assertion/replay, server UV=false rejection, RP/origin mismatch, grant/challenge binding,
 rotated sessions, reset/revoke invalidation and finalizer quarantine fault cases. A minimal intercepted
 fixture page remains only for WebAuthn controls; no signature/callback is mocked. The compiled mount
 and production policy limits are active. Offline helper scripts never expose an HTTP test route.
 HAR, screenshots, video and traces are disabled to avoid recording capabilities. Both runners fail
-on occupied ports and stop only their own processes. Playwright 1.64.1 supports Ubuntu 26.04 on ARM
-directly: plain `bunx playwright install chromium` installs Chrome for Testing (chromium v1248), and the
+on occupied ports and stop only their own processes. Playwright 1.65.0 supports Ubuntu 26.04 on ARM
+directly: plain `bunx playwright install chromium` installs Chrome for Testing (chromium v1254), and the
 `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-arm64` workaround in the 1.58.2 evidence below is no
 longer needed. Virtual-authenticator results do not replace canonical physical phone/PWA tests.
 
