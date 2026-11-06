@@ -1,5 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { gunzipSync } from "node:zlib";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
+import { NodeNextRequest, NodeNextResponse } from "next/dist/server/base-http/node";
+import { sendResponse } from "next/dist/server/send-response";
 import type { Account, Folder, Message } from "@/lib/data";
 import { authenticatedTestCookie } from "@/lib/testAuthHarness";
 import { dbModulePromise } from "@/lib/testDbHarness";
@@ -16,7 +19,7 @@ const MESSAGE_COUNT = 60;
 function buildAccount(accountId: string): Account {
   return {
     id: accountId,
-    name: "Compressed JSON Test",
+    name: "Large JSON Delivery Test",
     email: "owner@example.test",
     avatar: "",
     imap: { host: "imap.example.test", port: 993, secure: true, user: "owner@example.test", password: "secret-imap" },
@@ -43,7 +46,7 @@ function buildMessage(accountId: string, folderId: string, index: number): Messa
 }
 
 async function seedMailbox() {
-  const accountId = `acc-compressed-json-${crypto.randomUUID()}`;
+  const accountId = `acc-large-json-${crypto.randomUUID()}`;
   const folder: Folder = {
     id: `${accountId}:Inbox`,
     accountId,
@@ -112,40 +115,56 @@ const routes: Array<{ name: string; call: (acceptEncoding?: string) => Promise<R
   }
 ];
 
-describe("large JSON reads are gzip-compressed", () => {
-  for (const route of routes) {
-    test(`${route.name} gzips for gzip clients and is unchanged otherwise`, async () => {
-      const plain = await route.call();
-      expect(plain.status).toBe(200);
-      expect(plain.headers.get("content-encoding")).toBeNull();
-      expect(plain.headers.get("vary")).toContain("Accept-Encoding");
-      const plainText = await plain.text();
-      expect(new TextEncoder().encode(plainText).byteLength).toBeGreaterThan(8 * 1024);
+type Delivered = { headers: http.IncomingHttpHeaders; raw: Buffer; decoded: string };
 
-      const compressed = await route.call("gzip, deflate, br, zstd");
-      expect(compressed.status).toBe(200);
-      expect(compressed.headers.get("content-encoding")).toBe("gzip");
-      expect(compressed.headers.get("content-type")).toBe("application/json");
-      const bytes = new Uint8Array(await compressed.arrayBuffer());
-      expect(bytes.byteLength).toBeLessThan(plainText.length / 4);
-      expect(JSON.parse(gunzipSync(bytes).toString("utf8"))).toEqual(JSON.parse(plainText));
+/**
+ * Serves the route's Response through Next's own `sendResponse` (the step the
+ * App Router uses for route handlers) and reads it back twice: raw bytes over
+ * node:http and decoded by fetch, the way the browser sees it.
+ */
+async function deliverThroughNext(respond: (acceptEncoding?: string) => Promise<Response>): Promise<Delivered> {
+  const server = http.createServer(async (req, res) => {
+    const acceptEncoding = req.headers["accept-encoding"];
+    const response = await respond(typeof acceptEncoding === "string" ? acceptEncoding : undefined);
+    await sendResponse(new NodeNextRequest(req), new NodeNextResponse(res), response);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/`;
+  const acceptEncoding = "gzip, deflate, br, zstd";
+  try {
+    const { headers, raw } = await new Promise<{ headers: http.IncomingHttpHeaders; raw: Buffer }>((resolve, reject) => {
+      http
+        .get(url, { headers: { "accept-encoding": acceptEncoding } }, (res) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (chunk: Buffer) => chunks.push(chunk));
+          res.on("end", () => resolve({ headers: res.headers, raw: Buffer.concat(chunks) }));
+          res.on("error", reject);
+        })
+        .on("error", reject);
+    });
+    const decoded = await (await fetch(url, { headers: { "accept-encoding": acceptEncoding } })).text();
+    return { headers, raw, decoded };
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+}
+
+describe("large JSON reads reach the client as JSON", () => {
+  for (const route of routes) {
+    test(`${route.name}: the bytes Next sends match the headers it sends`, async () => {
+      const direct = await route.call("gzip, deflate, br, zstd");
+      expect(direct.status).toBe(200);
+      // Next drops Content-Encoding (and Content-Length) from route-handler
+      // responses, so a self-encoded body would reach the client undeclared.
+      expect(direct.headers.get("content-encoding")).toBeNull();
+      const expected = await direct.json();
+
+      const delivered = await deliverThroughNext(route.call);
+      expect(delivered.headers["content-type"]).toContain("application/json");
+      expect(delivered.headers["content-encoding"]).toBeUndefined();
+      expect(delivered.raw.byteLength).toBeGreaterThan(8 * 1024);
+      expect(JSON.parse(delivered.raw.toString("utf8"))).toEqual(expected);
+      expect(JSON.parse(delivered.decoded)).toEqual(expected);
     });
   }
-
-  test("a fetch client decodes the route response transparently", async () => {
-    const server = Bun.serve({
-      port: 0,
-      hostname: "127.0.0.1",
-      fetch: (incoming) => threads(request(`threads?${folderQuery()}`, { acceptEncoding: incoming.headers.get("accept-encoding") ?? undefined }), params())
-    });
-    try {
-      const response = await fetch(server.url, { headers: { "accept-encoding": "gzip" } });
-      expect(response.headers.get("content-encoding")).toBe("gzip");
-      const body = (await response.json()) as { items: Message[]; total: number };
-      expect(body.items).toHaveLength(MESSAGE_COUNT);
-      expect(body.total).toBe(MESSAGE_COUNT);
-    } finally {
-      await server.stop(true);
-    }
-  });
 });

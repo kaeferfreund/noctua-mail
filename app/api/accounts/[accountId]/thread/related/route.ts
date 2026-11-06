@@ -3,7 +3,6 @@ import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import { compressedJsonResponse } from "@/app/api/_helpers/compressedJson";
 import {
   getAccountIdFromParams,
   requireAccountContext,
@@ -124,7 +123,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
               threadDateSource
             })
           : [];
-        return compressedJsonResponse(request, { ...data, linked });
+        return NextResponse.json({ ...data, linked });
       } catch (error) {
         if (error instanceof ThreadWindowCursorError) {
           return NextResponse.json({ ok: false, message: error.message }, { status: 400 });
@@ -144,6 +143,6 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     });
     await enrich(data.items);
 
-    return compressedJsonResponse(request, { items: data.items });
+    return NextResponse.json({ items: data.items });
   });
 }

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { requireActiveUserSession, withAuthResponse } from "@/lib/auth";
-import { compressedJsonResponse } from "@/app/api/_helpers/compressedJson";
 import { rejectOverlongSearchQuery } from "@/app/api/_helpers/searchQueryLength";
 import { errorResponse } from "@/app/api/_helpers/response";
 import { enrichMessagesWithThreadTopics } from "@/app/api/_helpers/enrichMessagesWithThreadTopics";
@@ -53,7 +52,7 @@ export async function GET(request: Request, { params }: DomainRouteParams) {
       });
       await enrichMessagesWithThreadCollab(items, { accountId: account.id });
     }
-    return compressedJsonResponse(request, {
+    return NextResponse.json({
       domain,
       role,
       accounts: accounts.map((account) => account.id),
