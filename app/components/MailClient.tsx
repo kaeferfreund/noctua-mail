@@ -1956,6 +1956,13 @@ export default function MailClient({
     asNew = false,
     prefill?: ComposeOpenPrefill
   ) => {
+    // The domain view lists several mailboxes, but compose writes from the active one.
+    // A message of another mailbox is answered in its own mailbox: open it there.
+    // (Inside one mailbox, a merged message of another mailbox is answered from this one.)
+    if (domainView && message && message.accountId !== activeAccountId && mode !== "new") {
+      navigateMessageRef.current(message.id, message.accountId);
+      return;
+    }
     // „Bearbeiten hebt die Planung auf“: the draft's schedule, read fresh from the server (other
     // tabs and members included), is cancelled before the draft opens.
     if (mode === "edit" && !asNew && message && isDraftItem(message) && roleAtLeast(currentAccount?.accessRole, "editor")) {
@@ -2925,7 +2932,10 @@ export default function MailClient({
     invalidateThreadCollab(activeAccountId);
   }
   const threadCollabById = useMemo(() => threadCollabCache.get(activeAccountId) ?? new Map<string, CollabSummary>(), [threadCollabCache, activeAccountId]);
-  const collab = useThreadCollab(activeAccountId, activeMessage?.threadId, {
+  // Assignment, status and notes belong to the opened message's mailbox: a domain view
+  // row of another mailbox is never assigned in the active one.
+  const collabAccountId = activeMessage?.accountId ?? activeAccountId;
+  const collab = useThreadCollab(collabAccountId, activeMessage?.threadId, {
     apiFetch, sessionKey: currentUser?.id, currentUserId: currentUser?.id, refreshVersion: authoritativeRevision + activeCollabRevision,
     onUpdate: handleThreadCollabUpdate, onReadDenied: invalidateThreadCollab,
     onCommit: (accountId) => {
@@ -2961,7 +2971,7 @@ export default function MailClient({
     if (authState === "unauth") setAppBadge(0);
     else if (mailboxSummaries.length > 0) setAppBadge(unreadBadgeCount(mailboxSummaries, pushDeviceSettings));
   }, [authState, mailboxSummaries, pushDeviceSettings]);
-  const collabRole = collab.readDenied ? undefined : (currentAccount as ShellAccount | null)?.accessRole ?? collab.members.find(member => member.userId === collab.me && !member.disabled)?.role;
+  const collabRole = collab.readDenied ? undefined : (accountById.get(collabAccountId) as ShellAccount | undefined)?.accessRole ?? collab.members.find(member => member.userId === collab.me && !member.disabled)?.role;
   const activeMessageRef = useRef<Message | null>(null);
   useCommittedRef(activeMessageRef, activeMessage ?? null);
   const activeMessageThreadKey = (() => {

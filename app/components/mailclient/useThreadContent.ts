@@ -434,9 +434,13 @@ export function useThreadContent({
       console.info("[noctua] fetch source start", { messageId });
       setLoadingSource((prev) => ({ ...prev, [messageId]: true }));
       const promise = (async () => {
+        // The message's own mailbox: a conversation can hold messages of other mailboxes.
+        const owner =
+          messageById.get(messageId) ??
+          Object.values(threadContentByIdRef.current).flat().find((item) => item.id === messageId);
         const loadSource = async () => {
           const res = await apiFetch(
-            buildAccountMessageSourcePath(activeAccountId, messageId)
+            buildAccountMessageSourcePath(owner?.accountId || activeAccountId, messageId)
           );
           if (!res.ok) {
             const errorMessage = await readErrorMessage(res);

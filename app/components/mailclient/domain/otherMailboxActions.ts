@@ -4,8 +4,9 @@ import type { MessageQuickAction } from "../message/MessageQuickActions";
 /**
  * Actions on a message of another mailbox shown next to the active one's (a
  * conversation merged across the domain, or a row of the domain view). Read
- * state, flags and to-dos go to that message's mailbox; replies and forwards are
- * written from the active mailbox. Everything that depends on the mailbox's
+ * state, flags and to-dos go to that message's mailbox. Replies and forwards are
+ * written from the active mailbox inside one mailbox; in the domain view they open
+ * the message in its own mailbox first (MailClient openCompose). Everything that depends on the mailbox's
  * folders, topics, drafts or ids (move, delete, archive, spam, topics, source)
  * is done in the message's own mailbox, which its mailbox badge opens.
  */
