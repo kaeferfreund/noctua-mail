@@ -17,6 +17,10 @@ export function buildAccountMessagesPath(accountId: string, query?: URLSearchPar
   return appendQuery(buildAccountApiPath(accountId, "/messages"), query);
 }
 
+export function buildAccountMessageCountsPath(accountId: string, query?: URLSearchParams | string | null) {
+  return appendQuery(buildAccountApiPath(accountId, "/messages/counts"), query);
+}
+
 export function buildAccountSearchPath(accountId: string, query?: URLSearchParams | string | null) {
   return appendQuery(buildAccountApiPath(accountId, "/search"), query);
 }

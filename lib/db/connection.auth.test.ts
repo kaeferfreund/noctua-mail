@@ -63,8 +63,12 @@ test("production handles: blank dbPath contention, concurrent path wins, shard t
         assert.equal(db.prepare("PRAGMA foreign_keys").get().foreign_keys,1);
         assert.equal(db.prepare("PRAGMA journal_mode").get().journal_mode,"wal");
       }
-      // A cold module graph must yield/retry while another process/handle owns
-      // the master writer lock; concurrent callers cannot observe partial init.
+      // A cold module graph with initialization work pending (a mailbox without a
+      // sender identity) must yield/retry while another process/handle owns the
+      // master writer lock; concurrent callers cannot observe partial init.
+      master.prepare(
+        "INSERT INTO accounts(id,name,email,avatar,dbPath,imapHost,imapPort,imapSecure,imapUser,imapPassword,smtpHost,smtpPort,smtpSecure,smtpUser,smtpPassword) VALUES('seed-pending','seed-pending','seed-pending@example.test','','','imap.example.test',993,1,'seed-pending@example.test','','smtp.example.test',465,1,'seed-pending@example.test','')"
+      ).run();
       const cold = await import("./lib/db/connection.ts?watcher-startup-contention");
       authDb.exec("BEGIN IMMEDIATE");
       let coldResolved = false;
@@ -74,7 +78,20 @@ test("production handles: blank dbPath contention, concurrent path wins, shard t
       assert.equal(coldResolved, false);
       authDb.exec("ROLLBACK");
       assert.equal(await firstCold, await secondCold);
+      assert.equal(master.prepare("SELECT COUNT(*) AS n FROM sender_identities WHERE accountId='seed-pending'").get().n, 1);
       cold.closeAllDbConnections();
+      // An up-to-date master needs no writer lock: every sync worker process
+      // initializes it, and the server's own writes run with busy_timeout 0.
+      const warm = await import("./lib/db/connection.ts?watcher-startup-up-to-date");
+      authDb.exec("BEGIN IMMEDIATE");
+      try {
+        await warm.getDb();
+      } finally {
+        authDb.exec("ROLLBACK");
+      }
+      warm.closeAllDbConnections();
+      master.prepare("DELETE FROM sender_identities WHERE accountId='seed-pending'").run();
+      master.prepare("DELETE FROM accounts WHERE id='seed-pending'").run();
       const insert = master.prepare(
         "INSERT INTO accounts(id,name,email,avatar,dbPath,imapHost,imapPort,imapSecure,imapUser,imapPassword,smtpHost,smtpPort,smtpSecure,smtpUser,smtpPassword) VALUES(?,?,?,'','',?,993,1,?,'',?,465,1,?,'')"
       );

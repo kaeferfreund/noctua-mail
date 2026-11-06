@@ -340,7 +340,7 @@ it("collaboration sidebar definitions activate their server badge filter; summar
   const requests: URLSearchParams[] = [];
   const apiFetch = (async (url: RequestInfo | URL) => {
     requests.push(new URL(String(url), "http://example.test").searchParams);
-    return json({ total: 4 });
+    return json({ ok: true, counts: [4, 4, 4, 4, 4] });
   }) as typeof fetch;
   function Harness() {
     const [folder, setFolder] = useState("inbox");
@@ -391,11 +391,10 @@ it("collaboration sidebar definitions activate their server badge filter; summar
     expect(view.getByTestId("scope").textContent).toBe("all:");
   }
   // All collaboration counts come from the canonical summary, leaving only
-  // the five non-collaboration view counts.
-  await waitFor(() => expect(requests.length).toBe(5));
-  expect(requests.map(request => [request.get("badges"), request.get("excludeFolderIds")]).sort()).toEqual([
-    ["focused", "trash"], ["todo", "trash"], ["calendar", "trash"], ["calendar,unread", "trash"], ["suspicious,unread", "trash"]
-  ].sort());
+  // the five non-collaboration view counts, read in one counts request.
+  await waitFor(() => expect(requests.length).toBe(1));
+  expect(requests[0].getAll("set")).toEqual(["focused", "todo", "calendar", "calendar,unread", "suspicious,unread"]);
+  expect(requests[0].get("excludeFolderIds")).toBe("trash");
 });
 
 it("retains note drafts through collapse and account/thread navigation and bounds long notes", async () => {
