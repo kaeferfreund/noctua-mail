@@ -27,8 +27,18 @@ type CachedIconResult =
 const SUCCESS_TTL_MS = 1000 * 60 * 60 * 12;
 const FAILURE_TTL_MS = 1000 * 60 * 15;
 const MAX_ICON_BYTES = 256 * 1024;
+/** Process-wide cap: every distinct sender domain and address adds an entry. */
+const MAX_CACHED_ICONS = 2000;
 
 const iconCache = new Map<string, CachedIconResult>();
+
+/** Insertion order is age order: the oldest entry makes room for a new one. */
+function rememberIcon(url: string, result: CachedIconResult) {
+  iconCache.delete(url);
+  if (iconCache.size >= MAX_CACHED_ICONS) iconCache.delete(iconCache.keys().next().value as string);
+  iconCache.set(url, result);
+  return result;
+}
 const inflightFetches = new Map<string, Promise<CachedIconResult>>();
 
 function isSupportedImageContentType(value: string | null) {
@@ -75,6 +85,7 @@ async function fetchRemoteIcon(url: string): Promise<CachedIconResult> {
   if (cached && cached.expiresAt > Date.now()) {
     return cached;
   }
+  if (cached) iconCache.delete(url);
   const pending = inflightFetches.get(url);
   if (pending) return pending;
 
@@ -99,8 +110,7 @@ async function fetchRemoteIcon(url: string): Promise<CachedIconResult> {
           contentType: null,
           expiresAt: Date.now() + FAILURE_TTL_MS
         };
-        iconCache.set(url, failed);
-        return failed;
+        return rememberIcon(url, failed);
       }
 
       const buffer = Buffer.from(await response.arrayBuffer());
@@ -110,8 +120,7 @@ async function fetchRemoteIcon(url: string): Promise<CachedIconResult> {
           contentType: null,
           expiresAt: Date.now() + FAILURE_TTL_MS
         };
-        iconCache.set(url, failed);
-        return failed;
+        return rememberIcon(url, failed);
       }
 
       const success: CachedIconResult = {
@@ -119,16 +128,14 @@ async function fetchRemoteIcon(url: string): Promise<CachedIconResult> {
         contentType: contentType || "image/png",
         expiresAt: Date.now() + SUCCESS_TTL_MS
       };
-      iconCache.set(url, success);
-      return success;
+      return rememberIcon(url, success);
     } catch {
       const failed: CachedIconResult = {
         body: null,
         contentType: null,
         expiresAt: Date.now() + FAILURE_TTL_MS
       };
-      iconCache.set(url, failed);
-      return failed;
+      return rememberIcon(url, failed);
     } finally {
       inflightFetches.delete(url);
     }
@@ -173,6 +180,10 @@ export async function resolveSenderIcon(params: {
     identity,
     provider: null as SenderIconProvider | null
   };
+}
+
+export function senderIconCacheSizeForTests() {
+  return iconCache.size;
 }
 
 export function clearSenderIconCacheForTests() {

@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it } from "bun:test";
 import {
   buildSenderIconCandidates,
   clearSenderIconCacheForTests,
-  resolveSenderIcon
+  resolveSenderIcon,
+  senderIconCacheSizeForTests
 } from "./senderIcons";
 import { getSenderIdentity } from "./senderIdentity";
 
@@ -86,5 +87,14 @@ describe("senderIcons", () => {
     expect(callCount).toBe(1);
     expect(first.contentType).toBe("image/png");
     expect(second.contentType).toBe("image/png");
+  });
+
+  it("keeps the process-wide icon cache bounded across many distinct senders", async () => {
+    globalThis.fetch = (async () => new Response(null, { status: 404 })) as unknown as typeof fetch;
+    for (let index = 0; index < 2100; index += 1) {
+      await resolveSenderIcon({ from: `"Sender" <sender@domain-${index}.example.test>`, enabled: true });
+    }
+    // Two candidates (domain favicon, gravatar) per sender, capped at 2000 entries.
+    expect(senderIconCacheSizeForTests()).toBe(2000);
   });
 });
