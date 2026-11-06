@@ -7,6 +7,7 @@ export {
 import {
   type GroupMeta,
   type StoredMessageSummary,
+  countMessagesByBadgeSets,
   ensureMessageSourceSizes,
   getAttachmentIds,
   getAttachmentMeta,
@@ -25,6 +26,7 @@ import {
 export {
   type GroupMeta,
   type StoredMessageSummary,
+  countMessagesByBadgeSets,
   ensureMessageSourceSizes,
   getAttachmentIds,
   getAttachmentMeta,

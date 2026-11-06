@@ -328,6 +328,11 @@ export const accountRouteRoles: Array<{ method: string; path: string; minRole: A
     "minRole": "editor"
   },
   {
+    "method": "GET",
+    "path": "messages/counts",
+    "minRole": "viewer"
+  },
+  {
     "method": "POST",
     "path": "messages/delete/associations",
     "minRole": "editor"

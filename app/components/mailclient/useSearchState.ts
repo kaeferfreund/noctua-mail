@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { buildAccountMessagesPath } from "@/lib/accountApiPaths";
+import { buildAccountMessageCountsPath } from "@/lib/accountApiPaths";
 import type { Folder } from "@/lib/data";
 import {
   SEARCH_BADGE_ORDER,
@@ -118,6 +118,8 @@ type VirtualFolderCounts = {
   inviteUnread: number | null;
   suspiciousUnread: number | null;
 };
+/** Badge sets of the virtual-folder counts, in the order of `VirtualFolderCounts`. */
+const VIRTUAL_COUNT_BADGE_SETS = ["focused", "todo", "calendar", "calendar,unread", "suspicious,unread"] as const;
 const NO_VIRTUAL_COUNTS: VirtualFolderCounts = { accountId: "", focused: null, todo: null, inviteTotal: null, inviteUnread: null, suspiciousUnread: null };
 
 export function useSearchState(options: UseSearchStateOptions) {
@@ -213,27 +215,20 @@ export function useSearchState(options: UseSearchStateOptions) {
     if (!activeAccountId || !secondaryReadsReady) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      const fetchCount = async (badges: string, excludedFolderIdsKey: string) => {
-        const params = new URLSearchParams({
-          page: "1",
-          pageSize: "1",
-          groupBy: "date",
-          searchScope: "all",
-          badges,
-          excludeFolderIds: excludedFolderIdsKey
-        });
-        const res = await apiFetch(buildAccountMessagesPath(activeAccountId, params), { signal: controller.signal });
-        if (!res.ok) throw new Error("Failed to fetch count");
-        const data = (await res.json()) as { total: number };
-        return data.total;
-      };
-      void Promise.all([
-        fetchCount("focused", virtualDefaultExcludedFolderIdsKey),
-        fetchCount("todo", virtualDefaultExcludedFolderIdsKey),
-        fetchCount("calendar", virtualDefaultExcludedFolderIdsKey),
-        fetchCount("calendar,unread", virtualDefaultExcludedFolderIdsKey),
-        fetchCount("suspicious,unread", virtualDefaultExcludedFolderIdsKey)
-      ])
+      // One counts-only request for all five badges; a full message list per badge
+      // cost three scans of the mailbox each (rows, groups, total) on every refresh.
+      const params = new URLSearchParams({ excludeFolderIds: virtualDefaultExcludedFolderIdsKey });
+      for (const badges of VIRTUAL_COUNT_BADGE_SETS) params.append("set", badges);
+      void apiFetch(buildAccountMessageCountsPath(activeAccountId, params), { signal: controller.signal })
+        .then(async (res) => {
+          if (!res.ok) throw new Error("Failed to fetch counts");
+          const data = (await res.json()) as { counts?: unknown };
+          const counts = Array.isArray(data.counts) ? data.counts : [];
+          if (counts.length !== VIRTUAL_COUNT_BADGE_SETS.length || !counts.every((value) => typeof value === "number")) {
+            throw new Error("Unexpected counts");
+          }
+          return counts as number[];
+        })
         .then(([focused, todo, inviteTotal, inviteUnread, suspiciousUnread]) => {
           if (controller.signal.aborted) return;
           setVirtualCounts({ accountId: activeAccountId, focused, todo, inviteTotal, inviteUnread, suspiciousUnread });
