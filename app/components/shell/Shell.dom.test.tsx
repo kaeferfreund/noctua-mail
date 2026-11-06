@@ -144,7 +144,7 @@ describe("shell sidebar", () => {
     expect(view.getByText("Example Person")).toBeTruthy();
   });
 
-  it("renders domain headings only for sections with more than six mailboxes", () => {
+  it("renders domain headings for sections with more than six mailboxes or a domain with two", () => {
     // A shared mailbox counts towards the list and sits in its domain's group.
     const accounts = Array.from({ length: 7 }, (_, i) => account(`box${i}`, `Box ${6 - i}`, i % 2 ? "b.example.test" : "a.example.test", i === 2));
     const view = renderSidebar(accounts, () => {});
@@ -167,8 +167,9 @@ describe("shell sidebar", () => {
     expect(heading.parentElement!.parentElement!.className).toContain("md:px-0");
     for (const element of [heading, ...rows]) expect(element.className).toContain("h-8");
     view.unmount();
-    const short = renderSidebar(accounts.slice(0, 6), () => {});
-    expect(short.queryByText("a.example.test")).toBeNull();
+    // Six mailboxes on six domains: no domain holds two, so no headings.
+    const short = renderSidebar(Array.from({ length: 6 }, (_, i) => account(`solo${i}`, `Solo ${i}`, `d${i}.example.test`)), () => {});
+    expect(short.queryByText("d0.example.test")).toBeNull();
     // Ungrouped rows keep the plain layout: no guide, no indent.
     const plainRows = [...short.container.querySelectorAll<HTMLButtonElement>("button[title$='.example.test']")];
     expect(plainRows).toHaveLength(6);
@@ -376,9 +377,20 @@ describe("collapsible domain groups", () => {
   });
 
   it("keeps ungrouped sections without a toggle", () => {
-    const view = renderSidebar(brand, () => {}, undefined, undefined, undefined, undefined, undefined, undefined, undefined, { userId: "user-1", summaries });
+    const solo = ["a", "b", "c"].map(id => account(`solo-${id}`, `Solo ${id}`, `${id}.solo.example.test`));
+    const view = renderSidebar(solo, () => {}, undefined, undefined, undefined, undefined, undefined, undefined, undefined, { userId: "user-1", summaries });
     expect(view.container.querySelector("button[aria-expanded][aria-controls]")).toBeNull();
-    expect(rowTitles(view, "brand.example.test")).toHaveLength(4);
+    expect(solo.map(row => rowTitles(view, row.email.split("@")[1]).length)).toEqual([1, 1, 1]);
+  });
+
+  it("groups a short section once one domain holds two mailboxes; a single-mailbox domain gets no domain view", () => {
+    const pair = ["a", "b"].map(id => account(`pair-${id}`, `Pair ${id}`, "pair.example.test"));
+    const single = account("single", "Single", "single.example.test");
+    const view = renderSidebar([...pair, single], () => {}, undefined, undefined, undefined, undefined, undefined, undefined, undefined,
+      { userId: "user-1", summaries, onOpenDomain: () => {} });
+    expect(view.getByRole("button", { name: "Show all mailboxes of pair.example.test" })).toBeTruthy();
+    expect(view.queryByRole("button", { name: "Show all mailboxes of single.example.test" })).toBeNull();
+    expect(view.getByText("single.example.test")).toBeTruthy();
   });
 });
 
@@ -422,10 +434,10 @@ describe("mailbox avatars and domain icons", () => {
   it("shows a row avatar only for a custom image URL, never initials", async () => {
     const images = stubAvatarImages();
     try {
-      const custom = { ...account("a", "Alpha"), avatar: "https://avatars.example.test/alpha.png" };
-      const literal = { ...account("b", "Bravo"), avatar: "NW" };
-      const view = renderSidebar([custom, literal, account("c", "Charlie")], () => {});
-      // Up to six mailboxes: no domain headers, so the custom avatar is the only image request.
+      const custom = { ...account("a", "Alpha", "a.example.test"), avatar: "https://avatars.example.test/alpha.png" };
+      const literal = { ...account("b", "Bravo", "b.example.test"), avatar: "NW" };
+      const view = renderSidebar([custom, literal, account("c", "Charlie", "c.example.test")], () => {});
+      // Up to six mailboxes and no domain with two: no domain headers, so the custom avatar is the only image request.
       expect(images.probes.map(probe => probe.src)).toEqual([custom.avatar]);
       await images.settle(custom.avatar, true);
       await waitFor(() => expect(rowOf(view, "Alpha").querySelector("[data-slot=avatar] img")?.getAttribute("src")).toBe(custom.avatar));

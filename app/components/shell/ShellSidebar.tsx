@@ -36,7 +36,7 @@ import TopicsSidebarSection from "@/app/components/mailclient/folder/TopicsSideb
 import BuildInfo from "@/app/components/mailclient/status/BuildInfo";
 import { buildSenderIconSrc } from "@/app/components/mailclient/SenderIcon";
 import type { BuildIdentity } from "@/lib/buildVersion";
-import { MAILBOX_GROUPING_MIN, groupMailboxes, mailboxAvatarUrl, mailboxLabel, sortMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
+import { DOMAIN_GROUP_MIN, groupMailboxes, shouldGroupMailboxes, mailboxAvatarUrl, mailboxLabel, sortMailboxes, type ShellAccount, type ShellView, type ShellViews } from "./types";
 import { useStableHandlers } from "@/app/hooks/useStableHandlers";
 import { useCollapsedDomains } from "@/lib/ui/collapsedDomains";
 import { versionedIconUrl } from "@/lib/appBranding";
@@ -260,7 +260,7 @@ export function MailboxRows({
   const listId = useId();
   const summaryById = useMemo(() => new Map(summaries?.map(summary => [summary.accountId, summary])), [summaries]);
   const groups = useMemo(() => groupMailboxes(accounts), [accounts]);
-  const grouped = accounts.length >= MAILBOX_GROUPING_MIN;
+  const grouped = useMemo(() => shouldGroupMailboxes(accounts), [accounts]);
   const { collapsed, toggle } = useCollapsedDomains(userId);
   // Headings and row lists are siblings: no wrapper per group adds padding
   // or margins of its own; a heading after the first opens with the gap
@@ -290,7 +290,7 @@ export function MailboxRows({
         );
         return (
           <Fragment key={group.domain ?? "all"}>
-            {grouped && domain && onOpenDomain ? (
+            {grouped && domain && onOpenDomain && group.accounts.length >= DOMAIN_GROUP_MIN ? (
               <div className={cn("flex w-full items-center gap-0.5", index > 0 && "mt-2")} data-slot="domain-group-heading">
                 {/* The name opens the domain view; the chevron collapses the group. */}
                 <button

@@ -85,13 +85,29 @@ export function mailboxLabel(account: Pick<Account, "name" | "email">): string {
 
 /** Sections with at least this many mailboxes are grouped by domain. */
 export const MAILBOX_GROUPING_MIN = 7;
+/** A domain with at least this many mailboxes gets a heading (and its domain view). */
+export const DOMAIN_GROUP_MIN = 2;
 
-/** Group long mailbox sections by domain, preserving name order within each group. */
+/** Group by domain when the section is long or any domain holds several mailboxes. */
+export function shouldGroupMailboxes(accounts: readonly ShellAccount[]): boolean {
+  if (accounts.length >= MAILBOX_GROUPING_MIN) return true;
+  const counts = new Map<string | null, number>();
+  for (const account of accounts) {
+    const domain = mailboxGroupDomain(account.email);
+    if (domain === null) continue;
+    const count = (counts.get(domain) ?? 0) + 1;
+    if (count >= DOMAIN_GROUP_MIN) return true;
+    counts.set(domain, count);
+  }
+  return false;
+}
+
+/** Group mailbox sections by domain, preserving name order within each group. */
 export function groupMailboxes(accounts: readonly ShellAccount[]): Array<{
   domain: string | null;
   accounts: ShellAccount[];
 }> {
-  if (accounts.length < MAILBOX_GROUPING_MIN) return [{ domain: null, accounts: [...accounts] }];
+  if (!shouldGroupMailboxes(accounts)) return [{ domain: null, accounts: [...accounts] }];
   const groups = new Map<string | null, ShellAccount[]>();
   for (const account of accounts) {
     const domain = mailboxGroupDomain(account.email);
