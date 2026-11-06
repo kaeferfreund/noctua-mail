@@ -119,10 +119,13 @@ function isDuplicateColumnError(error: unknown) {
 }
 
 /** Add provenance and revoke unidentified targeted invites in the same schema transaction. */
+const INVITE_ISSUER_COLUMNS: ReadonlyArray<readonly [name: string, ddl: string]> =
+  [["email","TEXT"],["issuedByUserId","TEXT"],["provenance","TEXT NOT NULL DEFAULT 'operator'"],["revokedAt","INTEGER"]];
 export function ensureInviteIssuerSchema(db:any) {
+  if (hasTableColumns(db, "invite_codes", INVITE_ISSUER_COLUMNS)) return;
   db.transaction(()=>{
     const hadProvenance=(db.prepare(`PRAGMA table_info(invite_codes)`).all() as {name:string}[]).some(column=>column.name==="provenance");
-    ensureTableColumns(db,"invite_codes",[["email","TEXT"],["issuedByUserId","TEXT"],["provenance","TEXT NOT NULL DEFAULT 'operator'"],["revokedAt","INTEGER"]]);
+    ensureTableColumns(db,"invite_codes",INVITE_ISSUER_COLUMNS);
     if(!hadProvenance)db.prepare(`UPDATE invite_codes SET revokedAt=? WHERE email IS NOT NULL`).run(Date.now());
   }).immediate();
 }
@@ -151,19 +154,31 @@ export function ensureTableColumns(
   }
 }
 
+/** Read-only probe: every listed column already exists. Lets start-up skip the
+ * writer lock (every sync worker process runs the master initialization). */
+function hasTableColumns(db: any, tableName: string, columns: ReadonlyArray<readonly [name: string, ddl: string]>) {
+  const existing = getDbTableColumns(db, tableName);
+  return columns.every(([name]) => existing.has(name));
+}
+
+const MASTER_TEAM_COLUMNS: ReadonlyArray<readonly [table: string, columns: ReadonlyArray<readonly [name: string, ddl: string]>]> = [
+  ["users", [["uiLocale", "TEXT CHECK(uiLocale IS NULL OR uiLocale IN ('de', 'en'))"]]],
+  ["user_accounts", [
+    // Links that predate roles were self-created, hence the default.
+    ["role", "TEXT NOT NULL DEFAULT 'manager'"],
+    ["grantedByUserId", "TEXT"],
+    ["grantedAt", "INTEGER"]
+  ]],
+  // JSON array of MCP scopes, enforced on every tool call; NULL = legacy read+drafts, invalid = no permissions.
+  ["mcp_tokens", [["scopes", "TEXT"]]]
+];
+
 // §3.1 team columns on the master tables. One immediate transaction makes
 // the PRAGMA reads and the ALTERs a unit (see `ensureTableColumns`).
 function ensureMasterTeamColumns(db: any) {
+  if (MASTER_TEAM_COLUMNS.every(([table, columns]) => hasTableColumns(db, table, columns))) return;
   db.transaction(() => {
-    ensureTableColumns(db, "users", [["uiLocale", "TEXT CHECK(uiLocale IS NULL OR uiLocale IN ('de', 'en'))"]]);
-    ensureTableColumns(db, "user_accounts", [
-      // Links that predate roles were self-created, hence the default.
-      ["role", "TEXT NOT NULL DEFAULT 'manager'"],
-      ["grantedByUserId", "TEXT"],
-      ["grantedAt", "INTEGER"]
-    ]);
-    // JSON array of MCP scopes, enforced on every tool call; NULL = legacy read+drafts, invalid = no permissions.
-    ensureTableColumns(db, "mcp_tokens", [["scopes", "TEXT"]]);
+    for (const [table, columns] of MASTER_TEAM_COLUMNS) ensureTableColumns(db, table, columns);
   }).immediate();
 }
 
@@ -190,6 +205,9 @@ function getUsersEmailLowerIndexState(db: any): "missing" | "unique" | "non-uniq
 // because of this step.
 function normalizeUserEmails(db: any) {
   try {
+    // Nothing to rewrite and the unique index in place: skip the writer lock.
+    if (getUsersEmailLowerIndexState(db) === "unique"
+      && !db.prepare(`SELECT 1 FROM users WHERE email <> lower(trim(email)) LIMIT 1`).get()) return;
     db.transaction(() => {
       const candidates = db
         .prepare(`SELECT id FROM users WHERE email <> lower(trim(email))`)
@@ -948,9 +966,12 @@ export function initMasterSchema(db: any) {
      ON admin_audit(createdAt DESC)`
   ).run();
 
-  db.transaction(() => {
-    for (const account of db.prepare("SELECT id,email,name FROM accounts").all()) seedSenderIdentityRow(db, account);
-  }).immediate();
+  // Only accounts without any sender identity get a seed row; skip the writer lock when there are none.
+  if (db.prepare(`SELECT 1 FROM accounts a WHERE NOT EXISTS (SELECT 1 FROM sender_identities s WHERE s.accountId = a.id) LIMIT 1`).get()) {
+    db.transaction(() => {
+      for (const account of db.prepare("SELECT id,email,name FROM accounts").all()) seedSenderIdentityRow(db, account);
+    }).immediate();
+  }
   ensureMasterTeamColumns(db);
   db.prepare(
     `CREATE INDEX IF NOT EXISTS idx_user_accounts_account
