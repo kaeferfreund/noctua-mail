@@ -58,8 +58,8 @@ async function seedAccount(account: Account, messages: Message[]) {
 
 /**
  * Domain d.example.test with three mailboxes:
- * - judith (A): customer mail X, a CC copy C (also in kontakt), a trashed reply T to X.
- * - kontakt (B): reply Y to X in Sent (stored under its own thread id), the CC copy C,
+ * - anna (A): customer mail X, a CC copy C (also in team), a trashed reply T to X.
+ * - team (B): reply Y to X in Sent (stored under its own thread id), the CC copy C,
  *   a draft reply D to X, the customer's answer R to Y (thread id X) and an unrelated mail U.
  * - hidden (H): same domain, the principal is no member; holds reply Z to X.
  * - other@other.example.test (O): different domain, member; holds reply Q to X.
@@ -69,8 +69,8 @@ async function fixture(memberOf: Array<"A" | "B" | "H" | "O"> = ["A", "B", "O"])
   const domain = `d${tag}.example.test`;
   const ids = { A: `dc-a-${tag}`, B: `dc-b-${tag}`, H: `dc-h-${tag}`, O: `dc-o-${tag}` };
   const accounts = {
-    A: syntheticAccount(ids.A, `judith@${domain}`),
-    B: syntheticAccount(ids.B, `kontakt@${domain}`),
+    A: syntheticAccount(ids.A, `anna@${domain}`),
+    B: syntheticAccount(ids.B, `team@${domain}`),
     H: syntheticAccount(ids.H, `hidden@${domain}`),
     O: syntheticAccount(ids.O, `other@o${tag}.example.test`)
   };
@@ -88,7 +88,7 @@ async function fixture(memberOf: Array<"A" | "B" | "H" | "O"> = ["A", "B", "O"])
     mail(ids.B, "INBOX", { id: `c-${tag}`, messageId: C, threadId: X, minute: 5, inReplyTo: X, references: [X] }),
     mail(ids.B, "Drafts", { id: `d-${tag}`, messageId: `<d-${tag}@${domain}>`, threadId: X, minute: 11, inReplyTo: X, references: [X], draft: true }),
     mail(ids.B, "INBOX", { id: `u-${tag}`, messageId: `<u-${tag}@example.invalid>`, threadId: `<u-${tag}@example.invalid>`, minute: 20 }),
-    // The customer's answer to Y reaches kontakt only, under the conversation's root thread id.
+    // The customer's answer to Y reaches team only, under the conversation's root thread id.
     mail(ids.B, "INBOX", { id: `r-${tag}`, messageId: `<r-${tag}@example.invalid>`, threadId: X, minute: 15, inReplyTo: Y, references: [X, Y] })
   ]);
   await seedAccount(accounts.H, [
@@ -147,31 +147,31 @@ describe("readable domain mailboxes", () => {
 });
 
 describe("conversation across mailboxes of one domain", () => {
-  test("judith's conversation shows kontakt's reply, once per Message-ID, own copy preferred", async () => {
+  test("anna's conversation shows team's reply, once per Message-ID, own copy preferred", async () => {
     const linked = await listDomainLinkedMessages({
       userId: base.principal.user.id,
       account: base.accounts.A,
       threadId: base.X,
       excludeFolderIds: [`${base.ids.A}:Trash`]
     });
-    // Y comes from kontakt; the CC copy C stays judith's; drafts, other domains and
+    // Y comes from team; the CC copy C stays anna's; drafts, other domains and
     // mailboxes without access never appear.
     expect(linked.map((item) => [item.accountId, item.id])).toEqual([[base.ids.B, `y-${base.tag}`], [base.ids.B, `r-${base.tag}`]]);
     expect(linked.every((item) => item.threadId === base.X)).toBe(true);
     expect(linked[0].linkedThreadId).toBe(`<other-root-${base.tag}>`);
-    // Parents resolve across mailboxes: Y answers judith's X, R answers kontakt's Y.
+    // Parents resolve across mailboxes: Y answers anna's X, R answers team's Y.
     expect(linked[0].parentId).toBe(`x-${base.tag}`);
     expect(linked[1].parentId).toBe(`y-${base.tag}`);
     expect(linked[0].body ?? "").toBe("");
   });
 
-  test("kontakt's Sent conversation shows judith's received mail", async () => {
+  test("team's Sent conversation shows anna's received mail", async () => {
     const linked = await listDomainLinkedMessages({
       userId: base.principal.user.id,
       account: base.accounts.B,
       threadId: `<other-root-${base.tag}>`
     });
-    // X and judith's copy of C are linked; judith's trashed reply T never is.
+    // X and anna's copy of C are linked; anna's trashed reply T never is.
     expect(linked.map((item) => item.id)).toEqual([`x-${base.tag}`, `c-${base.tag}`]);
     expect(linked.every((item) => item.accountId === base.ids.A)).toBe(true);
     // Ordered by date; the copy of C replies to X.
@@ -185,7 +185,7 @@ describe("conversation across mailboxes of one domain", () => {
     expect(data!.linked.map((item) => item.id)).toEqual([`y-${base.tag}`, `r-${base.tag}`]);
   });
 
-  test("a user with access to judith only never gets kontakt's messages", async () => {
+  test("a user with access to anna only never gets team's messages", async () => {
     const onlyA = await fixture(["A"]);
     const linked = await listDomainLinkedMessages({ userId: onlyA.principal.user.id, account: onlyA.accounts.A, threadId: onlyA.X });
     expect(linked).toEqual([]);
@@ -214,7 +214,7 @@ describe("domain view thread list", () => {
     expect(dates).toEqual([...dates].sort((a, b) => b - a));
     expect(new Set(data.items.map((item) => item.id)).size).toBe(data.items.length);
     expect(data.items[0].id).toBe(`u-${base.tag}`);
-    // The conversation X is in both inboxes; it is listed once, for kontakt (newest message R).
+    // The conversation X is in both inboxes; it is listed once, for team (newest message R).
     const conversation = data.items.filter((item) => item.threadId === base.X);
     expect(conversation.length).toBeGreaterThan(0);
     expect(conversation.every((item) => item.accountId === base.ids.B)).toBe(true);
