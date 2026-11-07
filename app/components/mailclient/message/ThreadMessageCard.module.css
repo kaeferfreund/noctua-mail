@@ -587,7 +587,7 @@
 }
 
 /* Gives way before the sender name; it stops at its min-content width, which
-   the mailbox badge below keeps down to its @ icon. */
+   the mailbox badge below keeps down to a short label stub. */
 .compactBadges {
   display: inline-flex;
   align-items: center;
@@ -600,13 +600,12 @@
   flex-shrink: 0;
 }
 
-/* The label column has no minimum (min-content stays icon + padding) but
-   still takes its full width when there is room, so the label truncates
-   before the name does and the icon stays. */
+/* The label column takes its full width when there is room but truncates
+   before the name does, down to a short stub that keeps the badge visible. */
 .compactBadges > [data-mailbox-badge] {
   display: inline-grid;
-  grid-auto-flow: column;
-  grid-template-columns: auto minmax(0, max-content);
+  grid-template-columns: minmax(0, max-content);
+  min-width: 3em;
   flex-shrink: 1;
 }
 
