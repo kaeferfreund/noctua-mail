@@ -73,7 +73,7 @@ type MessageRowProps = {
   iconFromEmail?: string;
   folderBadges: React.ReactNode;
   folderBadgeKey?: string;
-  /** Mailbox of the row in a list across mailboxes (domain view), on the sender line. */
+  /** Mailbox of the row in a list across mailboxes (domain view), directly left of the date. */
   mailboxBadge?: React.ReactNode;
   mailboxBadgeKey?: string;
   showFolderBadgesInSubjectMeta: boolean;
@@ -194,6 +194,7 @@ function MessageRow({
   const rowClassName = [
     styles.row,
     isCompactView ? styles.rowCompact : "",
+    isCompactView && mailboxBadge ? styles.rowCompactMailbox : "",
     useExternalStateStyles ? styles.rowExternalState : "",
     !useExternalStateStyles && showCompactDivider ? styles.rowDivider : "",
     !useExternalStateStyles && isSuggestionRow ? styles.rowSuggestion : "",
@@ -380,7 +381,6 @@ function MessageRow({
                 </span>
               )}
               <span className={styles.fromText}>{fromLine}</span>
-              {mailboxBadge ? <span className={styles.fromMailbox}>{mailboxBadge}</span> : null}
             </span>
           </Text>
         </FromAddressHoverCard>
@@ -393,6 +393,9 @@ function MessageRow({
               {size.label}
             </Text>
           )}
+          {mailboxBadge ? (
+            <span data-message-cell="mailbox" className={styles.fromMailbox}>{mailboxBadge}</span>
+          ) : null}
           <Text as="span" size="1" data-message-cell="date" className={dateClassName} title={dateDisplay.tooltip}>
             {dateDisplay.text}
           </Text>

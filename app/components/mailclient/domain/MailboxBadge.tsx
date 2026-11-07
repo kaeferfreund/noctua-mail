@@ -1,6 +1,5 @@
 import { useTranslations } from "next-intl";
 import { Badge } from "@radix-ui/themes";
-import { AtSign } from "lucide-react";
 import { badgeColors } from "@/lib/ui/badgeColors";
 import styles from "../folder/FolderBadges.module.css";
 
@@ -20,12 +19,7 @@ type MailboxBadgeProps = {
 export default function MailboxBadge({ label, email, onOpen }: MailboxBadgeProps) {
   const t = useTranslations("Domain");
   const title = onOpen ? t("openInMailbox", { mailbox: email }) : t("mailbox", { mailbox: email });
-  const content = (
-    <>
-      <AtSign size={12} aria-hidden="true" />
-      <span className={styles.badgeLabel}>{label}</span>
-    </>
-  );
+  const content = <span className={styles.badgeLabel}>{label}</span>;
   return (
     <Badge size="1" variant="soft" color={badgeColors.mailbox} asChild data-mailbox-badge="">
       {onOpen ? (
