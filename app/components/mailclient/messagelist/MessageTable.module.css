@@ -183,6 +183,11 @@
   min-width: 0;
 }
 
+/* Rows have room for the full mailbox name (folder badges stay at 80px). */
+.cellMailbox [data-mailbox-badge] {
+  max-width: 160px;
+}
+
 .recipientIcon {
   display: inline-flex;
   align-items: center;
