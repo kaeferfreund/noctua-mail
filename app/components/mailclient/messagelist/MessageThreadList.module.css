@@ -331,10 +331,12 @@
   white-space: nowrap;
 }
 
-/* Mailbox of the row in a list across mailboxes (domain view). */
-.cellFromMailbox {
+/* Mailbox of the row in a list across mailboxes (domain view), directly left
+   of the date so the sender keeps the width. */
+.cellMailbox {
   display: inline-flex;
   flex: 0 0 auto;
+  min-width: 0;
 }
 
 .recipientIcon {
