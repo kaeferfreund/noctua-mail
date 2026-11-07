@@ -194,6 +194,11 @@
   min-width: 0;
 }
 
+/* Rows have room for the full mailbox name (folder badges stay at 80px). */
+.fromMailbox [data-mailbox-badge] {
+  max-width: 160px;
+}
+
 .actions {
   display: inline-flex;
   align-items: center;
