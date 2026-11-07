@@ -108,10 +108,12 @@
    with an empty 1fr column between sender and badge. Sender and badge are
    intrinsic tracks with a 0 minimum: the grid hands them free space in equal
    shares up to their full width, so when space runs short both give way
-   equally; any rest goes to the spacer. */
-.pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"])) { grid-template-columns: 0 minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content) auto 28px; }
-.pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"]):has([data-message-select])) { grid-template-columns: 24px minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content) auto 28px; }
+   equally; any rest goes to the spacer. The date keeps its full width. */
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"])) { grid-template-columns: 0 minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content) max-content 28px; }
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"]):has([data-message-select])) { grid-template-columns: 24px minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content) max-content 28px; }
 .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="mailbox"]) { grid-column: 4; grid-row: 1; align-self: center; justify-self: end; min-width: 0; max-width: 100%; }
+/* Radix badges never shrink (flex-shrink: 0); here the badge follows its column. */
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="mailbox"] > [data-mailbox-badge]) { flex-shrink: 1; min-width: 0; max-width: min(160px, 100%); }
 .pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"]) [data-message-cell="date"]) { grid-column: 5; }
 .pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"]) [data-message-cell="actions"]) { grid-column: 6; }
 .pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"]) [data-message-subject-line]) { grid-column: 2 / 6; }
@@ -178,8 +180,8 @@
   .pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-select])) {
     grid-template-columns: 44px minmax(0, 1fr) auto 44px;
   }
-  .pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"])) { grid-template-columns: 0 minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content) auto 44px; }
-  .pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"]):has([data-message-select])) { grid-template-columns: 44px minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content) auto 44px; }
+  .pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"])) { grid-template-columns: 0 minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content) max-content 44px; }
+  .pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"]):has([data-message-select])) { grid-template-columns: 44px minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content) max-content 44px; }
   .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"]:has([data-message-select])) { width: 44px; }
   .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"] > [data-message-select]) {
     display: inline-flex;
