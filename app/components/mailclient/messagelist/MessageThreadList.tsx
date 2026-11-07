@@ -377,7 +377,6 @@ export default function MessageThreadList({
                       </span>
                     )}
                     <span className={styles.cellFromText}>{item.fromText}</span>
-                    {mailboxBadge ? <span className={styles.cellFromMailbox}>{mailboxBadge}</span> : null}
                   </span>
                 </FromAddressHoverCard>
 
@@ -471,6 +470,10 @@ export default function MessageThreadList({
                     </Text>
                   </span>
                 )}
+
+                {mailboxBadge ? (
+                  <span data-message-cell="mailbox" className={styles.cellMailbox}>{mailboxBadge}</span>
+                ) : null}
 
                 <span data-message-cell="date" className={styles.cellDate}>
                   <Text as="span" size="1" title={dateDisplay.tooltip}>

@@ -506,7 +506,6 @@ export default function MessageTable({
                       {item.fromText}
                     </span>
                   </FromAddressHoverCard>
-                  {mailboxBadge ? <span className={styles.cellFromMailbox}>{mailboxBadge}</span> : null}
                 </span>
                 <span
                   data-message-cell="subject" className={styles.cellSubject}
@@ -544,6 +543,9 @@ export default function MessageTable({
                     </Text>
                   </span>
                 )}
+                {mailboxBadge ? (
+                  <span data-message-cell="mailbox" className={styles.cellMailbox}>{mailboxBadge}</span>
+                ) : null}
                 <span data-message-cell="date" className={styles.cellDate}>
                   <Text as="span" size="1" title={dateDisplay.tooltip}>
                     {dateDisplay.text}

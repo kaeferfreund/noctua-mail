@@ -104,6 +104,15 @@
 .pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-select])) { grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) 28px; }
 .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"]:has([data-message-select])) { width: 24px; }
 
+/* Domain view: the mailbox badge gets its own column directly left of the date;
+   the date shrinks to its text, so the sender keeps the rest of the line. */
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"])) { grid-template-columns: 0 minmax(0, 1fr) auto auto 28px; }
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"]):has([data-message-select])) { grid-template-columns: 24px minmax(0, 1fr) auto auto 28px; }
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="mailbox"]) { grid-column: 3; grid-row: 1; align-self: center; min-width: 0; }
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"]) [data-message-cell="date"]) { grid-column: 4; }
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"]) [data-message-cell="actions"]) { grid-column: 5; }
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"]) [data-message-subject-line]) { grid-column: 2 / 5; }
+
 /* Pull-to-refresh (phone, see usePullToRefresh.ts): a zero-height row above the
    list whose icon slides in from above the pane's top edge; while pulling, the
    list follows by the same offset. Transforms leave the virtualized layout alone. */
@@ -166,6 +175,8 @@
   .pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-select])) {
     grid-template-columns: 44px minmax(0, 1fr) auto 44px;
   }
+  .pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"])) { grid-template-columns: 0 minmax(0, 1fr) auto auto 44px; }
+  .pane :global([data-message-layout="stacked"][data-message-narrow="true"]:has([data-message-cell="mailbox"]):has([data-message-select])) { grid-template-columns: 44px minmax(0, 1fr) auto auto 44px; }
   .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"]:has([data-message-select])) { width: 44px; }
   .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-cell="unread"] > [data-message-select]) {
     display: inline-flex;
