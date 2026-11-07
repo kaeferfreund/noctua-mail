@@ -186,9 +186,12 @@
   white-space: nowrap;
 }
 
+/* Domain view: the mailbox badge sits in the actions, directly left of the
+   date, so the sender keeps the remaining width. */
 .fromMailbox {
   display: inline-flex;
   flex: 0 0 auto;
+  min-width: 0;
 }
 
 .actions {
@@ -343,8 +346,14 @@
   .rowCompact .date { grid-column: 3; grid-row: 1; }
   .rowCompact .subjectRow { grid-column: 2 / 4; grid-row: 2; padding: 0; min-width: 0; }
   .rowCompact .subjectMeta, .rowCompact .metaRow, .rowCompact .size,
-  .rowCompact .actions > :global(:not([data-message-cell="date"]):not([data-message-action="menu"])) { display: none; }
+  .rowCompact .actions > :global(:not([data-message-cell="date"]):not([data-message-cell="mailbox"]):not([data-message-action="menu"])) { display: none; }
   .rowCompact :global([data-message-action="menu"]) { grid-column: 4; grid-row: 1 / 3; min-width: 44px; min-height: 44px; }
+  /* Domain view: an extra column for the mailbox badge left of the date. */
+  .rowCompactMailbox { grid-template-columns: 64px minmax(0, 1fr) auto auto 44px; }
+  .rowCompactMailbox .fromMailbox { grid-column: 3; grid-row: 1; align-self: center; }
+  .rowCompactMailbox .date { grid-column: 4; }
+  .rowCompactMailbox .subjectRow { grid-column: 2 / 5; }
+  .rowCompactMailbox :global([data-message-action="menu"]) { grid-column: 5; }
 }
 
 .mobileCollab { display: none; }
