@@ -13,16 +13,8 @@ import { mailboxGroupDomain } from "./senderIdentity";
 import { getFolderRecords } from "./db/folders";
 import { getLoadedDateGroups, listThreads, type GroupMeta } from "./db/messages/query";
 import { listLinkedConversationMessages } from "./db/messages/linkedConversation";
-import {
-  findArchiveFolder,
-  findDraftsFolder,
-  findInboxFolder,
-  findJunkFolder,
-  findSentFolder,
-  findTrashFolder
-} from "./specialFolders";
 import type { ThreadDateSource } from "./threadDate";
-import { DOMAIN_FOLDER_ROLES, type DomainFolderRole } from "./domainView";
+import { DOMAIN_FOLDER_ROLES, findDomainRoleFolder, type DomainFolderRole } from "./domainView";
 
 export { DOMAIN_FOLDER_ROLES, type DomainFolderRole };
 
@@ -68,18 +60,9 @@ export async function listDomainLinkedMessages(params: {
   });
 }
 
-const ROLE_FINDERS: Record<DomainFolderRole, (folders: Folder[], accountId: string) => Folder | null | undefined> = {
-  inbox: findInboxFolder,
-  sent: findSentFolder,
-  drafts: findDraftsFolder,
-  archive: findArchiveFolder,
-  trash: findTrashFolder,
-  spam: findJunkFolder
-};
-
 /** The folder playing `role` in one mailbox, or null when it has none. */
 export async function resolveDomainRoleFolder(accountId: string, role: DomainFolderRole) {
-  return ROLE_FINDERS[role](await getFolderRecords(accountId), accountId) ?? null;
+  return findDomainRoleFolder(await getFolderRecords(accountId), accountId, role);
 }
 
 /**
