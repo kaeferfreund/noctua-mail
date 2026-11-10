@@ -410,11 +410,14 @@ type MailClientProps = {
 type MoveToDialogState = {
   message: Message;
   request: MoveTargetRequest;
+  /** Mailbox whose folders are offered; null for a selection across mailboxes (special folders by role). */
+  accountId: string | null;
 };
 
 type CopyToAccountDialogState = {
   mode: "copy" | "move";
-  request: MoveTargetRequest;
+  /** One request per source mailbox (a domain view selection can span several). */
+  groups: Array<{ accountId: string; request: MoveTargetRequest }>;
 };
 
 type RecipientAliasDialogState = {
@@ -434,11 +437,15 @@ import { useFolderRefresh } from "./mailclient/useFolderRefresh";
 import { getFolderDisplayName } from "@/lib/i18n/folderNames";
 import { takeInviteCodeFromLocation } from "@/lib/inviteLink";
 import { mailboxGroupDomain } from "@/lib/senderIdentity";
-import type { DomainFolderRole } from "@/lib/domainView";
+import { domainFolderRoleOf, type DomainFolderRole } from "@/lib/domainView";
 import MailboxBadge from "./mailclient/domain/MailboxBadge";
 import DomainViewBar from "./mailclient/domain/DomainViewBar";
 import { mailboxLabel } from "./shell/types";
 import { OTHER_MAILBOX_MENU_VISIBILITY, OTHER_MAILBOX_QUICK_ACTION_VISIBILITY } from "./mailclient/domain/otherMailboxActions";
+import type { MessageCommandOptions, MessageCommandOutcome } from "./mailclient/useMessageMutations";
+import { canEditWithRole, groupByAccount, partitionByPermission, singleAccountOf, type MailboxSkipReport } from "./mailclient/domain/mailboxFanOut";
+import { useMailboxSkipNotice } from "./mailclient/domain/useMailboxSkipNotice";
+import { useDomainMailboxFolders, useDomainMailboxTopics } from "./mailclient/domain/useDomainMailboxCatalogs";
 
 const skipReaderRowsSubscription = () => () => {};
 const NO_READER_ROWS: Message[] = [];
@@ -831,6 +838,32 @@ export default function MailClient({
     () => folders.filter((folder) => folder.accountId === activeAccountId),
     [activeAccountId, folders]
   );
+  // Actions on messages of other mailboxes of the domain view: their folders
+  // (trash, archive, spam, a picked folder), the user's role per mailbox and
+  // one notice for what was skipped. The server authorises every request.
+  const otherDomainAccountIds = useMemo(
+    () => domainAccounts.map((account) => account.id).filter((id) => id !== activeAccountId),
+    [activeAccountId, domainAccounts]
+  );
+  const domainMailboxFolders = useDomainMailboxFolders({ accountIds: otherDomainAccountIds, apiFetch });
+  const domainMailboxTopics = useDomainMailboxTopics({ accountIds: otherDomainAccountIds, apiFetch });
+  const actionFolders = useMemo(
+    () => (domainMailboxFolders.allFolders.length > 0
+      ? [...folders, ...domainMailboxFolders.allFolders.filter((folder) => folder.accountId !== activeAccountId)]
+      : folders),
+    [activeAccountId, domainMailboxFolders.allFolders, folders]
+  );
+  const actionFolderById = useMemo(() => new Map(actionFolders.map((folder) => [folder.id, folder])), [actionFolders]);
+  const { ensureFolders: ensureDomainFolders } = domainMailboxFolders;
+  const getAccountFolders = useCallback(
+    async (accountId: string) => (accountId === activeAccountId ? accountFolders : ensureDomainFolders(accountId)),
+    [accountFolders, activeAccountId, ensureDomainFolders]
+  );
+  const canEditMailbox = useCallback(
+    (accountId: string) => canEditWithRole(accountById.get(accountId)?.accessRole),
+    [accountById]
+  );
+  const reportMailboxSkips = useMailboxSkipNotice({ accountById, pushNotice });
   const sentFolderBySpecialUse = useMemo(
     () => accountFolders.find((folder) => (folder.specialUse ?? "").toLowerCase() === "\\sent") ?? null,
     [accountFolders]
@@ -1206,9 +1239,10 @@ export default function MailClient({
   };
 
   // Folder helper wrappers - these don't need memoization (not passed to hooks)
-  const isDraftsFolder = useCallback((folderId?: string | null) => checkIsDraftsFolder(folderId, folders), [folders]);
-  const isTrashFolder = (folderId?: string | null) => checkIsTrashFolder(folderId, folders);
-  const isSpamFolder = (folderId?: string | null) => checkIsSpamFolder(folderId, folders);
+  // Known folders of every listed mailbox: a domain view row lies in its own mailbox's folder.
+  const isDraftsFolder = useCallback((folderId?: string | null) => checkIsDraftsFolder(folderId, actionFolders), [actionFolders]);
+  const isTrashFolder = (folderId?: string | null) => checkIsTrashFolder(folderId, actionFolders);
+  const isSpamFolder = (folderId?: string | null) => checkIsSpamFolder(folderId, actionFolders);
   const isSentFolder = (folderId?: string | null) => checkIsSentFolder(folderId, folders);
 
   // Preserve identity when counts change but thread-exclusion structure does not.
@@ -1958,8 +1992,9 @@ export default function MailClient({
   ) => {
     // The domain view lists several mailboxes, but compose writes from the active one.
     // A message of another mailbox is answered in its own mailbox: open it there.
-    // (Inside one mailbox, a merged message of another mailbox is answered from this one.)
-    if (domainView && message && message.accountId !== activeAccountId && mode !== "new") {
+    // (Inside one mailbox, a merged message of another mailbox is answered from this one;
+    // a draft of another mailbox is always edited there.)
+    if (message && message.accountId !== activeAccountId && mode !== "new" && (domainView || mode === "edit")) {
       navigateMessageRef.current(message.id, message.accountId);
       return;
     }
@@ -1977,18 +2012,33 @@ export default function MailClient({
   const readerActions = useMessageReaderActionsValue({ aiReplyAvailable, accounts, accountDateFormat, apiFetch, pushNotice, editDraft: editGeneratedDraft });
 
 
+  // Topics belong to one mailbox (catalog and thread_topics in its shard): a
+  // message of another mailbox (domain view) is tagged there, with its catalog,
+  // through its own routes, never through the active one.
+  const topicsForAccount = useCallback(
+    (accountId: string) => (accountId === activeAccountId ? allTopics : domainMailboxTopics.topicsByAccount.get(accountId) ?? []),
+    [activeAccountId, allTopics, domainMailboxTopics.topicsByAccount]
+  );
+  /** The thread's topics in the message's own mailbox (the same thread id can occur in two mailboxes). */
+  const threadTopicsOf = useCallback((message: Message): Topic[] => {
+    if (message.accountId === activeAccountId) {
+      return (message.threadId ? messageTopicsById.get(message.threadId) : undefined) ?? message.topics ?? [];
+    }
+    const listed = messages.find(
+      (item) => item.accountId === message.accountId && item.threadId === message.threadId && hasAssignedTopics(item.topics)
+    );
+    return listed?.topics ?? message.topics ?? [];
+  }, [activeAccountId, messageTopicsById, messages]);
+
   const getAssignedThreadTopics = useCallback((message: Message) => {
-    const threadTopics = message.threadId ? messageTopicsById.get(message.threadId) : undefined;
+    const threadTopics = threadTopicsOf(message);
     if (hasAssignedTopics(threadTopics)) {
-      return threadTopics ?? [];
+      return threadTopics;
     }
     return message.topics ?? [];
-  }, [messageTopicsById]);
+  }, [threadTopicsOf]);
 
-  // Topics belong to one mailbox (catalog and thread_topics in its shard): a
-  // message of another mailbox is tagged there, never through the active one.
   const handleAssignTopics = useCallback((message: Message) => {
-    if (message.accountId !== activeAccountId) return;
     setTopicPickerMessage(message);
     setTopicSuggestions([]);
     setTopicPickerOpen(true);
@@ -1997,7 +2047,7 @@ export default function MailClient({
     }
     const params = new URLSearchParams();
     if (message.threadId) params.set("threadId", message.threadId);
-    apiFetch(buildAccountMessageTopicSuggestionsPath(activeAccountId, params), { cache: "no-store" })
+    apiFetch(buildAccountMessageTopicSuggestionsPath(message.accountId || activeAccountId, params), { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => { if (data.ok) setTopicSuggestions(data.suggestions ?? []); })
       .catch(() => {});
@@ -2009,27 +2059,33 @@ export default function MailClient({
     }
     const params = new URLSearchParams();
     if (message.threadId) params.set("threadId", message.threadId);
-    const data = await apiFetch(buildAccountMessageTopicSuggestionsPath(activeAccountId, params), { cache: "no-store" })
+    const data = await apiFetch(buildAccountMessageTopicSuggestionsPath(message.accountId || activeAccountId, params), { cache: "no-store" })
       .then((r) => r.json())
       .catch(() => ({}));
     return data.ok ? (data.suggestions ?? []) : [];
   }, [activeAccountId, apiFetch, getAssignedThreadTopics]);
 
+  const { reloadTopics: reloadDomainTopics } = domainMailboxTopics;
   const handleCreateTopic = useCallback(async (
     name: string,
     color: TopicColor | null,
-    shortName?: string | null
+    shortName?: string | null,
+    accountId: string = activeAccountId
   ): Promise<Topic> => {
-    const res = await apiFetch(buildAccountTopicsPath(activeAccountId), {
+    const res = await apiFetch(buildAccountTopicsPath(accountId), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, shortName, color })
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.message ?? "Failed to create topic");
-    setAllTopics((prev) => [...prev, data.topic].sort((a, b) => a.name.localeCompare(b.name)));
+    if (accountId === activeAccountId) {
+      setAllTopics((prev) => [...prev, data.topic].sort((a, b) => a.name.localeCompare(b.name)));
+    } else {
+      void reloadDomainTopics(accountId);
+    }
     return data.topic;
-  }, [activeAccountId, apiFetch, setAllTopics]);
+  }, [activeAccountId, apiFetch, reloadDomainTopics, setAllTopics]);
 
   /**
    * Apply a batch of per-thread topic updates to every local
@@ -2041,16 +2097,19 @@ export default function MailClient({
    * changed.
    */
   const applyThreadTopicUpdates = useCallback((
-    updates: Map<string, Topic[]>
+    updates: Map<string, Topic[]>,
+    accountId?: string
   ) => {
     if (updates.size === 0) return;
+    // Only the mailbox the topics were set in: another mailbox can list the same thread id.
+    const inAccount = (msg: Message) => !accountId || msg.accountId === accountId;
     setMessages((prev) => prev.map((msg) => {
-      const next = updates.get(msg.threadId);
+      const next = inAccount(msg) ? updates.get(msg.threadId) : undefined;
       return next ? { ...msg, topics: next, topicSuggestions: [] } : msg;
     }));
     setViewMessage((prev) => {
       if (!prev) return prev;
-      const next = updates.get(prev.threadId);
+      const next = inAccount(prev) ? updates.get(prev.threadId) : undefined;
       return next ? { ...prev, topics: next, topicSuggestions: [] } : prev;
     });
     for (const [threadId, nextTopics] of updates) {
@@ -2058,7 +2117,7 @@ export default function MailClient({
       if (!cachedThread || cachedThread.length === 0) continue;
       upsertThreadCache(
         threadId,
-        cachedThread.map((item) => item.threadId === threadId ? {
+        cachedThread.map((item) => item.threadId === threadId && inAccount(item) ? {
           ...item,
           topics: nextTopics,
           topicSuggestions: []
@@ -2067,8 +2126,8 @@ export default function MailClient({
     }
   }, [setMessages, threadContentByIdRef, upsertThreadCache]);
 
-  const persistThreadTopics = useCallback(async (threadId: string, topicIds: string[]) => {
-    const res = await apiFetch(buildAccountMessageTopicsPath(activeAccountId), {
+  const persistThreadTopics = useCallback(async (threadId: string, topicIds: string[], accountId: string = activeAccountId) => {
+    const res = await apiFetch(buildAccountMessageTopicsPath(accountId), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ threadId, action: "set", topicIds })
@@ -2077,8 +2136,8 @@ export default function MailClient({
     if (!data.ok || !Array.isArray(data.topics)) {
       throw new Error(data.message ?? "Failed to update topics");
     }
-    applyThreadTopicUpdates(new Map([[threadId, data.topics as Topic[]]]));
-    void refreshTopicStats(activeAccountId);
+    applyThreadTopicUpdates(new Map([[threadId, data.topics as Topic[]]]), accountId);
+    if (accountId === activeAccountId) void refreshTopicStats(activeAccountId);
   }, [activeAccountId, apiFetch, applyThreadTopicUpdates, refreshTopicStats]);
 
   /**
@@ -2091,9 +2150,10 @@ export default function MailClient({
    */
   const postAddTopicToThread = useCallback(async (
     threadId: string,
-    topicId: string
+    topicId: string,
+    accountId: string = activeAccountId
   ): Promise<void> => {
-    const res = await apiFetch(buildAccountMessageTopicsPath(activeAccountId), {
+    const res = await apiFetch(buildAccountMessageTopicsPath(accountId), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ threadId, action: "add", topicId })
@@ -2314,24 +2374,23 @@ export default function MailClient({
 
   const handleSaveMessageTopics = useCallback(async (topicIds: string[]) => {
     if (!topicPickerMessage) return;
-    await persistThreadTopics(topicPickerMessage.threadId, topicIds);
+    await persistThreadTopics(topicPickerMessage.threadId, topicIds, topicPickerMessage.accountId || activeAccountId);
     if (activeTopicId) {
       await refreshActiveTopicModeResults();
     }
-  }, [activeTopicId, persistThreadTopics, refreshActiveTopicModeResults, topicPickerMessage]);
+  }, [activeAccountId, activeTopicId, persistThreadTopics, refreshActiveTopicModeResults, topicPickerMessage]);
 
   const handleToggleTopic = useCallback(async (message: Message, topicId: string) => {
-    if (message.accountId !== activeAccountId) return;
-    const currentTopics = messageTopicsById.get(message.threadId) ?? [];
+    const currentTopics = threadTopicsOf(message);
     const isAssigned = currentTopics.some((t) => t.id === topicId);
     const newTopicIds = isAssigned
       ? currentTopics.filter((t) => t.id !== topicId).map((t) => t.id)
       : [...currentTopics.map((t) => t.id), topicId];
-    await persistThreadTopics(message.threadId, newTopicIds);
+    await persistThreadTopics(message.threadId, newTopicIds, message.accountId || activeAccountId);
     if (activeTopicId) {
       await refreshActiveTopicModeResults();
     }
-  }, [activeAccountId, activeTopicId, messageTopicsById, persistThreadTopics, refreshActiveTopicModeResults]);
+  }, [activeAccountId, activeTopicId, persistThreadTopics, refreshActiveTopicModeResults, threadTopicsOf]);
 
   const handleAddActiveTopicSuggestion = useCallback(async (threadId: string) => {
     if (!activeTopicId || !threadId) return;
@@ -2378,6 +2437,9 @@ export default function MailClient({
     includeThreadAcrossFolders &&
     !isDraftsFolder(activeFolderId) &&
     !checkIsThreadExcludedFolder(activeFolderId);
+  // Pruning rows outside the active folder: the domain view lists each
+  // mailbox's own role folder, so there it would drop the other mailboxes' rows.
+  const pruneThreadAcrossFolders = domainView ? false : includeThreadAcrossFoldersForList;
   const evictMessageCaches = useCallback(
     (messageIds: string[]) => {
       if (messageIds.length === 0) return;
@@ -2443,18 +2505,24 @@ export default function MailClient({
         seedNotificationDedupKeys(dedupKeys);
       }
     }
-    const grouped = new Map<string, string[]>();
+    // Each message goes back to its folder in its own mailbox (the domain view
+    // can move messages of several mailboxes in one action).
+    const grouped = new Map<string, { accountId: string; destinationFolderId: string; messageIds: string[] }>();
     targets.forEach((target) => {
-      const list = grouped.get(target.restoreFolderId);
-      if (list) {
-        list.push(target.messageId);
+      const targetAccountId = target.accountId || accountId;
+      const key = `${targetAccountId}\u0000${target.restoreFolderId}`;
+      const entry = grouped.get(key);
+      if (entry) {
+        entry.messageIds.push(target.messageId);
         return;
       }
-      grouped.set(target.restoreFolderId, [target.messageId]);
+      grouped.set(key, { accountId: targetAccountId, destinationFolderId: target.restoreFolderId, messageIds: [target.messageId] });
     });
+    const touchedAccountIds = new Set(Array.from(grouped.values(), (entry) => entry.accountId));
     try {
-      for (const [destinationFolderId, messageIds] of grouped.entries()) {
-        const res = await apiFetch(buildAccountMessagesActionPath(accountId, "move"), {
+      let succeeded = 0;
+      for (const { accountId: groupAccountId, destinationFolderId, messageIds } of grouped.values()) {
+        const res = await apiFetch(buildAccountMessagesActionPath(groupAccountId, "move"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -2464,9 +2532,11 @@ export default function MailClient({
         });
         if (!res.ok) {
           reportError(await readErrorMessage(res));
-          return;
+          continue;
         }
+        succeeded += 1;
       }
+      if (succeeded === 0) return;
       setFolders((prev) =>
         applyFolderTransferCounts(
           prev,
@@ -2485,7 +2555,7 @@ export default function MailClient({
       );
       evictMessageCaches(targets.map((target) => target.messageId));
       await refreshFolders();
-      if (accountId === activeAccountId) {
+      if (Array.from(touchedAccountIds).some((id) => listAccountIds.has(id))) {
         await refreshMailboxData();
       }
       pushNotice({
@@ -2596,7 +2666,7 @@ export default function MailClient({
         return next;
       });
       try {
-        const res = await apiFetch(buildAccountDraftDiscardPath(activeAccountId, draftId), {
+        const res = await apiFetch(buildAccountDraftDiscardPath(message.accountId || activeAccountId, draftId), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({})
@@ -3232,7 +3302,7 @@ export default function MailClient({
         return pruneDetachedCrossFolderThreadMessages(candidate, {
           searchScope,
           activeFolderId,
-          includeThreadAcrossFoldersForList
+          includeThreadAcrossFoldersForList: pruneThreadAcrossFolders
         });
       });
     },
@@ -3241,7 +3311,7 @@ export default function MailClient({
       activeFolderId,
       evaluateMessageInCurrentResults,
       effectiveSearchBadges,
-      includeThreadAcrossFoldersForList,
+      pruneThreadAcrossFolders,
       searchScope,
       setMessages
     ]
@@ -3307,7 +3377,7 @@ export default function MailClient({
           pruneOptions: {
             searchScope,
             activeFolderId,
-            includeThreadAcrossFoldersForList,
+            includeThreadAcrossFoldersForList: pruneThreadAcrossFolders,
             supportsThreads
           }
         })
@@ -3324,13 +3394,16 @@ export default function MailClient({
       }
       updateThreadCacheWithMessage(nextSavedDraft);
     },
-    [messages, viewMessageId, viewMessage, threadContentByIdRef, effectiveGroupBy, threadDateSource, shouldKeepMessageInCurrentResults, setMessages, activeMessageId, updateThreadCacheWithMessage, searchScope, activeFolderId, includeThreadAcrossFoldersForList, supportsThreads, evictMessagesFromThreadCache]
+    [messages, viewMessageId, viewMessage, threadContentByIdRef, effectiveGroupBy, threadDateSource, shouldKeepMessageInCurrentResults, setMessages, activeMessageId, updateThreadCacheWithMessage, searchScope, activeFolderId, pruneThreadAcrossFolders, supportsThreads, evictMessagesFromThreadCache]
   );
 
   const handleSendDraft = useCallback(
     async (message: Message) => {
       if (!activeAccountId) return;
       const draftId = message.id;
+      // A draft of another mailbox (domain view) is sent by that mailbox's route,
+      // which authorises the sender there.
+      const draftAccountId = message.accountId || activeAccountId;
       setPendingMessageActions((prev) => {
         if (prev.has(draftId)) return prev;
         const next = new Set(prev);
@@ -3338,7 +3411,7 @@ export default function MailClient({
         return next;
       });
       try {
-        const res = await apiFetch(buildAccountDraftSendPath(activeAccountId, draftId), {
+        const res = await apiFetch(buildAccountDraftSendPath(draftAccountId, draftId), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({})
@@ -3362,6 +3435,14 @@ export default function MailClient({
         // Don't let the deletion-reconciler fire a misleading "draft gone on
         // server" tombstone notice for the row we're about to repurpose.
         suppressDraftDeleteReconcile(draftId);
+
+        if (draftAccountId !== activeAccountId) {
+          // Its Sent folder is not synced here: the row leaves the list and the
+          // list is read again.
+          removeDraftFromUi(draftId);
+          await refreshMailboxDataRef.current();
+          return;
+        }
 
         // Swap the draft row into its sent form in place rather than removing
         // it and waiting for the Sent-folder sync to add a fresh row a few
@@ -3448,8 +3529,8 @@ export default function MailClient({
   // first commit; until then the shims no-op / return no-op promises,
   // which matches the pre-mount behavior (no list to mutate yet).
   const handleArchiveMessage = useCallback(
-    (message: Message) =>
-      listHandleRef.current?.handleArchiveMessage(message) ?? Promise.resolve(),
+    (message: Message, options?: MessageCommandOptions): Promise<MessageCommandOutcome> =>
+      listHandleRef.current?.handleArchiveMessage(message, options) ?? Promise.resolve("failed"),
     []
   );
   const handleUnsubscribe = useCallback(
@@ -3481,13 +3562,13 @@ export default function MailClient({
       []
     );
   const handleMarkSpam = useCallback(
-    (message: Message) =>
-      listHandleRef.current?.handleMarkSpam(message) ?? Promise.resolve(),
+    (message: Message, options?: MessageCommandOptions): Promise<MessageCommandOutcome> =>
+      listHandleRef.current?.handleMarkSpam(message, options) ?? Promise.resolve("failed"),
     []
   );
   const handleMarkNotSpam = useCallback(
-    (message: Message) =>
-      listHandleRef.current?.handleMarkNotSpam(message) ?? Promise.resolve(),
+    (message: Message, options?: MessageCommandOptions): Promise<MessageCommandOutcome> =>
+      listHandleRef.current?.handleMarkNotSpam(message, options) ?? Promise.resolve("failed"),
     []
   );
   const handleSetCategory = useCallback(
@@ -3665,23 +3746,38 @@ export default function MailClient({
     (message: Message, origin: "list" | "thread" | "table" = "list") => {
       setMoveToDialogState({
         message,
-        request: buildMoveTargetRequest(message, origin)
+        request: buildMoveTargetRequest(message, origin),
+        accountId: message.accountId || activeAccountId
       });
     },
-    [buildMoveTargetRequest]
+    [activeAccountId, buildMoveTargetRequest]
   );
 
-  const handleGetRecentFolders = useCallback((): Folder[] => {
-    return getRecentMoveFolderIds(activeAccountId ?? "")
-      .flatMap((id) => (folderById.has(id) ? [folderById.get(id)!] : []));
-  }, [activeAccountId, folderById]);
+  /**
+   * Folders a move can pick for messages of one mailbox (the active one or, in
+   * the domain view, another). A selection across mailboxes (null) gets the
+   * active mailbox's special folders, which every mailbox maps by role.
+   */
+  const moveFoldersFor = useCallback(
+    (accountId: string | null): Folder[] => {
+      if (accountId === null) return accountFolders.filter((folder) => domainFolderRoleOf(folder) !== null);
+      return accountId === activeAccountId ? accountFolders : domainMailboxFolders.foldersByAccount.get(accountId) ?? [];
+    },
+    [accountFolders, activeAccountId, domainMailboxFolders.foldersByAccount]
+  );
+
+  const getRecentFoldersFor = useCallback((accountId: string | null): Folder[] => {
+    const byId = new Map(moveFoldersFor(accountId).map((folder) => [folder.id, folder]));
+    return getRecentMoveFolderIds(accountId ?? activeAccountId ?? "")
+      .flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+  }, [activeAccountId, moveFoldersFor]);
 
   const recordAndMove = useCallback(
     (folderId: string, options: Parameters<typeof moveMessagesToFolder>[1]) => {
-      recordRecentMoveFolder(activeAccountId ?? "", folderId);
+      recordRecentMoveFolder(actionFolderById.get(folderId)?.accountId ?? activeAccountId ?? "", folderId);
       void moveMessagesToFolder(folderId, options);
     },
-    [activeAccountId, moveMessagesToFolder]
+    [actionFolderById, activeAccountId, moveMessagesToFolder]
   );
 
   const handleMoveToFolder = useCallback(
@@ -3698,71 +3794,113 @@ export default function MailClient({
 
   const handleCopyToAccount = useCallback(
     (message: Message, origin: "list" | "thread" | "table" = "list") => {
-      setCopyToAccountState({ mode: "copy", request: buildMoveTargetRequest(message, origin) });
+      setCopyToAccountState({
+        mode: "copy",
+        groups: [{ accountId: message.accountId || activeAccountId, request: buildMoveTargetRequest(message, origin) }]
+      });
     },
-    [buildMoveTargetRequest]
+    [activeAccountId, buildMoveTargetRequest]
   );
 
   const handleMoveToAccount = useCallback(
     (message: Message, origin: "list" | "thread" | "table" = "list") => {
-      setCopyToAccountState({ mode: "move", request: buildMoveTargetRequest(message, origin) });
+      setCopyToAccountState({
+        mode: "move",
+        groups: [{ accountId: message.accountId || activeAccountId, request: buildMoveTargetRequest(message, origin) }]
+      });
     },
-    [buildMoveTargetRequest]
+    [activeAccountId, buildMoveTargetRequest]
   );
 
+  // Copies go out of each message's own mailbox (one request per source mailbox).
   const handleCopyMessagesToAccount = useCallback(
-    (mode: "copy" | "move", messageIds: string[]) => {
-      const ids = Array.from(new Set(messageIds.filter(Boolean)));
-      if (ids.length === 0) return;
-      setCopyToAccountState({ mode, request: { messageIds: ids } });
+    (mode: "copy" | "move", targets: Message[]) => {
+      const groups = Array.from(groupByAccount(targets, activeAccountId), ([accountId, messages]) => ({
+        accountId,
+        request: { messageIds: Array.from(new Set(messages.map((message) => message.id).filter(Boolean))) }
+      })).filter((group) => group.request.messageIds.length > 0);
+      if (groups.length === 0) return;
+      setCopyToAccountState({ mode, groups });
     },
-    []
+    [activeAccountId]
+  );
+  const copySourceAccountIds = useMemo(
+    () => new Set(copyToAccountState?.groups.map((group) => group.accountId) ?? [activeAccountId]),
+    [activeAccountId, copyToAccountState]
+  );
+  const copyDestinationAccounts = useMemo(
+    () => accounts.filter((account) => !copySourceAccountIds.has(account.id)),
+    [accounts, copySourceAccountIds]
   );
 
   const performCopyToAccount = useCallback(
     async (destinationAccountId: string, destinationFolderId: string) => {
       const state = copyToAccountState;
       if (!state) return;
-      const { mode, request } = state;
-      const { messageIds, threadMove } = request;
-      if (messageIds.length === 0 && !threadMove) return;
+      const { mode } = state;
+      const groups = state.groups.filter((group) => group.request.messageIds.length > 0 || group.request.threadMove);
+      if (groups.length === 0) return;
       const destinationName =
         accounts.find((account) => account.id === destinationAccountId)?.name?.trim() ||
         accounts.find((account) => account.id === destinationAccountId)?.email?.trim() ||
         "account";
+      const total = groups.reduce((sum, group) => sum + Math.max(group.request.messageIds.length, 1), 0);
+      const skipped: MailboxSkipReport["skipped"] = [];
+      const skipGroup = (group: (typeof groups)[number]) => {
+        const ids = group.request.messageIds.length > 0 ? group.request.messageIds : [group.request.threadMove?.threadId ?? ""];
+        ids.forEach((id) => skipped.push({ id, accountId: group.accountId, reason: "permission" }));
+      };
+      let copied = 0;
+      let failedCount = 0;
+      let warning: string | undefined;
+      let firstError: string | undefined;
       try {
-        const res = await apiFetch(
-          buildAccountMessagesActionPath(activeAccountId, "copy-to-account"),
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              messageIds,
-              threadMove,
-              destinationAccountId,
-              destinationFolderId,
-              mode
-            })
+        for (const group of groups) {
+          if (!canEditMailbox(group.accountId)) {
+            skipGroup(group);
+            continue;
           }
-        );
-        if (!res.ok) {
-          reportError(await readErrorMessage(res));
-          return;
+          const { messageIds, threadMove } = group.request;
+          const threadMovePayload = threadMove ? { threadId: threadMove.threadId, sourceFolderId: threadMove.sourceFolderId } : undefined;
+          const res = await apiFetch(
+            buildAccountMessagesActionPath(group.accountId, "copy-to-account"),
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                messageIds,
+                threadMove: threadMovePayload,
+                destinationAccountId,
+                destinationFolderId,
+                mode
+              })
+            }
+          );
+          if (!res.ok) {
+            if (res.status === 403) skipGroup(group);
+            else reportError(await readErrorMessage(res));
+            continue;
+          }
+          const data = (await res.json()) as {
+            copied?: number;
+            removedIds?: string[];
+            results?: Array<{ ok: boolean; warning?: string; error?: string }>;
+          };
+          copied += data.copied ?? 0;
+          const removedIds = new Set(data.removedIds ?? []);
+          if (removedIds.size > 0) {
+            setMessages((prev) =>
+              prev.filter((message) => !(message.accountId === group.accountId && removedIds.has(message.id)))
+            );
+          }
+          const failed = (data.results ?? []).filter((result) => !result.ok);
+          failedCount += failed.length;
+          firstError ??= failed[0]?.error;
+          warning ??= (data.results ?? []).find((result) => result.warning)?.warning;
         }
-        const data = (await res.json()) as {
-          copied?: number;
-          removedIds?: string[];
-          results?: Array<{ ok: boolean; warning?: string; error?: string }>;
-        };
-        const copied = data.copied ?? 0;
-        const removedIds = new Set(data.removedIds ?? []);
-        if (removedIds.size > 0) {
-          setMessages((prev) => prev.filter((message) => !removedIds.has(message.id)));
-        }
-        const failed = (data.results ?? []).filter((result) => !result.ok);
-        const warning = (data.results ?? []).find((result) => result.warning)?.warning;
+        if (skipped.length > 0) reportMailboxSkips({ action: mode === "move" ? "moveAccount" : "copyAccount", total, skipped });
         if (copied === 0) {
-          reportError(failed[0]?.error ?? tn("crossAccountFailed"));
+          if (skipped.length === 0 || failedCount > 0) reportError(firstError ?? tn("crossAccountFailed"));
           return;
         }
         pushNotice({
@@ -3770,7 +3908,7 @@ export default function MailClient({
           title: tn("crossAccountComplete", { mode, count: copied, destination: destinationName }),
           description:
             warning ??
-            (failed.length > 0 ? tn("processingFailed", { count: failed.length }) : undefined),
+            (failedCount > 0 ? tn("processingFailed", { count: failedCount }) : undefined),
           durationMs: NOTICE_TIMEOUTS.success
         });
       } catch {
@@ -3782,8 +3920,9 @@ export default function MailClient({
       copyToAccountState,
       accounts,
       apiFetch,
-      activeAccountId,
+      canEditMailbox,
       reportError,
+      reportMailboxSkips,
       readErrorMessage,
       setMessages,
       pushNotice
@@ -3849,8 +3988,12 @@ export default function MailClient({
   );
 
   const addTopicToMessages = useCallback(
-    (targets: Message[], topicId: string) => {
-      const topic = allTopics.find((t) => t.id === topicId);
+    (selection: Message[], topicId: string) => {
+      // A topic belongs to one mailbox's catalog: it is added to the threads of
+      // that mailbox (the selection's, also when it is not the active one).
+      const accountId = singleAccountOf(selection) ?? activeAccountId;
+      const targets = selection.filter((message) => message.accountId === accountId);
+      const topic = topicsForAccount(accountId).find((t) => t.id === topicId);
       if (!topic) return;
       // Topics are per-thread, so dedup by threadId. We then skip
       // threads that already have the topic per local state as an
@@ -3880,10 +4023,11 @@ export default function MailClient({
         let failed = 0;
         try {
           for (const threadId of threadIds) {
-            const current = messageTopicsById.get(threadId) ?? [];
+            const sample = targets.find((message) => message.threadId === threadId);
+            const current = sample ? threadTopicsOf(sample) : [];
             if (current.some((t) => t.id === topic.id)) continue;
             try {
-              await postAddTopicToThread(threadId, topic.id);
+              await postAddTopicToThread(threadId, topic.id, accountId);
               // Mirror the server's canonical ordering
               // (lib/topics/core.ts uses `ORDER BY t.name ASC`)
               // so a subsequent refresh doesn't visibly reorder
@@ -3897,8 +4041,8 @@ export default function MailClient({
             }
           }
           if (collected.size > 0) {
-            applyThreadTopicUpdates(collected);
-            refreshTopicStats(activeAccountId).catch(() => {});
+            applyThreadTopicUpdates(collected, accountId);
+            if (accountId === activeAccountId) refreshTopicStats(activeAccountId).catch(() => {});
             if (activeTopicId) {
               try {
                 await refreshActiveTopicModeResults();
@@ -3920,14 +4064,14 @@ export default function MailClient({
     [
       activeAccountId,
       activeTopicId,
-      allTopics,
       applyThreadTopicUpdates,
-      messageTopicsById,
       postAddTopicToThread,
       refreshActiveTopicModeResults,
       refreshTopicStats,
       reportError,
-      tn
+      threadTopicsOf,
+      tn,
+      topicsForAccount
     ]
   );
 
@@ -3946,12 +4090,12 @@ export default function MailClient({
     // wiping flags off the minority).
     const isMajority = <T,>(items: T[], predicate: (item: T) => boolean) =>
       items.filter(predicate).length > items.length / 2;
-    // Read state, flags and to-dos go to each message's own mailbox. Moves, deletions,
-    // topics and copies use the active mailbox's folders and ids: rows of other
-    // mailboxes (domain view) are left out, they are changed in their own mailbox.
-    const resolveOwnMessages = (ids: string[]) =>
-      resolveMessagesByIds(ids).filter((message) => message.accountId === activeAccountId);
-    const resolveIds = (ids: string[]) => resolveOwnMessages(ids).map((m) => m.id);
+    // Every action goes to each message's own mailbox (the domain view lists
+    // several): read state, flags, to-dos, moves (special folders map by role),
+    // deletions (each mailbox's trash), archive. Mailboxes the user may not
+    // change are skipped and named in one notice; the rest is done.
+    // Topics, a picked folder and copies use one mailbox's objects: the
+    // selection's mailbox, also when it is not the active one.
     return {
       markRead: ({ threadIds }) => setSeen(threadIds, true),
       markUnread: ({ threadIds }) => setSeen(threadIds, false),
@@ -3987,53 +4131,65 @@ export default function MailClient({
         })();
       },
       moveToFolder: ({ threadIds }, folderId) => {
-        const messageIds = resolveIds(threadIds);
+        const messageIds = resolveMessagesByIds(threadIds).map((m) => m.id);
         if (messageIds.length === 0) return;
         recordAndMove(folderId, { messageIds });
       },
       moveToOther: ({ threadIds }) => {
-        const targets = resolveOwnMessages(threadIds);
+        const targets = resolveMessagesByIds(threadIds);
         if (targets.length === 0) return;
         setMoveToDialogState({
           message: targets[0],
-          request: { messageIds: targets.map((m) => m.id) }
+          request: { messageIds: targets.map((m) => m.id) },
+          accountId: singleAccountOf(targets)
         });
       },
       addTopic: ({ threadIds }, topicId) =>
-        addTopicToMessages(resolveOwnMessages(threadIds), topicId),
+        addTopicToMessages(resolveMessagesByIds(threadIds), topicId),
       archive: ({ threadIds }) => {
-        const targets = resolveOwnMessages(threadIds);
+        const targets = resolveMessagesByIds(threadIds);
+        if (targets.length === 0) return;
+        const { allowed, denied } = partitionByPermission(targets, canEditMailbox);
         void (async () => {
-          for (const target of targets) {
-            await handleArchiveMessage(target);
+          const skipped: MailboxSkipReport["skipped"] = denied.map((message) => ({
+            id: message.id,
+            accountId: message.accountId,
+            reason: "permission"
+          }));
+          for (const target of allowed) {
+            if ((await handleArchiveMessage(target, { quietDenied: true })) === "denied") {
+              skipped.push({ id: target.id, accountId: target.accountId, reason: "permission" });
+            }
           }
+          if (skipped.length > 0) reportMailboxSkips({ action: "archive", total: targets.length, skipped });
         })();
       },
       remove: ({ ids, threadIds }) => {
         // A single message takes the per-message path, which asks before
         // deleting the thread behind a collapsed row.
         if (ids.length === 1) {
-          const [message] = resolveOwnMessages(ids);
+          const [message] = resolveMessagesByIds(ids);
           if (message) void handleDeleteMessage(message);
           return;
         }
-        const ownThreadIds = resolveIds(threadIds);
-        if (ownThreadIds.length === 0) return;
-        void handleDeleteMessagesByIds(ownThreadIds, { selectedIds: resolveIds(ids) });
+        const targetIds = resolveMessagesByIds(threadIds).map((m) => m.id);
+        if (targetIds.length === 0) return;
+        void handleDeleteMessagesByIds(targetIds, { selectedIds: resolveMessagesByIds(ids).map((m) => m.id) });
       },
       copyToAccount: ({ threadIds }) =>
-        handleCopyMessagesToAccount("copy", resolveIds(threadIds)),
+        handleCopyMessagesToAccount("copy", resolveMessagesByIds(threadIds)),
       moveToAccount: ({ threadIds }) =>
-        handleCopyMessagesToAccount("move", resolveIds(threadIds))
+        handleCopyMessagesToAccount("move", resolveMessagesByIds(threadIds))
     };
   }, [
-    activeAccountId,
     addTopicToMessages,
+    canEditMailbox,
     handleArchiveMessage,
     handleCopyMessagesToAccount,
     handleDeleteMessage,
     handleDeleteMessagesByIds,
     recordAndMove,
+    reportMailboxSkips,
     resolveMessagesByIds,
     toggleTodoFlag,
     updateFlagState,
@@ -4085,11 +4241,11 @@ export default function MailClient({
     handleOpenHtmlInNewWindow,
     handleShowRelated,
     handleShowThread,
-    allTopics,
+    topicsForAccount(message.accountId || activeAccountId),
     handleAssignTopics,
     handleToggleTopic,
     handleFetchSuggestions,
-    handleGetRecentFolders,
+    () => getRecentFoldersFor(message.accountId || activeAccountId),
     (target, folderId) => handleMoveToFolder(target, folderId, origin),
     (target) => handleMoveTo(target, origin),
     isDraftItem,
@@ -4119,6 +4275,28 @@ export default function MailClient({
     [getSelectionActionTargets, selectionStore]
   );
   const headerSelectionActions = useBoundSelectionActions(selectionActions, getHeaderSelectionTargets);
+  // What the selection menus offer depends on the selection's mailbox: its
+  // topics and folders, or (across mailboxes) no topics and the special folders.
+  const selectionScopeOf = useCallback(
+    (targets: { threadIds: string[] }) => singleAccountOf(resolveMessagesByIds(targets.threadIds)),
+    [resolveMessagesByIds]
+  );
+  const getHeaderSelectionTopics = useCallback(() => {
+    const scope = selectionScopeOf(getHeaderSelectionTargets());
+    return scope ? topicsForAccount(scope) : [];
+  }, [getHeaderSelectionTargets, selectionScopeOf, topicsForAccount]);
+  const getHeaderSelectionRecentFolders = useCallback(
+    () => getRecentFoldersFor(selectionScopeOf(getHeaderSelectionTargets())),
+    [getHeaderSelectionTargets, getRecentFoldersFor, selectionScopeOf]
+  );
+  const getBulkContextTopics = useCallback(() => {
+    const scope = selectionScopeOf(getBulkContextTargets());
+    return scope ? topicsForAccount(scope) : [];
+  }, [getBulkContextTargets, selectionScopeOf, topicsForAccount]);
+  const getBulkContextRecentFolders = useCallback(
+    () => getRecentFoldersFor(selectionScopeOf(getBulkContextTargets())),
+    [getBulkContextTargets, getRecentFoldersFor, selectionScopeOf]
+  );
 
   useEffect(() => {
     const isTypingTarget = (target: EventTarget | null) => {
@@ -5108,7 +5286,7 @@ export default function MailClient({
   const handleDownloadEml = async (message: Message) => {
     try {
       const res = await apiFetch(
-        buildAccountMessageSourcePath(activeAccountId, message.id)
+        buildAccountMessageSourcePath(message.accountId || activeAccountId, message.id)
       );
       if (!res.ok) {
         reportError(await readErrorMessage(res));
@@ -5230,6 +5408,19 @@ export default function MailClient({
 
 
   const rootFolders = useMemo(() => accountFolders.filter((folder) => !folder.parentId), [accountFolders]);
+  // The move dialog offers the folders of the selection's mailbox; for a
+  // selection across mailboxes, the special folders, listed flat.
+  const moveDialogFolders = useMemo(() => {
+    const scopeAccountId = moveToDialogState ? moveToDialogState.accountId : activeAccountId;
+    if (scopeAccountId === activeAccountId) {
+      return { accountId: activeAccountId, rootFolders, folderTree, folderById };
+    }
+    const list = moveFoldersFor(scopeAccountId);
+    const byId = new Map(list.map((folder) => [folder.id, folder]));
+    return scopeAccountId === null
+      ? { accountId: activeAccountId, rootFolders: list, folderTree: new Map<string, Folder[]>(), folderById: byId }
+      : { accountId: scopeAccountId, rootFolders: list.filter((folder) => !folder.parentId), folderTree: buildFolderTree(list), folderById: byId };
+  }, [activeAccountId, folderById, folderTree, moveFoldersFor, moveToDialogState, rootFolders]);
   const virtualFoldersForPane = useMemo(
     () =>
       VIRTUAL_FOLDERS.filter(folder => !["virtual:assigned-to-me", "virtual:unassigned", "virtual:open"].includes(folder.id)).map((folder) => ({
@@ -5535,9 +5726,9 @@ export default function MailClient({
               selectionStore={selectionStore}
               hasActiveMessage={Boolean(activeMessageId)}
               actions={headerSelectionActions}
-              allTopics={allTopics}
+              onGetTopics={getHeaderSelectionTopics}
               hasOtherAccounts={otherAccounts.length > 0}
-              onGetRecentFolders={handleGetRecentFolders}
+              onGetRecentFolders={getHeaderSelectionRecentFolders}
               onSelectAll={selectAllMessages}
               onClearSelection={clearSelection}
             />
@@ -5640,10 +5831,13 @@ export default function MailClient({
                 activeMessageId,
                 activeFolderId,
                 searchScope,
-                includeThreadAcrossFoldersForList,
+                includeThreadAcrossFoldersForList: pruneThreadAcrossFolders,
                 supportsThreads,
-                folders,
-                folderById,
+                folders: actionFolders,
+                folderById: actionFolderById,
+                getAccountFolders,
+                canEditMailbox,
+                reportMailboxSkips,
                 messages,
                 threadScopeMessages: mutationThreadScopeMessages,
                 visibleMessages,
@@ -5695,13 +5889,10 @@ export default function MailClient({
                   archive={() => { void handleArchiveMessage(activeMessage); }}
                   spam={() => { void (isSpamFolder(activeMessage.folderId) ? handleMarkNotSpam(activeMessage) : handleMarkSpam(activeMessage)); }}
                   inSpam={isSpamFolder(activeMessage.folderId)}
-                  // As in the message menu (OTHER_MAILBOX_MENU_VISIBILITY): a row of another
-                  // mailbox in the domain view is deleted, moved and tagged in its own mailbox.
-                  {...(activeMessage.accountId === activeAccountId ? {
-                    remove: () => { void handleDeleteMessage(activeMessage, { allowThreadDeletion: false }); },
-                    move: () => handleMoveTo(activeMessage, "thread"),
-                    topics: () => handleAssignTopics(activeMessage)
-                  } : {})}
+                  // A message of another mailbox is deleted, moved and tagged in its own mailbox.
+                  remove={() => { void handleDeleteMessage(activeMessage, { allowThreadDeletion: false }); }}
+                  move={() => handleMoveTo(activeMessage, "thread")}
+                  topics={() => handleAssignTopics(activeMessage)}
                   done={() => {
                     if (hasTodoFlag(activeMessage) || hasDoneFlag(activeMessage)) void toggleTodoFlag(activeMessage);
                     else void updateKeywordFlag(activeMessage, DONE_FLAG, true);
@@ -5883,13 +6074,12 @@ export default function MailClient({
         topicPicker={{
           open: topicPickerOpen,
           onOpenChange: setTopicPickerOpen,
-          allTopics,
-          messageTopics: topicPickerMessage
-            ? (messageTopicsById.get(topicPickerMessage.threadId) ?? [])
-            : [],
+          allTopics: topicPickerMessage ? topicsForAccount(topicPickerMessage.accountId) : allTopics,
+          messageTopics: topicPickerMessage ? threadTopicsOf(topicPickerMessage) : [],
           suggestions: topicSuggestions,
           onSave: handleSaveMessageTopics,
-          onCreateTopic: handleCreateTopic
+          onCreateTopic: (name, color, shortName) =>
+            handleCreateTopic(name, color, shortName, topicPickerMessage?.accountId || activeAccountId)
         }}
       />
 
@@ -6036,10 +6226,10 @@ export default function MailClient({
       <MoveToDialog
         open={moveToDialogState !== null}
         onOpenChange={(open) => { if (!open) setMoveToDialogState(null); }}
-        accountId={activeAccountId}
-        rootFolders={rootFolders}
-        folderTree={folderTree}
-        folderById={folderById}
+        accountId={moveDialogFolders.accountId}
+        rootFolders={moveDialogFolders.rootFolders}
+        folderTree={moveDialogFolders.folderTree}
+        folderById={moveDialogFolders.folderById}
         onMove={(folderId) => {
           if (!moveToDialogState) return;
           recordAndMove(folderId, moveToDialogState.request);
@@ -6048,8 +6238,8 @@ export default function MailClient({
       <CopyToAccountDialog
         open={copyToAccountState !== null}
         mode={copyToAccountState?.mode ?? "copy"}
-        messageCount={copyToAccountState?.request.messageIds.length ?? 0}
-        accounts={otherAccounts}
+        messageCount={copyToAccountState?.groups.reduce((sum, group) => sum + group.request.messageIds.length, 0) ?? 0}
+        accounts={copyDestinationAccounts}
         apiFetch={apiFetch}
         onOpenChange={(open) => { if (!open) setCopyToAccountState(null); }}
         onConfirm={(destinationAccountId, destinationFolderId) => {
@@ -6063,9 +6253,9 @@ export default function MailClient({
         onOpenChange={(open) => { if (!open) setBulkContextMenu(null); }}
         returnFocusRef={bulkContextMenuReturnFocusRef}
         actions={bulkContextMenuActions}
-        allTopics={allTopics}
+        onGetTopics={getBulkContextTopics}
         hasOtherAccounts={otherAccounts.length > 0}
-        onGetRecentFolders={handleGetRecentFolders}
+        onGetRecentFolders={getBulkContextRecentFolders}
       />
     </DomainIconVersionsContext.Provider>
     </CollabRowsContext.Provider>

@@ -17,6 +17,17 @@ import {
 } from "./utils/messageMutation";
 import { decrementGroupMetaForMessages } from "./utils/messageHelpers";
 import type { MessageGroupMeta } from "./messagelist/listModel";
+import {
+  resolveEquivalentFolderId,
+  type CanEditMailbox,
+  type MailboxAction,
+  type MailboxSkipReason,
+  type MailboxSkipReport,
+  type ReportMailboxSkips
+} from "./domain/mailboxFanOut";
+
+const NO_FOLDERS: Folder[] = [];
+const messageKey = (message: Pick<Message, "id" | "accountId">) => `${message.accountId}\u0000${message.id}`;
 
 export type UndoMoveTarget = {
   messageId: string;
@@ -28,6 +39,8 @@ export type UndoMoveTarget = {
    * state by the move that we're undoing.
    */
   headerMessageId?: string;
+  /** Mailbox of the message; undo moves it back there (the domain view mixes mailboxes). */
+  accountId?: string;
 };
 
 type MoveNoticeInput = {
@@ -65,6 +78,12 @@ export type MoveMessagesOptions = {
   managePendingState?: boolean;
   updateActiveMessage?: boolean;
   reportErrorOnFailure?: boolean;
+  /** Per-mailbox destinations (delete: each mailbox's trash), instead of mapping the destination by role. */
+  destinationsByAccount?: ReadonlyMap<string, string>;
+  /** The action named when messages are skipped (no permission, no matching folder). */
+  skipAction?: MailboxAction;
+  /** Collects skipped messages for the caller's own notice instead of reporting them here. */
+  collectSkipped?: MailboxSkipReport["skipped"];
 };
 
 export type MoveMessagesToFolder = (
@@ -81,6 +100,12 @@ type UseMessageMoveActionsOptions = {
   messages: Message[];
   selectionStore: SelectionStore;
   folderById: Map<string, Pick<Folder, "name" | "specialUse">>;
+  /** Known folders of every listed mailbox (the active one's and, in the domain view, the others'). */
+  folders?: Folder[];
+  /** A mailbox's folders, read when not known yet (role mapping for other mailboxes). */
+  getAccountFolders?: (accountId: string) => Promise<Folder[] | null>;
+  canEditMailbox?: CanEditMailbox;
+  reportMailboxSkips?: ReportMailboxSkips;
   lastSelectedIdRef: React.MutableRefObject<string | null>;
   setFolders: React.Dispatch<React.SetStateAction<Folder[]>>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -139,6 +164,10 @@ export function useMessageMoveActions({
   messages,
   selectionStore,
   folderById,
+  folders = NO_FOLDERS,
+  getAccountFolders,
+  canEditMailbox,
+  reportMailboxSkips,
   lastSelectedIdRef,
   setFolders,
   setMessages,
@@ -176,51 +205,119 @@ export function useMessageMoveActions({
             : activeMessageId
               ? [activeMessageId]
               : [];
-      // Rows of other mailboxes (domain view) are moved in their own mailbox only:
-      // their ids never reach this mailbox's move route.
-      const otherMailboxIds = new Set(
-        messages.filter((item) => item.accountId !== activeAccountId).map((item) => item.id)
-      );
-      const uniqueIds = Array.from(new Set(ids)).filter((id) => !otherMailboxIds.has(id));
+      const uniqueIds = Array.from(new Set(ids));
       const threadMove = options?.threadMove;
       if (uniqueIds.length === 0 && !threadMove) return null;
-      const idSet = new Set(uniqueIds);
-      const sourceTargets = messages
-        .filter((item) => item.accountId === activeAccountId && idSet.has(item.id))
-      const localUndoTargets: UndoMoveTarget[] = sourceTargets.map((item) => ({
-        messageId: item.id,
-        restoreFolderId: item.folderId,
-        headerMessageId: item.messageId
-      }));
-      const headerMessageIdByRowId = new Map<string, string>();
-      sourceTargets.forEach((item) => {
-        if (item.messageId) headerMessageIdByRowId.set(item.id, item.messageId);
-      });
       const managePendingState = options?.managePendingState ?? true;
       const clearSelectionOnSuccess = options?.clearSelectionOnSuccess ?? true;
       const updateActiveMessage = options?.updateActiveMessage ?? true;
       const showNotice = options?.showNotice ?? true;
       const reportErrorOnFailure = options?.reportErrorOnFailure ?? true;
-      try {
+      const skipAction = options?.skipAction ?? "move";
+      // Each message moves in its own mailbox (the domain view lists several):
+      // to the destination itself in the destination's mailbox, to the folder of
+      // the same role (trash, archive, …) in any other, or not at all when a
+      // custom folder has no equivalent there.
+      const destinationFolder = folders.find((folder) => folder.id === destinationFolderId);
+      const destinationAccountId = destinationFolder?.accountId ?? activeAccountId;
+      const messageById = new Map<string, Message>();
+      messages.forEach((item) => {
+        if (!messageById.has(item.id)) messageById.set(item.id, item);
+      });
+      const groups = new Map<string, { ids: string[]; threadMove?: ThreadMoveRequest }>();
+      const groupFor = (accountId: string) => {
+        const existing = groups.get(accountId);
+        if (existing) return existing;
+        const created: { ids: string[]; threadMove?: ThreadMoveRequest } = { ids: [] };
+        groups.set(accountId, created);
+        return created;
+      };
+      uniqueIds.forEach((id) => {
+        groupFor(messageById.get(id)?.accountId || destinationAccountId).ids.push(id);
+      });
+      if (threadMove) {
+        groupFor(threadMove.accountId || destinationAccountId).threadMove = threadMove;
+      }
+      const skipped: MailboxSkipReport["skipped"] = [];
+      const skipGroup = (accountId: string, group: { ids: string[]; threadMove?: ThreadMoveRequest }, reason: MailboxSkipReason) => {
+        const refs = group.ids.length > 0 ? group.ids : group.threadMove ? [group.threadMove.threadId] : [];
+        refs.forEach((id) => skipped.push({ id, accountId, reason }));
+      };
+      const requestedCount = Array.from(groups.values()).reduce(
+        (sum, group) => sum + (group.ids.length > 0 ? group.ids.length : group.threadMove ? 1 : 0),
+        0
+      );
+      const allIds = uniqueIds;
+      if (managePendingState) {
+        setPendingMessageActions((prev) => new Set([...prev, ...allIds]));
+      }
+
+      type GroupResult = {
+        accountId: string;
+        destinationFolderId: string;
+        destinationMailbox?: string;
+        queued: boolean;
+        movedPreviousIds: Set<string>;
+        idRemap: Map<string, string>;
+        undoTargets: UndoMoveTarget[];
+      };
+
+      const moveGroup = async (
+        accountId: string,
+        group: { ids: string[]; threadMove?: ThreadMoveRequest }
+      ): Promise<GroupResult | null> => {
+        if (canEditMailbox && !canEditMailbox(accountId)) {
+          skipGroup(accountId, group, "permission");
+          return null;
+        }
+        let groupDestinationId = options?.destinationsByAccount?.get(accountId) ?? null;
+        if (!groupDestinationId) {
+          if (accountId === destinationAccountId) {
+            groupDestinationId = destinationFolderId;
+          } else if (destinationFolder) {
+            const accountFolders = (await getAccountFolders?.(accountId)) ?? [];
+            groupDestinationId = resolveEquivalentFolderId({
+              destination: destinationFolder,
+              accountId,
+              accountFolders
+            });
+          }
+        }
+        if (!groupDestinationId) {
+          skipGroup(accountId, group, "noFolder");
+          return null;
+        }
+        const idSet = new Set(group.ids);
+        const sourceTargets = messages.filter((item) => item.accountId === accountId && idSet.has(item.id));
+        const localUndoTargets: UndoMoveTarget[] = sourceTargets.map((item) => ({
+          messageId: item.id,
+          restoreFolderId: item.folderId,
+          headerMessageId: item.messageId,
+          accountId
+        }));
+        const headerMessageIdByRowId = new Map<string, string>();
+        sourceTargets.forEach((item) => {
+          if (item.messageId) headerMessageIdByRowId.set(item.id, item.messageId);
+        });
         applyDeleteReconcileSuppression?.({
           targets: sourceTargets,
-          messageIds: uniqueIds,
+          messageIds: group.ids,
           fallbackFolderId: activeFolderId
         });
-        if (managePendingState) {
-          setPendingMessageActions((prev) => new Set([...prev, ...uniqueIds]));
-        }
-        const res = await apiFetch(buildAccountMessagesActionPath(activeAccountId, "move"), {
+        const { accountId: _threadAccountId, ...threadMovePayload } = group.threadMove ?? { threadId: "" };
+        const res = await apiFetch(buildAccountMessagesActionPath(accountId, "move"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            messageIds: uniqueIds,
-            destinationFolderId,
-            threadMove
+            messageIds: group.ids,
+            destinationFolderId: groupDestinationId,
+            threadMove: group.threadMove ? threadMovePayload : undefined
           })
         });
         if (!res.ok) {
-          if (reportErrorOnFailure) {
+          if (res.status === 403 && canEditMailbox) {
+            skipGroup(accountId, group, "permission");
+          } else if (reportErrorOnFailure) {
             reportError(await readErrorMessage(res));
           }
           return null;
@@ -238,11 +335,8 @@ export function useMessageMoveActions({
                 .map((item) => item?.previousId ?? "")
                 .filter(Boolean)
             )
-          : new Set(uniqueIds);
-        const movedCount = movedPreviousIds.size;
-        if (movedCount === 0) {
-          return null;
-        }
+          : new Set(group.ids);
+        if (movedPreviousIds.size === 0) return null;
         const resolveMovedId = (id: string) => idRemap.get(id) ?? id;
         const fallbackUndoTargets = localUndoTargets
           .filter((target) => movedPreviousIds.has(target.messageId))
@@ -265,11 +359,12 @@ export function useMessageMoveActions({
                 return {
                   ...target,
                   messageId: resolveMovedId(target.messageId),
+                  accountId,
                   ...(headerMessageId ? { headerMessageId } : {})
                 };
               })
           : [];
-        const mappedUndoTargets =
+        const undoTargets =
           responseUndoTargets.length > 0 ? responseUndoTargets : fallbackUndoTargets;
         markMessagesMutated?.();
         setFolders((prev) =>
@@ -290,10 +385,12 @@ export function useMessageMoveActions({
         let removedFromList: Message[] = [];
         setMessages((prev) => {
           let changed = false;
-          const nextById = new Map<string, Message>();
+          // Keyed by mailbox and id: the same message (equal row id) can be
+          // listed for two mailboxes of a domain, and only this one's moves.
+          const nextByKey = new Map<string, Message>();
           prev.forEach((item) => {
-            if (!movedPreviousIds.has(item.id)) {
-              nextById.set(item.id, item);
+            if (item.accountId !== accountId || !movedPreviousIds.has(item.id)) {
+              nextByKey.set(messageKey(item), item);
               return;
             }
             const resolvedId = resolveMovedId(item.id);
@@ -313,9 +410,9 @@ export function useMessageMoveActions({
             });
             changed = true;
             if (!keep) return;
-            nextById.set(updated.id, updated);
+            nextByKey.set(messageKey(updated), updated);
           });
-          const nextMessages = changed ? Array.from(nextById.values()) : prev;
+          const nextMessages = changed ? Array.from(nextByKey.values()) : prev;
           const next = pruneDetachedCrossFolderThreadMessages(nextMessages, {
             searchScope,
             activeFolderId,
@@ -325,10 +422,11 @@ export function useMessageMoveActions({
           // resolve each prev id to its post-move counterpart before
           // checking membership — otherwise a kept-but-renamed message
           // would be misidentified as removed.
-          const nextIds = new Set(next.map((item) => item.id));
-          removedFromList = prev.filter(
-            (item) => !nextIds.has(resolveMovedId(item.id))
-          );
+          const nextKeys = new Set(next.map(messageKey));
+          removedFromList = prev.filter((item) => {
+            const id = item.accountId === accountId ? resolveMovedId(item.id) : item.id;
+            return !nextKeys.has(messageKey({ accountId: item.accountId, id }));
+          });
           return next;
         });
         setGroupMeta((prev) =>
@@ -336,20 +434,63 @@ export function useMessageMoveActions({
             ? decrementGroupMetaForMessages(prev, removedFromList)
             : prev
         );
-        if (
-          updateActiveMessage &&
-          movedPreviousIds.has(activeMessageId)
-        ) {
+        return {
+          accountId,
+          destinationFolderId: data.destinationFolderId,
+          destinationMailbox: data.destinationMailbox,
+          queued,
+          movedPreviousIds,
+          idRemap,
+          undoTargets
+        };
+      };
+
+      try {
+        const settled = await Promise.all(
+          Array.from(groups.entries()).map(([accountId, group]) =>
+            moveGroup(accountId, group).catch(() => {
+              if (reportErrorOnFailure) reportError(tn("moveFailed"));
+              return null;
+            })
+          )
+        );
+        const results = settled.filter((result): result is GroupResult => result !== null);
+        // Skipped messages go to the caller, or into a notice after the success notice.
+        const reportSkipped = () => {
+          if (options?.collectSkipped) {
+            options.collectSkipped.push(...skipped);
+          } else if (reportMailboxSkips && skipped.length > 0) {
+            reportMailboxSkips({ action: skipAction, total: requestedCount, skipped });
+          }
+        };
+        const movedPreviousIds = new Set(results.flatMap((result) => Array.from(result.movedPreviousIds)));
+        const movedCount = movedPreviousIds.size;
+        if (movedCount === 0) {
+          reportSkipped();
+          return null;
+        }
+        const resolveMovedId = (id: string) => {
+          for (const result of results) {
+            const next = result.idRemap.get(id);
+            if (next) return next;
+          }
+          return id;
+        };
+        const mappedUndoTargets = results.flatMap((result) => result.undoTargets);
+        const activeResult = results.find((result) => result.movedPreviousIds.has(activeMessageId));
+        if (updateActiveMessage && activeResult) {
           const resolvedActiveId = resolveMovedId(activeMessageId);
-          const activeMessage = messages.find((item) => item.id === activeMessageId);
+          const activeMessage = messages.find(
+            (item) => item.id === activeMessageId && item.accountId === activeResult.accountId
+          );
           const activeUpdated = activeMessage
             ? remapMessageReferenceIds(
                 {
                   ...activeMessage,
                   id: resolvedActiveId,
-                  folderId: data.destinationFolderId,
-                  mailboxPath: data.destinationMailbox ?? activeMessage.mailboxPath,
-                  imapUid: queued ? undefined : activeMessage.imapUid
+                  folderId: activeResult.destinationFolderId,
+                  mailboxPath: activeResult.destinationMailbox ?? activeMessage.mailboxPath,
+                  imapUid: activeResult.queued ? undefined : activeMessage.imapUid
                 },
                 activeMessage.id,
                 resolvedActiveId
@@ -385,7 +526,10 @@ export function useMessageMoveActions({
         if (showNotice) {
           pushNotice({
             type: "success",
-            title: tn(queued ? "movingBackground" : "moved", { count: movedCount, destination: destinationName }),
+            title: tn(results.some((result) => result.queued) ? "movingBackground" : "moved", {
+              count: movedCount,
+              destination: destinationName
+            }),
             description: singleSubject,
             actionKind: mappedUndoTargets.length > 0 ? "undo" : undefined,
             onAction:
@@ -400,6 +544,7 @@ export function useMessageMoveActions({
             durationMs: noticeSuccessTimeout
           });
         }
+        reportSkipped();
         if (onMoveComplete) {
           onMoveComplete(
             Array.from(
@@ -414,7 +559,8 @@ export function useMessageMoveActions({
         return {
           ids: resultIds,
           undoTargets: mappedUndoTargets,
-          destinationFolderId: data.destinationFolderId,
+          destinationFolderId: results.find((result) => result.accountId === destinationAccountId)?.destinationFolderId
+            ?? results[0].destinationFolderId,
           destinationName,
           singleSubject
         };
@@ -427,7 +573,7 @@ export function useMessageMoveActions({
         if (managePendingState) {
           setPendingMessageActions((prev) => {
             const next = new Set(prev);
-            uniqueIds.forEach((id) => next.delete(id));
+            allIds.forEach((id) => next.delete(id));
             return next;
           });
         }
@@ -438,8 +584,11 @@ export function useMessageMoveActions({
       activeFolderId,
       activeMessageId,
       apiFetch,
+      canEditMailbox,
       clearSelectionState,
       folderById,
+      folders,
+      getAccountFolders,
       locale,
       messages,
       noticeSuccessTimeout,
@@ -447,6 +596,7 @@ export function useMessageMoveActions({
       tn,
       readErrorMessage,
       reportError,
+      reportMailboxSkips,
       searchScope,
       includeThreadAcrossFoldersForList,
       selectionStore,

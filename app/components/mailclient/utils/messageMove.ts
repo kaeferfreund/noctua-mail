@@ -6,6 +6,8 @@ import { getMessageThreadKey } from "./messageMutation";
 export type ThreadMoveRequest = {
   threadId: string;
   sourceFolderId?: string;
+  /** Mailbox of the thread (client only: the move goes to this mailbox's route). */
+  accountId?: string;
 };
 
 export type MoveTargetRequest = {
@@ -58,11 +60,23 @@ export function resolveMoveTargetRequest({
     return fallback;
   }
 
+  // The thread is moved in the message's own mailbox (in the domain view a row
+  // can belong to another mailbox, whose rows lie in its own role folder).
+  const accountId = message.accountId || activeAccountId;
   const localThreadMessages = threadScopeMessages.filter(
     (item) =>
-      item.accountId === activeAccountId &&
+      item.accountId === accountId &&
       getMessageThreadKey(item) === threadId
   );
+
+  if (accountId !== activeAccountId) {
+    return {
+      messageIds: dedupeIds(
+        localThreadMessages.filter((item) => item.folderId === message.folderId).map((item) => item.id)
+      ),
+      threadMove: { threadId, sourceFolderId: message.folderId, accountId }
+    };
+  }
 
   if (searchScope === "folder" && activeFolderId) {
     return {

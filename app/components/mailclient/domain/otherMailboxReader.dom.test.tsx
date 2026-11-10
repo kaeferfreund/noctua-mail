@@ -6,7 +6,8 @@ import { Theme } from "@radix-ui/themes";
 import { ThemeProvider } from "next-themes";
 
 // Domain view with the active mailbox account-a and a row of account-b: the
-// expanded reader's toolbar only offers actions that work on that row's mailbox.
+// expanded reader's toolbar offers the same actions for both rows (each acts in
+// the row's own mailbox).
 const DAY = Date.UTC(2026, 9, 23, 9);
 function row(accountId: string, id: string, subject: string, minute: number) {
   return {
@@ -81,13 +82,12 @@ async function openExpanded(view: ReturnType<typeof render>, subject: string) {
 }
 
 describe("reader toolbar in the domain view", () => {
-  it("hides Delete, Move and Topics for a row of another mailbox and keeps them for the active one's", async () => {
+  it("offers Archive, Delete, Move and Topics for a row of another mailbox as for the active one's", async () => {
     setup();
     const { default: MailClient } = await import("../../MailClient");
     const view = render(<ThemeProvider attribute="class"><Theme><MailClient /></Theme></ThemeProvider>);
     const otherToolbar = await openExpanded(view, "Other synthetic subject");
-    expect(otherToolbar.queryByRole("button", { name: "Archive" })).not.toBeNull();
-    for (const name of ["Delete", "Move to", "Topics"]) expect(otherToolbar.queryByRole("button", { name })).toBeNull();
+    for (const name of ["Archive", "Delete", "Move to", "Topics"]) expect(otherToolbar.queryByRole("button", { name })).not.toBeNull();
     fireEvent.click(otherToolbar.getByRole("button", { name: "Show message list" }));
     const ownToolbar = await openExpanded(view, "Own synthetic subject");
     for (const name of ["Archive", "Delete", "Move to", "Topics"]) expect(ownToolbar.queryByRole("button", { name })).not.toBeNull();

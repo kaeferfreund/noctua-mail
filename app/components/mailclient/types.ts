@@ -34,6 +34,8 @@ export type DeleteConfirmState = {
   linkedReminderIds: string[];
   linkedEventIds: string[];
   linkedEvents: LinkedCalendarEventDetail[];
+  /** Linked reminders and events per mailbox (a deletion can span the mailboxes of a domain). */
+  linkedByAccount?: Record<string, { reminderIds: string[]; eventIds: string[] }>;
 };
 
 export type NoticeInput = Omit<InAppNotice, "id" | "expiresAt"> & {

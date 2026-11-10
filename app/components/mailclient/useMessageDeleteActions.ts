@@ -29,6 +29,23 @@ import {
   findTrashFolderIdForAccount,
   isPermanentDeleteTarget as isPermanentDeleteTargetPure
 } from "./utils/trashFolder";
+import {
+  groupByAccount,
+  partitionByPermission,
+  type CanEditMailbox,
+  type MailboxSkipReport,
+  type ReportMailboxSkips
+} from "./domain/mailboxFanOut";
+
+const ALLOW_ALL: CanEditMailbox = () => true;
+const messageKey = (message: Pick<Message, "id" | "accountId">) => `${message.accountId}\u0000${message.id}`;
+
+/** A mailbox's route refused the change (403): counted as skipped, not as a failure. */
+class MailboxPermissionError extends Error {
+  constructor(readonly accountId: string) {
+    super("Forbidden");
+  }
+}
 
 const getThreadKey = (item: Message) => item.threadId ?? item.messageId ?? item.id;
 
@@ -41,10 +58,12 @@ export function resolveDeleteTargets(params: {
   activeAccountId: string;
 }): { targets: Message[]; kind: "thread" | "message" } {
   const threadId = getThreadKey(params.message);
+  // A thread is deleted in the message's own mailbox (the domain view lists several).
+  const accountId = params.message.accountId || params.activeAccountId;
   const threadItems = params.supportsThreads
     ? params.threadScopeMessages.filter(
         (item) =>
-          item.accountId === params.activeAccountId && getThreadKey(item) === threadId
+          item.accountId === accountId && getThreadKey(item) === threadId
       )
     : [];
   // Threads absent from the map (e.g. topic-suggestion threads) render
@@ -146,6 +165,10 @@ type UseMessageDeleteActionsOptions = {
   onMessagesRemoved?: (messageIds: string[]) => void;
   markMessagesMutated?: () => void;
   markDeleteReconcileSuppression?: (targets: Message[]) => void;
+  /** A mailbox's folders, read when not known yet (its trash in the domain view). */
+  getAccountFolders?: (accountId: string) => Promise<Folder[] | null>;
+  canEditMailbox?: CanEditMailbox;
+  reportMailboxSkips?: ReportMailboxSkips;
 };
 
 export function useMessageDeleteActions({
@@ -185,7 +208,10 @@ export function useMessageDeleteActions({
   noticeSuccessTimeout,
   onMessagesRemoved,
   markMessagesMutated,
-  markDeleteReconcileSuppression
+  markDeleteReconcileSuppression,
+  getAccountFolders,
+  canEditMailbox = ALLOW_ALL,
+  reportMailboxSkips
 }: UseMessageDeleteActionsOptions) {
   const tn = useTranslations("Notifications");
   const isPermanentDeleteTarget = useCallback(
@@ -199,9 +225,18 @@ export function useMessageDeleteActions({
     lastSelectedIdRef.current = null;
   }, [lastSelectedIdRef, selectionStore]);
 
+  // Each mailbox has its own trash; another mailbox's folders are read on demand.
   const findTrashFolderId = useCallback(
-    () => findTrashFolderIdForAccount(folders, activeAccountId),
+    (accountId: string = activeAccountId) => findTrashFolderIdForAccount(folders, accountId),
     [activeAccountId, folders]
+  );
+  const resolveTrashFolderId = useCallback(
+    async (accountId: string) => {
+      const known = findTrashFolderIdForAccount(folders, accountId);
+      if (known || accountId === activeAccountId || !getAccountFolders) return known;
+      return findTrashFolderIdForAccount((await getAccountFolders(accountId)) ?? [], accountId);
+    },
+    [activeAccountId, folders, getAccountFolders]
   );
 
   const buildDeleteConfirmState = useCallback(
@@ -209,11 +244,9 @@ export function useMessageDeleteActions({
       targets: Message[],
       kind: DeleteConfirmState["kind"]
     ): Promise<DeleteConfirmState> => {
-      const trashFolderId = findTrashFolderId();
       const permanentDeleteCount = targets.filter((target) =>
-        isPermanentDeleteTarget(target, trashFolderId)
+        isPermanentDeleteTarget(target, findTrashFolderId(target.accountId || activeAccountId))
       ).length;
-      const eventUids = collectDeleteConfirmEventUids(targets);
       let calendarLinkedMessageCount = 0;
       let calendarLinkedReminderCount = 0;
       let calendarLinkedReminderFutureCount = 0;
@@ -224,73 +257,82 @@ export function useMessageDeleteActions({
       let linkedReminderIds: string[] = [];
       let linkedEventIds: string[] = [];
       let linkedEvents: LinkedCalendarEventDetail[] = [];
+      const linkedByAccount: Record<string, { reminderIds: string[]; eventIds: string[] }> = {};
 
-      if (targets.length > 0) {
+      // Calendar links are looked up in each mailbox the user may change (the
+      // others are skipped by the delete itself).
+      const reminders: NonNullable<DeleteAssociationLookupResponse["reminders"]> = [];
+      const events: NonNullable<DeleteAssociationLookupResponse["events"]> = [];
+      for (const [accountId, accountTargets] of groupByAccount(targets, activeAccountId)) {
+        if (!canEditMailbox(accountId)) continue;
         try {
           const res = await apiFetch(
-            buildAccountMessagesActionPath(activeAccountId, "delete/associations"),
+            buildAccountMessagesActionPath(accountId, "delete/associations"),
             {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                messageIds: targets.map((target) => target.id),
-                eventUids
+                messageIds: accountTargets.map((target) => target.id),
+                eventUids: collectDeleteConfirmEventUids(accountTargets)
               })
             }
           );
-          if (res.ok) {
-            const data = (await res.json()) as DeleteAssociationLookupResponse;
-            const summary = summarizeDeleteCalendarAssociations(targets, {
-              reminders: (data.reminders ?? []).flatMap((item) =>
-                item.id
-                  ? [
-                      {
-                        id: item.id,
-                        messageId: item.messageId,
-                        eventUid: item.eventUid,
-                        isFuture: Boolean(item.isFuture)
-                      }
-                    ]
-                  : []
-              ),
-              events: (data.events ?? []).flatMap((item) =>
-                item.id
-                  ? [
-                      {
-                        id: item.id,
-                        eventUid: item.eventUid,
-                        summary: item.summary,
-                        location: item.location,
-                        allDay: item.allDay,
-                        startTimezone: item.startTimezone,
-                        isRecurring: item.isRecurring,
-                        isMessageSpecificOccurrence: item.isMessageSpecificOccurrence,
-                        occurrenceStartAtMs: item.occurrenceStartAtMs,
-                        occurrenceEndAtMs: item.occurrenceEndAtMs,
-                        isFuture: Boolean(item.isFuture)
-                      }
-                    ]
-                  : []
-              )
-            });
-            calendarLinkedMessageCount = summary.linkedMessageCount;
-            calendarLinkedReminderCount = summary.linkedReminderCount;
-            calendarLinkedReminderFutureCount = summary.linkedReminderFutureCount;
-            calendarLinkedReminderPastCount = summary.linkedReminderPastCount;
-            calendarLinkedEventCount = summary.linkedEventCount;
-            calendarLinkedEventFutureCount = summary.linkedEventFutureCount;
-            calendarLinkedEventPastCount = summary.linkedEventPastCount;
-            linkedEvents = summary.linkedEvents;
-            linkedReminderIds = Array.from(
-              new Set((data.reminders ?? []).flatMap((item) => (item.id ? [item.id] : [])))
-            );
-            linkedEventIds = Array.from(
-              new Set((data.events ?? []).flatMap((item) => (item.id ? [item.id] : [])))
-            );
-          }
+          if (!res.ok) continue;
+          const data = (await res.json()) as DeleteAssociationLookupResponse;
+          reminders.push(...(data.reminders ?? []));
+          events.push(...(data.events ?? []));
+          const reminderIds = Array.from(new Set((data.reminders ?? []).flatMap((item) => (item.id ? [item.id] : []))));
+          const eventIds = Array.from(new Set((data.events ?? []).flatMap((item) => (item.id ? [item.id] : []))));
+          if (reminderIds.length > 0 || eventIds.length > 0) linkedByAccount[accountId] = { reminderIds, eventIds };
         } catch {
           // Ignore lookup failures and preserve the default delete flow.
         }
+      }
+
+      if (reminders.length > 0 || events.length > 0) {
+        const summary = summarizeDeleteCalendarAssociations(targets, {
+          reminders: reminders.flatMap((item) =>
+            item.id
+              ? [
+                  {
+                    id: item.id,
+                    messageId: item.messageId,
+                    eventUid: item.eventUid,
+                    isFuture: Boolean(item.isFuture)
+                  }
+                ]
+              : []
+          ),
+          events: events.flatMap((item) =>
+            item.id
+              ? [
+                  {
+                    id: item.id,
+                    eventUid: item.eventUid,
+                    summary: item.summary,
+                    location: item.location,
+                    allDay: item.allDay,
+                    startTimezone: item.startTimezone,
+                    isRecurring: item.isRecurring,
+                    isMessageSpecificOccurrence: item.isMessageSpecificOccurrence,
+                    occurrenceStartAtMs: item.occurrenceStartAtMs,
+                    occurrenceEndAtMs: item.occurrenceEndAtMs,
+                    isFuture: Boolean(item.isFuture)
+                  }
+                ]
+              : []
+          )
+        });
+        calendarLinkedMessageCount = summary.linkedMessageCount;
+        calendarLinkedReminderCount = summary.linkedReminderCount;
+        calendarLinkedReminderFutureCount = summary.linkedReminderFutureCount;
+        calendarLinkedReminderPastCount = summary.linkedReminderPastCount;
+        calendarLinkedEventCount = summary.linkedEventCount;
+        calendarLinkedEventFutureCount = summary.linkedEventFutureCount;
+        calendarLinkedEventPastCount = summary.linkedEventPastCount;
+        linkedEvents = summary.linkedEvents;
+        linkedReminderIds = Object.values(linkedByAccount).flatMap((entry) => entry.reminderIds);
+        linkedEventIds = Object.values(linkedByAccount).flatMap((entry) => entry.eventIds);
       }
 
       return {
@@ -307,31 +349,34 @@ export function useMessageDeleteActions({
         calendarLinkedEventPastCount,
         linkedReminderIds,
         linkedEventIds,
-        linkedEvents
+        linkedEvents,
+        linkedByAccount
       };
     },
-    [activeAccountId, apiFetch, findTrashFolderId, isPermanentDeleteTarget]
+    [activeAccountId, apiFetch, canEditMailbox, findTrashFolderId, isPermanentDeleteTarget]
   );
 
   const deleteLinkedCalendarAssociations = useCallback(
     async (deleteConfirm: DeleteConfirmState) => {
-      if (deleteConfirm.linkedReminderIds.length === 0 && deleteConfirm.linkedEventIds.length === 0) {
-        return;
-      }
-      const res = await apiFetch(
-        buildAccountMessagesActionPath(activeAccountId, "delete/linked-calendar"),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            reminderIds: deleteConfirm.linkedReminderIds,
-            eventIds: deleteConfirm.linkedEventIds
-          })
+      const byAccount = deleteConfirm.linkedByAccount
+        ?? { [activeAccountId]: { reminderIds: deleteConfirm.linkedReminderIds, eventIds: deleteConfirm.linkedEventIds } };
+      for (const [accountId, linked] of Object.entries(byAccount)) {
+        if (linked.reminderIds.length === 0 && linked.eventIds.length === 0) continue;
+        const res = await apiFetch(
+          buildAccountMessagesActionPath(accountId, "delete/linked-calendar"),
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              reminderIds: linked.reminderIds,
+              eventIds: linked.eventIds
+            })
+          }
+        );
+        if (!res.ok) {
+          const errorMessage = await readErrorMessage(res);
+          throw new Error(errorMessage || tn("deleteCalendarFailed"));
         }
-      );
-      if (!res.ok) {
-        const errorMessage = await readErrorMessage(res);
-        throw new Error(errorMessage || tn("deleteCalendarFailed"));
       }
     },
     [activeAccountId, apiFetch, readErrorMessage, tn]
@@ -339,13 +384,16 @@ export function useMessageDeleteActions({
 
   const deleteSingleMessagePermanently = useCallback(
     async (target: Message) => {
-      const res = await apiFetch(buildAccountMessageActionPath(activeAccountId, target.id, "delete"), {
+      const accountId = target.accountId || activeAccountId;
+      const res = await apiFetch(buildAccountMessageActionPath(accountId, target.id, "delete"), {
         method: "POST"
       });
       if (!res.ok) {
+        if (res.status === 403) throw new MailboxPermissionError(accountId);
         const errorMessage = await readErrorMessage(res);
         throw new Error(errorMessage || tn("deleteFailed"));
       }
+      const isTarget = (item: Message) => item.id === target.id && (item.accountId || activeAccountId) === accountId;
       const data = (await res.json()) as DeleteResponse;
       const movedMessageId = data.messageId ?? target.id;
       markMessagesMutated?.();
@@ -359,7 +407,7 @@ export function useMessageDeleteActions({
         let next: Message[];
         if (data.action === "deleted" || !data.trashFolderId) {
           next = pruneDetachedCrossFolderThreadMessages(
-            prev.filter((item) => item.id !== target.id),
+            prev.filter((item) => !isTarget(item)),
             {
               searchScope,
               activeFolderId,
@@ -369,7 +417,7 @@ export function useMessageDeleteActions({
         } else if (data.action === "moved") {
           if (!(searchScope === "all" && data.trashFolderId)) {
             next = pruneDetachedCrossFolderThreadMessages(
-              prev.filter((item) => item.id !== target.id),
+              prev.filter((item) => !isTarget(item)),
               {
                 searchScope,
                 activeFolderId,
@@ -378,7 +426,7 @@ export function useMessageDeleteActions({
             );
           } else {
             const remapped = prev.flatMap((item) => {
-              if (item.id !== target.id) return [item];
+              if (!isTarget(item)) return [item];
               const updated = {
                 ...item,
                 id: movedMessageId,
@@ -404,9 +452,10 @@ export function useMessageDeleteActions({
         // the membership check so a kept-but-renamed row isn't
         // misidentified as removed. Other branches don't remap, so the
         // resolver is a no-op there.
-        const resolveId = (id: string) => (id === target.id ? movedMessageId : id);
-        const nextIds = new Set(next.map((item) => item.id));
-        removedFromList = prev.filter((item) => !nextIds.has(resolveId(item.id)));
+        const nextKeys = new Set(next.map(messageKey));
+        removedFromList = prev.filter(
+          (item) => !nextKeys.has(messageKey(isTarget(item) ? { ...item, id: movedMessageId } : item))
+        );
         return next;
       });
       setGroupMeta((prev) =>
@@ -430,8 +479,9 @@ export function useMessageDeleteActions({
     ]
   );
 
+  // Permanent deletion of messages of one mailbox.
   const deleteMessagesPermanently = useCallback(
-    async (targets: Message[]) => {
+    async (accountId: string, targets: Message[]) => {
       const uniqueIds = Array.from(new Set(targets.map((target) => target.id).filter(Boolean)));
       if (uniqueIds.length === 0) return [] as string[];
       if (uniqueIds.length === 1) {
@@ -439,12 +489,13 @@ export function useMessageDeleteActions({
         const result = await deleteSingleMessagePermanently(single);
         return result.action === "deleted" ? [single.id] : [];
       }
-      const res = await apiFetch(buildAccountMessagesActionPath(activeAccountId, "delete/bulk"), {
+      const res = await apiFetch(buildAccountMessagesActionPath(accountId, "delete/bulk"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ messageIds: uniqueIds })
       });
       if (!res.ok) {
+        if (res.status === 403) throw new MailboxPermissionError(accountId);
         const errorMessage = await readErrorMessage(res);
         throw new Error(errorMessage || tn("deleteManyFailed"));
       }
@@ -454,15 +505,15 @@ export function useMessageDeleteActions({
       let removedFromList: Message[] = [];
       setMessages((prev) => {
         const next = pruneDetachedCrossFolderThreadMessages(
-          prev.filter((item) => !deletedIds.has(item.id)),
+          prev.filter((item) => !((item.accountId || activeAccountId) === accountId && deletedIds.has(item.id))),
           {
             searchScope,
             activeFolderId,
             includeThreadAcrossFoldersForList
           }
         );
-        const nextIds = new Set(next.map((item) => item.id));
-        removedFromList = prev.filter((item) => !nextIds.has(item.id));
+        const nextKeys = new Set(next.map(messageKey));
+        removedFromList = prev.filter((item) => !nextKeys.has(messageKey(item)));
         return next;
       });
       setGroupMeta((prev) =>
@@ -606,36 +657,78 @@ export function useMessageDeleteActions({
       let movedToTrashCount = 0;
       let permanentlyDeletedCount = 0;
       const removedIds: string[] = [];
-      const trashFolderId = findTrashFolderId();
-      const hardDeleteTargets = targets.filter((target) =>
-        isPermanentDeleteTarget(target, trashFolderId)
+      // Each message is deleted in its own mailbox: moved to that mailbox's
+      // trash, or deleted for good when it is already there (as in one
+      // mailbox). Mailboxes the user may not change are skipped up front, a
+      // 403 from a mailbox's route the same way; one notice names them.
+      const skipped: MailboxSkipReport["skipped"] = [];
+      const { allowed, denied } = partitionByPermission(
+        targets.map((target) => (target.accountId ? target : { ...target, accountId: activeAccountId })),
+        canEditMailbox
       );
-      const moveTargets = targets.filter(
-        (target) => !isPermanentDeleteTarget(target, trashFolderId)
-      );
+      denied.forEach((target) => skipped.push({ id: target.id, accountId: target.accountId, reason: "permission" }));
+      const trashByAccount = new Map<string, string>();
+      const hardDeleteByAccount = new Map<string, Message[]>();
+      const moveTargets: Message[] = [];
+      const noTrash: Message[] = [];
+      for (const [accountId, accountTargets] of groupByAccount(allowed)) {
+        const trashFolderId = await resolveTrashFolderId(accountId);
+        if (trashFolderId) trashByAccount.set(accountId, trashFolderId);
+        accountTargets.forEach((target) => {
+          if (isPermanentDeleteTarget(target, trashFolderId)) {
+            hardDeleteByAccount.set(accountId, [...(hardDeleteByAccount.get(accountId) ?? []), target]);
+          } else if (trashFolderId) {
+            moveTargets.push(target);
+          } else {
+            noTrash.push(target);
+          }
+        });
+      }
       try {
         setPendingMessageActions((prev) => new Set([...prev, ...targets.map((t) => t.id)]));
-        if (moveTargets.length > 0) {
-          if (!trashFolderId) {
+        if (noTrash.length > 0) {
+          // One mailbox without a trash folder fails as before; in a mixed
+          // selection its messages are skipped and named in the notice.
+          if (noTrash.length === targets.length) {
             reportError(tn("trashMissing"));
             return;
           }
-          const moveResult = await moveMessagesToFolder(trashFolderId, {
+          noTrash.forEach((target) => skipped.push({ id: target.id, accountId: target.accountId, reason: "noFolder" }));
+        }
+        if (moveTargets.length > 0) {
+          const moveResult = await moveMessagesToFolder(trashByAccount.get(moveTargets[0].accountId) ?? "", {
             messageIds: moveTargets.map((target) => target.id),
+            destinationsByAccount: trashByAccount,
+            collectSkipped: skipped,
+            skipAction: "delete",
             showNotice: false,
             clearSelectionOnSuccess: false,
             managePendingState: false,
             updateActiveMessage: false
           });
-          if (!moveResult) return;
-          movedToTrashCount += moveResult.ids.length;
-          undoTargets.push(...moveResult.undoTargets);
-          removedIds.push(...moveResult.ids);
+          if (moveResult) {
+            movedToTrashCount += moveResult.ids.length;
+            undoTargets.push(...moveResult.undoTargets);
+            removedIds.push(...moveResult.ids);
+          }
         }
-        if (hardDeleteTargets.length > 0) {
-          const deletedIds = await deleteMessagesPermanently(hardDeleteTargets);
-          permanentlyDeletedCount += deletedIds.length;
-          removedIds.push(...deletedIds);
+        for (const [accountId, accountTargets] of hardDeleteByAccount) {
+          try {
+            const deletedIds = await deleteMessagesPermanently(accountId, accountTargets);
+            permanentlyDeletedCount += deletedIds.length;
+            removedIds.push(...deletedIds);
+          } catch (error) {
+            if (!(error instanceof MailboxPermissionError)) throw error;
+            accountTargets.forEach((target) => skipped.push({ id: target.id, accountId, reason: "permission" }));
+          }
+        }
+        // The skip notice comes after the success notice, so it is the newest one shown.
+        const reportSkipped = () => {
+          if (skipped.length > 0) reportMailboxSkips?.({ action: "delete", total: targets.length, skipped });
+        };
+        if (removedIds.length === 0) {
+          reportSkipped();
+          return;
         }
         // Keep the operation's renderer order even if the move has already
         // removed its row; the continuation checks the latest reader selection.
@@ -657,6 +750,7 @@ export function useMessageDeleteActions({
         }
         await refreshFolders();
         pushDeleteNotice(movedToTrashCount, permanentlyDeletedCount, undoTargets, singleSubject);
+        reportSkipped();
         if (onMessagesRemoved && removedIds.length > 0) {
           onMessagesRemoved(removedIds);
         }
@@ -678,11 +772,14 @@ export function useMessageDeleteActions({
       continueAfterRemoval,
       getNavigationRows,
       clearSelectionState,
+      activeAccountId,
+      canEditMailbox,
       deleteMessagesPermanently,
-      findTrashFolderId,
+      resolveTrashFolderId,
       isPermanentDeleteTarget,
       lastSelectedIdRef,
       moveMessagesToFolder,
+      reportMailboxSkips,
       messages,
       pushDeleteNotice,
       refreshFolders,
@@ -700,8 +797,8 @@ export function useMessageDeleteActions({
 
   const handleDeleteMessage = useCallback(
     async (message: Message, options?: { allowThreadDeletion?: boolean }) => {
-      // A message of another mailbox (domain view, merged conversation) is deleted in its own mailbox.
-      if (message.accountId !== activeAccountId) return;
+      // A message of another mailbox (domain view, merged conversation) is deleted
+      // in its own mailbox: its trash, its thread, its routes.
       const threadId = getThreadKey(message);
       const { targets, kind } = resolveDeleteTargets({
         message,
@@ -760,7 +857,7 @@ export function useMessageDeleteActions({
             threadScopeMessages.find((item) => item.id === id) ??
             messages.find((item) => item.id === id)
         )
-        .filter((message): message is Message => Boolean(message) && message?.accountId === activeAccountId);
+        .filter((message): message is Message => Boolean(message));
       if (targets.length === 0) return;
       const selectedIds = new Set(options?.selectedIds ?? uniqueIds);
       const hiddenTargets = targets.filter((target) => !selectedIds.has(target.id));
@@ -798,7 +895,6 @@ export function useMessageDeleteActions({
       });
     },
     [
-      activeAccountId,
       buildDeleteConfirmState,
       confirmDelete,
       deleteLinkedCalendarAssociations,

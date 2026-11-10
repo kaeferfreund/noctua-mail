@@ -73,7 +73,7 @@ function setupArchive({ failedId, active = "", allFolders = false }: {
     return <Theme><TooltipProvider><SelectionActionsMenu
       selectionStore={store} hasActiveMessage={Boolean(activeMessageId)}
       actions={bindSelectionActions(actions, () => ({ ids: [...store.getIds()], threadIds: [...store.getIds()] }))}
-      allTopics={[]} hasOtherAccounts={false} onGetRecentFolders={() => []}
+      onGetTopics={() => []} hasOtherAccounts={false} onGetRecentFolders={() => []}
       onSelectAll={() => {}} onClearSelection={() => store.clearSelection()}
     /></TooltipProvider></Theme>;
   }
