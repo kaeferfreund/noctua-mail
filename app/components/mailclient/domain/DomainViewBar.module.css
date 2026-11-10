@@ -24,8 +24,14 @@
   display: none;
 }
 
-.role {
+/* Radix gives ghost buttons negative margins and a content height; the soft
+ * (active) button has neither. Same box for both keeps the labels on one line
+ * and the row steady when the active folder changes. */
+.roles .role {
   flex-shrink: 0;
+  margin: 0;
+  box-sizing: border-box;
+  height: var(--base-button-height);
 }
 
 .close {
