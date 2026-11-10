@@ -143,8 +143,8 @@ creator from the stored token, never client-supplied identity metadata.
 server `instructions` (`MCP_SERVER_INSTRUCTIONS` in `lib/mcpServer.ts`). Clients add the
 instructions to the model context: the server is the user's personal and shared e-mail; use it
 whenever the user asks to write, answer, forward, find, organise or triage e-mail; typical flow
-`list_accounts` → `search_messages`/`list_messages_by_folder` → `create_draft_message`; drafts are
-never sent by MCP; every created, changed or listed item carries a `url`; a pasted Noctua Mail
+`list_accounts` → `search_messages`/`list_messages_by_folder` → `create_draft_message`; attachments are
+read with `list_message_attachments` → `get_message_attachment`; drafts are never sent by MCP; every created, changed or listed item carries a `url`; a pasted Noctua Mail
 link (query with `a=` and usually `m=`) is resolved with `resolve_link` first and can be passed as
 `url` to the draft and flag tools. Every tool has a
 task-first description, a `title` and `annotations` (`readOnlyHint`, `destructiveHint`,
@@ -159,6 +159,7 @@ The text content repeats them (`Open in Noctua Mail: <url>`, or one line per lis
 | `create_draft_message`, `update_draft_message`, `get_draft_message`, `list_draft_messages` (per draft) | draft in the Drafts folder (`a`,`f`,`m`), opens in the reader |
 | `search_messages`, `list_messages_by_folder` (per item) | the message (`a`,`f`,`m`) |
 | `flag_message`, `unflag_message`, `mark_message_todo`, `mark_message_done`, `clear_message_todo` | the message |
+| `list_message_attachments`, `get_message_attachment` | the message the attachment belongs to |
 | `assign_topics`, `unassign_topics`, `get_thread_collaboration`, `set_thread_status`, `assign_thread`, `add_internal_comment`, `list_thread_activity` | the given message, else the thread's newest message |
 | `list_accounts`, `list_mailbox_summary` (per mailbox), `check_new_mail` | the mailbox (`a`) |
 | `list_folders` (per folder) | the folder (`a`,`f`) |
@@ -182,7 +183,7 @@ has the `search_messages` item shape with `url`; a draft (Drafts folder, `\Draft
 (`folderId:null` when the folder does not belong to that mailbox).
 
 `create_draft_message` (mode reply/forward), `get_draft_message`, `update_draft_message`,
-`flag_message`, `unflag_message`, `mark_message_todo`, `mark_message_done` and
+`list_message_attachments`, `get_message_attachment`, `flag_message`, `unflag_message`, `mark_message_todo`, `mark_message_done` and
 `clear_message_todo` accept an optional `url` instead of `messageId`/`draftId`. Passing both,
 an `accountId` other than the link's, or a link without `m` is an error; `messageId`/`draftId`
 are optional on these tools but one of id or `url` is required.
@@ -267,6 +268,61 @@ Assigned-to-me uses the token creator. For example:
 {"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"assign_thread","arguments":{"threadId":"<request@example.test>","assigneeUserId":"me"}}}
 ```
 
+### MCP attachment tools
+
+Both tools are `read` / viewer and read-only. The message is selected like the other message tools
+(`{accountId?,messageId}` or `{url}`); draft ids work the same way, so the attachment ids that
+`get_draft_message` lists open through the same tool. Message results (`resolve_link`, the
+`search_messages` and `list_messages_by_folder` items, `create_draft_message`/`update_draft_message`)
+carry `attachments:[{id,filename,contentType,size,inline,url?,cid?}]`; `url` is the app's attachment
+route that inline images in `htmlBody` point at.
+
+| Tool | Input | Structured success |
+| --- | --- | --- |
+| `list_message_attachments` | `{accountId?,messageId}` or `{url}` | `{ok:true,accountId,messageId,attachments:[{id,filename,contentType,size,inline}],url}` |
+| `get_message_attachment` | `{accountId?,messageId` (or `url`)`,attachmentId,offset?,maxChars?,includeData?}` | `{ok:true,accountId,messageId,attachment,form,bytes?,text?,offset?,returnedChars?,totalChars?,truncated,nextOffset?,dataIncluded,note?,url}` |
+
+`form` says how the content comes back:
+
+- `image`: PNG, JPEG, GIF, WebP. The declared type must be one of these and the file signature must
+  match one of them; the MCP `image` content block uses the detected type. Otherwise the file is
+  treated as a binary file.
+- `text`: `text/*`, JSON/XML (also `+json`/`+xml`), CSV, YAML, calendar, `message/rfc822` and other
+  `message/*` reports, and generic binary types (`application/octet-stream`) with a text extension
+  (`.txt`, `.csv`, `.ics`, `.eml` …). Decoded with the declared charset (UTF-8 otherwise); content with
+  NUL bytes is treated as binary. A second text content block carries the page; `structuredContent.text`
+  repeats it. `offset` (characters, default 0) and `maxChars` (default 20,000, max 100,000) page
+  through it; `truncated` and `nextOffset` tell whether and where to continue. A page never splits a
+  UTF-16 surrogate pair.
+- `metadata`: PDF and office documents (no text extraction exists in Noctua; `note` says so) and other
+  binary files, without `includeData`. Nothing is loaded for documents and binaries in this form.
+- `resource`: with `includeData:true` for anything that is not an image or readable text: an embedded
+  resource `{uri,mimeType,blob}` with the original bytes in base64. `uri` is the app's attachment route
+  (it needs a signed-in browser session; it is not a storage locator).
+
+Limits (constants in `lib/mcpAttachments.ts`, named in the tool description): one call loads at most
+5 MiB of attachment data (`MCP_ATTACHMENT_MAX_BYTES`), checked on disk before the file is read; an
+attachment without a cached file is extracted from the stored raw message source only when that source
+is at most 12 MiB (`MCP_ATTACHMENT_MAX_SOURCE_BYTES`); all calls of one HTTP request (a JSON-RPC batch)
+load at most 10 MiB together (`MCP_ATTACHMENT_MAX_REQUEST_BYTES`); at most two attachment loads run at
+once per process. Larger files return a tool error that names the size and the limit and links the
+message. Attachments are read from the local cache (cached attachment file, else the stored source, as
+the web attachment route does); there is no IMAP fetch.
+
+Access is the access to the message: the token's mailbox set and live role (viewer) as for the other
+read tools, an uncovered mailbox fails with `Mailbox is not covered by MCP token`, an unknown message
+with `Message not found`. `attachmentId` is only compared against the attachment rows of that message
+in that mailbox; any other id (guessed, of another message or mailbox) returns `Attachment not found`.
+No client-supplied path or storage key is used. Filenames lose control, bidi and zero-width characters
+and are cut to 255 characters; content types are reduced to a lowercase `type/subtype` (anything else
+becomes `application/octet-stream`).
+
+```json
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"list_message_attachments","arguments":{"messageId":"imap-0123456789abcdef"}}}
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"get_message_attachment","arguments":{"messageId":"imap-0123456789abcdef","attachmentId":"att-1","offset":20000}}}
+{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"get_message_attachment","arguments":{"messageId":"imap-0123456789abcdef","attachmentId":"att-2","includeData":true}}}
+```
+
 ### MCP draft tools
 
 Drafts are edited in place; clients never need to create a second version and delete the
@@ -285,7 +341,7 @@ old one. The tool descriptions say so, so AI clients stop proposing that workaro
   Drafts-folder messages without the flag. `search_messages` with badge `draft` also finds drafts.
 - `get_draft_message` returns `text` (text/plain part; for Markdown drafts the Markdown source,
   repeated in `markdown`) and `html` as stored. Inline images in `html` point at attachment
-  URLs. Attachment bytes are never returned.
+  URLs. Attachment bytes are not part of the draft; open them with `get_message_attachment`.
 - `update_draft_message` is partial: omitted fields keep the stored value; `to`/`cc`/`bcc`
   replace the whole field (empty string clears it). `text`/`html`/`markdown` replace the whole
   body with the same rules as `create_draft_message` (format follows the richest field unless
