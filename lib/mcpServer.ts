@@ -633,7 +633,7 @@ const DESTRUCTIVE_CHANGE = { readOnlyHint: false, destructiveHint: true, idempot
 export const MCP_SERVER_INFO = {
   name: "noctua-mail",
   title: "Noctua Mail",
-  version: "1.0.10",
+  version: "1.0.11",
   description: "The user's e-mail: personal and shared mailboxes in Noctua Mail."
 };
 
