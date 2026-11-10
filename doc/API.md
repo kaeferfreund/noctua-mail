@@ -289,8 +289,9 @@ route that inline images in `htmlBody` point at.
   treated as a binary file.
 - `text`: `text/*`, JSON/XML (also `+json`/`+xml`), CSV, YAML, calendar, `message/rfc822` and other
   `message/*` reports, and generic binary types (`application/octet-stream`) with a text extension
-  (`.txt`, `.csv`, `.ics`, `.eml` …). Decoded with the declared charset (UTF-8 otherwise); content with
-  NUL bytes is treated as binary. A second text content block carries the page; `structuredContent.text`
+  (`.txt`, `.csv`, `.ics`, `.eml` …). Decoded by byte-order mark, else the declared charset, else UTF-8 with a
+  Windows-1252 fallback; content with NUL bytes is treated as binary. A generic binary type with an
+  image or document extension (`.jpg`, `.pdf` …) is handled like that image or document type. A second text content block carries the page; `structuredContent.text`
   repeats it. `offset` (characters, default 0) and `maxChars` (default 20,000, max 100,000) page
   through it; `truncated` and `nextOffset` tell whether and where to continue. A page never splits a
   UTF-16 surrogate pair.

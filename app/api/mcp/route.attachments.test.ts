@@ -65,7 +65,9 @@ async function seedMailbox(accountId: string) {
     { id: "att-5", filename: "gross.pdf", contentType: "application/pdf", data: Buffer.alloc(MCP_ATTACHMENT_MAX_BYTES + 1, 0x20) },
     { id: "att-6", filename: "gruss.txt", contentType: "text/plain; charset=ISO-8859-1", data: LATIN1 },
     { id: "att-7", filename: `${RLO}gnp.exe${BELL}\nnotiz.txt`, contentType: "TEXT/Plain\r\nX-Evil: 1", data: Buffer.from("Notiz") },
-    { id: "att-8", filename: "fehlt.txt", contentType: "text/plain", data: null }
+    { id: "att-8", filename: "fehlt.txt", contentType: "text/plain", data: null },
+    // What the sync stores for a real mail: the bare type, no charset.
+    { id: "att-9", filename: "export.csv", contentType: "text/csv", data: Buffer.from("Empfänger;Müller", "latin1") }
   ]);
   const other = await seedMessage(accountId, inbox.id, "other", [
     { id: "att-other", filename: "geheim.txt", contentType: "text/plain", data: Buffer.from("other message") }
@@ -111,7 +113,7 @@ describe("MCP attachment tools", () => {
     const origin = new URL(listed.structuredContent.url).origin;
     expect(listed.structuredContent.url).toBe(messageDeepLink(main, origin));
     const attachments = listed.structuredContent.attachments as Array<Record<string, unknown>>;
-    expect(attachments).toHaveLength(9);
+    expect(attachments).toHaveLength(10);
     expect(attachments[0]).toEqual({ id: "att-0", filename: "foto.png", contentType: "image/png", size: PNG.length, inline: true });
     expect(attachments.find(item => item.id === "att-1")).toMatchObject({ contentType: "text/csv" });
     // Untrusted metadata: bidi/control characters and header injection are removed, a malformed type becomes octet-stream.
@@ -159,6 +161,8 @@ describe("MCP attachment tools", () => {
 
     const latin = await get("att-6", {}, 6);
     expect(latin.structuredContent).toMatchObject({ form: "text", text: "Grüße aus Köln" });
+    const bare = await get("att-9", {}, 60);
+    expect(bare.structuredContent).toMatchObject({ form: "text", text: "Empfänger;Müller" });
 
     const pdf = await get("att-2", {}, 7);
     expect(pdf.structuredContent).toMatchObject({ form: "metadata", dataIncluded: false, attachment: { contentType: "application/pdf" } });

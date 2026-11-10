@@ -33,6 +33,10 @@ const TEXT_APPLICATION_TYPES = new Set([
 const TEXT_MESSAGE_TYPES = new Set(["message/rfc822", "message/delivery-status", "message/disposition-notification", "message/global"]);
 /** Extensions treated as text when a mail declares a generic binary type. */
 const TEXT_EXTENSIONS = new Set(["txt", "csv", "tsv", "json", "xml", "ics", "vcf", "eml", "md", "log", "yaml", "yml", "html", "htm"]);
+/** Extensions that decide the kind when a mail declares a generic binary type; images are still checked against the bytes. */
+const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
+const DOCUMENT_EXTENSIONS = new Set(["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf"]);
+const IMAGE_TYPE_ALIASES = new Set(["image/jpg", "image/pjpeg", "image/x-png"]);
 const DOCUMENT_TYPES = new Set([
   "application/pdf", "application/msword", "application/rtf", "application/vnd.ms-excel", "application/vnd.ms-powerpoint"
 ]);
@@ -57,9 +61,17 @@ export function sanitizeAttachmentContentType(value: unknown) {
   return MIME_TYPE_PATTERN.test(base) ? base : "application/octet-stream";
 }
 
+/** The charset parameter of a raw content type, or null. The sync stores bare types, so it is usually absent. */
 function charsetOf(contentType: unknown) {
   const match = (typeof contentType === "string" ? contentType : "").match(/;\s*charset\s*=\s*"?([A-Za-z0-9_.:-]{1,40})"?/i);
-  return match?.[1]?.toLowerCase() ?? "utf-8";
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
+function bomCharset(data: Uint8Array) {
+  if (data[0] === 0xef && data[1] === 0xbb && data[2] === 0xbf) return "utf-8";
+  if (data[0] === 0xff && data[1] === 0xfe) return "utf-16le";
+  if (data[0] === 0xfe && data[1] === 0xff) return "utf-16be";
+  return null;
 }
 
 function extensionOf(filename: string) {
@@ -79,11 +91,16 @@ export function toMcpAttachmentSummary(attachment: Pick<Attachment, "id" | "file
 
 /** What a declared (sanitized) type and filename suggest. Images are confirmed later against the bytes. */
 export function classifyAttachment(contentType: string, filename: string): McpAttachmentKind {
-  if ((IMAGE_TYPES as readonly string[]).includes(contentType)) return "image";
+  if ((IMAGE_TYPES as readonly string[]).includes(contentType) || IMAGE_TYPE_ALIASES.has(contentType)) return "image";
   if (contentType.startsWith("text/") || TEXT_APPLICATION_TYPES.has(contentType) || TEXT_MESSAGE_TYPES.has(contentType) ||
       /^application\/[a-z0-9.-]+\+(json|xml)$/.test(contentType)) return "text";
   if (DOCUMENT_TYPES.has(contentType) || DOCUMENT_TYPE_PREFIXES.some(prefix => contentType.startsWith(prefix))) return "document";
-  if (GENERIC_BINARY_TYPES.has(contentType) && TEXT_EXTENSIONS.has(extensionOf(filename))) return "text";
+  if (GENERIC_BINARY_TYPES.has(contentType)) {
+    const extension = extensionOf(filename);
+    if (TEXT_EXTENSIONS.has(extension)) return "text";
+    if (IMAGE_EXTENSIONS.has(extension)) return "image";
+    if (DOCUMENT_EXTENSIONS.has(extension)) return "document";
+  }
   return "binary";
 }
 
@@ -97,11 +114,21 @@ export function detectImageType(data: Uint8Array): ImageType | null {
   return null;
 }
 
-/** Decodes text-like attachment bytes with the declared charset (UTF-8 when unknown). Null for content with NUL bytes. */
+/**
+ * Decodes text-like attachment bytes: a byte-order mark wins, then a declared
+ * charset, then strict UTF-8, then Windows-1252 (typical for exported CSV files
+ * whose type came without a charset). Null for content with NUL bytes.
+ */
 export function decodeAttachmentText(data: Uint8Array, rawContentType: unknown) {
-  let decoder: TextDecoder;
-  try { decoder = new TextDecoder(charsetOf(rawContentType)); } catch { decoder = new TextDecoder("utf-8"); }
-  const text = decoder.decode(data);
+  let text: string | null = null;
+  const declared = bomCharset(data) ?? charsetOf(rawContentType);
+  if (declared && declared !== "utf-8" && declared !== "utf8") {
+    try { text = new TextDecoder(declared).decode(data); } catch { text = null; }
+  }
+  if (text === null) {
+    try { text = new TextDecoder("utf-8", { fatal: true }).decode(data); }
+    catch { text = new TextDecoder("windows-1252").decode(data); }
+  }
   return text.includes("\u0000") ? null : text;
 }
 
