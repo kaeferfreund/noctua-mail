@@ -434,7 +434,7 @@ import { useFolderRefresh } from "./mailclient/useFolderRefresh";
 import { getFolderDisplayName } from "@/lib/i18n/folderNames";
 import { takeInviteCodeFromLocation } from "@/lib/inviteLink";
 import { mailboxGroupDomain } from "@/lib/senderIdentity";
-import type { DomainFolderRole } from "@/lib/domainView";
+import { DOMAIN_FOLDER_ROLES, findDomainRoleFolder, type DomainFolderRole } from "@/lib/domainView";
 import MailboxBadge from "./mailclient/domain/MailboxBadge";
 import DomainViewBar from "./mailclient/domain/DomainViewBar";
 import { mailboxLabel } from "./shell/types";
@@ -5074,6 +5074,18 @@ export default function MailClient({
     },
     [accounts, activeAccountId, navigateDomain]
   );
+  // Folder bar of a single mailbox: its special folders in domain view order,
+  // a role without a folder is left out.
+  const mailboxRoleFolders = useMemo(
+    () => DOMAIN_FOLDER_ROLES.flatMap((role) => {
+      const folder = findDomainRoleFolder(accountFolders, activeAccountId, role);
+      return folder ? [{ role, folderId: folder.id }] : [];
+    }),
+    [accountFolders, activeAccountId]
+  );
+  const activeMailboxRole = searchScope === "folder" && !activeVirtualFolder && !isRelatedSearch
+    ? mailboxRoleFolders.find((entry) => entry.folderId === activeFolderId)?.role ?? null
+    : null;
   const handleNoticeOpen = (notice: InAppNotice) => {
     const jumpTarget = notice.messageId ?? notice.ids?.[0];
     if (jumpTarget) {
@@ -5293,6 +5305,12 @@ export default function MailClient({
       tv
     ]
   );
+  // Opens a folder of the active mailbox the way a click on it in the sidebar does.
+  const openMailboxFolder = useCallback((folderId: string) => {
+    clearSearch();
+    setSearchScope("folder");
+    if (!queueFolderChoice(folderId)) setActiveFolderId(folderId);
+  }, [clearSearch, queueFolderChoice, setActiveFolderId, setSearchScope]);
   // "Inbox" heads the sidebar's Views section (design §7.2). Only a real
   // inbox qualifies; inboxFolder itself falls back to the first folder.
   const inboxView = useMemo<ShellView | null>(() => {
@@ -5307,21 +5325,14 @@ export default function MailClient({
       countAriaLabel: tv("unreadCount", { count: unread }),
       emphasize: unread > 0,
       icon: <Inbox size={13} />,
-      onSelect: () => {
-        clearSearch();
-        setSearchScope("folder");
-        if (!queueFolderChoice(inboxFolder.id)) setActiveFolderId(inboxFolder.id);
-      }
+      onSelect: () => openMailboxFolder(inboxFolder.id)
     };
   }, [
     activeFolderId,
     activeVirtualFolder,
-    clearSearch,
     inboxFolder,
-    queueFolderChoice,
+    openMailboxFolder,
     searchScope,
-    setActiveFolderId,
-    setSearchScope,
     tv
   ]);
   const isExistingAccount = Boolean(
@@ -5557,13 +5568,21 @@ export default function MailClient({
               relatedNotice={relatedNotice}
               listBanner={domainView ? (
                 <DomainViewBar
-                  domain={domainView.domain}
-                  role={domainView.role}
-                  mailboxCount={domainAccounts.length}
+                  roles={DOMAIN_FOLDER_ROLES}
+                  activeRole={domainView.role}
                   onRoleChange={(role) => { void navigateDomain(domainView.domain, activeAccountId, role); }}
                   onClose={() => { void navigateLinkedAccount(activeAccountId); }}
                 />
-              ) : null}
+              ) : (
+                <DomainViewBar
+                  roles={mailboxRoleFolders.map((entry) => entry.role)}
+                  activeRole={activeMailboxRole}
+                  onRoleChange={(role) => {
+                    const folderId = mailboxRoleFolders.find((entry) => entry.role === role)?.folderId;
+                    if (folderId) openMailboxFolder(folderId);
+                  }}
+                />
+              )}
               searchCriteriaLabel={searchCriteriaLabel}
               searchCriteriaBadges={searchCriteriaBadges}
               onClearSearch={clearSearch}

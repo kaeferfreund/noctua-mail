@@ -1,36 +1,23 @@
 .bar {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
-.heading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.close {
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-/* Six folders do not fit at 390 px: the row scrolls instead of wrapping. */
+/* Six folders do not fit at 390 px: the row scrolls instead of wrapping and
+ * ends before the close button. The fixed row height keeps the bar steady
+ * while a mailbox's folders are still loading (no buttons yet). */
 .roles {
   display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  box-sizing: content-box;
+  min-height: var(--space-5);
   gap: 4px;
+  padding-block: 2px; /* room for the focus ring inside the scroll box */
   overflow-x: auto;
   scrollbar-width: none;
-  padding-bottom: 2px;
 }
 
 .roles::-webkit-scrollbar {
@@ -38,5 +25,9 @@
 }
 
 .role {
+  flex-shrink: 0;
+}
+
+.close {
   flex-shrink: 0;
 }
