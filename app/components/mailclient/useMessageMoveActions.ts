@@ -78,6 +78,12 @@ export type MoveMessagesOptions = {
   managePendingState?: boolean;
   updateActiveMessage?: boolean;
   reportErrorOnFailure?: boolean;
+  /**
+   * Mailbox of each message, from the caller that holds the message. It wins over
+   * the list lookup: a message shown only in the reader (a conversation across
+   * mailboxes) is not in the list.
+   */
+  accountByMessageId?: ReadonlyMap<string, string>;
   /** Per-mailbox destinations (delete: each mailbox's trash), instead of mapping the destination by role. */
   destinationsByAccount?: ReadonlyMap<string, string>;
   /** The action named when messages are skipped (no permission, no matching folder). */
@@ -232,11 +238,15 @@ export function useMessageMoveActions({
         groups.set(accountId, created);
         return created;
       };
+      // A message whose mailbox is unknown here belongs to the active mailbox
+      // (as before the domain view) — never to the destination's mailbox, which
+      // would send its id to another mailbox's route.
       uniqueIds.forEach((id) => {
-        groupFor(messageById.get(id)?.accountId || destinationAccountId).ids.push(id);
+        const accountId = options?.accountByMessageId?.get(id) || messageById.get(id)?.accountId || activeAccountId;
+        groupFor(accountId).ids.push(id);
       });
       if (threadMove) {
-        groupFor(threadMove.accountId || destinationAccountId).threadMove = threadMove;
+        groupFor(threadMove.accountId || activeAccountId).threadMove = threadMove;
       }
       const skipped: MailboxSkipReport["skipped"] = [];
       const skipGroup = (accountId: string, group: { ids: string[]; threadMove?: ThreadMoveRequest }, reason: MailboxSkipReason) => {

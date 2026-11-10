@@ -13,6 +13,8 @@ export type ThreadMoveRequest = {
 export type MoveTargetRequest = {
   messageIds: string[];
   threadMove?: ThreadMoveRequest;
+  /** Mailbox of each message (client only), for messages the list does not hold. */
+  accountByMessageId?: ReadonlyMap<string, string>;
 };
 
 type ResolveMoveTargetRequestParams = {
@@ -40,7 +42,10 @@ export function resolveMoveTargetRequest({
   visibleMessages,
   threadScopeMessages
 }: ResolveMoveTargetRequestParams): MoveTargetRequest {
-  const fallback = { messageIds: [message.id] };
+  const fallback: MoveTargetRequest = {
+    messageIds: [message.id],
+    accountByMessageId: new Map([[message.id, message.accountId || activeAccountId]])
+  };
   if (origin === "thread") {
     return fallback;
   }

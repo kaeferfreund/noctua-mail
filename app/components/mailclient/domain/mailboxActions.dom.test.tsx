@@ -117,11 +117,40 @@ describe("moving a selection across mailboxes", () => {
   });
 });
 
+describe("a message the list does not hold", () => {
+  // The reader can show a message of another mailbox (a conversation across
+  // mailboxes) that is no row of the list.
+  it("moves in the mailbox its caller names", async () => {
+    const h = moveHarness([message("a", "a1")], moveResponse);
+    await act(async () => {
+      await h.hook.result.current.moveMessagesToFolder("b:Papierkorb", {
+        messageIds: ["b1"],
+        accountByMessageId: new Map([["b1", "b"]]),
+        destinationsByAccount: new Map([["b", "b:Papierkorb"]])
+      });
+    });
+    expect(h.calls.map((call) => [call.path, call.body?.destinationFolderId, call.body?.messageIds])).toEqual([
+      ["/api/accounts/b/messages/move", "b:Papierkorb", ["b1"]]
+    ]);
+  });
+
+  it("never follows the destination's mailbox when its own mailbox is unknown", async () => {
+    const h = moveHarness([message("a", "a1")], moveResponse);
+    await act(async () => {
+      await h.hook.result.current.moveMessagesToFolder("b:Papierkorb", { messageIds: ["x1"] });
+    });
+    expect(h.calls.map((call) => [call.path, call.body?.destinationFolderId, call.body?.messageIds])).toEqual([
+      ["/api/accounts/a/messages/move", "a:Trash", ["x1"]]
+    ]);
+  });
+});
+
 describe("deleting a selection across mailboxes", () => {
   function deleteHarness(messages: Message[], respond: (call: Call) => Response | undefined) {
     const { calls, apiFetch } = recordingFetch(respond);
     const skips: MailboxSkipReport[] = [];
     const notices: Array<{ title: string; description?: string }> = [];
+    const errors: string[] = [];
     const moveMessagesToFolder = mock(async (folderId: string, options?: { messageIds?: string[]; destinationsByAccount?: ReadonlyMap<string, string> }) => ({
       ids: options?.messageIds ?? [],
       undoTargets: (options?.messageIds ?? []).map((id) => ({ messageId: id, restoreFolderId: "x", accountId: id.slice(0, 1) })),
@@ -137,14 +166,15 @@ describe("deleting a selection across mailboxes", () => {
       isFlaggedMessage: () => false, isTrashFolder: (id) => folders.some((item) => item.id === id && item.specialUse === "\\Trash"),
       moveMessagesToFolder, selectionStore: createSelectionStore(), lastSelectedIdRef: { current: null },
       setMessages() {}, setGroupMeta() {}, setPendingMessageActions() {}, setActiveMessageId() {}, setViewMessage() {},
-      refreshFolders: async () => {}, apiFetch, readErrorMessage: async () => "Synthetic error", reportError() {},
+      refreshFolders: async () => {}, apiFetch, readErrorMessage: async () => "Synthetic error",
+      reportError: (error) => { errors.push(error); },
       pushNotice: (notice) => notices.push(notice), confirmDelete: async () => "delete_mail_only",
       undoMoveOperation: async () => {}, noticeSuccessTimeout: 1000,
       getAccountFolders: async (accountId) => foldersByAccount[accountId] ?? null,
       canEditMailbox, reportMailboxSkips: (report) => skips.push(report)
     };
     const hook = renderHook(() => useMessageDeleteActions(options), { wrapper: I18nTestProvider });
-    return { hook, calls, skips, notices, moveMessagesToFolder };
+    return { hook, calls, skips, notices, errors, moveMessagesToFolder };
   }
 
   it("moves to each mailbox's trash, deletes for good what is already there, skips the read-only mailbox", async () => {
@@ -197,6 +227,32 @@ describe("deleting a selection across mailboxes", () => {
     });
     expect(h.skips[0]).toMatchObject({ total: 3, skipped: [{ id: "b1", accountId: "b" }, { id: "b2", accountId: "b" }] });
     expect(h.notices[0]?.title).toBe("Message deleted permanently.");
+  });
+  it("passes each message's mailbox to the move, also for a message outside the list", async () => {
+    const other = message("b", "b1");
+    const h = deleteHarness([message("a", "a1")], () => Response.json({}));
+    await act(async () => { await h.hook.result.current.handleDeleteMessage(other); });
+    const [folderId, moveOptions] = h.moveMessagesToFolder.mock.calls[0]! as unknown as
+      [string, { accountByMessageId?: ReadonlyMap<string, string> }];
+    expect(folderId).toBe("b:Papierkorb");
+    expect(Object.fromEntries(moveOptions.accountByMessageId ?? [])).toEqual({ b1: "b" });
+  });
+
+  it("goes on with the other mailboxes when permanent deletion fails in one", async () => {
+    const messages = [message("a", "a1", "Trash"), message("a", "a2"), message("b", "b1", "Papierkorb")];
+    const h = deleteHarness(messages, (call) => {
+      if (call.path === "/api/accounts/a/messages/a1/delete") return new Response(null, { status: 503 });
+      if (call.path.endsWith("/delete")) return Response.json({ ok: true, action: "deleted" });
+      return Response.json({});
+    });
+    await act(async () => {
+      await h.hook.result.current.handleDeleteMessagesByIds(messages.map((item) => item.id), { selectedIds: messages.map((item) => item.id) });
+    });
+    expect(h.calls.filter((call) => call.path.endsWith("/delete")).map((call) => call.path))
+      .toEqual(["/api/accounts/a/messages/a1/delete", "/api/accounts/b/messages/b1/delete"]);
+    expect(h.errors).toEqual(["Synthetic error"]);
+    // What was removed still gets its notice.
+    expect(h.notices[0]).toMatchObject({ title: "Moved message to Trash.", description: "1 message was deleted permanently." });
   });
 });
 

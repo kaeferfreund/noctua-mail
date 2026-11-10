@@ -97,7 +97,8 @@ describe("resolveMoveTargetRequest", () => {
     });
 
     expect(result).toEqual({
-      messageIds: ["child"]
+      messageIds: ["child"],
+      accountByMessageId: new Map([["child", "acc"]])
     });
   });
 
@@ -117,7 +118,8 @@ describe("resolveMoveTargetRequest", () => {
     });
 
     expect(result).toEqual({
-      messageIds: ["root"]
+      messageIds: ["root"],
+      accountByMessageId: new Map([["root", "acc"]])
     });
   });
 });

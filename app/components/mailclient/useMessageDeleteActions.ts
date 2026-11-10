@@ -698,6 +698,7 @@ export function useMessageDeleteActions({
         if (moveTargets.length > 0) {
           const moveResult = await moveMessagesToFolder(trashByAccount.get(moveTargets[0].accountId) ?? "", {
             messageIds: moveTargets.map((target) => target.id),
+            accountByMessageId: new Map(moveTargets.map((target) => [target.id, target.accountId])),
             destinationsByAccount: trashByAccount,
             collectSkipped: skipped,
             skipAction: "delete",
@@ -718,8 +719,13 @@ export function useMessageDeleteActions({
             permanentlyDeletedCount += deletedIds.length;
             removedIds.push(...deletedIds);
           } catch (error) {
-            if (!(error instanceof MailboxPermissionError)) throw error;
-            accountTargets.forEach((target) => skipped.push({ id: target.id, accountId, reason: "permission" }));
+            if (error instanceof MailboxPermissionError) {
+              accountTargets.forEach((target) => skipped.push({ id: target.id, accountId, reason: "permission" }));
+            } else {
+              // One mailbox failing does not stop the others, and what was
+              // already removed still gets its notice, undo and refresh below.
+              reportError(error instanceof Error && error.message ? error.message : options.errorMessage);
+            }
           }
         }
         // The skip notice comes after the success notice, so it is the newest one shown.
