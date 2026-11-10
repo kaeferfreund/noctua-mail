@@ -1,8 +1,32 @@
 /** Shared client/server vocabulary of the domain view („Sammler“). */
 
+import type { Folder } from "@/lib/data";
+import {
+  findArchiveFolder,
+  findDraftsFolder,
+  findInboxFolder,
+  findJunkFolder,
+  findSentFolder,
+  findTrashFolder
+} from "@/lib/specialFolders";
+
 /** Special folders the domain view can switch between, in display order. */
 export const DOMAIN_FOLDER_ROLES = ["inbox", "sent", "drafts", "archive", "trash", "spam"] as const;
 export type DomainFolderRole = (typeof DOMAIN_FOLDER_ROLES)[number];
+
+const ROLE_FINDERS: Record<DomainFolderRole, (folders: Folder[], accountId: string) => Folder | null | undefined> = {
+  inbox: findInboxFolder,
+  sent: findSentFolder,
+  drafts: findDraftsFolder,
+  archive: findArchiveFolder,
+  trash: findTrashFolder,
+  spam: findJunkFolder
+};
+
+/** The folder of `accountId` playing `role`, or null when the mailbox has none. */
+export function findDomainRoleFolder(folders: Folder[], accountId: string, role: DomainFolderRole) {
+  return ROLE_FINDERS[role](folders, accountId) ?? null;
+}
 
 export function parseDomainFolderRole(value: unknown): DomainFolderRole {
   return typeof value === "string" && (DOMAIN_FOLDER_ROLES as readonly string[]).includes(value)

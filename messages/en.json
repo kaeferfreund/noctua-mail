@@ -2299,9 +2299,8 @@
     "openDomain": "Show all mailboxes of {domain}",
     "collapse": "Collapse {domain}",
     "expand": "Expand {domain}",
-    "allMailboxes": "All mailboxes",
-    "mailboxCount": "{count, plural, one {# mailbox} other {# mailboxes}}",
     "folderSwitch": "Folder in the domain view",
+    "folderSwitchMailbox": "Mailbox folders",
     "close": "Close domain view",
     "roles": {
       "inbox": "Inbox",
