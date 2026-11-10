@@ -16,6 +16,27 @@ import { NOTICE_TIMEOUTS } from "./constants";
 import type { UndoMoveTarget } from "./useMessageMoveActions";
 
 import type { ContinueAfterRemoval } from "./messagelist/successfulRemoval";
+import {
+  groupByAccount,
+  type CanEditMailbox,
+  type MailboxAction,
+  type MailboxSkipReport,
+  type ReportMailboxSkips
+} from "./domain/mailboxFanOut";
+
+/** Result of a command on one message: done, skipped for lack of permission, or failed (reported). */
+export type MessageCommandOutcome = "done" | "denied" | "failed";
+/** `quietDenied`: a bulk caller collects denied messages for one notice of its own. */
+export type MessageCommandOptions = { quietDenied?: boolean };
+
+/** The action a flag change is named by in a notice about skipped messages. */
+export function flagMutationAction(payload: { value: boolean; flag?: string; keyword?: string }): MailboxAction {
+  if (payload.flag === "seen") return payload.value ? "markRead" : "markUnread";
+  if (payload.flag === "answered") return payload.value ? "answered" : "unanswered";
+  if (payload.keyword === TODO_FLAG) return payload.value ? "todo" : "untodo";
+  if (payload.keyword === DONE_FLAG) return "done";
+  return payload.value ? "flag" : "unflag";
+}
 
 type UseMessageMutationsProps = {
   continueAfterRemoval?: ContinueAfterRemoval;
@@ -50,6 +71,8 @@ type UseMessageMutationsProps = {
     categorySignals: string[]
   ) => void;
   queueFilteredSearchRefresh: (hasCriteria: boolean) => void;
+  canEditMailbox?: CanEditMailbox;
+  reportMailboxSkips?: ReportMailboxSkips;
 };
 
 type SystemFlag = "seen" | "answered" | "flagged" | "draft" | "deleted";
@@ -89,13 +112,52 @@ export function useMessageMutations({
   setActiveTopicSuggestionMessages,
   updateThreadCacheWithFlags,
   updateThreadCacheWithCategory,
-  queueFilteredSearchRefresh
+  queueFilteredSearchRefresh,
+  canEditMailbox,
+  reportMailboxSkips
 }: UseMessageMutationsProps) {
   const viewMessageId = viewMessage?.id;
   const folderRefreshGeneration = useRef(0);
   useEffect(() => () => { folderRefreshGeneration.current += 1; }, [activeAccountId]);
 
   const tn = useTranslations("Notifications");
+
+  // Permission handling shared by every command: a mailbox the user may not
+  // change is skipped up front, a 403 from its route the same way, and the
+  // skip is named in a notice (or left to a bulk caller collecting them).
+  const reportDenied = useCallback((
+    message: Pick<Message, "id" | "accountId">,
+    action: MailboxAction,
+    quiet?: boolean
+  ) => {
+    if (!quiet) {
+      reportMailboxSkips?.({
+        action,
+        total: 1,
+        skipped: [{ id: message.id, accountId: message.accountId || activeAccountId, reason: "permission" }]
+      });
+    }
+  }, [activeAccountId, reportMailboxSkips]);
+  const deniedUpFront = useCallback((
+    message: Pick<Message, "id" | "accountId">,
+    action: MailboxAction,
+    quiet?: boolean
+  ) => {
+    if (!canEditMailbox || canEditMailbox(message.accountId || activeAccountId)) return false;
+    reportDenied(message, action, quiet);
+    return true;
+  }, [activeAccountId, canEditMailbox, reportDenied]);
+  const deniedByServer = useCallback((
+    res: Response,
+    message: Pick<Message, "id" | "accountId">,
+    action: MailboxAction,
+    quiet?: boolean
+  ) => {
+    if (res.status !== 403 || !reportMailboxSkips) return false;
+    reportDenied(message, action, quiet);
+    return true;
+  }, [reportDenied, reportMailboxSkips]);
+
   const reconcileMessageFlags = useCallback((
     message: Message,
     flags: string[],
@@ -166,29 +228,36 @@ export function useMessageMutations({
       return data.flags ?? [];
     } catch (error) {
       if (!(error instanceof Response)) throw error;
-      await reportResponseError(error);
+      if (!deniedByServer(error, message, flagMutationAction(payload))) await reportResponseError(error);
       return null;
     }
-  }, [activeAccountId, apiFetch, reportResponseError]);
+  }, [activeAccountId, apiFetch, deniedByServer, reportResponseError]);
 
+  // One request per mailbox. Mailboxes the user may not change are skipped up
+  // front, a 403 the same way; one notice names them, the rest is applied.
   const requestBulkFlagMutation = useCallback(async (
     messages: Array<Pick<Message, "id" | "accountId">>,
     payload: { value: boolean; flag?: SystemFlag; keyword?: string }
   ) => {
-    const idsByAccount = new Map<string, string[]>();
-    for (const message of messages) {
-      const accountId = message.accountId || activeAccountId;
-      idsByAccount.set(accountId, [...(idsByAccount.get(accountId) ?? []), message.id]);
-    }
-    const results: Array<{ messageId: string; flags: string[] }> = [];
+    const results: Array<{ messageId: string; flags: string[]; accountId?: string }> = [];
+    const skipped: MailboxSkipReport["skipped"] = [];
     let failed = false;
-    for (const [accountId, messageIds] of idsByAccount) {
+    for (const [accountId, accountMessages] of groupByAccount(messages, activeAccountId)) {
+      const messageIds = accountMessages.map((message) => message.id);
+      if (canEditMailbox && !canEditMailbox(accountId)) {
+        messageIds.forEach((id) => skipped.push({ id, accountId, reason: "permission" }));
+        continue;
+      }
       const res = await apiFetch(buildAccountMessagesActionPath(accountId, "flags/bulk"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...payload, messageIds })
       });
       if (!res.ok) {
+        if (res.status === 403 && reportMailboxSkips) {
+          messageIds.forEach((id) => skipped.push({ id, accountId, reason: "permission" }));
+          continue;
+        }
         await reportResponseError(res);
         failed = true;
         continue;
@@ -204,10 +273,13 @@ export function useMessageMutations({
           description: data.skipped[0]?.reason
         });
       }
-      results.push(...(data.results ?? []));
+      results.push(...(data.results ?? []).map((result) => ({ ...result, accountId })));
+    }
+    if (skipped.length > 0) {
+      reportMailboxSkips?.({ action: flagMutationAction(payload), total: messages.length, skipped });
     }
     return failed && results.length === 0 ? null : results;
-  }, [activeAccountId, apiFetch, pushNotice, reportResponseError, tn]);
+  }, [activeAccountId, apiFetch, canEditMailbox, pushNotice, reportMailboxSkips, reportResponseError, tn]);
 
   const reconcileMoveMutation = useCallback((
     message: Message,
@@ -234,7 +306,7 @@ export function useMessageMutations({
     const movedMessage = computeOptimisticMovedMessage(message, optimisticParams);
 
     updateMessagesWithCurrentResultPrune((item) => {
-      if (item.id !== message.id) return item;
+      if (item.id !== message.id || item.accountId !== message.accountId) return item;
       return computeOptimisticMovedMessage(item, optimisticParams);
     }, { source });
 
@@ -294,14 +366,16 @@ export function useMessageMutations({
       method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
     }), [activeAccountId, apiFetch]);
 
-  const handleArchiveMessage = useCallback(async (message: Message) => {
+  const handleArchiveMessage = useCallback(async (message: Message, options?: MessageCommandOptions): Promise<MessageCommandOutcome> => {
+    if (deniedUpFront(message, "archive", options?.quietDenied)) return "denied";
     try {
       const navigationRows = getNavigationRows?.();
       applyMoveReconcileSuppression([message]);
       const res = await requestMessageCommand(message, "archive");
       if (!res.ok) {
+        if (deniedByServer(res, message, "archive", options?.quietDenied)) return "denied";
         reportError(await readErrorMessage(res));
-        return;
+        return "failed";
       }
       const data = (await res.json()) as {
         action: "moved";
@@ -321,10 +395,14 @@ export function useMessageMutations({
         successTitle: tn("archived"),
         undoSuccessMessage: tn("archiveUndone")
       });
+      return "done";
     } catch {
       reportError(tn("archiveFailed"));
+      return "failed";
     }
   }, [
+    deniedByServer,
+    deniedUpFront,
     requestMessageCommand,
     applyMoveReconcileSuppression,
     getNavigationRows,
@@ -397,15 +475,17 @@ export function useMessageMutations({
     [requestMessageCommand, readErrorMessage, reportError, pushNotice, confirmUnsubscribe, setPendingMessageActions, tn]
   );
 
-  const handleMarkSpam = useCallback(async (message: Message) => {
+  const handleMarkSpam = useCallback(async (message: Message, options?: MessageCommandOptions): Promise<MessageCommandOutcome> => {
+    if (deniedUpFront(message, "spam", options?.quietDenied)) return "denied";
     setPendingMessageActions((prev) => new Set(prev).add(message.id));
     try {
       const navigationRows = getNavigationRows?.();
       applyMoveReconcileSuppression([message]);
       const res = await requestMessageCommand(message, "spam");
       if (!res.ok) {
+        if (deniedByServer(res, message, "spam", options?.quietDenied)) return "denied";
         reportError(await readErrorMessage(res));
-        return;
+        return "failed";
       }
       const data = (await res.json()) as {
         action: "moved";
@@ -425,8 +505,10 @@ export function useMessageMutations({
         successTitle: tn("markedSpam"),
         undoSuccessMessage: tn("spamUndone")
       });
+      return "done";
     } catch {
       reportError(tn("spamFailed"));
+      return "failed";
     } finally {
       setPendingMessageActions((prev) => {
         const next = new Set(prev);
@@ -435,6 +517,8 @@ export function useMessageMutations({
       });
     }
   }, [
+    deniedByServer,
+    deniedUpFront,
     requestMessageCommand,
     applyMoveReconcileSuppression,
     getNavigationRows,
@@ -445,15 +529,17 @@ export function useMessageMutations({
     tn
   ]);
 
-  const handleMarkNotSpam = useCallback(async (message: Message) => {
+  const handleMarkNotSpam = useCallback(async (message: Message, options?: MessageCommandOptions): Promise<MessageCommandOutcome> => {
+    if (deniedUpFront(message, "notSpam", options?.quietDenied)) return "denied";
     setPendingMessageActions((prev) => new Set(prev).add(message.id));
     try {
       const navigationRows = getNavigationRows?.();
       applyMoveReconcileSuppression([message]);
       const res = await requestMessageCommand(message, "not-spam");
       if (!res.ok) {
+        if (deniedByServer(res, message, "notSpam", options?.quietDenied)) return "denied";
         reportError(await readErrorMessage(res));
-        return;
+        return "failed";
       }
       const data = (await res.json()) as {
         action: "moved";
@@ -473,8 +559,10 @@ export function useMessageMutations({
         successTitle: tn("markedNotSpam"),
         undoSuccessMessage: tn("notSpamUndone")
       });
+      return "done";
     } catch {
       reportError(tn("notSpamFailed"));
+      return "failed";
     } finally {
       setPendingMessageActions((prev) => {
         const next = new Set(prev);
@@ -483,6 +571,8 @@ export function useMessageMutations({
       });
     }
   }, [
+    deniedByServer,
+    deniedUpFront,
     requestMessageCommand,
     applyMoveReconcileSuppression,
     getNavigationRows,
@@ -529,6 +619,8 @@ export function useMessageMutations({
     value: boolean,
     shouldRetry?: () => boolean
   ) => {
+    // Auto-read (shouldRetry) is gated by role elsewhere and never notifies.
+    if (!shouldRetry && deniedUpFront(message, flagMutationAction({ flag, value }))) return;
     try {
       const flags = await requestMessageFlagMutation(message, { flag, value }, shouldRetry);
       if (!flags) return;
@@ -538,7 +630,7 @@ export function useMessageMutations({
       reportError(tn("flagFailed"));
     }
   }, [
-    applyFlagsResults, hasFilteredSearchCriteria, queueFilteredSearchRefresh, reportError,
+    applyFlagsResults, deniedUpFront, hasFilteredSearchCriteria, queueFilteredSearchRefresh, reportError,
     requestMessageFlagMutation, tn
   ]);
 
@@ -547,6 +639,7 @@ export function useMessageMutations({
     keyword: string,
     value: boolean
   ) => {
+    if (deniedUpFront(message, flagMutationAction({ keyword, value }))) return;
     try {
       const flags = await requestMessageFlagMutation(message, { keyword, value });
       if (!flags) return;
@@ -556,24 +649,26 @@ export function useMessageMutations({
       reportError(tn("keywordFailed"));
     }
   }, [
-    applyFlagsResults, hasFilteredSearchCriteria, queueFilteredSearchRefresh, reportError,
+    applyFlagsResults, deniedUpFront, hasFilteredSearchCriteria, queueFilteredSearchRefresh, reportError,
     requestMessageFlagMutation, tn
   ]);
 
   const applyBulkFlagResults = useCallback((
     messages: Message[],
-    results: Array<{ messageId: string; flags: string[] }>,
+    results: Array<{ messageId: string; flags: string[]; accountId?: string }>,
     source: string
   ) => {
-    const flagsByMessageId = new Map(results.map((r) => [r.messageId, r.flags]));
+    // Keyed by mailbox too: the same message can be listed for two mailboxes.
+    const key = (accountId: string | undefined, messageId: string) => `${accountId || activeAccountId}\u0000${messageId}`;
+    const flagsByMessageId = new Map(results.map((r) => [key(r.accountId, r.messageId), r.flags]));
     const pairs = messages
       .map((message) => {
-        const nextFlags = flagsByMessageId.get(message.id);
+        const nextFlags = flagsByMessageId.get(key(message.accountId, message.id));
         return nextFlags ? { message, nextFlags } : null;
       })
       .filter((pair): pair is { message: Message; nextFlags: string[] } => pair !== null);
     applyFlagsResults(pairs, source);
-  }, [applyFlagsResults]);
+  }, [activeAccountId, applyFlagsResults]);
 
   const updateFlagStateBulk = useCallback(async (
     messages: Message[],
@@ -619,7 +714,7 @@ export function useMessageMutations({
   ) => {
     setPendingMessageActions((prev) => new Set(prev).add(message.id));
     try {
-      const res = await apiFetch(buildAccountMessageActionPath(activeAccountId, message.id, "category"), {
+      const res = await apiFetch(buildAccountMessageActionPath(message.accountId || activeAccountId, message.id, "category"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ category })
@@ -732,6 +827,7 @@ export function useMessageMutations({
     collapsedThreadMessages?: Message[],
     clickedBadge?: "todo" | "done"
   ) => {
+    if (deniedUpFront(message, hasTodoFlag(message) ? "done" : "todo")) return;
     try {
       if (collapsedThreadMessages && collapsedThreadMessages.length > 0 && clickedBadge) {
         if (clickedBadge === "todo") {
@@ -800,7 +896,7 @@ export function useMessageMutations({
       reportError(tn("todoFailed"));
     }
   }, [
-    hasFilteredSearchCriteria, queueFilteredSearchRefresh, reconcileMessageFlags, reportError,
+    deniedUpFront, hasFilteredSearchCriteria, queueFilteredSearchRefresh, reconcileMessageFlags, reportError,
     requestMessageFlagMutation, transitionTodoState, tn
   ]);
 

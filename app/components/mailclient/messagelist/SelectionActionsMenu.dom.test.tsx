@@ -90,7 +90,7 @@ function renderMenu({
           selectionStore={store}
           hasActiveMessage={activeMessageId !== null}
           actions={actions}
-          allTopics={[]}
+          onGetTopics={() => []}
           hasOtherAccounts={false}
           onGetRecentFolders={() => []}
           onSelectAll={() => {
@@ -234,7 +234,7 @@ describe("right-click bulk menu", () => {
             ids: Array.from(store.getIds()),
             threadIds: Array.from(store.getIds())
           }))}
-          allTopics={[]}
+          onGetTopics={() => []}
           hasOtherAccounts
           onGetRecentFolders={() => []}
         />

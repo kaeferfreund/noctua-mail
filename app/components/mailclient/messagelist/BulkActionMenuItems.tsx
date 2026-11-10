@@ -21,7 +21,8 @@ import type { BulkActionMenuActions } from "./selectionActions";
 
 export type BulkActionMenuItemsProps = {
   actions: BulkActionMenuActions;
-  allTopics: Topic[];
+  /** Topics of the selection's mailbox (read when the menu opens; empty across mailboxes). */
+  onGetTopics: () => Topic[];
   hasOtherAccounts: boolean;
   onGetRecentFolders: () => Folder[];
 };
@@ -34,11 +35,13 @@ export type BulkActionMenuItemsProps = {
  */
 export default function BulkActionMenuItems({
   actions,
-  allTopics,
+  onGetTopics,
   hasOtherAccounts,
   onGetRecentFolders
 }: BulkActionMenuItemsProps) {
   const t = useTranslations("List");
+  // Items render when the menu opens, so the topics match the current selection.
+  const allTopics = onGetTopics();
   return (
     <>
       <DropdownMenu.Item shortcut="R" onSelect={actions.onMarkRead}>

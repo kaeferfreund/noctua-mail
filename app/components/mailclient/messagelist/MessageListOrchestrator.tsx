@@ -35,7 +35,8 @@ import {
   type UndoMoveTarget
 } from "../useMessageMoveActions";
 import { useMessageDeleteActions } from "../useMessageDeleteActions";
-import { useMessageMutations } from "../useMessageMutations";
+import { useMessageMutations, type MessageCommandOptions, type MessageCommandOutcome } from "../useMessageMutations";
+import type { CanEditMailbox, ReportMailboxSkips } from "../domain/mailboxFanOut";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 
 /**
@@ -87,7 +88,7 @@ export type MessageListHandle = {
   selectionStore: SelectionStore;
   lastSelectedIdRef: React.MutableRefObject<string | null>;
   setPendingMessageActions: React.Dispatch<React.SetStateAction<Set<string>>>;
-  handleArchiveMessage: (message: Message) => Promise<void>;
+  handleArchiveMessage: (message: Message, options?: MessageCommandOptions) => Promise<MessageCommandOutcome>;
   handleUnsubscribe: (message: Message) => Promise<void>;
   handleDeleteMessage: (
     message: Message,
@@ -96,8 +97,8 @@ export type MessageListHandle = {
   handleDeleteMessagesByIds: (ids: string[], options?: { selectedIds: string[] }) => Promise<void>;
   handleMoveMessages: (destinationFolderId: string, messageIds?: string[]) => void;
   moveMessagesToFolder: MoveMessagesToFolder;
-  handleMarkSpam: (message: Message) => Promise<void>;
-  handleMarkNotSpam: (message: Message) => Promise<void>;
+  handleMarkSpam: (message: Message, options?: MessageCommandOptions) => Promise<MessageCommandOutcome>;
+  handleMarkNotSpam: (message: Message, options?: MessageCommandOptions) => Promise<MessageCommandOutcome>;
   handleSetCategory: (
     message: Message,
     category: "newsletter" | "notification" | "transactional" | null
@@ -175,8 +176,13 @@ export type MessageListOrchestratorMutationInputs = {
   searchScope: "folder" | "all";
   includeThreadAcrossFoldersForList: boolean;
   supportsThreads: boolean;
+  /** Known folders of every listed mailbox (the active one's and, in the domain view, the others'). */
   folders: Folder[];
   folderById: Map<string, { name: string }>;
+  /** A mailbox's folders, read when not known yet. */
+  getAccountFolders?: (accountId: string) => Promise<Folder[] | null>;
+  canEditMailbox?: CanEditMailbox;
+  reportMailboxSkips?: ReportMailboxSkips;
   messages: Message[];
   threadScopeMessages: Message[];
   visibleMessages: VisibleMessageEntry[];
@@ -360,6 +366,10 @@ export default function MessageListOrchestrator({
     messages: mutationInputs.messages,
     selectionStore,
     folderById: mutationInputs.folderById,
+    folders: mutationInputs.folders,
+    getAccountFolders: mutationInputs.getAccountFolders,
+    canEditMailbox: mutationInputs.canEditMailbox,
+    reportMailboxSkips: mutationInputs.reportMailboxSkips,
     lastSelectedIdRef,
     setFolders: mutationInputs.setFolders,
     setMessages: mutationInputs.setMessages,
@@ -425,7 +435,10 @@ export default function MessageListOrchestrator({
       mutationInputs.reconcileActiveTopicSuggestionRemovals(messageIds);
     },
     markMessagesMutated: mutationInputs.markMessagesMutated,
-    markDeleteReconcileSuppression: mutationInputs.markDeleteReconcileSuppression
+    markDeleteReconcileSuppression: mutationInputs.markDeleteReconcileSuppression,
+    getAccountFolders: mutationInputs.getAccountFolders,
+    canEditMailbox: mutationInputs.canEditMailbox,
+    reportMailboxSkips: mutationInputs.reportMailboxSkips
   });
 
   const {
@@ -466,7 +479,9 @@ export default function MessageListOrchestrator({
     setActiveTopicSuggestionMessages: mutationInputs.setActiveTopicSuggestionMessages,
     updateThreadCacheWithFlags: mutationInputs.updateThreadCacheWithFlags,
     updateThreadCacheWithCategory: mutationInputs.updateThreadCacheWithCategory,
-    queueFilteredSearchRefresh: mutationInputs.queueFilteredSearchRefresh
+    queueFilteredSearchRefresh: mutationInputs.queueFilteredSearchRefresh,
+    canEditMailbox: mutationInputs.canEditMailbox,
+    reportMailboxSkips: mutationInputs.reportMailboxSkips
   });
 
   // Publish the handle. `selectionStore` and `lastSelectedIdRef` are

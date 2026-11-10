@@ -106,7 +106,7 @@ for (const selectedDuringRequest of ["target", "other", "removed-row"] as const)
     apiFetch: () => response
   });
   const view = render(<Theme><MessageListOrchestrator {...input} listHandleRef={handle} /></Theme>);
-  let pending!: Promise<void>;
+  let pending!: Promise<unknown>;
   act(() => { pending = handle.current!.handleArchiveMessage(messages[0]); });
   const current = selectedDuringRequest === "other" ? messages[2] : messages[0];
   selected = current;
