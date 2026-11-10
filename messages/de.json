@@ -2326,9 +2326,8 @@
     "openDomain": "Alle Postfächer von {domain} anzeigen",
     "collapse": "{domain} einklappen",
     "expand": "{domain} ausklappen",
-    "allMailboxes": "Alle Postfächer",
-    "mailboxCount": "{count, plural, one {# Postfach} other {# Postfächer}}",
     "folderSwitch": "Ordner im Sammler",
+    "folderSwitchMailbox": "Ordner des Postfachs",
     "close": "Sammler schließen",
     "roles": {
       "inbox": "Posteingang",
