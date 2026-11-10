@@ -13,6 +13,23 @@ import { getOwnAddresses } from "@/lib/ownAddresses";
 import { assertMcpToolPermission, listMcpTokenAccounts, mcpTokenScopes, resolveMcpToolContext } from "@/lib/mcpAuth";
 import { mcpToolScope, type McpScope } from "@/lib/mcpPermissions";
 import { isMcpToolRateLimited } from "@/lib/mcpRateLimit";
+import {
+  MCP_ATTACHMENT_DEFAULT_TEXT_CHARS,
+  MCP_ATTACHMENT_MAX_BYTES,
+  MCP_ATTACHMENT_MAX_REQUEST_BYTES,
+  MCP_ATTACHMENT_MAX_SOURCE_BYTES,
+  MCP_ATTACHMENT_MAX_TEXT_CHARS,
+  classifyAttachment,
+  decodeAttachmentText,
+  detectImageType,
+  formatByteSize,
+  pageAttachmentText,
+  toMcpAttachmentSummary,
+  withAttachmentLoadSlot,
+  type McpAttachmentForm
+} from "@/lib/mcpAttachments";
+import { readStoredAttachmentData, StoredAttachmentTooLargeError } from "@/lib/mail/storedAttachmentData";
+import { buildAccountAttachmentPath } from "@/lib/accountApiPaths";
 import { enrichMessagesWithThreadCollab } from "@/app/api/_helpers/enrichMessagesWithThreadCollab";
 import { getThreadCollabState, listThreadComments, listThreadActivity,
   updateThreadCollabState, addThreadComment } from "@/lib/threadCollab";
@@ -25,6 +42,7 @@ import {
   isJSONRPCError,
   isJSONRPCRequest,
   isJSONRPCResponse,
+  type CallToolResult,
   type JSONRPCMessage,
   type MessageExtraInfo,
   type RequestId
@@ -32,7 +50,7 @@ import {
 import { z } from "zod";
 import { enrichMessagesWithThreadTopics } from "@/app/api/_helpers/enrichMessagesWithThreadTopics";
 import { runNewMailCheck } from "@/app/api/_helpers/newMailCheck";
-import type { Account, Folder, Message, McpTokenMetadata } from "@/lib/data";
+import type { Account, Attachment, Folder, Message, McpTokenMetadata } from "@/lib/data";
 import {
   getFolders,
   getMessageById,
@@ -337,6 +355,33 @@ const SEARCH_RESULT_TOPIC_SCHEMA = {
   matchCount: z.number().optional()
 };
 
+const ATTACHMENT_SUMMARY_SCHEMA = z.object({ id: z.string(), filename: z.string(), contentType: z.string(), size: z.number(), inline: z.boolean() });
+
+const ATTACHMENT_LIMITS_TEXT =
+  `Limits: an attachment larger than ${formatByteSize(MCP_ATTACHMENT_MAX_BYTES)} cannot be opened (open it in Noctua Mail instead); ` +
+  `all calls in one request together load at most ${formatByteSize(MCP_ATTACHMENT_MAX_REQUEST_BYTES)}; ` +
+  `text is returned in pages of maxChars (default ${MCP_ATTACHMENT_DEFAULT_TEXT_CHARS}, max ${MCP_ATTACHMENT_MAX_TEXT_CHARS}) from offset.`;
+
+const GET_MESSAGE_ATTACHMENT_SCHEMA = {
+  ...MESSAGE_ID_SCHEMA,
+  messageId: MESSAGE_ID_SCHEMA.messageId.describe("Message (or draft) id the attachment belongs to. Pass either messageId or url."),
+  attachmentId: z.string().trim().min(1).max(256).describe("Attachment id from list_message_attachments, a message's `attachments` or get_draft_message."),
+  offset: z.number().int().min(0).optional().describe("Text attachments: character offset of the page to return (use nextOffset of the previous page)."),
+  maxChars: z.number().int().min(1).max(MCP_ATTACHMENT_MAX_TEXT_CHARS).optional()
+    .describe(`Text attachments: characters per page, default ${MCP_ATTACHMENT_DEFAULT_TEXT_CHARS}, max ${MCP_ATTACHMENT_MAX_TEXT_CHARS}.`),
+  includeData: z.boolean().optional().describe(
+    "PDF, office and other non-text, non-image files: also return the original file as an embedded resource (base64). Use it when you can read the format yourself, e.g. PDFs."
+  )
+};
+
+const GET_MESSAGE_ATTACHMENT_OUTPUT_SCHEMA = {
+  ok: z.boolean(), accountId: z.string(), messageId: z.string(), attachment: ATTACHMENT_SUMMARY_SCHEMA,
+  form: z.enum(["image", "text", "resource", "metadata"]).describe("How the content is returned: image block, text, embedded resource (base64 file) or metadata only."),
+  bytes: z.number().optional().describe("Bytes of the file as loaded, when it was loaded."),
+  text: z.string().optional(), offset: z.number().optional(), returnedChars: z.number().optional(), totalChars: z.number().optional(),
+  truncated: z.boolean(), nextOffset: z.number().optional(), dataIncluded: z.boolean(), note: z.string().optional(), url: URL_OUTPUT
+};
+
 const SEARCH_RESULT_MESSAGE_SCHEMA = {
   deliveredTo: z.array(z.string()).optional(),
   originalTo: z.array(z.string()).optional(),
@@ -377,6 +422,7 @@ const SEARCH_RESULT_MESSAGE_SCHEMA = {
   topics: z.array(z.object(SEARCH_RESULT_TOPIC_SCHEMA)).optional(),
   topicSuggestions: z.array(z.object(SEARCH_RESULT_TOPIC_SCHEMA)).optional(),
   collab: z.object({ status: z.enum(["open", "in_progress", "waiting", "closed"]), assigneeUserId: z.string().nullable(), commentCount: z.number(), updatedAt: z.number() }).optional(),
+  attachments: z.array(ATTACHMENT_SUMMARY_SCHEMA).optional().describe("Attachments of the message; read one with get_message_attachment."),
   url: URL_OUTPUT.optional()
 };
 
@@ -562,8 +608,17 @@ function withLink(summary: string, url: string | null | undefined) {
   return url ? `${summary}\nOpen in Noctua Mail: ${url}` : summary;
 }
 
+/**
+ * A message as MCP returns it, with its link. Attachments keep their app route `url` (inline images in htmlBody point
+ * at it) and get the sanitized summary fields that get_message_attachment reports.
+ */
+function mcpMessage<T extends Message>(message: T) {
+  const attachments = message.attachments?.map(item => ({ ...item, ...toMcpAttachmentSummary(item) }));
+  return { ...message, ...(attachments ? { attachments } : {}), url: messageUrl(message) };
+}
+
 function withMessageUrls<T extends Message>(items: T[]) {
-  return items.map(item => ({ ...item, url: messageUrl(item) }));
+  return items.map(mcpMessage);
 }
 
 function formatMessageListContent(result: Omit<MessageListResult, "items"> & { items: (Message & { url: string })[] }) {
@@ -590,6 +645,7 @@ export const MCP_SERVER_INSTRUCTIONS = [
   "or mentions a mailbox, folder, sender, message or thread. Use the real mailbox data instead of answering from memory.",
   "Typical flow: list_accounts -> search_messages or list_messages_by_folder -> get details -> create_draft_message",
   "(mode reply/forward with messageId) or update_draft_message to revise an existing draft in place.",
+  "To read an attachment (PDF, image, CSV …): list_message_attachments (or the `attachments` of a message) -> get_message_attachment with its attachmentId.",
   "Drafts are never sent by these tools: the user reviews and sends them in Noctua Mail.",
   "Every created, changed or listed item comes back with a `url`; give that link to the user so they can open it directly.",
   "When the user pastes a Noctua Mail link (a URL whose query has `a=` and usually `m=`, like https://mail.example.test/?a=…&m=…), it identifies a mailbox and message:",
@@ -1033,7 +1089,7 @@ async function createDraftMessage(
     ...(result.warning ? { warning: result.warning } : {}),
     identityId: result.identityId,
     draftId: result.draftId,
-    message,
+    message: message ? mcpMessage(message) : message,
     url: message ? messageUrl(message) : null
   };
 }
@@ -1061,7 +1117,7 @@ async function updateDraftMessage(context: McpAccountContext, args: DraftUpdateP
     previousDraftId: existing.id,
     ...(result.warning ? { warning: result.warning } : {}),
     draftIdChanged: result.draftId !== existing.id,
-    message,
+    message: message ? mcpMessage(message) : message,
     url: message ? messageUrl(message) : null
   };
 }
@@ -1408,12 +1464,114 @@ export async function executeMcpHttpRequest(params: {
     if (!message) throw new Error("Message not found");
     await enrichMessagesWithThreadCollab([message], { accountId: ctx.accountId });
     await enrichMessagesWithThreadTopics([message], { accountId: ctx.accountId });
-    const item = { ...message, url: messageUrl(message) };
+    const item = mcpMessage(message);
     const draft = await getStoredDraft(ctx.accountId, message.id).then(stored => toEditableDraft(ctx.accountId, stored))
       .catch(error => { if (error instanceof DraftSaveError) return null; throw error; });
     return buildToolResult(withLink(`The link opens ${draft ? "draft" : "message"} ${JSON.stringify(message.subject)} id=${message.id} in mailbox ${mailbox}.`, item.url),
       { ok: true, accountId: ctx.accountId, account, folderId: message.folderId, messageId: message.id, message: item, isDraft: Boolean(draft),
         ...(draft ? { draft } : {}), url: item.url });
+  });
+
+  // Attachment bytes loaded by all get_message_attachment calls of this HTTP request (one batch).
+  let attachmentBytesLoaded = 0;
+  const requestBudgetError = () => new Error(`This request already loaded ${formatByteSize(attachmentBytesLoaded)} of attachments; ` +
+    `the limit per request is ${formatByteSize(MCP_ATTACHMENT_MAX_REQUEST_BYTES)}. Request further attachments in a separate call.`);
+
+  /** Bytes of an attachment of a message the token may read, within the per-call and per-request caps. */
+  async function loadAttachmentBytes(accountId: string, messageId: string, stored: Attachment, label: string, url: string) {
+    if (attachmentBytesLoaded >= MCP_ATTACHMENT_MAX_REQUEST_BYTES) throw requestBudgetError();
+    let data: Buffer | null;
+    try {
+      data = await withAttachmentLoadSlot(() => readStoredAttachmentData(accountId, messageId, stored,
+        { maxBytes: MCP_ATTACHMENT_MAX_BYTES, maxSourceBytes: MCP_ATTACHMENT_MAX_SOURCE_BYTES }));
+    } catch (error) {
+      if (!(error instanceof StoredAttachmentTooLargeError)) throw error;
+      const what = error.kind === "attachment" ? `Attachment ${label} is too large to open here: ${formatByteSize(error.size)} (${error.size} bytes)`
+        : `Attachment ${label} has to be extracted from a message source of ${formatByteSize(error.size)} (${error.size} bytes), which is too large to open here`;
+      throw new Error(withLink(`${what}; the limit is ${formatByteSize(error.cap)} (${error.cap} bytes). Open it in Noctua Mail instead.`, url));
+    }
+    if (!data) throw new Error(withLink(`The data of attachment ${label} is not available on the server. Open the message in Noctua Mail.`, url));
+    attachmentBytesLoaded += data.length;
+    if (attachmentBytesLoaded > MCP_ATTACHMENT_MAX_REQUEST_BYTES) throw requestBudgetError();
+    return data;
+  }
+
+  server.registerTool("list_message_attachments", {
+    title: "List attachments of an e-mail",
+    description: "List the attachments of an e-mail (or draft) with id, filename, content type, size and whether they are inline images. Select the message by messageId or by its Noctua Mail link (url). Read one with get_message_attachment.",
+    inputSchema: z.object(MESSAGE_ID_SCHEMA).strict(),
+    annotations: READ_ONLY,
+    outputSchema: { ok: z.boolean(), accountId: z.string(), messageId: z.string(), attachments: z.array(ATTACHMENT_SUMMARY_SCHEMA), url: URL_OUTPUT }
+  }, async args => {
+    const { ctx, id } = await resolveMessageTarget(context, { accountId: args.accountId, url: args.url, id: args.messageId }, "viewer", "messageId");
+    const message = await getMessageById(ctx.accountId, id);
+    if (!message) throw new Error("Message not found");
+    const attachments = (message.attachments ?? []).map(toMcpAttachmentSummary);
+    const url = messageUrl(message);
+    return buildToolResult(withLink([`Message ${message.id} has ${attachments.length} attachment(s).`,
+      ...attachments.map(item => `- ${JSON.stringify(item.filename)} id=${item.id} ${item.contentType} ${formatByteSize(item.size)}${item.inline ? " inline" : ""}`)].join("\n"), url),
+    { ok: true, accountId: ctx.accountId, messageId: message.id, attachments, url });
+  });
+
+  server.registerTool("get_message_attachment", {
+    title: "Open an attachment",
+    description: "Open an attachment of an e-mail or draft so you can read it. Images (PNG, JPEG, GIF, WebP) come back as an image; " +
+      "text-like files (text, CSV, JSON, XML, calendar, attached e-mails …) as text in pages (offset/maxChars, truncated, nextOffset); " +
+      "PDF, office documents and other files as metadata, plus the original file as an embedded resource (base64) when includeData is true. " +
+      `Select the message by messageId or url and the attachment by attachmentId (from list_message_attachments). ${ATTACHMENT_LIMITS_TEXT}`,
+    inputSchema: z.object(GET_MESSAGE_ATTACHMENT_SCHEMA).strict(),
+    annotations: READ_ONLY,
+    outputSchema: GET_MESSAGE_ATTACHMENT_OUTPUT_SCHEMA
+  }, async ({ attachmentId, offset, maxChars, includeData, ...target }) => {
+    const { ctx, id } = await resolveMessageTarget(context, { accountId: target.accountId, url: target.url, id: target.messageId }, "viewer", "messageId");
+    const message = await getMessageById(ctx.accountId, id);
+    if (!message) throw new Error("Message not found");
+    // Only an attachment row of this very message counts; ids of other messages or mailboxes are not found.
+    const stored = (message.attachments ?? []).find(item => item.id === attachmentId);
+    if (!stored) throw new Error("Attachment not found");
+    const attachment = toMcpAttachmentSummary(stored);
+    const url = messageUrl(message);
+    const label = `${JSON.stringify(attachment.filename)} (${attachment.contentType}, ${formatByteSize(attachment.size)})`;
+    const base = { ok: true, accountId: ctx.accountId, messageId: message.id, attachment, url };
+    const result = (form: McpAttachmentForm, summary: string, extra: Record<string, unknown>, blocks: CallToolResult["content"] = []) =>
+      ({ content: [{ type: "text" as const, text: withLink(summary, url) }, ...blocks],
+        structuredContent: { ...base, form, truncated: false, dataIncluded: false, ...extra } }) satisfies CallToolResult;
+
+    let kind = classifyAttachment(attachment.contentType, attachment.filename);
+    let note = kind === "document" ? "Text extraction is not available for this document type." : undefined;
+    if ((kind === "document" || kind === "binary") && !includeData) {
+      return result("metadata", `Attachment ${label}. ${note ?? "Binary file."} Pass includeData: true to receive the original file.`,
+        { note: note ?? "Binary file: the content is returned only with includeData." });
+    }
+
+    const data = await loadAttachmentBytes(ctx.accountId, message.id, stored, label, url);
+    if (kind === "image") {
+      const imageType = detectImageType(data);
+      if (imageType) {
+        return result("image", `Image attachment ${label}.`, { bytes: data.length, dataIncluded: true },
+          [{ type: "image", data: data.toString("base64"), mimeType: imageType }]);
+      }
+      kind = "binary";
+      note = "The file content is not the declared image type.";
+    }
+    if (kind === "text") {
+      const decoded = decodeAttachmentText(data, stored.contentType);
+      if (decoded !== null) {
+        const page = pageAttachmentText(decoded, offset, maxChars ?? MCP_ATTACHMENT_DEFAULT_TEXT_CHARS);
+        const range = `characters ${page.offset}-${page.offset + page.returnedChars} of ${page.totalChars}`;
+        return result("text", `Text attachment ${label}, ${range}${page.truncated ? `; continue with offset ${page.nextOffset}` : ""}.`,
+          { bytes: data.length, ...page }, [{ type: "text", text: page.text }]);
+      }
+      kind = "binary";
+      note = "The file is not readable as text.";
+    }
+    if (!includeData) {
+      return result("metadata", `Attachment ${label}. ${note} Pass includeData: true to receive the original file.`, { bytes: data.length, note });
+    }
+    const resourceUri = new URL(buildAccountAttachmentPath(ctx.accountId, message.id, attachment.id), readAuthEnv().baseURL).href;
+    return result("resource", `Attachment ${label} as embedded file.${note ? ` ${note}` : ""}`,
+      { bytes: data.length, dataIncluded: true, ...(note ? { note } : {}) },
+      [{ type: "resource", resource: { uri: resourceUri, mimeType: attachment.contentType, blob: data.toString("base64") } }]);
   });
 
   server.registerTool(

@@ -44,6 +44,10 @@ test("draft edit tools: reading a draft needs read, editing it needs drafts", ()
     .toEqual(["read", "read", "drafts", "drafts"]);
 });
 
+test("attachment tools only read: listing and opening attachments need read", () => {
+  expect(["list_message_attachments", "get_message_attachment"].map(mcpToolScope)).toEqual(["read", "read"]);
+});
+
 test("signature template tools: listing needs read, changing templates needs manage like identity management", () => {
   expect(["list_signature_templates", "save_signature_template", "delete_signature_template", "set_default_signature_template"].map(mcpToolScope))
     .toEqual(["read", "manage", "manage", "manage"]);
