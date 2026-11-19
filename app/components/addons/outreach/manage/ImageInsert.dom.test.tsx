@@ -52,7 +52,7 @@ describe("Bild einfügen", () => {
     fireEvent.click(picks[1]);
 
     const team = IMAGES[1];
-    const tag = `<img src="${team.url}" alt="" width="800" style="max-width:100%;height:auto">`;
+    const tag = `<img src="${team.url}" alt="" width="600" style="max-width:100%;height:auto">`;
     await waitFor(() => expect(openDialogElement()).toBeNull());
     expect(area.value).toBe(TEMPLATE.html.slice(0, at) + tag + TEMPLATE.html.slice(at));
     // The cursor sits inside alt="" so the user can describe the image right away.
@@ -76,7 +76,7 @@ describe("Bild einfügen", () => {
     ]);
     const dialog = await openDialog(page);
     fireEvent.click(await dialog.findByRole("button", { name: /kopfzeile\.png/ }));
-    await waitFor(() => expect(source(page).value).toContain(`<img src="${IMAGES[0].url}" alt="" width="1200"`));
+    await waitFor(() => expect(source(page).value).toContain(`<img src="${IMAGES[0].url}" alt="" width="600"`));
   });
 
   it("uploads the file as raw bytes, refuses a second submit while it runs and inserts the server's image", async () => {
@@ -107,7 +107,7 @@ describe("Bild einfügen", () => {
 
     await act(async () => { pending.release(json({ ok: true, image: NEW_IMAGE, created: true })); await pending.promise; });
     await waitFor(() => expect(openDialogElement()).toBeNull());
-    expect(source(page).value).toBe(`${TEMPLATE.html}<img src="${NEW_IMAGE.url}" alt="" width="640" style="max-width:100%;height:auto">`);
+    expect(source(page).value).toBe(`${TEMPLATE.html}<img src="${NEW_IMAGE.url}" alt="" width="600" style="max-width:100%;height:auto">`);
   });
 
   it("refuses a too large file and a wrong type before any request", async () => {

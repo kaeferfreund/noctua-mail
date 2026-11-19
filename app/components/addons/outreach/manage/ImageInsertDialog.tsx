@@ -27,11 +27,14 @@ export function imageFileRefusal(file: Pick<File, "name" | "type" | "size">): "t
   return null;
 }
 
+/** Common content width of a mail; Outlook for Windows shows an image at its `width` attribute and ignores `max-width`. */
+export const MAIL_IMAGE_MAX_WIDTH = 600;
+
 /** The `<img>` tag the editors insert; `src` is the server's root-relative URL as given. */
 export function imageTag(image: Pick<OutreachImage, "url" | "width">) {
   const src = image.url.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
   const head = `<img src="${src}" alt="`;
-  const tail = `"${image.width ? ` width="${image.width}"` : ""} style="max-width:100%;height:auto">`;
+  const tail = `"${image.width ? ` width="${Math.min(image.width, MAIL_IMAGE_MAX_WIDTH)}"` : ""} style="max-width:100%;height:auto">`;
   /** `altAt`: offset of the empty alt value inside the tag, where the cursor goes after inserting. */
   return { tag: head + tail, altAt: head.length };
 }
