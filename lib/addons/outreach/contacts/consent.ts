@@ -37,12 +37,14 @@ export function writeMembership(db: Database, accountId: string, contactId: stri
 
 /** Call inside the caller's write transaction to commit membership and enrollment together. */
 export function subscribeToList(db: Database, contact: ContactRow, listId: string,
-  consent: { at: number; source: string; explicit: boolean }, now: number) {
+  consent: { at: number; source: string; explicit: boolean; decisionAt?: number }, now: number) {
   const { accountId, id: contactId } = contact;
   const member = getMembership(db, accountId, contactId, listId);
   // An already active membership is a retry. Preserve the original consent and enrollment.
   if (!contact.suppressedReason && contact.emailConsent === "subscribed" && member?.status === "subscribed") return;
-  const decision = subscriptionDecision(contact, member, consent.at, consent.explicit);
+  // `decisionAt` is the earliest moment the consent can really have been given (see the subscribe API);
+  // `at` is what gets stored.
+  const decision = subscriptionDecision(contact, member, consent.decisionAt ?? consent.at, consent.explicit);
   if (decision === "contact_suppressed") throw new ContactError("Contact is suppressed", 409, decision);
   if (decision === "new_consent_required") throw new ContactError("New consent after the unsubscribe is required", 409, decision);
   if (contact.emailConsent !== "subscribed" || contact.consentAt === null || consent.at > contact.consentAt) {
