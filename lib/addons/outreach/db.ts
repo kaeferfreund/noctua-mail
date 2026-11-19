@@ -5,9 +5,9 @@ import { getDataDir } from "@/lib/runtimePaths";
 import { onShutdown } from "@/lib/server/shutdown";
 
 /**
- * The addon keeps ALL of its data in one SQLite file of its own. It never adds a table or a
- * column to `db/main.db` or to an account shard, so the mail storage needs no migration for
- * it and removing the addon is: flag off, delete this file.
+ * The addon stores its metadata in its own SQLite file and keeps image bytes under
+ * `addons/outreach/media/` in the data directory. The main database and account shards
+ * need no migration.
  */
 export function getOutreachDbPath() {
   return path.join(getDataDir(), "db", "addons", "outreach.db");
@@ -19,11 +19,11 @@ export function outreachDbExists() {
 }
 
 /** Bump with every schema change and add the step to `migrate`. */
-export const OUTREACH_SCHEMA_VERSION = 4;
+export const OUTREACH_SCHEMA_VERSION = 5;
 
 /**
- * Schema v1. Every table carries `accountId` (the mailbox that owns the row); every query
- * must filter by it. Times are epoch milliseconds. JSON columns hold arrays/objects as text.
+ * Schema v1. Every table carries `accountId` (the mailbox that owns the row). Mailbox
+ * queries must filter by it. Times are epoch milliseconds. JSON columns hold arrays/objects as text.
  * Tasks may add indexes in their own migration step, but a column or table change needs a
  * new schema version.
  */
@@ -316,6 +316,23 @@ const SCHEMA_V4 = `
   ALTER TABLE sequences ADD COLUMN statusChangedVia TEXT;
 `;
 
+/** Schema v5: each mailbox owns its image metadata; the bytes are shared by hash. */
+const SCHEMA_V5 = `
+  CREATE TABLE IF NOT EXISTS images (
+    accountId TEXT NOT NULL,
+    hash TEXT NOT NULL,
+    contentType TEXT NOT NULL,
+    bytes INTEGER NOT NULL,
+    width INTEGER,
+    height INTEGER,
+    filename TEXT NOT NULL,
+    createdAt INTEGER NOT NULL,
+    createdByUserId TEXT,
+    PRIMARY KEY (accountId, hash)
+  );
+  CREATE INDEX IF NOT EXISTS idx_images_hash ON images (hash);
+`;
+
 function schemaVersion(db: Database) {
   const current = Number((db.prepare("PRAGMA user_version").get() as { user_version?: number } | null)?.user_version ?? 0);
   if (current > OUTREACH_SCHEMA_VERSION) {
@@ -334,6 +351,7 @@ function migrate(db: Database) {
     if (current < 2) db.exec(SCHEMA_V2);
     if (current < 3) db.exec(SCHEMA_V3);
     if (current < 4) db.exec(SCHEMA_V4);
+    if (current < 5) db.exec(SCHEMA_V5);
     db.exec(`PRAGMA user_version = ${OUTREACH_SCHEMA_VERSION}`);
   }).immediate();
 }
