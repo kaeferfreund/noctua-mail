@@ -1,5 +1,6 @@
-import { afterAll, beforeAll, expect, test } from "bun:test";
+import { afterAll, beforeAll, expect, spyOn, test } from "bun:test";
 import { existsSync, mkdtempSync, rmSync, unlinkSync } from "node:fs";
+import { open } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { closeOutreachDb, getOutreachDb, getOutreachDbPath } from "@/lib/addons/outreach/db";
@@ -64,4 +65,23 @@ test("the public route serves only canonical, registered files, including with t
   unlinkSync(join(outreachMediaDir(), filename));
   expect((await request(filename, "HEAD", { "if-none-match": "*" })).status).toBe(404);
   expect(db.query("SELECT count(*) AS count FROM tracking_events").get()).toEqual({ count: 0 });
+});
+
+test("GET streams from the checked descriptor without calling readFile", async () => {
+  const bytes = Buffer.alloc(512 * 1024, 0x78);
+  Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==", "base64").copy(bytes);
+  const { image } = await saveOutreachImage(await getOutreachDb(), "test-mailbox", prepareImage(bytes, "large.gif"), null);
+  const filename = image.url.split("/").pop()!;
+  const file = await open(join(outreachMediaDir(), filename), "r");
+  const readFile = spyOn(Object.getPrototypeOf(file) as Pick<typeof file, "readFile">, "readFile");
+  await file.close();
+  try {
+    const response = await request(filename);
+    expect(response.status).toBe(200);
+    unlinkSync(join(outreachMediaDir(), filename));
+    expect(Buffer.from(await response.arrayBuffer())).toEqual(bytes);
+    expect(readFile).not.toHaveBeenCalled();
+  } finally {
+    readFile.mockRestore();
+  }
 });

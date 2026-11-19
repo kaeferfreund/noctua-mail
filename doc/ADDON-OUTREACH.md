@@ -191,13 +191,19 @@ or `.webp`). Mailboxes share the file bytes and keep separate library entries. T
 URL can be read by anyone who has it. There is no delete operation because previously sent
 mail depends on the URL. Back up the media directory with the addon database.
 
+Uploads and rehosting require a complete image header with dimensions from 1 to 16,384 pixels
+on each side. The server checks the header without decoding the image pixels. Rehosting keeps
+the source filename's base and adds or replaces the extension using the detected format.
+
 To migrate existing image references, use `bun scripts/outreach-rehost-images.ts --account example
 --host images.example.test --drop-links-to badge.example.test`. The command scans template HTML,
 campaign drafts and sequence steps in that mailbox. It fetches only over HTTPS on the explicitly
-listed hosts, including redirect destinations. The dry run reports replacements, anchor removals
-and download failures and leaves stored data untouched. Diagnostic URLs omit credentials and
-query values. Add `--write` to save the successful replacements and remove matching anchors
-with their contents. Rerun to retry failures or edits detected while downloading.
+listed hosts, including redirect destinations. Both modes report replacements, anchor removals,
+ambiguous markup skipped per document, and download failures. The dry run leaves stored data
+untouched. Add `--write` to apply the reported edits. Anchor removals are applied only when the
+source range is unambiguous and reparsing preserves the rest of the HTML tree. Image rewrites
+must preserve the tree apart from the intended `src` changes. Diagnostic URLs omit credentials
+and query values. Rerun to retry failures or edits detected while downloading.
 
 ## Areas inside `lib/addons/outreach/`
 
@@ -224,3 +230,7 @@ needs `send`, consent changes need `manage`. Tools: `get_message_tracking`,
 `cancel_campaign`, `list_sequences`, `get_sequence`, `save_sequence`, `set_sequence_status`.
 `list_campaigns`, `get_campaign`, `list_sequences` and `get_sequence` return the trace fields of
 the REST shapes; `schedule_campaign` and `set_sequence_status` record the calling token.
+
+Authenticated `/api/mcp` requests have a 7,006,892-byte body limit, including the entire body
+of a JSON-RPC batch. The limit fits one 5 MiB image encoded as base64 plus 16 KiB for the envelope.
+Larger requests receive HTTP 413.

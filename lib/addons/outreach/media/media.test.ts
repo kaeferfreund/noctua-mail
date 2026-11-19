@@ -44,13 +44,60 @@ test("v4 upgrades add only image storage, preserving existing template data", ()
   expect(listOutreachImages(db, "a")).toEqual([]);
 });
 
-test("type is detected from bytes; only matching filename suffixes and bounded, valid base64 are accepted", () => {
-  const png = Buffer.from("89504e470d0a1a0a0000000d494844520000000300000002", "hex");
-  const jpeg = Buffer.from("ffd8ffc00008080002000303", "hex");
-  const webp = Buffer.from("524946461600000057454250565038580a00000000000000020000010000", "hex");
-  for (const [bytes, name, contentType] of [[png, "x.png", "image/png"], [jpeg, "x.jpeg", "image/jpeg"], [webp, "x", "image/webp"]] as const) {
-    expect(prepareImage(bytes, name)).toMatchObject({ contentType, width: 3, height: 2 });
+const headers = [
+  { name: "x.png", type: "image/png", signatureSize: 8,
+    hex: "89504e470d0a1a0a0000000d49484452000000030000000208020000001216f14d" },
+  { name: "x.jpeg", type: "image/jpeg", signatureSize: 3,
+    hex: "ffd8ffe000045859ffc0000b080002000301011100" },
+  { name: "x.gif", type: "image/gif", signatureSize: 6,
+    hex: "47494638396103000200000000" },
+  { name: "x.webp", type: "image/webp", signatureSize: 12,
+    hex: "524946461600000057454250565038580a00000000000000020000010000" },
+  { name: "x.webp", type: "image/webp", signatureSize: 12,
+    hex: "524946461600000057454250565038200a0000001000009d012a03000200" },
+  { name: "x.webp", type: "image/webp", signatureSize: 12,
+    hex: "5249464612000000574542505650384c050000002f0240000000" }
+];
+
+test.each(headers)("validates the complete $type header ($hex)", ({ name, type, signatureSize, hex }) => {
+  const bytes = Buffer.from(hex, "hex");
+  expect(prepareImage(bytes, name)).toMatchObject({ contentType: type, width: 3, height: 2 });
+  expect(() => prepareImage(bytes.subarray(0, signatureSize), name)).toThrow("Use PNG");
+  expect(() => prepareImage(bytes.subarray(0, -1), name)).toThrow("Use PNG");
+});
+
+test("rejects inconsistent length fields in otherwise complete image headers", () => {
+  const fields = [
+    [0, 11, 12], // PNG IHDR length
+    [1, 5, 30],  // JPEG APP segment runs past the frame
+    [1, 11, 10], // JPEG frame size disagrees with its component count
+    [3, 4, 20],  // WebP RIFF length
+    [4, 16, 9],  // WebP chunk declares less than a VP8 frame header
+    [5, 16, 4]   // WebP chunk declares less than a VP8L header
+  ];
+  for (const [index, offset, value] of fields) {
+    const { hex, name } = headers[index];
+    const bytes = Buffer.from(hex, "hex");
+    bytes[offset] = value;
+    expect(() => prepareImage(bytes, name)).toThrow("Use PNG");
   }
+});
+
+test("rejects zero and oversized dimensions and accepts the 16,384 px boundary", () => {
+  const png = Buffer.from(headers[0].hex, "hex");
+  png.writeUInt32BE(16_384, 16);
+  expect(prepareImage(png, "x.png").width).toBe(16_384);
+  png.writeUInt32BE(16_385, 16);
+  expect(() => prepareImage(png, "x.png")).toThrow("Use PNG");
+  const gifHeader = Buffer.from(headers[2].hex, "hex");
+  gifHeader.writeUInt16LE(0, 8);
+  expect(() => prepareImage(gifHeader, "x.gif")).toThrow("Use PNG");
+  const webp = Buffer.from(headers[3].hex, "hex");
+  webp.writeUIntLE(16_384, 27, 3);
+  expect(() => prepareImage(webp, "x.webp")).toThrow("Use PNG");
+});
+
+test("only matching filename suffixes and bounded, valid base64 are accepted", () => {
   expect(() => prepareImage(gif, "photo.png")).toThrow("extension");
   expect(() => prepareImage(Buffer.from("<svg/>"), "photo.png")).toThrow("Use PNG");
   expect(() => prepareImage(new Uint8Array(OUTREACH_IMAGE_MAX_BYTES + 1), "photo.png")).toThrow("5 MiB");

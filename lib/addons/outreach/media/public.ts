@@ -1,5 +1,6 @@
 import { constants } from "node:fs";
 import { open } from "node:fs/promises";
+import { Readable } from "node:stream";
 import { getOutreachDb, outreachDbExists } from "../db";
 import { servesDeliveredMail } from "../tracking/public";
 import type { OutreachImageType } from "../types";
@@ -23,6 +24,7 @@ export async function outreachImageResponse(request: Request, filename: string) 
 
     const file = await open(/* turbopackIgnore: true */ outreachImageFile(outreachMediaDir(), hash, row.contentType),
       constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    let streaming = false;
     try {
       const stat = await file.stat();
       if (!stat.isFile() || stat.size !== row.bytes) return notFound();
@@ -42,9 +44,22 @@ export async function outreachImageResponse(request: Request, filename: string) 
       });
       if (cacheMatch) return new Response(null, { status: 304, headers });
       headers.set("Content-Length", String(row.bytes));
-      return new Response(request.method === "HEAD" ? null : await file.readFile(), { headers });
+      if (request.method === "HEAD" || stat.size === 0) return new Response(null, { headers });
+      const stream = file.createReadStream({ start: 0, end: stat.size - 1, autoClose: true });
+      try {
+        const body = Readable.toWeb(stream, { strategy: {
+          highWaterMark: stream.readableHighWaterMark,
+          size: (chunk: Uint8Array) => chunk.byteLength
+        } });
+        // Node's stream/web and DOM typings differ for the same runtime stream.
+        const response = new Response(body as unknown as ReadableStream<Uint8Array>, { headers });
+        streaming = true;
+        return response;
+      } finally {
+        if (!streaming) stream.destroy();
+      }
     } finally {
-      await file.close();
+      if (!streaming) await file.close();
     }
   } catch {
     return notFound();

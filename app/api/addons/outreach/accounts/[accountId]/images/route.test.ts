@@ -48,6 +48,7 @@ test("editors upload and viewers list only their mailbox; unsafe requests are re
   expect((await post(accountId, "one.gif", gif, { "content-length": String(OUTREACH_IMAGE_MAX_BYTES + 1) })).status).toBe(413);
   expect((await post(accountId, "one.png", gif)).status).toBe(415);
   expect((await post(accountId, "one.png", "<svg/>")).status).toBe(415);
+  expect((await post(accountId, "one.gif", "GIF89a")).status).toBe(415);
   const upload = await post();
   expect(upload.status).toBe(200);
   const result = await upload.json();
@@ -77,6 +78,7 @@ test("MCP tools use the read and drafts scopes and apply the live mailbox role",
   expect(await call(read.tokenRecord, "upload_email_image", upload)).toMatchObject({ result: { isError: true } });
   expect(await call(drafts.tokenRecord, "upload_email_image", { ...upload, accountId: otherId })).toMatchObject({ result: { isError: true } });
   expect(await call(drafts.tokenRecord, "upload_email_image", { ...upload, data: "bad %% base64" })).toMatchObject({ result: { isError: true } });
+  expect(await call(drafts.tokenRecord, "upload_email_image", { ...upload, data: Buffer.from("GIF89a").toString("base64") })).toMatchObject({ result: { isError: true } });
   expect(await call(drafts.tokenRecord, "upload_email_image", upload)).toMatchObject({
     result: { structuredContent: { ok: true, image: { accountId, url: expect.stringMatching(/^\/t\/m\/[a-f0-9]{64}\.gif$/) } } }
   });

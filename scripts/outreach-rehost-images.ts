@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { isIP } from "node:net";
-import { parseArgs } from "node:util";
-import { parseFragment, type DefaultTreeAdapterTypes as Tree } from "parse5";
+import { isDeepStrictEqual, parseArgs } from "node:util";
+import { parse, parseFragment, type DefaultTreeAdapterTypes as Tree } from "parse5";
 import { closeOutreachDb, getOutreachDb, getOutreachDbPath, outreachDbExists } from "@/lib/addons/outreach/db";
 import { imageUrl, OutreachImageError, prepareImage, saveOutreachImage } from "@/lib/addons/outreach/media";
 import { OUTREACH_IMAGE_MAX_BYTES } from "@/lib/addons/outreach/types";
@@ -19,7 +19,8 @@ type Document = { kind: "template" | "campaign" | "sequence step"; id: string; n
   sequenceId: string | null; updatedAt: number };
 type DocumentRef = Pick<Document, "kind" | "id">;
 type Range = { start: number; end: number };
-type ImageRef = Range & { url: string };
+type ImageRef = Range & { url: string; src: Tree.Element["attrs"][number] };
+type Patch = Range & { value: string };
 class RehostError extends Error {}
 
 function allowedHosts(hosts: readonly string[]) {
@@ -40,47 +41,143 @@ function httpUrl(value: string) {
   } catch { /* Ignore relative and invalid URLs. */ }
 }
 
-function findChanges(html: string, hosts: Set<string>, dropHosts: Set<string>) {
-  const tree = parseFragment(html, { sourceCodeLocationInfo: true });
-  const pending: Tree.Node[] = [tree];
-  const matches: Array<ImageRef | Range> = [];
+function* walkTree(root: Tree.Node, removed?: ReadonlySet<Tree.Node>) {
+  const pending: Array<{ node: Tree.Node; parent?: Tree.Node; depth: number }> = [{ node: root, depth: 0 }];
   while (pending.length) {
-    const node = pending.pop()!;
-    if ("tagName" in node && node.namespaceURI === "http://www.w3.org/1999/xhtml") {
-      const location = node.sourceCodeLocation;
-      if (location && node.tagName === "a") {
-        const href = httpUrl(node.attrs.find(attr => attr.name === "href")?.value ?? "");
-        if (href && dropHosts.has(href.hostname)) {
-          matches.push({ start: location.startOffset, end: location.endOffset });
-          continue;
-        }
-      }
-      const attr = location?.attrs?.src;
-      if (attr && node.tagName === "img") {
-        const src = httpUrl(node.attrs.find(item => item.name === "src")?.value ?? "");
-        if (src && hosts.has(src.hostname)) {
-          src.hash = "";
-          matches.push({ start: attr.startOffset, end: attr.endOffset, url: src.href });
-        }
+    const entry = pending.pop()!;
+    const { node, depth } = entry;
+    if (removed?.has(node)) continue;
+    yield entry;
+    if ("content" in node) pending.push({ node: (node as Tree.Template).content, parent: node, depth: depth + 1 });
+    if ("childNodes" in node) {
+      for (let i = node.childNodes.length - 1; i >= 0; i--) {
+        pending.push({ node: node.childNodes[i], parent: node, depth: depth + 1 });
       }
     }
-    if ("childNodes" in node) for (const child of node.childNodes) pending.push(child);
-    if ("content" in node) pending.push((node as Tree.Template).content);
+  }
+}
+
+function treeShape(root: Tree.Node, removed?: ReadonlySet<Tree.Node>) {
+  return Array.from(walkTree(root, removed), ({ node, depth }) => {
+    const base = [depth, node.nodeName];
+    if ("tagName" in node) return [...base, node.tagName, node.namespaceURI, node.attrs];
+    if ("value" in node) return [...base, node.value];
+    if ("data" in node) return [...base, node.data];
+    if ("name" in node) return [...base, node.name, node.publicId, node.systemId];
+    if ("mode" in node) return [...base, node.mode];
+    return base;
+  });
+}
+
+function overlaps(a: Range, b: Range) {
+  return a.start < b.end && b.start < a.end;
+}
+
+type Location = NonNullable<Tree.Node["sourceCodeLocation"]>;
+function sourceRange(location: Location): Range {
+  return { start: location.startOffset, end: location.endOffset };
+}
+
+function unambiguousLink(node: Tree.Element, range: Range, nodes: Tree.Node[], ancestors: Set<Tree.Node>) {
+  const descendants = new Set(Array.from(walkTree(node), entry => entry.node));
+  return nodes.every(other => {
+    const location = other.sourceCodeLocation;
+    if (!location || descendants.has(other) || !overlaps(range, sourceRange(location))) return true;
+    if (!ancestors.has(other)) return false;
+    // A containing ancestor may span the link, but its own tags must be outside the cut.
+    if (location.startOffset >= range.start || location.endOffset < range.end) return false;
+    return !("startTag" in location && location.startTag && overlaps(range, sourceRange(location.startTag))) &&
+      !("endTag" in location && location.endTag && overlaps(range, sourceRange(location.endTag)));
+  });
+}
+
+function parseHtml(html: string, sourceCodeLocationInfo = false) {
+  // Match the preview/send renderer's choice of document versus fragment.
+  const fullDocument = /^(?:\s|<!--(?:(?!-->)[\s\S])*-->)*(?:<!doctype\b|<html\b|<head\b|<body\b)/i.test(html);
+  return fullDocument ? parse(html, { sourceCodeLocationInfo }) : parseFragment(html, { sourceCodeLocationInfo });
+}
+
+function findChanges(original: string, hosts: Set<string>, dropHosts: Set<string>) {
+  const tree = parseHtml(original, true);
+  const entries = Array.from(walkTree(tree));
+  const nodes = entries.map(entry => entry.node);
+  const parents = new Map(entries.map(({ node, parent }) => [node, parent]));
+  const removed = new Set<Tree.Node>();
+  const patches: Patch[] = [];
+  let html = original;
+
+  function acceptPatch(patch: Patch) {
+    if (patches.some(other => overlaps(patch, other))) return false;
+    const nextPatches = [...patches, patch].sort((a, b) => a.start - b.start);
+    // Source offsets preserve untouched bytes, including mail-specific syntax and comments.
+    let offset = 0;
+    const parts: string[] = [];
+    for (const { start, end, value } of nextPatches) {
+      parts.push(original.slice(offset, start), value);
+      offset = end;
+    }
+    parts.push(original.slice(offset));
+    const next = parts.join("");
+    if (!isDeepStrictEqual(treeShape(parseHtml(next)), treeShape(tree, removed))) return false;
+    patches.push(patch);
+    html = next;
+    return true;
   }
 
-  // Source offsets preserve the bytes outside edits, including mail-specific markup and placeholder syntax.
-  // The HTML parser may reconstruct a formatting element with the same opening tag. Drop its range once.
-  const images: ImageRef[] = [];
-  const links: Range[] = [];
-  matches.sort((a, b) => a.start - b.start || b.end - a.end);
-  let covered = 0;
-  for (const match of matches) {
-    if (match.start < covered) continue;
-    covered = match.end;
-    if ("url" in match) images.push(match);
-    else links.push(match);
+  const skippedLinks = new Set<number | Tree.Node>();
+  let links = 0;
+  if (dropHosts.size) {
+    for (const node of nodes) {
+      if (!("tagName" in node) || node.namespaceURI !== "http://www.w3.org/1999/xhtml" || node.tagName !== "a") continue;
+      const href = httpUrl(node.attrs.find(attr => attr.name === "href")?.value ?? "");
+      if (!href || !dropHosts.has(href.hostname)) continue;
+
+      const ancestors = new Set<Tree.Node>();
+      for (let parent = parents.get(node); parent; parent = parents.get(parent)) ancestors.add(parent);
+      if (Array.from(ancestors).some(ancestor => removed.has(ancestor))) continue;
+
+      const location = node.sourceCodeLocation;
+      const key = location?.startOffset ?? node;
+      if (skippedLinks.has(key)) continue;
+      if (location?.startTag && location.endTag) {
+        const range = { start: location.startTag.startOffset, end: location.endTag.endOffset };
+        if (unambiguousLink(node, range, nodes, ancestors)) {
+          removed.add(node);
+          if (acceptPatch({ ...range, value: "" })) {
+            links++;
+            continue;
+          }
+          removed.delete(node);
+        }
+      }
+      // The parser can split one source anchor into several elements. Count that source anchor once.
+      skippedLinks.add(key);
+    }
   }
-  return { images, links };
+
+  const images: ImageRef[] = [];
+  for (const { node } of walkTree(tree, removed)) {
+    if (!("tagName" in node) || node.namespaceURI !== "http://www.w3.org/1999/xhtml" || node.tagName !== "img") continue;
+    const location = node.sourceCodeLocation?.attrs?.src;
+    const src = node.attrs.find(attr => attr.name === "src");
+    const url = src && httpUrl(src.value);
+    if (location && src && url && hosts.has(url.hostname)) {
+      url.hash = "";
+      images.push({ ...sourceRange(location), url: url.href, src });
+    }
+  }
+  images.sort((a, b) => a.start - b.start);
+  return {
+    images, links, skippedLinks: skippedLinks.size,
+    get html() { return html; },
+    replaceImage(ref: ImageRef, hosted: string) {
+      const previous = ref.src.value;
+      ref.src.value = hosted;
+      if (acceptPatch({ start: ref.start, end: ref.end, value: `src="${hosted}"` })) return true;
+      ref.src.value = previous;
+      return false;
+    }
+  };
 }
 
 const redirects = new Set([301, 302, 303, 307, 308]);
@@ -153,7 +250,7 @@ async function download(source: string, hosts: Set<string>, fetchImage: FetchIma
     const { bytes, url } = await Promise.race([deadline, fetchBytes(new URL(source), hosts, fetchImage, controller.signal)]);
     let name = url.pathname.split("/").pop() ?? "";
     try { name = decodeURIComponent(name); } catch { /* Keep the literal path segment. */ }
-    return prepareImage(bytes, name);
+    return prepareImage(bytes, name, { canonicalExtension: true });
   } finally {
     clearTimeout(timer);
   }
@@ -208,44 +305,41 @@ export async function rehostImages(db: Database, options: Options) {
   const edits: Array<{ document: Document; html: string }> = [];
   const summary = [];
   for (const document of documents) {
-    const { images, links } = findChanges(document.html, hosts, dropHosts);
+    const changes = findChanges(document.html, hosts, dropHosts);
     const distinct = new Set<string>();
-    const patches = links.map(link => ({ ...link, value: "" }));
+    let skippedAmbiguous = changes.skippedLinks;
     let references = 0;
-    for (const ref of images) {
+    for (const ref of changes.images) {
       const { url } = ref;
-      if (!urls.has(url)) {
-        let image: Awaited<ReturnType<typeof download>> | undefined;
+      let hosted = urls.get(url);
+      let image: Awaited<ReturnType<typeof download>> | undefined;
+      if (hosted === undefined) {
         try {
           image = await download(url, hosts, fetchImage);
+          hosted = imageUrl(image.hash, image.contentType);
         } catch (error) {
           urls.set(url, null);
           failures.push({ url, reason: error instanceof RehostError || error instanceof OutreachImageError ? error.message : "Network or body read failed." });
-        }
-        if (image) {
-          const hosted = write
-            ? (await saveOutreachImage(db, accountId, image, null, directory)).image.url
-            : imageUrl(image.hash, image.contentType);
-          urls.set(url, hosted);
+          continue;
         }
       }
-      const hosted = urls.get(url);
       if (!hosted) continue;
+      if (!changes.replaceImage(ref, hosted)) {
+        skippedAmbiguous++;
+        continue;
+      }
+      if (image) {
+        if (write) await saveOutreachImage(db, accountId, image, null, directory);
+        urls.set(url, hosted);
+      }
       references++;
       distinct.add(hosted);
-      patches.push({ ...ref, value: `src="${hosted}"` });
     }
-    summary.push({ kind: document.kind, id: document.id, name: document.name, references, images: distinct.size, links: links.length });
-    if (write && patches.length) {
-      let offset = 0;
-      const parts: string[] = [];
-      for (const patch of patches.sort((a, b) => a.start - b.start)) {
-        parts.push(document.html.slice(offset, patch.start), patch.value);
-        offset = patch.end;
-      }
-      parts.push(document.html.slice(offset));
-      edits.push({ document, html: parts.join("") });
-    }
+    summary.push({
+      kind: document.kind, id: document.id, name: document.name,
+      references, images: distinct.size, links: changes.links, skippedAmbiguous
+    });
+    if (write && changes.html !== document.html) edits.push({ document, html: changes.html });
   }
   const conflicts = write && edits.length ? updateDocuments(db, accountId, edits) : [];
   return { summary, failures, conflicts };
@@ -266,7 +360,7 @@ async function main() {
     });
     console.info(values.write ? "Write run" : "Dry run");
     for (const row of result.summary) {
-      console.info(`${row.kind} ${JSON.stringify(row.name)} (${row.id}): ${row.references} references, ${row.images} distinct images, ${row.links} links to drop.`);
+      console.info(`${row.kind} ${JSON.stringify(row.name)} (${row.id}): ${row.references} references, ${row.images} distinct images, ${row.links} links to drop, ${row.skippedAmbiguous} skipped (ambiguous markup).`);
     }
     for (const { url, reason } of result.failures) {
       const printable = new URL(url);

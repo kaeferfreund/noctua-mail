@@ -74,6 +74,64 @@ test("dry run and write share URL filtering and deduplication, preserving unrela
   }
 });
 
+test("only unambiguous badge links are removed and dry run reports the same skips as write", async () => {
+  const link = '<a href="https://badge.example.test">';
+  const footer = '<footer><span>Footer</span>' + link + 'Badge</a></footer>';
+  const nested = '<table><tr><td><table><tr><td>' + link + 'Badge</a></td></tr></table></td></tr></table>';
+  const cases = [
+    { id: "table-foster", html: `<table>${link}Badge<tr><td>Tabelleninhalt</td></tr>Badge-Fortsetzung</a></table>` },
+    { id: "split", html: `<p>${link}<b>Badge</a>Rest</b></p>` },
+    { id: "pre", html: `<pre>${link}Badge</a>
+Rest</pre>` },
+    { id: "document-boundary", html: `${link}Badge</a><!doctype html><p>Rest</p>` },
+    { id: "unclosed", html: `<p>${link}Badge</p>` },
+    { id: "footer", html: footer, expected: footer.replace(link + "Badge</a>", "") },
+    { id: "nested", html: nested, expected: nested.replace(link + "Badge</a>", "") }
+  ];
+  for (const { id, html } of cases) insertTemplate(db, id, html);
+  const options = {
+    accountId: "a", hosts: ["cdn.example.test"], dropLinksTo: ["badge.example.test"],
+    fetchImage: async (url: URL) => { throw new Error(`Unexpected image download: ${url.pathname}`); }
+  };
+  const dry = await rehostImages(db, options);
+  const write = await rehostImages(db, { ...options, write: true });
+  expect(write).toEqual(dry);
+  for (const { id, html, expected } of cases) {
+    expect(write.summary.find(row => row.id === id)).toMatchObject({
+      links: expected === undefined ? 0 : 1, skippedAmbiguous: expected === undefined ? 1 : 0
+    });
+    expect(db.query("SELECT html FROM templates WHERE accountId = 'a' AND id = ?").get(id)).toEqual({ html: expected ?? html });
+  }
+});
+
+test("rehosting adds or replaces the suffix with the detected canonical extension", async () => {
+  const url = "https://cdn.example.test/picture.php?format=gif";
+  const noSuffix = "https://cdn.example.test/other";
+  const html = `<table><img src="${url}" srcset="${url} 2x"><tr><td><img src="${noSuffix}"></td></tr></table>`;
+  insertTemplate(db, "template", html);
+  const directory = mkdtempSync(join(tmpdir(), "outreach-rehost-"));
+  try {
+    const otherGif = Buffer.from(gif);
+    otherGif[4] = 0x37; // GIF87a, so it occupies its own library entry.
+    const options = {
+      accountId: "a", hosts: ["cdn.example.test"], directory,
+      fetchImage: async (source: URL) => new Response(source.href === url ? gif : otherGif)
+    };
+    const dry = await rehostImages(db, options);
+    expect(dry.failures).toEqual([]);
+    expect(dry.summary[0]).toMatchObject({ references: 2, images: 2 });
+    expect(await rehostImages(db, { ...options, write: true })).toEqual(dry);
+    const images = listOutreachImages(db, "a");
+    expect(images.map(item => item.filename).sort()).toEqual(["other.gif", "picture.gif"]);
+    expect(db.query("SELECT html FROM templates WHERE accountId = 'a' AND id = 'template'").get()).toEqual({
+      html: html.replace(`src="${url}"`, `src="${images.find(item => item.filename === "picture.gif")!.url}"`)
+        .replace(`src="${noSuffix}"`, `src="${images.find(item => item.filename === "other.gif")!.url}"`)
+    });
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("only allowed HTTPS destinations are fetched; declared and streamed limits and image types are enforced", async () => {
   const allowed = "https://cdn.example.test";
   const sources = [
@@ -90,7 +148,7 @@ test("only allowed HTTPS destinations are fetched; declared and streamed limits 
       if (url.pathname === "/redirect.gif") return new Response(null, { status: 302, headers: { location: "https://outside.example.test/" } });
       if (url.pathname === "/declared.gif") return new Response(gif, { headers: { "content-length": String(OUTREACH_IMAGE_MAX_BYTES + 1) } });
       if (url.pathname === "/streamed.gif") return new Response(new Uint8Array(OUTREACH_IMAGE_MAX_BYTES + 1));
-      return new Response("<svg/>");
+      return new Response("GIF89a");
     }
   });
   expect(requests).toEqual(sources.slice(3));
