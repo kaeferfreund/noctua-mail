@@ -1941,7 +1941,8 @@ export async function executeMcpHttpRequest(params: {
       server,
       resolveAccount: async (accountId, minRole) => {
         const ctx = await resolveAccountContext(context, accountId, minRole);
-        return { accountId: ctx.accountId, role: ctx.role, userId: ctx.tokenRecord.createdByUserId, tokenId: ctx.tokenRecord.id };
+        return { accountId: ctx.accountId, role: ctx.role, userId: ctx.tokenRecord.createdByUserId, tokenId: ctx.tokenRecord.id,
+          tokenLabel: ctx.tokenRecord.label, tokenSuffix: ctx.tokenRecord.tokenSuffix };
       },
       resolveMessage: async args => {
         const { ctx, id } = await resolveMessageTarget(context, { accountId: args.accountId, url: args.url, id: args.messageId }, "viewer", "messageId");

@@ -32,7 +32,7 @@ test("D: an erased contact's restored unsubscribe keeps its address", async () =
   await unsubscribe(accountId, contact.id, 200);
   await eraseContact(accountId, contact.id, 300);
   const returned = (await upsertContact(accountId, { email: "leaver@example.test" })).contact;
-  expect(findContact(await getOutreachDb(), accountId, returned.id)).toMatchObject({ emailConsent: "never", unsubscribedAt: 200 });
+  expect(findContact(await getOutreachDb(), accountId, returned.id)).toMatchObject({ emailConsent: "never", unsubscribedAt: 300 });
   await expect(patchContact(accountId, returned.id, { email: "other@example.test" })).rejects.toMatchObject({ status: 409, code: "email_change_conflict" });
   // A contact without any consent history can still correct its address.
   const fresh = (await upsertContact(accountId, { email: "typo@example.test" })).contact;
@@ -93,7 +93,7 @@ test("I: the MCP tool subscribe_contact documents and passes confirmResubscribe"
   await changeContactSubscription(accountId, contact.id, { action: "subscribe", listId: list.id }, 100);
   await unsubscribe(accountId, contact.id, 200);
   const server = new McpServer({ name: "Synthetic outreach", version: "1" });
-  const resolveAccount = async () => ({ accountId, role: "editor" as const, userId: "user-1", tokenId: "token-1" });
+  const resolveAccount = async () => ({ accountId, role: "editor" as const, userId: "user-1", tokenId: "token-1", tokenLabel: "Synthetic", tokenSuffix: "a1b2" });
   registerOutreachContactTools({
     server, resolveAccount, outreachAccount: resolveAccount,
     resolveMessage: async () => { throw new Error("Unused in contact tools"); },

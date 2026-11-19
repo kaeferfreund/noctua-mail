@@ -249,7 +249,10 @@ function ContactDetailBody({ contact, path, onChange, onBack }: { contact: Conta
       {confirm === "delete" ? (
         <ConfirmDialog title={t("contacts.deleteTitle")} description={t("contacts.deleteDescription", { email: contact.email })}
           confirmLabel={t("contacts.deleteConfirm")} destructive busy={busy === "delete"} error={error}
-          onCancel={() => { setConfirm(null); setError(null); }} onConfirm={() => void remove()} />
+          onCancel={() => { setConfirm(null); setError(null); }} onConfirm={() => void remove()}>
+          {/* The server keeps a hash of the address that counts as an unsubscribe (erased_addresses). */}
+          <p className="text-sm text-muted-foreground">{t("contacts.deleteKeepsBlock")}</p>
+        </ConfirmDialog>
       ) : null}
       {confirm === "suppress" ? (
         <ConfirmDialog title={t("contacts.suppressTitle")} description={t("contacts.suppressDescription", { email: contact.email })}

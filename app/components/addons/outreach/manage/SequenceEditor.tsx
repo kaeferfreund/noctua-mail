@@ -7,7 +7,7 @@ import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
 import type { Sequence, SequenceInput, SequenceReport, SequenceStatus } from "@/lib/addons/outreach/types";
 import { useOutreachManage, useResource, useUnsavedChanges } from "./manageContext";
-import { ConfirmDialog, ErrorNote, Field, LoadingNote, SectionHeader, SequenceStatusBadge, StatsFigures, nativeControlClass, useOutreachFormat } from "./ui";
+import { ConfirmDialog, ErrorNote, Field, LoadingNote, SectionHeader, SequenceStatusBadge, StatsFigures, TraceLine, nativeControlClass, useOutreachFormat } from "./ui";
 import { ContentFields, hasContent } from "./HtmlContent";
 import { LabeledSwitch, SenderSelect, TrackingSwitches } from "./SendingFields";
 
@@ -165,6 +165,7 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
         </>} />
       <ErrorNote error={dialog ? null : error} />
       {notice ? <p role="status" className="text-sm text-muted-foreground">{notice}</p> : null}
+      {current && status !== "draft" ? <TraceLine action={status} userId={current.statusChangedByUserId} via={current.statusChangedVia} /> : null}
       {status === "live" && canEdit ? <p className="text-xs text-muted-foreground">{t("sequences.liveEditHint")}</p> : null}
       {canEdit && !canGoLive && status !== "live" ? <p className="text-xs text-muted-foreground">{t("sequences.goLiveNeeds")}</p> : null}
 

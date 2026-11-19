@@ -36,9 +36,10 @@ test("AL: concurrent first calls share one handle, and a close leaves none open"
 test("AL: a migration reads the schema version under the write lock", async () => {
   const { Database } = await import("bun:sqlite");
   const file = getOutreachDbPath();
-  // An outreach.db one version behind: schema v2 without the v3 column.
+  // An outreach.db one version behind: schema v3 without the v4 columns.
   const old = initOutreachSchema(await getOutreachDb());
-  old.exec(`ALTER TABLE tracking_events DROP COLUMN linkToken; PRAGMA user_version = ${OUTREACH_SCHEMA_VERSION - 1};`);
+  old.exec(`ALTER TABLE campaigns DROP COLUMN scheduledVia; ALTER TABLE sequences DROP COLUMN statusChangedVia;
+    PRAGMA user_version = ${OUTREACH_SCHEMA_VERSION - 1};`);
   closeOutreachDb();
 
   // Another process takes the write lock first and migrates the file while this one waits for it.
@@ -48,7 +49,7 @@ test("AL: a migration reads the schema version under the write lock", async () =
     db.exec("PRAGMA busy_timeout = 15000; BEGIN IMMEDIATE");
     console.log("locked");
     Bun.sleepSync(400);
-    db.exec("ALTER TABLE tracking_events ADD COLUMN linkToken TEXT; PRAGMA user_version = ${OUTREACH_SCHEMA_VERSION}; COMMIT");
+    db.exec("ALTER TABLE campaigns ADD COLUMN scheduledVia TEXT; ALTER TABLE sequences ADD COLUMN statusChangedVia TEXT; PRAGMA user_version = ${OUTREACH_SCHEMA_VERSION}; COMMIT");
     db.close();
   `, file], { stdout: "pipe", stderr: "inherit" });
   const reader = other.stdout.getReader();

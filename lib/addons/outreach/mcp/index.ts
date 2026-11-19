@@ -5,7 +5,8 @@ import { registerOutreachContactTools } from "./contacts";
 import { registerOutreachSendingTools } from "./sending";
 import { registerOutreachTrackingTools } from "./tracking";
 
-export type OutreachMcpAccount = { accountId: string; role: AccountRole; userId: string; tokenId: string };
+/** `tokenLabel` / `tokenSuffix`: the calling MCP token as it is now, recorded with scheduled work (`../via.ts`). */
+export type OutreachMcpAccount = { accountId: string; role: AccountRole; userId: string; tokenId: string; tokenLabel: string; tokenSuffix: string };
 
 /** What the core MCP server hands to the addon; the addon never reaches into lib/mcpServer.ts. */
 export type OutreachMcpCore = {

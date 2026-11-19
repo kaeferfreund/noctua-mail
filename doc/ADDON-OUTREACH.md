@@ -63,16 +63,30 @@ identity checks as the manual send routes.
 
 ## Data model
 
-`lib/addons/outreach/db.ts` holds the schema (v1) with comments. Every table carries
+`lib/addons/outreach/db.ts` holds the schema (v1, with the additive steps up to v4) with comments. Every table carries
 `accountId`; every query filters by it. Shapes that cross a boundary are in
 `lib/addons/outreach/types.ts`.
 
 Consent rules live in `lib/addons/outreach/contacts/consent.ts`. A contact is mailed only with
 consent, without a suppression and while subscribed to the list. `contacts.unsubscribedAt` keeps
 the newest global unsubscribe even after a re-subscription, so a consent older than it can never
-be applied to any list. Erasing a contact removes its data; if it was suppressed or had
-unsubscribed, `erased_addresses` keeps a SHA-256 of the address with the reason and dates, and a
-contact created later for that address takes the block over.
+be applied to any list. Erasing a contact removes its data; `erased_addresses` always keeps a
+SHA-256 of the address with the suppression and dates, nothing else. The erase counts as an
+unsubscribe at its time (or at a later unsubscribe on record), and a suppression is kept as it
+was. A contact created later for that address takes the block over: the subscribe API accepts
+it only with a `consentAt` later than the erase, the Klaviyo import does not activate it with an
+older consent or list join, and a manual subscribe in the app or over MCP asks for the
+re-subscription confirmation. Until then nothing is mailed to it. The delete confirmation in the
+contact view says so.
+
+A campaign scheduled, or a sequence switched live or paused, acts for the user who did it: the
+scheduled sends check that user's live role at every send, and they keep running when the MCP
+token that scheduled them is revoked (the campaign can still be cancelled, the sequence paused).
+So that this stays traceable, `campaigns.scheduledByUserId` / `scheduledVia` and
+`sequences.statusChangedByUserId` / `statusChangedVia` record who and through what:
+`"app"` or `"mcp:<label> (…<suffix>)"`, a snapshot of the token's label and suffix at that moment
+(label capped at 80 characters; see `lib/addons/outreach/via.ts`). Rows from before schema v4 have
+no value. The campaign view and the sequence editor show it in one quiet line.
 
 A `sends` row is one tracked outgoing mail: per recipient for campaigns and sequences, per
 message for a normal mail (then several recipients share one row, so an open means "someone
@@ -135,7 +149,7 @@ Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 | GET | `{base}/tracking/events?sendId=&contactId=&campaignId=&sequenceId=&type=&includeMachine=&limit=&before=` | → `TrackingEventsResponse` |
 | GET | `{base}/contacts?q=&listId=&consent=&suppressed=&page=&pageSize=` | → `ContactListResponse` |
 | POST | `{base}/contacts` | `ContactInput` (upsert by address) → `{ok, contact, created}` |
-| GET, PATCH, DELETE | `{base}/contacts/{contactId}` | `Partial<ContactInput>` → `{ok, contact: ContactDetail}`; DELETE erases the contact and its events |
+| GET, PATCH, DELETE | `{base}/contacts/{contactId}` | `Partial<ContactInput>` → `{ok, contact: ContactDetail}`; DELETE erases the contact and its events and keeps the address blocked (see Data model) |
 | POST | `{base}/contacts/{contactId}/subscriptions` | `SubscriptionChange` → `{ok, contact: ContactDetail}`; 409 `resubscribe_confirmation_required` (with `unsubscribedAt`) until `confirmResubscribe: true` is sent for a person with an unsubscribe on record |
 | POST | `{base}/contacts/{contactId}/suppression` | `{suppressed: boolean}` (manager) → `{ok, contact: ContactDetail}` |
 | GET, POST | `{base}/lists` | `ContactListInput` → `{ok, lists}` / `{ok, list}` |
@@ -146,13 +160,13 @@ Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 | GET, PATCH, DELETE | `{base}/templates/{templateId}` | `Partial<EmailTemplateInput>` → `{ok, template}`; DELETE archives |
 | POST | `{base}/render` | `{subject, html, text?, contactId?}` → `RenderResponse` |
 | GET, POST | `{base}/campaigns` | `CampaignInput` → `{ok, campaigns: CampaignSummary[]}` / `{ok, campaign}` |
-| GET, PATCH, DELETE | `{base}/campaigns/{campaignId}` | `CampaignInput` → `{ok, campaign: Campaign}`; only drafts change or delete |
+| GET, PATCH, DELETE | `{base}/campaigns/{campaignId}` | `CampaignInput` → `{ok, campaign: Campaign}`; only drafts change or delete. `Campaign` and `CampaignSummary` carry `scheduledByUserId` and `scheduledVia` |
 | POST | `{base}/campaigns/{campaignId}/test` | `TestSendRequest` → `{ok}` |
 | POST | `{base}/campaigns/{campaignId}/schedule` | `CampaignScheduleRequest` → `CampaignScheduleResponse`; `dryRun: true` checks and counts without scheduling. Pass its `campaign.updatedAt` as `expectedUpdatedAt` to reject a changed draft with 409 `campaign_changed`. Scheduling a campaign that would reach nobody answers 409 `no_recipients`. |
 | POST | `{base}/campaigns/{campaignId}/cancel` | → `{ok, campaign}` |
 | GET | `{base}/campaigns/{campaignId}/report?cursor=` | → `CampaignReport` |
 | GET, POST | `{base}/sequences` | `SequenceInput` → `{ok, sequences: SequenceSummary[]}` / `{ok, sequence}` |
-| GET, PATCH, DELETE | `{base}/sequences/{sequenceId}` | `SequenceInput` → `{ok, sequence: Sequence}`; only drafts delete |
+| GET, PATCH, DELETE | `{base}/sequences/{sequenceId}` | `SequenceInput` → `{ok, sequence: Sequence}`; only drafts delete. `Sequence` and `SequenceSummary` carry `statusChangedByUserId` and `statusChangedVia` |
 | POST | `{base}/sequences/{sequenceId}/status` | `{status: "live" \| "paused"}` → `{ok, sequence}` |
 | GET | `{base}/sequences/{sequenceId}/report` | → `SequenceReport` |
 
@@ -184,3 +198,5 @@ needs `send`, consent changes need `manage`. Tools: `get_message_tracking`,
 `list_email_templates`, `get_email_template`, `save_email_template`, `list_campaigns`,
 `get_campaign`, `get_campaign_report`, `save_campaign`, `schedule_campaign`,
 `cancel_campaign`, `list_sequences`, `get_sequence`, `save_sequence`, `set_sequence_status`.
+`list_campaigns`, `get_campaign`, `list_sequences` and `get_sequence` return the trace fields of
+the REST shapes; `schedule_campaign` and `set_sequence_status` record the calling token.
