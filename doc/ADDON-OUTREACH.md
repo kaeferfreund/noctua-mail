@@ -19,6 +19,14 @@ All examples use synthetic data.
 The addon never adds a table or column to `db/main.db` or to an account shard. Removing it
 is: flag off, delete `outreach.db`.
 
+Switching the flag off does not break mail that was already sent. As long as `outreach.db`
+exists, `/t/c/{token}` still redirects to the stored target, `/t/u/{token}` still shows the page
+and stores the unsubscribe (and cancels what is queued for that person), and the open pixel
+still answers; no tracking event is recorded. Deleting `outreach.db` is final: from then on
+every link in every tracked mail and every unsubscribe link of every newsletter answers 404, so
+delete the file only when those mails no longer matter. An installation that never used the
+addon has no such file and its `/t/*` routes answer 404.
+
 Core files call into the addon at exactly these seams:
 
 1. `instrumentation.ts` starts the addon scheduler when the flag is on.

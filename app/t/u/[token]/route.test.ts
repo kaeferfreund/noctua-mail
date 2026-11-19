@@ -108,8 +108,35 @@ test("a test send's link does not change consent for the contact used to render 
   expect(await getContactDetail(fixture.accountId, fixture.contactId)).toMatchObject({ emailConsent: "subscribed" });
 });
 
-test("unsubscribe routes are inaccessible when the server flag is off", async () => {
+test("switched off: an unsubscribe link of delivered mail still unsubscribes, without a tracking event", async () => {
+  const fixture = await subscribedContact();
+  const db = await getOutreachDb();
+  const sendId = "send-switched-off";
+  db.query("INSERT INTO sends (id, accountId, kind, contactId, status, queuedAt) VALUES (?, ?, 'campaign', ?, 'sent', 0)").run(sendId, fixture.accountId, fixture.contactId);
+  const urls = await createUnsubscribeUrls(fixture.accountId, { sendId, contactId: fixture.contactId });
+  const token = new URL(urls!.url).pathname.split("/").at(-1)!;
+  const params = { params: Promise.resolve({ token }) };
   delete process.env.NOCTUA_ADDON_OUTREACH;
+  try {
+    expect((await GET(new Request(urls!.url), params)).status).toBe(200);
+    expect(await getContactDetail(fixture.accountId, fixture.contactId)).toMatchObject({ emailConsent: "subscribed" });
+    const submit = await POST(new Request(urls!.url, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": "198.51.100.9" }, body: "List-Unsubscribe=One-Click" }), params);
+    expect(submit.status).toBe(200);
+    expect(await getContactDetail(fixture.accountId, fixture.contactId)).toMatchObject({ emailConsent: "unsubscribed" });
+    expect(db.query("SELECT count(*) AS n FROM tracking_events WHERE accountId = ?").get(fixture.accountId)).toEqual({ n: 0 });
+  } finally {
+    process.env.NOCTUA_ADDON_OUTREACH = "1";
+  }
+});
+
+test("switched off and never used: without the addon's database the unsubscribe routes do not exist", async () => {
+  const { mkdtempSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dataDir = process.env.NOCTUA_DATA_DIR;
+  const empty = mkdtempSync(join(tmpdir(), "outreach-absent-"));
+  delete process.env.NOCTUA_ADDON_OUTREACH;
+  process.env.NOCTUA_DATA_DIR = empty;
   try {
     const token = newOutreachToken();
     const url = `https://links.example.test/t/u/${token}`;
@@ -118,6 +145,8 @@ test("unsubscribe routes are inaccessible when the server flag is off", async ()
     expect((await POST(new Request(url, { method: "POST" }), params)).status).toBe(404);
   } finally {
     process.env.NOCTUA_ADDON_OUTREACH = "1";
+    if (dataDir === undefined) delete process.env.NOCTUA_DATA_DIR; else process.env.NOCTUA_DATA_DIR = dataDir;
+    rmSync(empty, { recursive: true, force: true });
   }
 });
 

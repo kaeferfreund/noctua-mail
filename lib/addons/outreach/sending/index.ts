@@ -19,6 +19,6 @@ export async function onListSubscribed(accountId: string, event: { listId: strin
 
 /** Cancel active enrollments and queued sends after loss of consent or suppression. */
 export async function onContactUnmailable(accountId: string, contactId: string): Promise<void> {
-  if (!outreachAddonEnabled()) return;
+  // Also while the flag is off: an unsubscribe through an old mail must cancel what is still queued.
   cancelContact(await getOutreachDb(), accountId, contactId, Date.now());
 }
