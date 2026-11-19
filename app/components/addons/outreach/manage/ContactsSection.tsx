@@ -229,7 +229,8 @@ function AddContactDialog({ defaultListId, onClose, onChanged, onCreated }: {
           </form>
         )}
         <ErrorNote error={error} />
-        <DialogFooter>
+        {/* Up to three actions after a known address; they wrap instead of overflowing the dialog. */}
+        <DialogFooter className="sm:flex-wrap">
           {stage?.kind === "confirm" ? <>
             <Button variant="outline" disabled={busy} onClick={() => setStage({ kind: "notSubscribed", contact: stage.contact, created: stage.created })}>{t("actions.cancel")}</Button>
             <Button disabled={busy} onClick={() => void subscribe(stage.contact, stage.created, true)}>{busy ? t("actions.working") : t("contacts.resubscribeConfirm")}</Button>
