@@ -34,7 +34,8 @@ export function useComposeTracking({ accountId, format, sessionKey }: {
   const [choice, setChoice] = useState<{ accountId: string; sessionKey: string; enabled: boolean } | null>(null);
   const active = status.trackingConfigured && isOutreachEnabledFor(status, accountId);
   const offeredFor = (value: ComposeFormat) => active && value !== "text";
-  const preset = status.accounts.find(account => account.accountId === accountId)?.trackMailDefault ?? false;
+  // Read the default only behind the activation check: an unusable status body has no `accounts`.
+  const preset = active && (status.accounts.find(account => account.accountId === accountId)?.trackMailDefault ?? false);
   const enabled = choice && choice.accountId === accountId && choice.sessionKey === sessionKey ? choice.enabled : preset;
   return {
     offered: offeredFor(format),
