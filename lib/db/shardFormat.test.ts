@@ -116,8 +116,10 @@ test("production shard-opening inventory routes every writable shard connection 
     .filter(file => /\.tsx?$/.test(file) && !/\.test\.|\/test[^/]*|\/testFixtures\//.test(file));
   const openers = files.filter(file => /new\s+(?:Database|DatabaseCtor)\s*\(|Database\.open\(/.test(source(file))).sort();
   expect(openers).toEqual([
+    "lib/addons/outreach/db.ts", "lib/addons/outreach/tracking/compose.ts",
     "lib/db/connection.ts", "lib/db/messages/senderKeyBackfill.ts", "lib/mail/spam/evalData.ts", "lib/membershipCleanup.ts",
-    "scripts/checkShardMessageCollisions.ts", "scripts/dev-fixture/store.ts", "scripts/spam-apply.ts", "scripts/verifyAdmissionCleanup.ts"
+    "scripts/checkShardMessageCollisions.ts", "scripts/dev-fixture/store.ts",
+    "scripts/outreach-import-klaviyo-contacts.ts", "scripts/outreach-import-klaviyo-content.ts", "scripts/spam-apply.ts", "scripts/verifyAdmissionCleanup.ts"
   ]);
   const markerCallers = files.filter(file => /configureAccountDb\(/.test(source(file))).sort();
   expect(markerCallers).toEqual(["lib/db/connection.ts", "lib/db/messages/senderKeyBackfill.ts", "lib/membershipCleanup.ts"]);
@@ -135,6 +137,18 @@ test("production shard-opening inventory routes every writable shard connection 
   // The spam apply script inspects shards read-only; its writes go through the common DB API.
   expect(source("scripts/spam-apply.ts").match(/new Database\(/g)).toHaveLength(2);
   expect(source("scripts/spam-apply.ts").match(/new Database\([^\n]*, \{ readonly: true \}\);/g)).toHaveLength(2);
+  // The outreach addon keeps its own database file and never opens a shard or the master DB.
+  expect(source("lib/addons/outreach/db.ts").match(/new DatabaseCtor\(/g)).toHaveLength(1);
+  expect(source("lib/addons/outreach/db.ts")).toContain("initOutreachSchema(new DatabaseCtor(dbPath))");
+  expect(source("lib/addons/outreach/db.ts")).toContain(`path.join(getDataDir(), "db", "addons", "outreach.db")`);
+  expect(source("lib/addons/outreach/tracking/compose.ts")).toContain("const path = getOutreachDbPath();");
+  expect(source("lib/addons/outreach/tracking/compose.ts").match(/new DatabaseCtor\(/g)).toEqual(["new DatabaseCtor("]);
+  expect(source("lib/addons/outreach/tracking/compose.ts")).toContain("new DatabaseCtor(path, { create: false, readwrite: true })");
+  // Its import scripts preview in memory and read the addon database read-only; writes go through the addon's own handle.
+  for (const file of ["scripts/outreach-import-klaviyo-contacts.ts", "scripts/outreach-import-klaviyo-content.ts"]) {
+    for (const opener of source(file).match(/new Database\([^)]*\)/g) ?? []) expect(opener).toMatch(/^new Database\((?:":memory:"|\w+, \{ readonly: true \})\)$/);
+    expect(source(file)).not.toMatch(/getMainDbPath|getAccountDb|getDefaultAccountDbPath/);
+  }
   // Remaining raw constructors open a synthetic UID store or the master DB.
   expect(source("scripts/dev-fixture/store.ts")).toContain("new Database(this.uidValidityPath)");
   expect(source("scripts/verifyAdmissionCleanup.ts")).toContain("new Database(getMainDbPath())");
