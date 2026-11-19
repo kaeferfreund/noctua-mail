@@ -16,7 +16,8 @@ import { hasSmtp, isSesConfigured, sendOutreachMail, SendStopped } from "./send"
 import { sendOwner } from "./lease";
 import { assertContent, assertDraft, campaignSummary, getCampaign, getSequence, required, resolveContent, saveSequence, snapshotSequenceTemplates } from "./store";
 
-export type SendingActor = { accountId: string; authorization: OutboundAuthorization };
+/** `via`: where the request came from, recorded with a scheduled campaign or a status change (`../via.ts`). */
+export type SendingActor = { accountId: string; authorization: OutboundAuthorization; via: string };
 
 function assertLists(db: Database, accountId: string, ids: readonly string[]) {
   const query = db.query("SELECT 1 FROM lists WHERE accountId = ? AND id = ? AND archivedAt IS NULL");
@@ -81,9 +82,9 @@ export async function scheduleCampaign(db: Database, actor: SendingActor, id: st
     assertContent(content);
     if (preview) return live;
     const now = Date.now();
-    db.query(`UPDATE campaigns SET status = 'scheduled', scheduledByUserId = ?, sendAt = ?, updatedAt = ?,
+    db.query(`UPDATE campaigns SET status = 'scheduled', scheduledByUserId = ?, scheduledVia = ?, sendAt = ?, updatedAt = ?,
       senderIdentityId = ?, subject = ?, previewText = ?, html = ?, text = ?
-      WHERE accountId = ? AND id = ? AND status = 'draft'`).run(userId, scheduled?.sendAt ?? now, Math.max(now, live.updatedAt + 1), identity.id, content.subject, content.previewText, content.html, content.text, accountId, id);
+      WHERE accountId = ? AND id = ? AND status = 'draft'`).run(userId, actor.via, scheduled?.sendAt ?? now, Math.max(now, live.updatedAt + 1), identity.id, content.subject, content.previewText, content.html, content.text, accountId, id);
     return getCampaign(db, accountId, id);
   }).immediate();
   return { ok: true, campaign: preview ?? await campaignSummary(next), recipients };
@@ -137,8 +138,8 @@ export async function setSequenceStatus(db: Database, actor: SendingActor, id: s
       assertLists(db, accountId, sequence.triggerListId ? [sequence.triggerListId] : []);
       snapshotSequenceTemplates(db, sequence);
     }
-    db.query(`UPDATE sequences SET status = ?, statusChangedByUserId = ?, updatedAt = ?
-      WHERE accountId = ? AND id = ?`).run(status, authorized.userId, Date.now(), accountId, id);
+    db.query(`UPDATE sequences SET status = ?, statusChangedByUserId = ?, statusChangedVia = ?, updatedAt = ?
+      WHERE accountId = ? AND id = ?`).run(status, authorized.userId, actor.via, Date.now(), accountId, id);
     return getSequence(db, accountId, id);
   }).immediate();
 }

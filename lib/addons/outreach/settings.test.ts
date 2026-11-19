@@ -36,7 +36,7 @@ test("the tracking origin prefers its own variable and rejects non-http values",
 test("the addon database is its own file with its own schema version", async () => {
   const db = await getOutreachDb();
   expect(getOutreachDbPath()).toBe(path.join(dir, "db", "addons", "outreach.db"));
-  expect(OUTREACH_SCHEMA_VERSION).toBe(3);
+  expect(OUTREACH_SCHEMA_VERSION).toBe(4);
   expect((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(OUTREACH_SCHEMA_VERSION);
   const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as { name: string }[]).map(row => row.name);
   expect(tables).toEqual(["account_settings", "api_tokens", "campaigns", "contacts", "erased_addresses", "list_members", "lists", "sends",

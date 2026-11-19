@@ -9,7 +9,7 @@ import { adminRequest } from "@/app/hooks/useAdminApi";
 import type { ContactList, EmailTemplateSummary } from "@/lib/addons/outreach/types";
 import { cn } from "@/lib/utils";
 import { createOutreachApi } from "./outreachApi";
-import { OUTREACH_SECTIONS, OutreachManageContext, useSharedResource, type OutreachLocation, type OutreachManageContextValue, type OutreachSection } from "./manageContext";
+import { OUTREACH_SECTIONS, OutreachManageContext, useSharedResource, type OutreachLocation, type OutreachManageContextValue, type OutreachMember, type OutreachSection } from "./manageContext";
 import { ConfirmDialog, outreachRootClass } from "./ui";
 import OverviewSection from "./OverviewSection";
 import ContactsSection from "./ContactsSection";
@@ -67,12 +67,16 @@ export default function OutreachManage({ accountId, accountLabel, role, location
     () => adminRequest<{ identities: SenderIdentity[] }>(fetchImpl, `/api/accounts/${encodeURIComponent(accountId)}/identities`).then(body => body.identities),
     accountId
   );
+  const members = useSharedResource(
+    () => adminRequest<{ members: OutreachMember[] }>(fetchImpl, `/api/accounts/${encodeURIComponent(accountId)}/members`).then(body => body.members),
+    accountId
+  );
 
   const canEdit = role === "editor" || role === "manager";
   const value: OutreachManageContextValue = {
     api, accountId, role, canEdit,
     isManager: role === "manager",
-    navigate, setDirty, lists, templates, identities
+    navigate, setDirty, lists, templates, identities, members
   };
 
   return (

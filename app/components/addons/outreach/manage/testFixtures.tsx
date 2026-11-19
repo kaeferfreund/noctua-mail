@@ -68,7 +68,8 @@ export const TEMPLATE: EmailTemplate = {
 export const DRAFT: Campaign = {
   id: "camp-draft", accountId: ACCOUNT_ID, name: "Rundbrief Dezember", subject: "Neuigkeiten im Dezember", previewText: "Kurz vor Jahresende",
   senderIdentityId: null, templateId: null, html: HTML, text: "", listIds: ["list-news"], excludedListIds: [], status: "draft",
-  trackOpens: true, trackClicks: true, sendAt: null, startedAt: null, finishedAt: null, createdAt: T0, updatedAt: T0 + DAY
+  trackOpens: true, trackClicks: true, sendAt: null, startedAt: null, finishedAt: null, scheduledByUserId: null, scheduledVia: null,
+  createdAt: T0, updatedAt: T0 + DAY
 };
 
 export const SENT: Campaign = {
@@ -94,7 +95,7 @@ export const OVERVIEW: OutreachOverview = {
 
 export const SEQUENCE: Sequence = {
   id: "seq-welcome", accountId: ACCOUNT_ID, name: "Willkommensserie", triggerListId: "list-news", senderIdentityId: null, status: "live",
-  trackOpens: true, trackClicks: true, createdAt: T0 - 200 * DAY, updatedAt: T0,
+  trackOpens: true, trackClicks: true, statusChangedByUserId: null, statusChangedVia: null, createdAt: T0 - 200 * DAY, updatedAt: T0,
   steps: [
     { id: "step-1", position: 0, delayMinutes: 0, name: "Willkommen", subject: "Willkommen an Bord", previewText: "", templateId: null, html: HTML, text: "", enabled: true },
     { id: "step-2", position: 1, delayMinutes: 1440, name: "Tipps", subject: "Drei Tipps für den Start", previewText: "", templateId: null, html: HTML, text: "", enabled: true },
@@ -102,6 +103,11 @@ export const SEQUENCE: Sequence = {
     { id: "step-4", position: 3, delayMinutes: 2880, name: "Feedback", subject: "Wie gefällt es dir?", previewText: "", templateId: null, html: HTML, text: "", enabled: false }
   ]
 };
+
+export const MEMBERS = [
+  { userId: "user-erika", email: "erika@example.test", name: "Erika Beispiel", role: "editor", isOwner: false },
+  { userId: "user-max", email: "max@example.test", name: null, role: "manager", isOwner: true }
+];
 
 /** One JSON answer; errors use the addon's `{ok:false, message, code?}` shape. */
 export function json(body: unknown, status = 200) {
@@ -168,6 +174,7 @@ function defaults({ method, path }: Call): Response {
     return json({ ok: true, sequence: { ...rest, stepCount: steps.length, activeEnrollments: 23, stats: stats() }, enrollments: { active: 23, completed: 266, cancelled: 21 },
       steps: steps.map((step, index) => ({ stepId: step.id, position: step.position, name: step.name, stats: stats({ recipients: 120 - index * 30, sent: 120 - index * 30, opened: 70 - index * 15, clicked: 15 - index * 3, bounced: 1, unsubscribed: index, machineOpens: 25 }) })) });
   }
+  if (path === `/api/accounts/${ACCOUNT_ID}/members`) return json({ ok: true, members: MEMBERS });
   if (path === `/api/accounts/${ACCOUNT_ID}/identities`) {
     return json({ ok: true, identities: [{ id: "id-1", accountId: ACCOUNT_ID, email: "news@example.test", displayName: "Beispiel GmbH", isDefault: true, enabled: true, createdBy: null, createdAt: T0, updatedAt: T0 }] });
   }

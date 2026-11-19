@@ -1,5 +1,5 @@
 import path from "path";
-import { mkdirSync } from "fs";
+import { existsSync, mkdirSync } from "fs";
 import type { Database } from "bun:sqlite";
 import { getDataDir } from "@/lib/runtimePaths";
 import { onShutdown } from "@/lib/server/shutdown";
@@ -13,8 +13,13 @@ export function getOutreachDbPath() {
   return path.join(getDataDir(), "db", "addons", "outreach.db");
 }
 
+/** The addon was used on this installation: its database file is there (also while the flag is off). */
+export function outreachDbExists() {
+  return existsSync(getOutreachDbPath());
+}
+
 /** Bump with every schema change and add the step to `migrate`. */
-export const OUTREACH_SCHEMA_VERSION = 3;
+export const OUTREACH_SCHEMA_VERSION = 4;
 
 /**
  * Schema v1. Every table carries `accountId` (the mailbox that owns the row); every query
@@ -279,9 +284,9 @@ const SCHEMA_V1 = `
  * Schema v2 (consent bookkeeping that must survive a re-subscription and an erase).
  * `contacts.unsubscribedAt`: the newest global unsubscribe; a later consent for one list
  * does not clear it, so an older consent for another list can never be applied afterwards.
- * `erased_addresses`: what remains of an erased contact that was suppressed or had
- * unsubscribed — a SHA-256 of the lower-cased address and the dates, nothing else. A contact
- * created later for the same address takes the block over.
+ * `erased_addresses`: what remains of an erased contact — a SHA-256 of the lower-cased address
+ * and the dates, nothing else. Every erase writes it; the erase counts as an unsubscribe at its
+ * time. A contact created later for the same address takes the block over.
  */
 const SCHEMA_V2 = `
   ALTER TABLE contacts ADD COLUMN unsubscribedAt INTEGER;
@@ -301,6 +306,16 @@ const SCHEMA_V3 = `
   ALTER TABLE tracking_events ADD COLUMN linkToken TEXT;
 `;
 
+/**
+ * Schema v4: how a campaign was scheduled and how a sequence's status was last changed —
+ * `'app'` or `'mcp:<label> (…<suffix>)'` (see `../via.ts`), a snapshot of the MCP token at that
+ * moment. NULL for rows from before this version.
+ */
+const SCHEMA_V4 = `
+  ALTER TABLE campaigns ADD COLUMN scheduledVia TEXT;
+  ALTER TABLE sequences ADD COLUMN statusChangedVia TEXT;
+`;
+
 function schemaVersion(db: Database) {
   const current = Number((db.prepare("PRAGMA user_version").get() as { user_version?: number } | null)?.user_version ?? 0);
   if (current > OUTREACH_SCHEMA_VERSION) {
@@ -318,6 +333,7 @@ function migrate(db: Database) {
     if (current < 1) db.exec(SCHEMA_V1);
     if (current < 2) db.exec(SCHEMA_V2);
     if (current < 3) db.exec(SCHEMA_V3);
+    if (current < 4) db.exec(SCHEMA_V4);
     db.exec(`PRAGMA user_version = ${OUTREACH_SCHEMA_VERSION}`);
   }).immediate();
 }

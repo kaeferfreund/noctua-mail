@@ -3,6 +3,7 @@ import { isIP } from "node:net";
 import { escapeUTF8 } from "entities";
 import { readBoundedBody } from "@/app/api/_helpers/readAuthJson";
 import { outreachAddonEnabled } from "@/lib/addons/outreach/config";
+import { outreachDbExists } from "@/lib/addons/outreach/db";
 import { getUnsubscribeOrganization, unsubscribeByToken } from "@/lib/addons/outreach/contacts/unsubscribe";
 import { createRateLimiter, getRequestIp } from "@/lib/rateLimit";
 
@@ -82,21 +83,31 @@ async function validForm(request: Request) {
   }
 }
 
+/**
+ * An unsubscribe link in mail that was already sent must keep working when the addon is switched
+ * off later: as long as its database is there, the page shows and the unsubscribe is stored.
+ * No tracking event is recorded then. Without a database (addon never used) the route is absent.
+ */
+const available = () => outreachAddonEnabled() || outreachDbExists();
+
 export async function GET(request: Request, { params }: RouteParams) {
-  if (!outreachAddonEnabled()) return new Response(null, { status: 404, headers });
+  if (!available()) return new Response(null, { status: 404, headers });
   if (viewLimiter.isLimited(getRequestIp(request))) return new Response(null, { status: 429, headers });
   return page(request, await getUnsubscribeOrganization((await params).token), false);
 }
 
 export async function POST(request: Request, { params }: RouteParams) {
-  if (!outreachAddonEnabled()) return new Response(null, { status: 404, headers });
+  if (!available()) return new Response(null, { status: 404, headers });
   const ip = getRequestIp(request);
   // A refused submit says so and keeps the form; it never shows the confirmation.
   if (submitLimiter.isLimited(ip)) return page(request, "", false, 429);
   if (!(await validForm(request))) return page(request, "", false, 400);
-  await unsubscribeByToken((await params).token, {
-    ip: isIP(ip) ? ip : null,
-    userAgent: request.headers.get("user-agent")?.slice(0, 1024)
-  });
+  const token = (await params).token;
+  if (outreachAddonEnabled()) {
+    await unsubscribeByToken(token, { ip: isIP(ip) ? ip : null, userAgent: request.headers.get("user-agent")?.slice(0, 1024) });
+  } else {
+    // Switched off: the consent change is stored, no event with address or client.
+    await unsubscribeByToken(token, {}, Date.now(), async () => {});
+  }
   return page(request, "", true);
 }

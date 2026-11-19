@@ -6,6 +6,7 @@ import {
   campaignReport, getCampaign, getSequence, getTemplate, listCampaigns, listSequences, listTemplates, saveCampaign,
   saveSequence, saveTemplate
 } from "../sending/store";
+import { outreachViaMcp } from "../via";
 import type { OutreachMcpAccount, OutreachMcpHost } from "./index";
 
 const mailbox = z.object({ accountId: itemId.optional() });
@@ -14,7 +15,8 @@ const sequenceId = { sequenceId: itemId };
 const readOnly = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
 const edit = { readOnlyHint: false, openWorldHint: false };
 const send = { readOnlyHint: false, openWorldHint: true };
-const actor = (account: OutreachMcpAccount) => ({ accountId: account.accountId, authorization: { tokenId: account.tokenId } });
+const actor = (account: OutreachMcpAccount) => ({ accountId: account.accountId, authorization: { tokenId: account.tokenId },
+  via: outreachViaMcp(account.tokenLabel, account.tokenSuffix) });
 
 export function registerOutreachSendingTools(host: OutreachMcpHost) {
   const { server, outreachAccount, result } = host;

@@ -132,9 +132,29 @@ test("public routes use opaque tokens, keep the pixel constant, store HEAD as ma
   ]);
   db.prepare("UPDATE tracking_links SET url = 'javascript:noop()' WHERE accountId = ? AND token = ?").run(accountId, token);
   expect((await getClick(request(`/t/c/${token}`), { params: Promise.resolve({ token }) })).status).toBe(404);
+});
+
+test("switched off: links of delivered mail still redirect and the pixel answers, nothing is recorded; without a database both are absent", async () => {
+  const db = await seedSend();
+  const html = await rewrite(`<a href="${target}">Link</a>`);
+  const token = html.match(/\/t\/c\/([\w-]+)/)![1];
+  const filename = html.match(/\/t\/o\/([\w-]+\.gif)/)![1];
+  const hit = (path: string) => new Request(`${origin}${path}`, { headers: { "x-real-ip": "192.0.2.77", "user-agent": "Mozilla/5.0 (X11; Linux x86_64) Firefox/130.0" } });
+
   delete process.env.NOCTUA_ADDON_OUTREACH;
-  expect((await getOpen(request(`/t/o/${filename}`), { params: Promise.resolve({ filename }) })).status).toBe(404);
-  expect((await getClick(request(`/t/c/${token}`), { params: Promise.resolve({ token }) })).status).toBe(404);
+  const open = await getOpen(hit(`/t/o/${filename}`), { params: Promise.resolve({ filename }) });
+  expect([open.status, open.headers.get("content-type")]).toEqual([200, "image/gif"]);
+  const click = await getClick(hit(`/t/c/${token}`), { params: Promise.resolve({ token }) });
+  expect([click.status, click.headers.get("location")]).toEqual([302, target]);
+  // Only stored targets, also while switched off.
+  expect((await getClick(hit(`/t/c/${newOutreachToken()}`), { params: Promise.resolve({ token: newOutreachToken() }) })).status).toBe(404);
+  expect(db.prepare("SELECT count(*) AS n FROM tracking_events").get()).toEqual({ n: 0 });
+
+  // An installation that never used the addon has no database: the routes do not exist.
+  closeOutreachDb();
+  rmSync(join(dir, "db"), { recursive: true, force: true });
+  expect((await getOpen(hit(`/t/o/${filename}`), { params: Promise.resolve({ filename }) })).status).toBe(404);
+  expect((await getClick(hit(`/t/c/${token}`), { params: Promise.resolve({ token }) })).status).toBe(404);
 });
 
 test("rate limiting drops events while preserving the GIF and redirect independently of spoofed leading hops", async () => {
@@ -338,7 +358,9 @@ test("malformed paths and unknown tokens leave the event budget available to gen
 test("v2 event URLs survive migration and new clicks are stored by token", async () => {
   const legacyDb = new Database(":memory:");
   try {
+    // The v4 step alters campaigns and sequences, which every real v2 file has.
     legacyDb.exec(`CREATE TABLE tracking_events (accountId TEXT, type TEXT, at INTEGER, url TEXT);
+      CREATE TABLE campaigns (id TEXT); CREATE TABLE sequences (id TEXT);
       PRAGMA user_version = 2;`);
     legacyDb.prepare("INSERT INTO tracking_events (accountId, type, at, url) VALUES (?, 'bounce', 0, 'Synthetic bounce')").run(accountId);
     initOutreachSchema(legacyDb);

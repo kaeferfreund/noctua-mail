@@ -11,7 +11,7 @@ test("MCP exposes seven contact tools with usable schemas and resolves the mailb
   const roles: unknown[] = [];
   const resolveAccount = async (_accountId: string | undefined, minRole?: "viewer" | "editor" | "manager") => {
     roles.push(minRole);
-    return { accountId, role: "editor" as const, userId: "user-1", tokenId: "token-1" };
+    return { accountId, role: "editor" as const, userId: "user-1", tokenId: "token-1", tokenLabel: "Synthetic", tokenSuffix: "a1b2" };
   };
   registerOutreachContactTools({
     server, resolveAccount, outreachAccount: resolveAccount,

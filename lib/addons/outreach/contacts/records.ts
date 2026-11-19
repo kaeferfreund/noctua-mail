@@ -45,20 +45,21 @@ export function requireList(db: Database, accountId: string, listId: string): Li
 const emailHash = (emailLower: string) => createHash("sha256").update(emailLower).digest("hex");
 
 /**
- * Erasing a contact must not erase the reason it may never be mailed. A suppression and the
- * newest unsubscribe (global or of any list) stay behind as a hash of the address.
+ * Erasing a contact must not erase the reason it may never be mailed. Every erase leaves a hash
+ * of the address behind: a suppression as it was, and the erase itself counts as an unsubscribe
+ * at the time of the erase (or of a later unsubscribe on record), so the address comes back only
+ * with a consent given after it.
  */
 export function rememberErasedAddress(db: Database, row: ContactRow, now: number) {
   const listUnsubscribedAt = (db.query("SELECT max(unsubscribedAt) AS at FROM list_members WHERE accountId = ? AND contactId = ?")
     .get(row.accountId, row.id) as { at: number | null }).at;
-  const times = [row.unsubscribedAt, row.emailConsent === "unsubscribed" ? row.consentAt ?? now : null, listUnsubscribedAt]
+  const times = [now, row.unsubscribedAt, row.emailConsent === "unsubscribed" ? row.consentAt ?? now : null, listUnsubscribedAt]
     .filter((value): value is number => value !== null);
-  if (!row.suppressedReason && !times.length) return;
   db.query(`INSERT INTO erased_addresses (accountId, emailHash, suppressedReason, suppressedAt, unsubscribedAt, erasedAt)
     VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(accountId, emailHash) DO UPDATE SET suppressedReason = excluded.suppressedReason,
       suppressedAt = excluded.suppressedAt, unsubscribedAt = excluded.unsubscribedAt, erasedAt = excluded.erasedAt`)
-    .run(row.accountId, emailHash(row.emailLower), row.suppressedReason, row.suppressedAt, times.length ? Math.max(...times) : null, now);
+    .run(row.accountId, emailHash(row.emailLower), row.suppressedReason, row.suppressedAt, Math.max(...times), now);
 }
 
 /** A contact that takes an address takes over what was remembered for it. */
