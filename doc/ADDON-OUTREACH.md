@@ -81,9 +81,34 @@ opens, clicks, unsubscribes, deliveries, bounces and complaints.
 | `POST /t/u/{token}` | unsubscribe (form and RFC 8058 one-click) |
 | `POST /t/ses-events` | Amazon SNS notifications for SES (signature and topic verified) |
 
-Rate limited per client address (`TRUSTED_PROXY_HOPS` as in the rest of the app). An event
-is `machine` when it comes from Apple Mail Privacy Protection, an image proxy, a link scanner
-or arrives within seconds of delivery; machine events are stored but not counted as opens.
+Open and click events share a per-client budget of 120 requests per minute. The routes use
+`TRUSTED_PROXY_HOPS` to resolve the client address. When the budget runs out, the GIF and
+stored redirects still work. Malformed tokens skip database lookups. For an unknown token,
+the result is reused for up to one minute, with room for 4,096 recent misses per database.
+The first lookup of a new guess uses the token index and leaves the event budget available.
+
+Open and click events from HEAD requests, Apple Mail Privacy Protection user-agent signatures
+(including a bare `Mozilla/5.0`), known security gateways and crawlers, or the first five seconds
+after SMTP acceptance are marked `machine`. The client and operating system come from user-agent
+patterns. Gmail and Yahoo image-proxy GET opens count as human opens, including in the first
+five seconds. Their IP and location belong to the proxy. These rules are estimates based on
+request metadata. Counts of human opens and clicks exclude machine events.
+
+Repeated opens within 60 seconds for the same send, IP and user agent collapse into one event
+per classification (human or machine). With immediate IP truncation, a short-lived,
+in-memory digest distinguishes clients on the same network. The IP is retained only at
+/24 (IPv4) or /48 (IPv6) after the mailbox retention window. Location comes from the optional
+local database. Event listings and the latest event in a send summary truncate expired IPs
+as soon as the retention window ends. Each physical cleanup run processes up to 20 batches
+of 500 rows per mailbox and yields between transactions.
+
+One send can store up to 2,000 open and click events combined. A click stores a reference
+to its link, which holds the target URL. Links longer than 2,048 characters keep their
+original href. The open pixel is omitted if the rewritten HTML cannot render it as an
+image.
+
+For open and click event pages, pass the returned `nextBefore` unchanged as `before`. The
+cursor is the last event's ID and distinguishes events with the same timestamp.
 
 ## REST
 

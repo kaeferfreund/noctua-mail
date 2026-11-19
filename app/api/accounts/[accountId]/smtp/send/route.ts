@@ -26,6 +26,7 @@ import {
 } from "@/app/api/_helpers/accountContext";
 import { toFiniteNumber } from "@/app/api/_helpers/numberParsing";
 import { smtpUpstreamErrorResponse } from "@/app/api/_helpers/smtpUpstreamError";
+import { outreachAddonEnabled } from "@/lib/addons/outreach/config";
 
 function buildMessageId(address: string) {
   const domain = address.split("@")[1]?.trim();
@@ -57,6 +58,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       text: string;
       markdown?: string;
       html?: string;
+      tracking?: boolean;
       composeFormat?: string;
       invite?: ComposeInvitePayload;
       inReplyTo?: string;
@@ -167,6 +169,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     }
     const messageId = buildMessageId(identity.email);
     let result: Awaited<ReturnType<typeof sendSmtpMessage>>;
+    let tracking: Awaited<ReturnType<typeof import("@/lib/addons/outreach/tracking/compose").prepareComposeTracking>> = null;
     // Compose sends a planned draft: take its schedule from the job first (409 while the job sends
     // it or after it did), close it after SMTP acceptance, restore it when the send fails.
     let scheduleHold: DraftScheduleHold | undefined;
@@ -181,6 +184,15 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       const authorization = await authorizeOutbound({ request }, { accountId, minRole: "editor", identity });
       const beforeSend = await prepareOutboundAssertion(authorization);
       beforeSend();
+      if (payload.tracking === true && html && outreachAddonEnabled()) {
+        try {
+          const { prepareComposeTracking } = await import("@/lib/addons/outreach/tracking/compose");
+          tracking = await prepareComposeTracking({ accountId, userId: accountContext.userId, messageId,
+            recipients: [to, cc, bcc].filter(Boolean).join(", "), subject: payload.subject ?? "", html });
+        } catch {
+          console.warn("[outreach] Could not load compose tracking; sending original HTML");
+        }
+      }
       result = await sendSmtpMessage(account, {
         to: outboundTo || undefined,
         cc: cc || undefined,
@@ -194,8 +206,15 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
         references: payload.references,
         xForwardedMessageId: payload.xForwardedMessageId,
         ...(attachments.length > 0 ? { attachments } : {})
-      }, identity, beforeSend);
+      }, identity, beforeSend, tracking ? {
+        html: tracking.html,
+        onPrepareFailure: () => {
+          tracking?.finish("failed");
+          console.warn("[outreach] Could not compose tracked MIME; sending original HTML");
+        }
+      } : undefined);
     } catch (error) {
+      tracking?.finish("failed");
       await scheduleHold?.abort(error);
       if (error instanceof OutboundAuthorizationError) return error.response;
       if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
@@ -207,6 +226,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       throw error;
     }
 
+    tracking?.finish("sent");
     await scheduleHold?.complete();
     const sentResult = await completeSend({ account, clientId, raw: result.raw, messageId,
       actor: collabActorFromSession(accountContext.session, accountContext.clientId), inReplyTo: payload.inReplyTo, references: payload.references,
