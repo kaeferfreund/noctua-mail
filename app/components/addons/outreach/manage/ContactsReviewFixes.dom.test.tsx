@@ -194,6 +194,20 @@ describe("contact detail", () => {
     await waitFor(() => expect(page.getAllByRole("button", { name: "Unsubscribe" }).length).toBe(2));
   });
 
+  it("I: the confirmation shows the date the server names, also when the contact's own data has none", async () => {
+    // A global unsubscribe that a later re-subscription to another list hides in the contact's data.
+    const serverDate = Date.UTC(2026, 2, 14, 9, 30);
+    const { page } = mount({
+      initial: { section: "contacts", id: CONTACT_DETAIL.id },
+      handlers: [call => call.method === "POST" && call.path.endsWith("/subscriptions")
+        ? json({ ok: false, code: "resubscribe_confirmation_required", message: "This person unsubscribed.", unsubscribedAt: serverDate }, 409) : undefined]
+    });
+    fireEvent.click(await page.findByRole("button", { name: "Subscribe" }));
+    const dialog = await page.findByRole("dialog");
+    expect(dialog.textContent).toContain(`person1@example.test unsubscribed on ${formatDate(serverDate, "en")}`);
+    expect(dialog.textContent).not.toContain(UNSUBSCRIBED_AT);
+  });
+
   it("I: cancelling the confirmation sends nothing more", async () => {
     const { page, calls } = mount({
       initial: { section: "contacts", id: CONTACT_DETAIL.id },

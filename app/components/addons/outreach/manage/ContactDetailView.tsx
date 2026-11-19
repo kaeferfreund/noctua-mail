@@ -19,6 +19,12 @@ export function isResubscribeConfirmation(error: unknown) {
   return error instanceof AdminApiError && error.status === 409 && error.code === "resubscribe_confirmation_required";
 }
 
+/** The unsubscribe date the server names in that 409 (`ResubscribeConfirmationRequired.unsubscribedAt`). */
+export function resubscribeDate(error: unknown) {
+  const value = error instanceof AdminApiError ? error.data.unsubscribedAt : null;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 /** Latest unsubscribe the contact view knows of, globally or from `listId`; null when none is shown. */
 export function lastUnsubscribe(contact: ContactDetail, listId: string) {
   const member = contact.lists.find(membership => membership.listId === listId);
@@ -111,7 +117,7 @@ function ContactDetailBody({ contact, path, onChange, onBack }: { contact: Conta
     } catch (caught) {
       // The person unsubscribed: ask first, subscribe only on an explicit confirmation.
       if (action === "subscribe" && !confirmResubscribe && isResubscribeConfirmation(caught)) {
-        return { ask: { resubscribe: listId, unsubscribedAt: lastUnsubscribe(contact, listId) } };
+        return { ask: { resubscribe: listId, unsubscribedAt: resubscribeDate(caught) ?? lastUnsubscribe(contact, listId) } };
       }
       throw caught;
     }

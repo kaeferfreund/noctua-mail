@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } f
 import { EMAIL_CONSENTS, type Contact, type ContactDetail, type ContactList, type ContactListResponse, type EmailConsent } from "@/lib/addons/outreach/types";
 import { useOutreachManage, useResource } from "./manageContext";
 import { EmptyState, ErrorNote, Field, LoadingNote, RowButton, SectionHeader, nativeControlClass, useOutreachFormat, outreachRootClass } from "./ui";
-import ContactDetailView, { isResubscribeConfirmation, lastUnsubscribe, useResubscribeQuestion } from "./ContactDetailView";
+import ContactDetailView, { isResubscribeConfirmation, lastUnsubscribe, resubscribeDate, useResubscribeQuestion } from "./ContactDetailView";
 
 const PAGE_SIZE = 50;
 const SEARCH_DELAY_MS = 300;
@@ -172,8 +172,10 @@ function AddContactDialog({ defaultListId, onClose, onChanged, onCreated }: {
       onCreated(contact.id);
     } catch (caught) {
       if (!confirmResubscribe && isResubscribeConfirmation(caught)) {
-        const detail = await api.get<{ contact: ContactDetail }>(`contacts/${encodeURIComponent(contact.id)}`).then(body => body.contact, () => null);
-        setStage({ kind: "confirm", contact, created, unsubscribedAt: detail ? lastUnsubscribe(detail, listId) : null });
+        // The answer names the date; only an older server without it needs the contact's own data.
+        const named = resubscribeDate(caught);
+        const detail = named === null ? await api.get<{ contact: ContactDetail }>(`contacts/${encodeURIComponent(contact.id)}`).then(body => body.contact, () => null) : null;
+        setStage({ kind: "confirm", contact, created, unsubscribedAt: named ?? (detail ? lastUnsubscribe(detail, listId) : null) });
       } else {
         setError(caught);
         setStage({ kind: "notSubscribed", contact, created });
