@@ -173,10 +173,13 @@ describe("newsletter campaigns", () => {
     });
     fireEvent.click(await page.findByRole("button", { name: "Send …" }));
     const dialog = await page.findByRole("dialog");
-    expect(dialog.textContent).toContain("The chosen lists (Newsletter) have at most 412 subscribed members together.");
-    expect(calls.some(call => call.path.endsWith("/schedule"))).toBe(false);
+    // The count comes from the server's dry run (consent, suppression, excluded lists), not from list sizes.
+    expect(dialog.textContent).toContain("The campaign goes to 398 recipients from the lists Newsletter.");
+    const scheduleCalls = () => calls.filter(call => call.path.endsWith("/schedule")).map(call => call.body);
+    expect(scheduleCalls()).toEqual([{ sendAt: null, dryRun: true }]);
     fireEvent.click(within(dialog).getByRole("button", { name: "Send now" }));
-    await waitFor(() => expect(calls.find(call => call.path.endsWith("/schedule"))?.body).toEqual({ sendAt: null }));
+    // The confirmed call names the draft version the count was made for.
+    await waitFor(() => expect(scheduleCalls()).toEqual([{ sendAt: null, dryRun: true }, { sendAt: null, expectedUpdatedAt: DRAFT.updatedAt }]));
     expect(await page.findByText("Sending to 398 recipients has started.")).toBeTruthy();
     expect(page.getByRole("button", { name: "Cancel sending" })).toBeTruthy();
   });
@@ -184,7 +187,9 @@ describe("newsletter campaigns", () => {
   it("sends a test and reports a refused schedule as a readable conflict", async () => {
     const { page, calls } = mount({
       initial: { section: "campaigns", id: DRAFT.id },
-      handlers: [call => call.path.endsWith("/schedule") ? json({ ok: false, message: "Only a draft can be scheduled." }, 409) : undefined]
+      handlers: [call => !call.path.endsWith("/schedule") ? undefined
+        : (call.body as { dryRun?: boolean }).dryRun ? json({ ok: true, recipients: 3, campaign: DRAFT })
+        : json({ ok: false, message: "Only a draft can be scheduled." }, 409)]
     });
     fireEvent.change(await page.findByLabelText("Test to"), { target: { value: "ich@example.test" } });
     fireEvent.click(page.getByRole("button", { name: "Send test" }));
@@ -197,7 +202,17 @@ describe("newsletter campaigns", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Schedule" }));
     const alert = await within(dialog).findByRole("alert");
     expect(alert.textContent).toContain("Only a draft can be scheduled.");
-    expect(typeof (calls.find(call => call.path.endsWith("/schedule"))?.body as { sendAt: unknown }).sendAt).toBe("number");
+    expect(typeof (calls.filter(call => call.path.endsWith("/schedule")).at(-1)?.body as { sendAt: unknown }).sendAt).toBe("number");
+  });
+
+  it("shows a refused dry run before any confirmation dialog opens", async () => {
+    const { page } = mount({
+      initial: { section: "campaigns", id: DRAFT.id },
+      handlers: [call => call.path.endsWith("/schedule") ? json({ ok: false, message: "SES is not configured." }, 400) : undefined]
+    });
+    fireEvent.click(await page.findByRole("button", { name: "Send …" }));
+    expect((await page.findByRole("alert")).textContent).toContain("SES is not configured.");
+    expect(page.queryByRole("dialog")).toBeNull();
   });
 
   it("reports rates next to counts, automatic fetches apart, links and recipients", async () => {

@@ -1,0 +1,30 @@
+{
+  "data": {
+    "id": "flow-welcome",
+    "attributes": {
+      "name": "Begrüßung",
+      "definition": {
+        "entry_action_id": "delay-first",
+        "triggers": [{ "id": "exported-list" }],
+        "actions": [
+          {
+            "id": "email-last", "type": "send-email", "links": { "next": null },
+            "data": { "message": { "name": "Weitere Infos", "subject_line": "Mehr Infos", "template_id": "template-follow-up" } }
+          },
+          {
+            "id": "delay-first", "type": "time-delay", "links": { "next": "email-first" },
+            "data": { "value": 2, "unit": "hours" }
+          },
+          {
+            "id": "email-first", "type": "send-email", "links": { "next": "delay-next" },
+            "data": { "message": { "name": "Begrüßung", "subject_line": "Hallo {{ first_name }}", "preview_text": "Willkommen", "template_id": "template-welcome" } }
+          },
+          {
+            "id": "delay-next", "type": "time-delay", "links": { "next": "email-last" },
+            "data": { "value": 3, "unit": "days" }
+          }
+        ]
+      }
+    }
+  }
+}
