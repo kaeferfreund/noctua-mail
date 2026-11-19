@@ -41,6 +41,7 @@ import { useStableHandlers } from "@/app/hooks/useStableHandlers";
 import { useCollapsedDomains } from "@/lib/ui/collapsedDomains";
 import { versionedIconUrl } from "@/lib/appBranding";
 import { domainIconVersionFor, type DomainIconVersions } from "@/app/hooks/useDomainIconVersions";
+import OutreachNavEntry from "@/app/components/addons/outreach/manage/OutreachNavEntry";
 
 export type ShellSidebarProps = {
   onNavigate?: () => void;
@@ -475,6 +476,7 @@ export default function ShellSidebar({ brand, mailboxes, views, topics, folders,
                   <SidebarMenuBadge>{compose.draftsCount}</SidebarMenuBadge>
                 </SidebarMenuItem></SidebarMenu>
               ) : null}
+              {mailboxes.activeAccountId ? <OutreachNavEntry accountId={mailboxes.activeAccountId} /> : null}
             </SidebarGroup>
             <SidebarGroup className={FLUSH_SECTION_CLASS}>
               <SidebarGroupContent>

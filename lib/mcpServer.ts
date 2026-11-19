@@ -1,3 +1,4 @@
+import { outreachAddonEnabled } from "./addons/outreach/config";
 import { authorizeOutbound } from "./outboundAuthorization";
 import { resolveComposeIdentity } from "./senderIdentitySelection";
 import { createSenderIdentityWithRecompute, updateSenderIdentity, SenderIdentityError } from "./senderIdentities";
@@ -1933,6 +1934,25 @@ export async function executeMcpHttpRequest(params: {
       const ctx = await resolveAccountContext(context, args.accountId); const target = await resolveThreadTarget(ctx, args);
       const [activity, url] = await Promise.all([listThreadActivity(ctx.accountId, target.threadId, { limit: args.limit }), threadUrl(ctx.accountId, target)]);
       return buildToolResult(withLink("Thread activity.", url), { ok: true, activity, url }); });
+
+  if (outreachAddonEnabled()) {
+    const { registerOutreachMcpTools } = await import("./addons/outreach/mcp");
+    registerOutreachMcpTools({
+      server,
+      resolveAccount: async (accountId, minRole) => {
+        const ctx = await resolveAccountContext(context, accountId, minRole);
+        return { accountId: ctx.accountId, role: ctx.role, userId: ctx.tokenRecord.createdByUserId, tokenId: ctx.tokenRecord.id };
+      },
+      resolveMessage: async args => {
+        const { ctx, id } = await resolveMessageTarget(context, { accountId: args.accountId, url: args.url, id: args.messageId }, "viewer", "messageId");
+        const message = await getMessageById(ctx.accountId, id);
+        if (!message) throw new Error("Message not found");
+        return { accountId: ctx.accountId, message };
+      },
+      result: buildToolResult,
+      appUrl: accountId => appUrl({ accountId })
+    });
+  }
 
   const transport = new StatelessJsonResponseTransport({
     authInfo: params.authInfo,

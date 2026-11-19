@@ -1,4 +1,5 @@
 import type { McpTokenMetadata } from "./data";
+import { OUTREACH_MCP_TOOL_SCOPES } from "./addons/outreach/mcpScopes";
 
 /** Token permissions narrow live mailbox roles; they never grant a mailbox role. */
 export const MCP_SCOPES = ["read", "drafts", "manage", "send"] as const;
@@ -51,7 +52,9 @@ export const MCP_TOOL_SCOPES: Readonly<Record<string, McpScope>> = {
   assign_thread: "drafts", add_internal_comment: "drafts", list_thread_activity: "read"
 };
 export function mcpToolScope(name: string): McpScope {
-  const scope = Object.hasOwn(MCP_TOOL_SCOPES, name) ? MCP_TOOL_SCOPES[name] : undefined;
+  // Addon tools are registered only while the addon flag is on; their classification is static.
+  const scope = Object.hasOwn(MCP_TOOL_SCOPES, name) ? MCP_TOOL_SCOPES[name]
+    : Object.hasOwn(OUTREACH_MCP_TOOL_SCOPES, name) ? OUTREACH_MCP_TOOL_SCOPES[name] : undefined;
   if (!scope) throw new Error(`MCP tool has no permission classification: ${name}`);
   return scope;
 }

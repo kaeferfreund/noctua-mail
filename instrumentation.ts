@@ -16,6 +16,8 @@ export async function register() {
   (await import("@/lib/threadRecomputeJobs")).resumeIdentityRecomputeJobs();
   // Resumes planned sends from scheduled_sends; overdue rows go out on the first pass.
   (await import("@/lib/scheduledSendJob")).startScheduledSendScheduler();
+  // Addon: campaigns, sequences and tracking retention. Nothing of it loads while the flag is off.
+  if ((await import("@/lib/addons/outreach/config")).outreachAddonEnabled()) (await import("@/lib/addons/outreach/sending")).startOutreachScheduler();
   if (process.env.NOCTUA_MAILBOX_WATCHER === "1") (await import("@/lib/mailboxWatcher")).startMailboxWatcher();
   startupInitialized = true;
 }
