@@ -2824,6 +2824,7 @@
       "sender": "Default sender",
       "senderHint": "Used for campaigns and sequences without their own sender.",
       "senderMailbox": "The mailbox's default sender",
+      "senderMissing": "The saved sender no longer exists. Saving stores the mailbox's default sender unless you choose another one.",
       "sendRate": "Send rate (mails per minute)",
       "sendRateHint": "Whole number from {min} to {max}.",
       "ipRetention": "Keep full IP addresses (days)",

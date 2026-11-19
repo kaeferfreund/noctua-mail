@@ -2824,6 +2824,7 @@
       "sender": "Standard-Absender",
       "senderHint": "Gilt für Kampagnen und Serien, die keinen eigenen Absender haben.",
       "senderMailbox": "Standard-Absender des Postfachs",
+      "senderMissing": "Der gespeicherte Absender existiert nicht mehr. Beim Speichern wird der Standard-Absender des Postfachs eingetragen, außer du wählst einen anderen.",
       "sendRate": "Versandrate (Mails pro Minute)",
       "sendRateHint": "Ganze Zahl von {min} bis {max}.",
       "ipRetention": "IP-Adressen vollständig aufbewahren (Tage)",
