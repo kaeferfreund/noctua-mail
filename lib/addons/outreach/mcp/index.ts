@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { AccountRole, Message } from "@/lib/data";
 import { isOutreachEnabledForAccount } from "../settings";
 import { registerOutreachContactTools } from "./contacts";
+import { registerOutreachMediaTools } from "./media";
 import { registerOutreachSendingTools } from "./sending";
 import { registerOutreachTrackingTools } from "./tracking";
 
@@ -41,4 +42,5 @@ export function registerOutreachMcpTools(core: OutreachMcpCore) {
   registerOutreachTrackingTools(host);
   registerOutreachContactTools(host);
   registerOutreachSendingTools(host);
+  registerOutreachMediaTools(host);
 }

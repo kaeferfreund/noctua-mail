@@ -14,17 +14,18 @@ All examples use synthetic data.
 | `app/api/addons/outreach/` | signed-in REST routes and the token-authenticated subscribe route |
 | `app/t/` | public routes that recipients' mail clients reach |
 | `app/components/addons/outreach/` | all UI |
-| `<data dir>/db/addons/outreach.db` | all data (own SQLite file, own `user_version`) |
+| `<data dir>/db/addons/outreach.db` | metadata (own SQLite file, own `user_version`) |
+| `<data dir>/addons/outreach/media/` | uploaded image files |
 
 The addon never adds a table or column to `db/main.db` or to an account shard. Removing it
-is: flag off, delete `outreach.db`.
+is: flag off, delete `outreach.db` and the media directory.
 
 Switching the flag off does not break mail that was already sent. As long as `outreach.db`
-exists, `/t/c/{token}` still redirects to the stored target, `/t/u/{token}` still shows the page
-and stores the unsubscribe (and cancels what is queued for that person), and the open pixel
-still answers; no tracking event is recorded. Deleting `outreach.db` is final: from then on
-every link in every tracked mail and every unsubscribe link of every newsletter answers 404, so
-delete the file only when those mails no longer matter. An installation that never used the
+exists, `/t/c/{token}` still redirects to the stored target and `/t/u/{token}` still shows the page
+and stores the unsubscribe (and cancels what is queued for that person). The open pixel still
+answers and hosted images still load. These requests record no tracking events while the flag
+is off. Deleting `outreach.db` makes tracked links, unsubscribe links and hosted image requests
+answer 404 at the server. Delete the file only when those mails no longer matter. An installation that never used the
 addon has no such file and its `/t/*` routes answer 404.
 
 Core files call into the addon at exactly these seams:
@@ -63,9 +64,9 @@ identity checks as the manual send routes.
 
 ## Data model
 
-`lib/addons/outreach/db.ts` holds the schema (v1, with the additive steps up to v4) with comments. Every table carries
-`accountId`; every query filters by it. Shapes that cross a boundary are in
-`lib/addons/outreach/types.ts`.
+`lib/addons/outreach/db.ts` holds the schema (v1, with additive steps up to v5). Every table
+carries `accountId`. Mailbox queries filter by it. The public image route finds the shared file
+by content hash. Shapes that cross a boundary are in `lib/addons/outreach/types.ts`.
 
 Consent rules live in `lib/addons/outreach/contacts/consent.ts`. A contact is mailed only with
 consent, without a suppression and while subscribed to the list. `contacts.unsubscribedAt` keeps
@@ -99,7 +100,7 @@ opens, clicks, unsubscribes, deliveries, bounces and complaints.
 | --- | --- |
 | `GET /t/o/{token}.gif` | open pixel; always answers the same 1×1 GIF, also for unknown tokens |
 | `GET /t/c/{token}` | click; 302 only to the URL stored for the token, 404 otherwise |
-| `GET /t/m/{sha256}.{ext}` | an uploaded image; content-addressed, cached for a year, no event recorded |
+| `GET, HEAD /t/m/{sha256}.{ext}` | an uploaded image; content-addressed, cached for a year, no event recorded |
 | `GET /t/u/{token}` | unsubscribe confirmation page (German and English) |
 | `POST /t/u/{token}` | unsubscribe (form and RFC 8058 one-click); its own budget of 2,000 submissions per minute per client, apart from the 120 page views, and a refused submission never shows the confirmation |
 | `POST /t/ses-events` | Amazon SNS notifications for SES (signature and topic verified) |
@@ -161,7 +162,7 @@ Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 | GET, PATCH, DELETE | `{base}/templates/{templateId}` | `Partial<EmailTemplateInput>` → `{ok, template}`; DELETE archives |
 | POST | `{base}/render` | `{subject, html, text?, contactId?}` → `RenderResponse` |
 | GET | `{base}/images` | → `OutreachImageListResponse` |
-| POST | `{base}/images?filename=` | file bytes as `application/octet-stream` → `OutreachImageUploadResponse` (PNG, JPEG, GIF, WebP; at most 5 MiB) |
+| POST | `{base}/images?filename=` | file bytes as `application/octet-stream` → `OutreachImageUploadResponse` (PNG, JPEG, GIF, WebP; at most 5 MiB; 413 if oversized, 415 if unsupported or the extension disagrees with the detected type) |
 | GET, POST | `{base}/campaigns` | `CampaignInput` → `{ok, campaigns: CampaignSummary[]}` / `{ok, campaign}` |
 | GET, PATCH, DELETE | `{base}/campaigns/{campaignId}` | `CampaignInput` → `{ok, campaign: Campaign}`; only drafts change or delete. `Campaign` and `CampaignSummary` carry `scheduledByUserId` and `scheduledVia` |
 | POST | `{base}/campaigns/{campaignId}/test` | `TestSendRequest` → `{ok}` |
@@ -180,6 +181,30 @@ a sent campaign), 400 for invalid input.
 The compose send route accepts one extra field, `tracking?: boolean`. It is ignored unless
 the flag is on and the mailbox has the addon activated.
 
+## Hosted email images
+
+Use the returned root-relative `image.url` in an `<img src>` in a template, campaign or sequence
+step. Preview and send rendering prepend the configured public origin to these image paths.
+HTML `srcset`, CSS URLs and Outlook conditional comments keep their original URLs.
+The URL uses the SHA-256 of the file bytes and a canonical extension (`.png`, `.jpg`, `.gif`,
+or `.webp`). Mailboxes share the file bytes and keep separate library entries. The public
+URL can be read by anyone who has it. There is no delete operation because previously sent
+mail depends on the URL. Back up the media directory with the addon database.
+
+Uploads and rehosting require a complete image header with dimensions from 1 to 16,384 pixels
+on each side. The server checks the header without decoding the image pixels. Rehosting keeps
+the source filename's base and adds or replaces the extension using the detected format.
+
+To migrate existing image references, use `bun scripts/outreach-rehost-images.ts --account example
+--host images.example.test --drop-links-to badge.example.test`. The command scans template HTML,
+campaign drafts and sequence steps in that mailbox. It fetches only over HTTPS on the explicitly
+listed hosts, including redirect destinations. Both modes report replacements, anchor removals,
+ambiguous markup skipped per document, and download failures. The dry run leaves stored data
+untouched. Add `--write` to apply the reported edits. Anchor removals are applied only when the
+source range is unambiguous and reparsing preserves the rest of the HTML tree. Image rewrites
+must preserve the tree apart from the intended `src` changes. Diagnostic URLs omit credentials
+and query values. Rerun to retry failures or edits detected while downloading.
+
 ## Areas inside `lib/addons/outreach/`
 
 | Folder | Owns | Public surface (`index.ts`) |
@@ -187,6 +212,7 @@ the flag is on and the mailbox has the addon activated.
 | `tracking/` | tokens, HTML rewrite, events, classification, location, retention, read models over sends and events | `prepareTrackedHtml`, `recordTrackingEvent`, `getMessageTracking`, `getSendStats`, `listSendSummaries`, `listLinkStats`, `runTrackingRetention` |
 | `contacts/` | contacts, lists, consent, suppression, API tokens, unsubscribe | `listSendableRecipients`, `getSendableRecipient`, `createUnsubscribeUrls`, `suppressContact` |
 | `sending/` | templates, rendering, campaigns, sequences, transports, scheduler, SES events | `isSesConfigured`, `onListSubscribed`, `onContactUnmailable`, `startOutreachScheduler` |
+| `media/` | image type checks, metadata, content-addressed files | `listOutreachImages`, `prepareImage`, `saveOutreachImage` |
 | `mcp/` | one file per area with that area's tools | `registerOutreachMcpTools` |
 
 An area imports another area only through its `index.ts`.
@@ -198,8 +224,13 @@ contacts, templates and campaign drafts; scheduling a campaign or switching a se
 needs `send`, consent changes need `manage`. Tools: `get_message_tracking`,
 `list_tracking_events`, `list_contact_lists`, `search_contacts`, `get_contact`,
 `upsert_contact`, `save_contact_list`, `subscribe_contact`, `unsubscribe_contact`,
-`list_email_templates`, `get_email_template`, `save_email_template`, `list_campaigns`,
+`list_email_templates`, `get_email_template`, `save_email_template`, `list_email_images`,
+`upload_email_image` (base64 `data` and `filename`), `list_campaigns`,
 `get_campaign`, `get_campaign_report`, `save_campaign`, `schedule_campaign`,
 `cancel_campaign`, `list_sequences`, `get_sequence`, `save_sequence`, `set_sequence_status`.
 `list_campaigns`, `get_campaign`, `list_sequences` and `get_sequence` return the trace fields of
 the REST shapes; `schedule_campaign` and `set_sequence_status` record the calling token.
+
+Authenticated `/api/mcp` requests have a 7,006,892-byte body limit, including the entire body
+of a JSON-RPC batch. The limit fits one 5 MiB image encoded as base64 plus 16 KiB for the envelope.
+Larger requests receive HTTP 413.

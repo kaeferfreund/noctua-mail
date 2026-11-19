@@ -1,6 +1,8 @@
 import { defaultTreeAdapter, parse, parseFragment, serialize, type DefaultTreeAdapterTypes as Tree } from "parse5";
 import { escapeHtml } from "@/lib/html/strip";
 import { htmlToPlainText } from "@/lib/mail/spam/input";
+import { outreachPublicOrigin } from "../config";
+import { imageFilename, imagePathPrefix } from "../media";
 import { TEMPLATE_PLACEHOLDERS, type RenderResponse } from "../types";
 
 // Each part can match a character in one way only, so a failed match costs linear time.
@@ -102,6 +104,7 @@ export function renderContent(content: Content, options: RenderOptions): RenderR
     }
     return encodeURIComponent(Buffer.from(token.value).toString());
   });
+  const publicOrigin = outreachPublicOrigin();
   visit(document, node => {
     if ("attrs" in node) {
       for (const attr of node.attrs) {
@@ -114,6 +117,12 @@ export function renderContent(content: Content, options: RenderOptions): RenderR
         // Check the assembled URL too: static text and encoded values can jointly form a scheme.
         if (dynamic && urlAttributes.has(attr.name) && /^[a-z][a-z\d+.-]*:/i.test(attr.value.replace(/[\x00-\x20]/g, ""))
           && !/^(https?|mailto|tel|cid):/i.test(attr.value.trim())) attr.value = "";
+        if (publicOrigin && node.tagName === "img" && attr.name === "src") {
+          const src = trimUrlWhitespace(attr.value);
+          if (src.startsWith(imagePathPrefix) && imageFilename.test(src.slice(imagePathPrefix.length))) {
+            attr.value = publicOrigin + src;
+          }
+        }
       }
     }
     if ("value" in node) {
