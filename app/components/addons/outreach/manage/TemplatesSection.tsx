@@ -92,12 +92,15 @@ function TemplateEditor({ template, onBack }: { template: EmailTemplate | null; 
   const save = async () => {
     setBusy(true); setError(null); setNotice(false);
     try {
-      const body = { ...form, name: form.name.trim() };
+      const sent = form;
+      const body = { ...sent, name: sent.name.trim() };
       const result = template
         ? await api.send<{ template: EmailTemplate }>("PATCH", `templates/${encodeURIComponent(template.id)}`, body)
         : await api.send<{ template: EmailTemplate }>("POST", "templates", body);
       const next = { name: result.template.name, subject: result.template.subject, previewText: result.template.previewText, html: result.template.html, text: result.template.text };
-      setSaved(next); setForm(next); setNotice(true);
+      setSaved(next); setNotice(true);
+      // Input typed while the request ran stays and remains unsaved.
+      setForm(previous => previous === sent ? next : previous);
       void templates.reload();
       if (!template) { markClean(); navigate({ section: "templates", id: result.template.id }); }
     } catch (caught) { setError(caught); }

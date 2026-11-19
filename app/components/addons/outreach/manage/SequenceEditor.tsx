@@ -8,7 +8,7 @@ import { Badge } from "@/app/components/ui/badge";
 import type { Sequence, SequenceInput, SequenceReport, SequenceStatus } from "@/lib/addons/outreach/types";
 import { useOutreachManage, useResource, useUnsavedChanges } from "./manageContext";
 import { ConfirmDialog, ErrorNote, Field, LoadingNote, SectionHeader, SequenceStatusBadge, StatsFigures, nativeControlClass, useOutreachFormat } from "./ui";
-import { ContentFields } from "./HtmlContent";
+import { ContentFields, hasContent } from "./HtmlContent";
 import { LabeledSwitch, SenderSelect, TrackingSwitches } from "./SendingFields";
 
 /** A step while it is edited: `key` identifies it in the UI, `id` only once the server stored it. */
@@ -71,6 +71,8 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
   const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [dialog, setDialog] = useState<SequenceStatus | "delete" | null>(null);
+  /** Bumped by every save and status change, so the report shows the stored state. */
+  const [reportVersion, setReportVersion] = useState(0);
   const dirty = comparable(form) !== comparable(saved);
   const markClean = useUnsavedChanges(`sequence:${current?.id ?? "new"}`, canEdit && dirty);
   const readOnly = !canEdit;
@@ -78,14 +80,20 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
   useEffect(() => { ensureLists(); }, [ensureLists]);
 
   const persist = async (): Promise<Sequence> => {
+    const sent = form;
     const result = current
-      ? await api.send<{ sequence: Sequence }>("PATCH", `sequences/${encodeURIComponent(current.id)}`, inputOf(form))
-      : await api.send<{ sequence: Sequence }>("POST", "sequences", inputOf(form));
-    const next = formOf(result.sequence);
-    // Keep the open step open across the save: new steps get their server id as key.
-    const openIndex = form.steps.findIndex(step => step.key === open);
-    setCurrent(result.sequence); setSaved(next); setForm(next);
-    if (openIndex >= 0) setOpen(next.steps[openIndex]?.key ?? null);
+      ? await api.send<{ sequence: Sequence }>("PATCH", `sequences/${encodeURIComponent(current.id)}`, inputOf(sent))
+      : await api.send<{ sequence: Sequence }>("POST", "sequences", inputOf(sent));
+    const stored = formOf(result.sequence);
+    // The server keeps the step order; keeping the UI keys keeps the open step open.
+    const next = { ...stored, steps: stored.steps.map((step, index) => ({ ...step, key: sent.steps[index]?.key ?? step.key })) };
+    setCurrent(result.sequence); setSaved(next);
+    // Input typed while the request ran stays and remains unsaved; new steps learn their ids.
+    setForm(previous => previous === sent ? next : {
+      ...previous,
+      steps: previous.steps.map(step => step.id ? step : { ...step, id: next.steps.find(entry => entry.key === step.key)?.id })
+    });
+    setReportVersion(version => version + 1);
     return result.sequence;
   };
   const run = async (key: string, action: () => Promise<void>) => {
@@ -99,9 +107,11 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
     if (!current) { markClean(); navigate({ section: "sequences", id: stored.id }); }
   });
   const setStatus = (status: "live" | "paused") => run("status", async () => {
-    const stored = dirty || !current ? await persist() : current;
+    // Pausing stops sending first; unsaved edits stay in the form and are saved separately.
+    const stored = status === "paused" && current ? current : dirty || !current ? await persist() : current;
     const result = await api.send<{ sequence: Sequence }>("POST", `sequences/${encodeURIComponent(stored.id)}/status`, { status });
     setCurrent(result.sequence);
+    setReportVersion(version => version + 1);
     setDialog(null);
     setNotice(status === "live" ? t("sequences.nowLive") : t("sequences.nowPaused"));
     if (!current) { markClean(); navigate({ section: "sequences", id: stored.id }); }
@@ -133,7 +143,7 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
   const status = current?.status ?? "draft";
   const triggerList = lists.data?.find(list => list.id === form.triggerListId) ?? null;
   const enabledSteps = form.steps.filter(step => step.enabled).length;
-  const incomplete = form.steps.some(step => step.enabled && (!step.subject.trim() || !step.html.trim()));
+  const incomplete = form.steps.some(step => step.enabled && (!step.subject.trim() || !hasContent(step)));
   const canGoLive = Boolean(form.name.trim() && form.triggerListId && enabledSteps > 0 && !incomplete);
 
   return (
@@ -163,7 +173,7 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
           <input required readOnly={readOnly} className={nativeControlClass} value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} />
         </Field>
         <Field label={t("sequences.trigger")} hint={t("sequences.triggerHint")}>
-          <select className={nativeControlClass} disabled={readOnly} value={form.triggerListId ?? ""} onChange={event => setForm({ ...form, triggerListId: event.target.value || null })}>
+          <select className={nativeControlClass} disabled={readOnly || status !== "draft"} value={form.triggerListId ?? ""} onChange={event => setForm({ ...form, triggerListId: event.target.value || null })}>
             <option value="">{t("sequences.chooseTrigger")}</option>
             {(lists.data ?? []).filter(list => !list.archivedAt || list.id === form.triggerListId).map(list => <option key={list.id} value={list.id}>{list.name}</option>)}
           </select>
@@ -188,7 +198,7 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
         </ol>
       </section>
 
-      {current && status !== "draft" ? <SequenceReportPanel sequenceId={current.id} /> : null}
+      {current && status !== "draft" ? <SequenceReportPanel sequenceId={current.id} version={reportVersion} /> : null}
 
       {dialog === "live" ? (
         <ConfirmDialog title={status === "paused" ? t("sequences.resumeTitle") : t("sequences.goLiveTitle")}
@@ -204,9 +214,7 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
         <ConfirmDialog title={t("sequences.pauseTitle")}
           description={t("sequences.pauseDescription", { list: triggerList?.name ?? "–" })}
           confirmLabel={t("sequences.pause")} busy={busy === "status"} error={error}
-          onCancel={() => { setDialog(null); setError(null); }} onConfirm={() => void setStatus("paused")}>
-          {dirty ? <p className="text-xs text-muted-foreground">{t("campaigns.savesFirst")}</p> : null}
-        </ConfirmDialog>
+          onCancel={() => { setDialog(null); setError(null); }} onConfirm={() => void setStatus("paused")} />
       ) : null}
       {dialog === "delete" ? (
         <ConfirmDialog title={t("sequences.deleteTitle")} description={t("sequences.deleteDescription", { name: form.name || t("sequences.untitled") })}
@@ -284,11 +292,11 @@ function StepCard({ step, index, count, open, readOnly, onToggle, onChange, onMo
   );
 }
 
-function SequenceReportPanel({ sequenceId }: { sequenceId: string }) {
+function SequenceReportPanel({ sequenceId, version }: { sequenceId: string; version: number }) {
   const t = useTranslations("outreach");
   const { api } = useOutreachManage();
   const format = useOutreachFormat();
-  const report = useResource(() => api.get<SequenceReport>(`sequences/${encodeURIComponent(sequenceId)}/report`), [api, sequenceId]);
+  const report = useResource(() => api.get<SequenceReport>(`sequences/${encodeURIComponent(sequenceId)}/report`), [api, sequenceId, version]);
   const data = report.data;
   return (
     <section aria-labelledby="sequence-report" className="flex flex-col gap-3">
