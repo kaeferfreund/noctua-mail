@@ -78,7 +78,7 @@ opens, clicks, unsubscribes, deliveries, bounces and complaints.
 | `GET /t/o/{token}.gif` | open pixel; always answers the same 1×1 GIF, also for unknown tokens |
 | `GET /t/c/{token}` | click; 302 only to the URL stored for the token, 404 otherwise |
 | `GET /t/u/{token}` | unsubscribe confirmation page (German and English) |
-| `POST /t/u/{token}` | unsubscribe (form and RFC 8058 one-click) |
+| `POST /t/u/{token}` | unsubscribe (form and RFC 8058 one-click); its own budget of 2,000 submissions per minute per client, apart from the 120 page views, and a refused submission never shows the confirmation |
 | `POST /t/ses-events` | Amazon SNS notifications for SES (signature and topic verified) |
 
 Open and click events share a per-client budget of 120 requests per minute. The routes use
@@ -140,7 +140,7 @@ Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 | GET, POST | `{base}/campaigns` | `CampaignInput` → `{ok, campaigns: CampaignSummary[]}` / `{ok, campaign}` |
 | GET, PATCH, DELETE | `{base}/campaigns/{campaignId}` | `CampaignInput` → `{ok, campaign: Campaign}`; only drafts change or delete |
 | POST | `{base}/campaigns/{campaignId}/test` | `TestSendRequest` → `{ok}` |
-| POST | `{base}/campaigns/{campaignId}/schedule` | `CampaignScheduleRequest` → `CampaignScheduleResponse`; `dryRun: true` checks and counts without scheduling. Pass its `campaign.updatedAt` as `expectedUpdatedAt` to reject a changed draft with 409 `campaign_changed`. |
+| POST | `{base}/campaigns/{campaignId}/schedule` | `CampaignScheduleRequest` → `CampaignScheduleResponse`; `dryRun: true` checks and counts without scheduling. Pass its `campaign.updatedAt` as `expectedUpdatedAt` to reject a changed draft with 409 `campaign_changed`. Scheduling a campaign that would reach nobody answers 409 `no_recipients`. |
 | POST | `{base}/campaigns/{campaignId}/cancel` | → `{ok, campaign}` |
 | GET | `{base}/campaigns/{campaignId}/report?cursor=` | → `CampaignReport` |
 | GET, POST | `{base}/sequences` | `SequenceInput` → `{ok, sequences: SequenceSummary[]}` / `{ok, sequence}` |
