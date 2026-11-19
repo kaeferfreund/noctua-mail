@@ -201,7 +201,7 @@ describe("newsletter campaigns", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Schedule" }));
     const alert = await within(dialog).findByRole("alert");
     expect(alert.textContent).toContain("Only a draft can be scheduled.");
-    expect(typeof (calls.findLast(call => call.path.endsWith("/schedule"))?.body as { sendAt: unknown }).sendAt).toBe("number");
+    expect(typeof (calls.filter(call => call.path.endsWith("/schedule")).at(-1)?.body as { sendAt: unknown }).sendAt).toBe("number");
   });
 
   it("shows a refused dry run before any confirmation dialog opens", async () => {
