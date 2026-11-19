@@ -1,0 +1,20 @@
+{
+  "data": [
+    {
+      "id": "template-welcome",
+      "attributes": {
+        "name": "Willkommen",
+        "html": "<p>Hallo {{ first_name|default:'du' }}!</p>{% unsubscribe 'Abmelden' %}",
+        "text": ""
+      }
+    },
+    {
+      "id": "template-follow-up",
+      "attributes": {
+        "name": "Weitere Infos",
+        "html": "<p>Mehr zu {{ organization.name }}</p>",
+        "text": "Abmelden: {% unsubscribe_link %}"
+      }
+    }
+  ]
+}

@@ -140,7 +140,7 @@ Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 | GET, POST | `{base}/campaigns` | `CampaignInput` → `{ok, campaigns: CampaignSummary[]}` / `{ok, campaign}` |
 | GET, PATCH, DELETE | `{base}/campaigns/{campaignId}` | `CampaignInput` → `{ok, campaign: Campaign}`; only drafts change or delete |
 | POST | `{base}/campaigns/{campaignId}/test` | `TestSendRequest` → `{ok}` |
-| POST | `{base}/campaigns/{campaignId}/schedule` | `CampaignScheduleRequest` → `CampaignScheduleResponse` |
+| POST | `{base}/campaigns/{campaignId}/schedule` | `CampaignScheduleRequest` → `CampaignScheduleResponse`; `dryRun: true` checks and counts without scheduling. Pass its `campaign.updatedAt` as `expectedUpdatedAt` to reject a changed draft with 409 `campaign_changed`. |
 | POST | `{base}/campaigns/{campaignId}/cancel` | → `{ok, campaign}` |
 | GET | `{base}/campaigns/{campaignId}/report?cursor=` | → `CampaignReport` |
 | GET, POST | `{base}/sequences` | `SequenceInput` → `{ok, sequences: SequenceSummary[]}` / `{ok, sequence}` |

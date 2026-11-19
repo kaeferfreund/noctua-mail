@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
+import type { Readable } from "node:stream";
 import { stripBccHeader } from "./stripBccHeader";
 import { configuredReplyTo, type ResolvedSender } from "../sendIdentity";
 import addressParser from "nodemailer/lib/addressparser/index.js";
@@ -157,18 +158,27 @@ export async function sendSmtpMessage(account: Account, mail: MailPayload, sende
  * This function relays `raw` unchanged; it does NOT remove or rewrite
  * any MIME header. **Bcc recipients must appear only in the
  * SMTP envelope — it is the caller's responsibility to ensure the `raw`
- * blob does not contain a `Bcc:` header** (see `stripBccHeader` in this
+ * MIME does not contain a `Bcc:` header** (see `stripBccHeader` in this
  * directory). Transmitting a raw blob that still carries a `Bcc:` header
  * would disclose blind-carbon addresses to every To/Cc recipient.
  */
 export async function sendRawSmtpMessage(
   account: Account,
-  raw: Buffer | string,
+  raw: Buffer | string | Readable,
   envelope: { from: string; to: string[] },
   beforeSend?: () => void
 ) {
   const transporter = createSmtpTransport(account);
   const wire = { envelope: { from: envelope.from, to: envelope.to }, raw };
+  const stream = Buffer.isBuffer(raw) || typeof raw === "string" ? undefined : raw;
+  if (stream) {
+    // MIME composition starts pulling its source before the SMTP envelope.
+    // Give the connection the lazy stream itself; it pulls only after 354.
+    transporter.use("stream", (mail, done) => {
+      mail.message.createReadStream = () => stream;
+      done();
+    });
+  }
 
   // The assertion and irreversible send initiation share this continuation.
   beforeSend?.();
@@ -177,6 +187,8 @@ export async function sendRawSmtpMessage(
     info = await transporter.sendMail(wire);
   } catch (error) {
     throw markSmtpUpstreamFailure(error, envelope.from);
+  } finally {
+    stream?.destroy();
   }
   return { messageId: (info as any)?.messageId ?? null };
 }

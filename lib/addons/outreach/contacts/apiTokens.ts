@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from "crypto";
 import { getOutreachDb } from "../db";
 import { newOutreachId, newOutreachToken } from "../ids";
 import type { OutreachApiToken, SubscribeRequest, SubscribeResponse } from "../types";
-import { notifyListSubscribed, subscribeToList } from "./consent";
+import { subscribeToList } from "./consent";
 import { ContactError } from "./input";
 import { findContactByEmail, insertContact, requireList, updateContactFields } from "./records";
 
@@ -80,12 +80,11 @@ export async function subscribeWithApiToken({ accountId, id }: AuthenticatedToke
     if (at > now) throw new ContactError("consentAt cannot be in the future");
     const existing = findContactByEmail(db, accountId, input.email);
     const contact = existing ? updateContactFields(db, existing, input, now) : insertContact(db, accountId, input, "api", now);
-    const subscribed = subscribeToList(db, contact, input.listId, {
+    subscribeToList(db, contact, input.listId, {
       at, source: input.consentSource ?? "api", explicit: input.consentAt !== undefined
     }, now);
     db.query("UPDATE api_tokens SET lastUsedAt = ? WHERE accountId = ? AND id = ?").run(now, accountId, id);
-    return { contactId: contact.id, created: !existing, subscribed };
+    return { contactId: contact.id, created: !existing };
   }).immediate();
-  if (result.subscribed) await notifyListSubscribed(accountId, result.contactId, input.listId, now);
   return { ok: true, contactId: result.contactId, status: "subscribed", created: result.created };
 }

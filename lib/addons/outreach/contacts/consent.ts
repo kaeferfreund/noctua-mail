@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { getOutreachDb } from "../db";
-import { onContactUnmailable, onListSubscribed } from "../sending";
+import { enrollListSubscription, onContactUnmailable } from "../sending";
 import type { ListMemberStatus, SubscriptionChange, SuppressionReason } from "../types";
 import { ContactError, emailSchema, parseContactInput } from "./input";
 import { findContact, findContactByEmail, getContactDetail, insertContact, rememberErasedAddress, requireContact, requireList, type ContactRow } from "./records";
@@ -35,13 +35,13 @@ export function writeMembership(db: Database, accountId: string, contactId: stri
     .run(accountId, contactId, listId, member.status, member.subscribedAt, member.unsubscribedAt, source);
 }
 
-/** Call inside the caller's write transaction, then notify sending only after commit. */
+/** Call inside the caller's write transaction to commit membership and enrollment together. */
 export function subscribeToList(db: Database, contact: ContactRow, listId: string,
   consent: { at: number; source: string; explicit: boolean }, now: number) {
   const { accountId, id: contactId } = contact;
   const member = getMembership(db, accountId, contactId, listId);
   // An already active membership is a retry. Preserve the original consent and enrollment.
-  if (!contact.suppressedReason && contact.emailConsent === "subscribed" && member?.status === "subscribed") return false;
+  if (!contact.suppressedReason && contact.emailConsent === "subscribed" && member?.status === "subscribed") return;
   const decision = subscriptionDecision(contact, member, consent.at, consent.explicit);
   if (decision === "contact_suppressed") throw new ContactError("Contact is suppressed", 409, decision);
   if (decision === "new_consent_required") throw new ContactError("New consent after the unsubscribe is required", 409, decision);
@@ -49,19 +49,11 @@ export function subscribeToList(db: Database, contact: ContactRow, listId: strin
     db.query(`UPDATE contacts SET emailConsent = 'subscribed', consentAt = ?, consentSource = ?, updatedAt = ?
       WHERE accountId = ? AND id = ?`).run(consent.at, consent.source, now, accountId, contactId);
   }
-  if (member?.status === "subscribed") return false;
+  if (member?.status === "subscribed") return;
   writeMembership(db, accountId, contactId, listId, {
     status: "subscribed", subscribedAt: consent.at, unsubscribedAt: null
   }, consent.source);
-  return true;
-}
-
-export async function notifyListSubscribed(accountId: string, contactId: string, listId: string, at: number) {
-  try {
-    await onListSubscribed(accountId, { contactId, listId, at });
-  } catch {
-    console.warn("Outreach failed to notify sending of a list subscription");
-  }
+  enrollListSubscription(db, accountId, { contactId, listId, at: now });
 }
 
 export async function notifyContactUnmailable(accountId: string, contactId: string) {
@@ -74,7 +66,7 @@ export async function notifyContactUnmailable(accountId: string, contactId: stri
 
 export async function changeContactSubscription(accountId: string, contactId: string, change: SubscriptionChange, now = Date.now()) {
   const db = await getOutreachDb();
-  const subscribed = db.transaction(() => {
+  db.transaction(() => {
     const contact = requireContact(db, accountId, contactId);
     const list = requireList(db, accountId, change.listId);
     const source = change.consentSource ?? "manual";
@@ -89,9 +81,7 @@ export async function changeContactSubscription(accountId: string, contactId: st
       }, source);
     }
     // The contact can still receive mail for other lists. The per-list send check enforces this opt-out.
-    return false;
   }).immediate();
-  if (subscribed) await notifyListSubscribed(accountId, contactId, change.listId, now);
   return getContactDetail(accountId, contactId);
 }
 
