@@ -670,6 +670,63 @@ export async function loadSendableDraft(accountId: string, draftId: string) {
  * and the local message store, and a copy is appended to the Sent
  * folder. The result distinguishes delivery from Sent-copy failure.
  */
+/**
+ * Removes the draft a message was just sent from (tombstone, IMAP copy, local row, files).
+ *
+ * The message has already been relayed to the SMTP server; if any cleanup step
+ * throws, it must NOT surface as a send failure — the client would display
+ * "Failed to send", prompting the user to retry and send the message twice.
+ * Every step is logged and swallowed; a storage leak or a stale draft row is
+ * the lesser evil. The server does this itself (not the client after the
+ * response) so a reload or a lost connection during the send cannot leave the
+ * draft behind next to the sent message.
+ */
+export async function removeSentDraft(params: {
+  account: Account;
+  clientId?: string;
+  draft: Message;
+  deadlineAt: number;
+  sentResult: SentCopyResult;
+}) {
+  const { account, clientId, draft, deadlineAt, sentResult } = params;
+  const accountId = account.id;
+  try {
+    // Tombstone the draft by its stable Message-Id before any IMAP/DB
+    // cleanup runs, so that even if the IMAP delete below fails (or another
+    // client lags), the next Drafts sync drops this draft instead of
+    // resurrecting it next to the message we just sent. Scoped enforcement
+    // (Drafts-flagged only) keeps a Sent copy that shares this Message-Id
+    // untouched. Kept inside the swallowing try so a transient DB error here
+    // can't surface as a (false) send failure.
+    await recordDraftTombstone(accountId, draft.messageId, draft.mailboxPath ?? null);
+    const attachmentIds = await getAttachmentIds(accountId, draft.id);
+    if (draft.mailboxPath && typeof draft.imapUid === "number") {
+      try {
+        await withImapDeadline(deadlineAt, () => deleteImapMessage(account, draft.mailboxPath!, draft.imapUid!, clientId));
+      } catch (error) {
+        if (error instanceof PostSendTimeoutError) {
+          sentResult.sentCopy = "failed";
+          sentResult.sentCopyWarning = "Email sent, but draft cleanup timed out. Do not send it again.";
+          sentResult.postSendWarning = [sentResult.postSendWarning, "Email sent, but removing the server draft failed."].filter(Boolean).join(" ");
+        }
+        console.warn("[draft-send] IMAP delete failed after send", {
+          accountId,
+          draftId: draft.id,
+          error
+        });
+      }
+    }
+    await deleteMessageById(accountId, draft.id);
+    await deleteMessageFiles(accountId, draft.id, attachmentIds);
+  } catch (error) {
+    console.warn("[draft-send] post-send cleanup failed", {
+      accountId,
+      draftId: draft.id,
+      error
+    });
+  }
+}
+
 export async function sendDraftForAccount(params: {
   account: Account;
   accountId: string;
@@ -709,59 +766,7 @@ export async function sendDraftForAccount(params: {
     messageId, actor: params.actor, inReplyTo: draft.inReplyTo, references: draft.references,
     xForwardedMessageId: draft.xForwardedMessageId });
 
-  // Everything past this point is post-send cleanup. The message has
-  // already been relayed to the SMTP server; if any cleanup step
-  // throws, we must NOT surface it as a send failure — the client
-  // would display "Failed to send draft", prompting the user to retry
-  // and send the message twice.
-  //
-  // Individually:
-  //   - IMAP delete is non-fatal on its own already (wrapped below).
-  //     Failure just means the draft re-appears on next sync.
-  //   - `getAttachmentIds` can throw on DB issues.
-  //   - `deleteMessageById` + `deleteMessageFiles` can fail on DB /
-  //     filesystem issues.
-  //
-  // All of these are logged as warnings and swallowed. The endpoint
-  // still returns success. Storage leak and stale draft rows in this
-  // path are real but non-urgent; the alternative (user-visible
-  // duplicate send) is worse. Surfacing these as a soft warning on
-  // the client is a future UX polish.
-  try {
-    // Tombstone the draft by its stable Message-Id before any IMAP/DB
-    // cleanup runs, so that even if the IMAP delete below fails (or another
-    // client lags), the next Drafts sync drops this draft instead of
-    // resurrecting it next to the message we just sent. Scoped enforcement
-    // (Drafts-flagged only) keeps the Sent copy — which shares this
-    // Message-Id — untouched. Kept inside the swallowing try so a transient
-    // DB error here can't surface as a (false) send failure.
-    await recordDraftTombstone(accountId, draft.messageId, draft.mailboxPath ?? null);
-    const attachmentIds = await getAttachmentIds(accountId, draft.id);
-    if (draft.mailboxPath && typeof draft.imapUid === "number") {
-      try {
-        await withImapDeadline(deadlineAt, () => deleteImapMessage(account, draft.mailboxPath!, draft.imapUid!, clientId));
-      } catch (error) {
-        if (error instanceof PostSendTimeoutError) {
-          sentResult.sentCopy = "failed";
-          sentResult.sentCopyWarning = "Email sent, but draft cleanup timed out. Do not send it again.";
-          sentResult.postSendWarning = [sentResult.postSendWarning, "Email sent, but removing the server draft failed."].filter(Boolean).join(" ");
-        }
-        console.warn("[draft-send] IMAP delete failed after send", {
-          accountId,
-          draftId: draft.id,
-          error
-        });
-      }
-    }
-    await deleteMessageById(accountId, draft.id);
-    await deleteMessageFiles(accountId, draft.id, attachmentIds);
-  } catch (error) {
-    console.warn("[draft-send] post-send cleanup failed", {
-      accountId,
-      draftId: draft.id,
-      error
-    });
-  }
+  await removeSentDraft({ account, clientId, draft, deadlineAt, sentResult });
 
   return { ...sentResult, identityId: identity.id };
 }

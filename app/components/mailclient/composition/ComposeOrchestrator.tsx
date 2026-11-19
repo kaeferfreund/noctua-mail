@@ -30,7 +30,6 @@ import {
 } from "@/lib/composeInvite";
 import { extractComposeInviteDraftFromSource } from "@/lib/composeInviteMetadata";
 import {
-  buildAccountDraftDiscardPath,
   buildAccountMessageSourcePath,
   buildAccountSmtpSendPath
 } from "@/lib/accountApiPaths";
@@ -1118,18 +1117,11 @@ function ComposeOrchestratorImpl(
         // replace the shared draft ref while delivery is in flight.
         const sentDraftId = sendDraftId;
         acceptedDraftId = sentDraftId;
-        if (sentDraftId && activeAccountId) {
+        // The send route already removed this draft on the server (also when the page
+        // reloads mid-send); the UI only drops it from the list.
+        if (sentDraftId) {
           suppressDraftDeleteReconcile(sentDraftId);
           removeDraftFromUi(sentDraftId);
-          try {
-            await apiFetch(buildAccountDraftDiscardPath(activeAccountId, sentDraftId), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({})
-            });
-          } catch {
-            // ignore draft cleanup errors
-          }
         }
         const sentView = composeView;
         if (isSendSession()) {

@@ -8,7 +8,7 @@ import { createScheduledSendFixture, SCHEDULED_SEND_TEST_ORIGIN as ORIGIN } from
 import { createAuthenticatedTestSession } from "@/lib/testAuthHarness";
 import { startSmtpSink } from "@/lib/testFixtures/mail/smtp-sink";
 import { demoPass, demoUser } from "@/lib/testFixtures/mail/seed";
-import { claimDueScheduledSends, getScheduledSend } from "@/lib/db";
+import { claimDueScheduledSends, getMessageById, getScheduledSend } from "@/lib/db";
 import { cancelDraftSchedule, releaseDraftScheduleForEdit } from "@/app/components/mailclient/scheduledSend/scheduledSendClient";
 import type { Account } from "@/lib/data";
 import { POST as smtpSend } from "./route";
@@ -106,6 +106,22 @@ realMailTest("compose „Senden“ with the draft id cancels the queued schedule
   expect(delivered("Synthetic planned")).toBe(before + 1);
   expect(await getScheduledSend(s.scheduleId)).toMatchObject({ status: "cancelled", lastError: "sent_now", leaseOwner: null });
   expect((await claimDueScheduledSends(jobOwner(), s.sendAt, 1_000)).some(row => row.id === s.scheduleId)).toBe(false);
+});
+
+realMailTest("compose „Senden“ removes its draft on the server; a draft id of a non-draft message is left alone", async () => {
+  // The client may be gone right after SMTP (reload, lost connection): the route itself removes the draft.
+  const f = await createScheduledSendFixture(local(sink.port));
+  const send = (draftId: string, subject: string) => smtpSend(f.request("POST", {
+    identityId: f.identity.id, to: "recipient@example.test", subject, text: "Synthetic body", draftId
+  }, {}, f, "/smtp/send"), f.params());
+  const draftId = await f.seedDraft();
+  expect((await send(draftId, "Synthetic draft cleanup")).status).toBe(200);
+  expect(await getMessageById(f.accountId, draftId)).toBeNull();
+
+  // Without the \Draft flag the id is not a draft of this session: never deleted through a send.
+  const receivedId = await f.seedDraft({ flags: ["\\Seen"] });
+  expect((await send(receivedId, "Synthetic not a draft")).status).toBe(200);
+  expect(await getMessageById(f.accountId, receivedId)).not.toBeNull();
 });
 
 realMailTest("409 while the job sends the draft and after it sent it; nothing reaches SMTP", async () => {
