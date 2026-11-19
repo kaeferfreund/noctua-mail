@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import "@/lib/testDbHarness";
 import { getOutreachDb } from "@/lib/addons/outreach/db";
 import { saveOutreachSettings } from "@/lib/addons/outreach/settings";
-import { createApiToken, listApiTokens, revokeApiToken } from "@/lib/addons/outreach/contacts/apiTokens";
+import { CONSENT_CLOCK_SKEW_MS, createApiToken, listApiTokens, revokeApiToken } from "@/lib/addons/outreach/contacts/apiTokens";
 import { suppressContact } from "@/lib/addons/outreach/contacts";
 import { changeContactSubscription } from "@/lib/addons/outreach/contacts/consent";
 import { createContactList, findContactByEmail, getContactDetail } from "@/lib/addons/outreach/contacts/records";
@@ -59,7 +59,7 @@ test("validates input strictly and stores only the token digest", async () => {
     { email, firstName: "a".repeat(201) },
     { email, properties: Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`key${i}`, i])) },
     // Beyond the tolerance for a caller whose clock runs ahead.
-    { email, consentAt: Date.now() + 10 * 60_000 },
+    { email, consentAt: Date.now() + 10 * CONSENT_CLOCK_SKEW_MS },
     { email, emailConsent: "subscribed" }
   ]) expect((await subscribe(secret, { listId: allowed.id, ...input })).status).toBe(400);
   expect((await subscribe(secret, { email, listId: allowed.id }, { "Content-Type": "text/plain" })).status).toBe(400);
@@ -86,13 +86,15 @@ test("subscribe retries preserve consent and an opt-out requires a newer explici
     email, consentAt: 100, consentSource: "synthetic_signup", lists: [{ subscribedAt: 100 }]
   });
   await changeContactSubscription(accountId, created.contactId, { action: "unsubscribe", listId: allowed.id }, 200);
-  for (const consentAt of [undefined, 100, 200]) {
+  // The claim must be later than the unsubscribe by more than the clock tolerance.
+  for (const consentAt of [undefined, 100, 200, 201, 200 + CONSENT_CLOCK_SKEW_MS]) {
     const stale = await subscribe(secret, { ...body, consentAt });
     expect(stale.status).toBe(409);
     expect(await stale.json()).toMatchObject({ code: "new_consent_required" });
   }
-  expect((await subscribe(secret, { ...body, consentAt: 201 })).status).toBe(200);
-  expect(await getContactDetail(accountId, created.contactId)).toMatchObject({ consentAt: 201, lists: [{ status: "subscribed", subscribedAt: 201 }] });
+  const fresh = 201 + CONSENT_CLOCK_SKEW_MS;
+  expect((await subscribe(secret, { ...body, consentAt: fresh })).status).toBe(200);
+  expect(await getContactDetail(accountId, created.contactId)).toMatchObject({ consentAt: fresh, lists: [{ status: "subscribed", subscribedAt: fresh }] });
 });
 
 test("a suppressed address cannot subscribe or update its profile through this endpoint", async () => {
