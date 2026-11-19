@@ -64,7 +64,7 @@ identity checks as the manual send routes.
 
 ## Data model
 
-`lib/addons/outreach/db.ts` holds the schema (v1, with additive steps up to v5). Every table
+`lib/addons/outreach/db.ts` holds the schema (v1, with migrations up to v6). Every table
 carries `accountId`. Mailbox queries filter by it. The public image route finds the shared file
 by content hash. Shapes that cross a boundary are in `lib/addons/outreach/types.ts`.
 
@@ -93,6 +93,21 @@ A `sends` row is one tracked outgoing mail: per recipient for campaigns and sequ
 message for a normal mail (then several recipients share one row, so an open means "someone
 opened"). `tracking_links` maps the opaque public tokens to a send; `tracking_events` holds
 opens, clicks, unsubscribes, deliveries, bounces and complaints.
+
+## Import Klaviyo email history
+
+Run `bun scripts/outreach-import-klaviyo-history.ts --account example --archive /path/to/archive/raw`
+for a read-only preview. Add `--write` to import into the outreach database selected by
+`NOCTUA_DATA_DIR`. The command reports counts only. Import flow content first to include
+history for its matching sequence steps.
+
+The import adds sent campaigns, historical sends and their delivery, open, click, bounce,
+complaint and message-linked unsubscribe events. Missing profiles and addresses without a
+contact contribute anonymous counts without recipient addresses, IPs or user agents. Older
+IPs for matching contacts are truncated according to the mailbox setting. Campaign HTML keeps
+its archived image URLs. The import never queues mail, enrolls anyone or updates consent.
+Replaying the same archive leaves existing history unchanged. Erasing a contact deletes their
+imported sends and events and records opaque send IDs to prevent replay of those rows.
 
 ## Public routes (`/t/*`, no session, no cookies)
 

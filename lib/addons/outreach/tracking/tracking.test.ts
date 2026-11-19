@@ -358,9 +358,10 @@ test("malformed paths and unknown tokens leave the event budget available to gen
 test("v2 event URLs survive migration and new clicks are stored by token", async () => {
   const legacyDb = new Database(":memory:");
   try {
-    // The v4 step alters campaigns and sequences, which every real v2 file has.
-    legacyDb.exec(`CREATE TABLE tracking_events (accountId TEXT, type TEXT, at INTEGER, url TEXT);
+    legacyDb.exec(`CREATE TABLE tracking_events (accountId TEXT, sendId TEXT, type TEXT, machine INTEGER, at INTEGER, url TEXT, detail TEXT);
       CREATE TABLE campaigns (id TEXT); CREATE TABLE sequences (id TEXT);
+      CREATE TABLE sends (sequenceStepId TEXT, contactId TEXT, kind TEXT);
+      CREATE UNIQUE INDEX idx_sends_step_contact ON sends (sequenceStepId, contactId) WHERE sequenceStepId IS NOT NULL AND kind = 'sequence';
       PRAGMA user_version = 2;`);
     legacyDb.prepare("INSERT INTO tracking_events (accountId, type, at, url) VALUES (?, 'bounce', 0, 'Synthetic bounce')").run(accountId);
     initOutreachSchema(legacyDb);

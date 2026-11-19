@@ -19,7 +19,7 @@ export function outreachDbExists() {
 }
 
 /** Bump with every schema change and add the step to `migrate`. */
-export const OUTREACH_SCHEMA_VERSION = 5;
+export const OUTREACH_SCHEMA_VERSION = 6;
 
 /**
  * Schema v1. Every table carries `accountId` (the mailbox that owns the row). Mailbox
@@ -333,6 +333,25 @@ const SCHEMA_V5 = `
   CREATE INDEX IF NOT EXISTS idx_images_hash ON images (hash);
 `;
 
+export const klaviyoEventIdSql = "json_extract(CASE WHEN json_valid(detail) THEN detail END, '$.klaviyoEventId')";
+
+/** Historical sequence sends are reportable but do not occupy a native enrollment's step. */
+const SCHEMA_V6 = `
+  ALTER TABLE sends ADD COLUMN source TEXT NOT NULL DEFAULT 'native';
+  DROP INDEX idx_sends_step_contact;
+  CREATE UNIQUE INDEX idx_sends_step_contact ON sends (sequenceStepId, contactId, source)
+    WHERE sequenceStepId IS NOT NULL AND kind = 'sequence';
+  CREATE UNIQUE INDEX idx_events_klaviyo ON tracking_events (accountId, ${klaviyoEventIdSql})
+    WHERE ${klaviyoEventIdSql} IS NOT NULL;
+  CREATE INDEX idx_events_account_send_type ON tracking_events (accountId, sendId, type, machine);
+  -- Opaque send IDs prevent an archive replay from restoring erased history.
+  CREATE TABLE klaviyo_erased_sends (
+    accountId TEXT NOT NULL,
+    sendId TEXT NOT NULL,
+    PRIMARY KEY (accountId, sendId)
+  );
+`;
+
 function schemaVersion(db: Database) {
   const current = Number((db.prepare("PRAGMA user_version").get() as { user_version?: number } | null)?.user_version ?? 0);
   if (current > OUTREACH_SCHEMA_VERSION) {
@@ -352,6 +371,7 @@ function migrate(db: Database) {
     if (current < 3) db.exec(SCHEMA_V3);
     if (current < 4) db.exec(SCHEMA_V4);
     if (current < 5) db.exec(SCHEMA_V5);
+    if (current < 6) db.exec(SCHEMA_V6);
     db.exec(`PRAGMA user_version = ${OUTREACH_SCHEMA_VERSION}`);
   }).immediate();
 }

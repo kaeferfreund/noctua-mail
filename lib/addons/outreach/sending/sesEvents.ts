@@ -62,7 +62,7 @@ export async function applySesEvent(snsMessageId: string, input: unknown, deps =
   // outcome stayed open (still `sending`, or failed as uncertain/interrupted after SES may have accepted it).
   const lookup = rows<{ id: string; contactId: string | null; kind: string; status: string; error: string | null;
     providerMessageId: string | null }>(db, `SELECT id, contactId, kind, status, error, providerMessageId FROM sends
-    WHERE accountId = ?1 AND kind IN ('campaign','sequence','test')
+    WHERE accountId = ?1 AND source = 'native' AND kind IN ('campaign','sequence','test')
       AND ((status = 'sent' AND providerMessageId = ?2) OR id = ?3)
     ORDER BY status = 'sent' AND providerMessageId = ?2 DESC LIMIT 1`);
   const storeProviderId = db.query(`UPDATE sends SET providerMessageId = ? WHERE accountId = ? AND id = ?

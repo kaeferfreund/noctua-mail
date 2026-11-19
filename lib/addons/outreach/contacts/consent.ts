@@ -177,6 +177,9 @@ export async function eraseContact(accountId: string, contactId: string, now = D
     db.query(`DELETE FROM tracking_links ${related}`).run(accountId, contactId);
     db.query("DELETE FROM sequence_enrollments WHERE accountId = ? AND contactId = ?").run(accountId, contactId);
     db.query("DELETE FROM list_members WHERE accountId = ? AND contactId = ?").run(accountId, contactId);
+    db.query(`INSERT INTO klaviyo_erased_sends (accountId, sendId)
+      SELECT accountId, id FROM sends WHERE accountId = ? AND contactId = ? AND source = 'klaviyo'`).run(accountId, contactId);
+    db.query("DELETE FROM sends WHERE accountId = ? AND contactId = ? AND source = 'klaviyo'").run(accountId, contactId);
     db.query(`UPDATE sends SET contactId = NULL, recipients = '', subject = '', error = NULL,
       status = CASE WHEN status = 'queued' THEN 'skipped' ELSE status END
       WHERE accountId = ? AND contactId = ?`).run(accountId, contactId);

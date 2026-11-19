@@ -6,10 +6,11 @@
  */
 
 export const OUTREACH_VIA_APP = "app";
+export const OUTREACH_VIA_KLAVIYO = "import:klaviyo";
 const MAX_LABEL = 80;
 const MAX_SUFFIX = 12;
 
-export type OutreachVia = { kind: "app" } | { kind: "mcp"; label: string; suffix: string };
+export type OutreachVia = { kind: "app" } | { kind: "mcp"; label: string; suffix: string } | { kind: "import"; source: "klaviyo" };
 
 function clean(value: string, max: number) {
   return Array.from(value.replace(/[\u0000-\u001f\u007f]/g, " ").trim()).slice(0, max).join("");
@@ -23,6 +24,7 @@ export function outreachViaMcp(label: string, suffix: string) {
 /** Null for rows from before the trace existed, and for anything not written by this module. */
 export function parseOutreachVia(value: string | null | undefined): OutreachVia | null {
   if (value === OUTREACH_VIA_APP) return { kind: "app" };
+  if (value === OUTREACH_VIA_KLAVIYO) return { kind: "import", source: "klaviyo" };
   const match = value ? /^mcp:([\s\S]*) \(…([^()]*)\)$/.exec(value) : null;
   return match ? { kind: "mcp", label: match[1], suffix: match[2] } : null;
 }

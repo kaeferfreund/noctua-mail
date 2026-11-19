@@ -192,11 +192,11 @@ export function TraceLine({ action, userId, via }: { action: "scheduled" | "live
   const t = useTranslations("outreach");
   const { members } = useOutreachManage();
   const parsed = parseOutreachVia(via);
-  const traced = parsed !== null;
+  const traced = parsed !== null && parsed.kind !== "import";
   const { ensure } = members;
   useEffect(() => { if (traced) ensure(); }, [ensure, traced]);
   // Wait for the members instead of switching from the unnamed to the named sentence.
-  if (!parsed || (members.data === null && !members.error)) return null;
+  if (!parsed || parsed.kind === "import" || (members.data === null && !members.error)) return null;
   const member = userId ? members.data?.find(entry => entry.userId === userId) : undefined;
   const through = parsed.kind === "app" ? t("trace.viaApp") : t("trace.viaMcp", { label: parsed.label, suffix: parsed.suffix });
   return (
