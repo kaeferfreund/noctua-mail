@@ -7,31 +7,33 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/app/components/ui/dialog";
-import { EMAIL_CONSENTS, type Contact, type ContactDetail, type ContactListResponse, type EmailConsent } from "@/lib/addons/outreach/types";
+import { EMAIL_CONSENTS, type Contact, type ContactDetail, type ContactList, type ContactListResponse, type EmailConsent } from "@/lib/addons/outreach/types";
 import { useOutreachManage, useResource } from "./manageContext";
 import { EmptyState, ErrorNote, Field, LoadingNote, RowButton, SectionHeader, nativeControlClass, useOutreachFormat, outreachRootClass } from "./ui";
-import ContactDetailView from "./ContactDetailView";
+import ContactDetailView, { isResubscribeConfirmation, lastUnsubscribe, useResubscribeQuestion } from "./ContactDetailView";
 
 const PAGE_SIZE = 50;
 const SEARCH_DELAY_MS = 300;
 
 export default function ContactsSection({ id, listId }: { id: string | null; listId: string | null }) {
   if (id) return <ContactDetailView key={id} contactId={id} />;
-  return <ContactsList initialListId={listId} />;
+  return <ContactsList listId={listId ?? ""} />;
 }
 
 type Suppressed = "" | "true" | "false";
 
-function ContactsList({ initialListId }: { initialListId: string | null }) {
+/** The list filter lives in the address (`?section=contacts&list=…`), so navigation and Back/Forward set it. */
+function ContactsList({ listId }: { listId: string }) {
   const t = useTranslations("outreach");
   const { api, navigate, canEdit, lists } = useOutreachManage();
   const format = useOutreachFormat();
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
-  const [listId, setListId] = useState(initialListId ?? "");
   const [consent, setConsent] = useState<EmailConsent | "">("");
   const [suppressed, setSuppressed] = useState<Suppressed>("");
   const [page, setPage] = useState(1);
+  const [pageListId, setPageListId] = useState(listId);
+  if (pageListId !== listId) { setPageListId(listId); setPage(1); }
   const [adding, setAdding] = useState(false);
   const { ensure: ensureLists } = lists;
   useEffect(() => { ensureLists(); }, [ensureLists]);
@@ -58,7 +60,7 @@ function ContactsList({ initialListId }: { initialListId: string | null }) {
           <input type="search" className={nativeControlClass} value={query} placeholder={t("contacts.searchPlaceholder")} onChange={event => setQuery(event.target.value)} />
         </Field>
         <Field label={t("contacts.filterList")}>
-          <select className={nativeControlClass} value={listId} onChange={event => filterChange(setListId)(event.target.value)}>
+          <select className={nativeControlClass} value={listId} onChange={event => navigate({ section: "contacts", listId: event.target.value || null })}>
             <option value="">{t("contacts.allLists")}</option>
             {(lists.data ?? []).filter(list => !list.archivedAt).map(list => <option key={list.id} value={list.id}>{list.name}</option>)}
           </select>
@@ -99,7 +101,7 @@ function ContactsList({ initialListId }: { initialListId: string | null }) {
           </div>
         </>
       ) : null}
-      {adding ? <AddContactDialog defaultListId={listId} onClose={() => setAdding(false)}
+      {adding ? <AddContactDialog defaultListId={listId} onClose={() => setAdding(false)} onChanged={() => void result.reload()}
         onCreated={contactId => { setAdding(false); navigate({ section: "contacts", id: contactId }); }} /> : null}
     </>
   );
@@ -128,36 +130,88 @@ function ContactRow({ contact, onOpen }: { contact: Contact; onOpen: () => void 
   );
 }
 
-function AddContactDialog({ defaultListId, onClose, onCreated }: { defaultListId: string; onClose: () => void; onCreated: (contactId: string) => void }) {
+/** Double opt-in needs a confirmation mail the addon does not send; the server refuses such lists. */
+function canAddTo(list: ContactList) {
+  return !list.archivedAt && list.optIn !== "double";
+}
+
+/**
+ * Where the dialog is after the contact itself was saved:
+ * `existing` – the address was known, nothing about its lists has changed yet;
+ * `confirm` – the person has an unsubscribe on record, the server asks before subscribing;
+ * `notSubscribed` – the contact is saved but the subscription was declined or failed.
+ */
+type AddStage =
+  | { kind: "existing"; contact: Contact }
+  | { kind: "confirm"; contact: Contact; created: boolean; unsubscribedAt: number | null }
+  | { kind: "notSubscribed"; contact: Contact; created: boolean };
+
+function AddContactDialog({ defaultListId, onClose, onChanged, onCreated }: {
+  defaultListId: string; onClose: () => void; onChanged: () => void; onCreated: (contactId: string) => void;
+}) {
   const t = useTranslations("outreach");
   const { api, lists } = useOutreachManage();
+  const resubscribeQuestion = useResubscribeQuestion();
+  const choices = (lists.data ?? []).filter(canAddTo);
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [listId, setListId] = useState(defaultListId);
+  const [chosenListId, setListId] = useState(defaultListId);
+  const listId = choices.some(list => list.id === chosenListId) ? chosenListId : "";
+  const listName = choices.find(list => list.id === listId)?.name ?? "";
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
-  const [existing, setExisting] = useState<string | null>(null);
+  const [stage, setStage] = useState<AddStage | null>(null);
+
+  const subscribe = async (contact: Contact, created: boolean, confirmResubscribe: boolean) => {
+    setBusy(true); setError(null);
+    try {
+      await api.send<{ contact: ContactDetail }>("POST", `contacts/${encodeURIComponent(contact.id)}/subscriptions`,
+        { listId, action: "subscribe", consentSource: "manual", ...(confirmResubscribe ? { confirmResubscribe: true } : {}) });
+      void lists.reload();
+      onCreated(contact.id);
+    } catch (caught) {
+      if (!confirmResubscribe && isResubscribeConfirmation(caught)) {
+        const detail = await api.get<{ contact: ContactDetail }>(`contacts/${encodeURIComponent(contact.id)}`).then(body => body.contact, () => null);
+        setStage({ kind: "confirm", contact, created, unsubscribedAt: detail ? lastUnsubscribe(detail, listId) : null });
+      } else {
+        setError(caught);
+        setStage({ kind: "notSubscribed", contact, created });
+      }
+      // The contact exists now even though the subscription did not happen: the list behind shows it.
+      if (created) onChanged();
+      setBusy(false);
+    }
+  };
   const submit = async () => {
     setBusy(true); setError(null);
     try {
-      const result = await api.send<{ contact: Contact; created: boolean }>("POST", "contacts", { email: email.trim(), firstName: firstName.trim(), lastName: lastName.trim() });
-      if (listId) {
-        await api.send<{ contact: ContactDetail }>("POST", `contacts/${encodeURIComponent(result.contact.id)}/subscriptions`, { listId, action: "subscribe", consentSource: "manual" });
-        void lists.reload();
-      }
-      if (!result.created) { setExisting(result.contact.id); setBusy(false); return; }
-      onCreated(result.contact.id);
+      // Empty name fields must not blank the names of a contact that already exists.
+      const result = await api.send<{ contact: Contact; created: boolean }>("POST", "contacts", {
+        email: email.trim(),
+        ...(firstName.trim() ? { firstName: firstName.trim() } : {}),
+        ...(lastName.trim() ? { lastName: lastName.trim() } : {})
+      });
+      // A known address is reported before anything about its lists changes.
+      if (!result.created) { setStage({ kind: "existing", contact: result.contact }); onChanged(); setBusy(false); return; }
+      if (listId) await subscribe(result.contact, true, false);
+      else onCreated(result.contact.id);
     } catch (caught) { setError(caught); setBusy(false); }
   };
+
+  const offerSubscribe = stage?.kind === "existing" && Boolean(listId);
   return (
     <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}>
       <DialogContent className={cn(outreachRootClass, "sm:max-w-md")}>
-        <DialogTitle>{t("contacts.addTitle")}</DialogTitle>
-        <DialogDescription>{t("contacts.addDescription")}</DialogDescription>
-        {existing ? (
-          <p role="status" className="text-sm">{t("contacts.addExisting")}</p>
-        ) : (
+        <DialogTitle>{stage?.kind === "confirm" ? t("contacts.resubscribeTitle") : t("contacts.addTitle")}</DialogTitle>
+        {stage?.kind === "confirm"
+          ? <DialogDescription>{resubscribeQuestion(stage.contact.email, stage.unsubscribedAt)}</DialogDescription>
+          : <DialogDescription>{t("contacts.addDescription")}</DialogDescription>}
+        {stage?.kind === "existing" ? (
+          <p role="status" className="text-sm">{listId ? t("contacts.addExistingList", { list: listName }) : t("contacts.addExisting")}</p>
+        ) : stage?.kind === "notSubscribed" ? (
+          <p role="status" className="text-sm">{stage.created ? t("contacts.addCreatedNotSubscribed", { list: listName }) : t("contacts.addNotSubscribed", { list: listName })}</p>
+        ) : stage ? null : (
           <form id="outreach-add-contact" className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); void submit(); }}>
             <Field label={t("contacts.email")}>
               <input type="email" required autoFocus className={nativeControlClass} value={email} onChange={event => setEmail(event.target.value)} />
@@ -169,17 +223,26 @@ function AddContactDialog({ defaultListId, onClose, onCreated }: { defaultListId
             <Field label={t("contacts.addToList")} hint={t("contacts.addToListHint")}>
               <select className={nativeControlClass} value={listId} onChange={event => setListId(event.target.value)}>
                 <option value="">{t("contacts.noList")}</option>
-                {(lists.data ?? []).filter(list => !list.archivedAt).map(list => <option key={list.id} value={list.id}>{list.name}</option>)}
+                {choices.map(list => <option key={list.id} value={list.id}>{list.name}</option>)}
               </select>
             </Field>
           </form>
         )}
         <ErrorNote error={error} />
         <DialogFooter>
-          <Button variant="outline" disabled={busy} onClick={onClose}>{t("actions.cancel")}</Button>
-          {existing
-            ? <Button onClick={() => onCreated(existing)}>{t("contacts.openExisting")}</Button>
-            : <Button type="submit" form="outreach-add-contact" disabled={busy || !email.trim()}>{busy ? t("actions.working") : t("contacts.addSubmit")}</Button>}
+          {stage?.kind === "confirm" ? <>
+            <Button variant="outline" disabled={busy} onClick={() => setStage({ kind: "notSubscribed", contact: stage.contact, created: stage.created })}>{t("actions.cancel")}</Button>
+            <Button disabled={busy} onClick={() => void subscribe(stage.contact, stage.created, true)}>{busy ? t("actions.working") : t("contacts.resubscribeConfirm")}</Button>
+          </> : stage ? <>
+            <Button variant="outline" disabled={busy} onClick={onClose}>{t("contacts.addClose")}</Button>
+            <Button variant={offerSubscribe ? "outline" : "default"} disabled={busy} onClick={() => onCreated(stage.contact.id)}>{t("contacts.openExisting")}</Button>
+            {offerSubscribe
+              ? <Button disabled={busy} onClick={() => void subscribe(stage.contact, false, false)}>{busy ? t("actions.working") : t("contacts.subscribeExisting", { list: listName })}</Button>
+              : null}
+          </> : <>
+            <Button variant="outline" disabled={busy} onClick={onClose}>{t("actions.cancel")}</Button>
+            <Button type="submit" form="outreach-add-contact" disabled={busy || !email.trim()}>{busy ? t("actions.working") : t("contacts.addSubmit")}</Button>
+          </>}
         </DialogFooter>
       </DialogContent>
     </Dialog>
