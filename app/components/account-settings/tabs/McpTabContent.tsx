@@ -421,7 +421,7 @@ function McpTokenSettings({
               <Text size="2" color="gray">{t("mcp.expiry")}</Text>
               <Select.Root value={expiryPreset} onValueChange={(value) => setExpiryPreset(value as typeof expiryPreset)}>
                 <Select.Trigger />
-                <Select.Content>
+                <Select.Content position="popper">
                   {EXPIRY_PRESETS.map((preset) => (
                     <Select.Item key={preset.value} value={preset.value}>
                       {preset.days === null ? t("mcp.presetCustom") : t("mcp.presetDays", { days: preset.days })}
