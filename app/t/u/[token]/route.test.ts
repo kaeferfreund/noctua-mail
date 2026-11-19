@@ -117,3 +117,16 @@ test("unsubscribe routes are inaccessible when the server flag is off", async ()
     process.env.NOCTUA_ADDON_OUTREACH = "1";
   }
 });
+
+test("the confirmation page allows exactly its own style block and nothing else", async () => {
+  const { createHash } = await import("node:crypto");
+  const response = await GET(new Request("https://links.example.test/t/u/unknown-token"), { params: Promise.resolve({ token: "unknown-token" }) });
+  const html = await response.text();
+  const style = /<style>([\s\S]*?)<\/style>/.exec(html)?.[1] ?? "";
+  expect(style.length).toBeGreaterThan(0);
+  const policy = response.headers.get("content-security-policy") ?? "";
+  expect(policy).toContain(`style-src 'sha256-${createHash("sha256").update(style).digest("base64")}'`);
+  expect(policy).toContain("default-src 'none'");
+  expect(policy).not.toContain("unsafe-inline");
+  expect(html).not.toMatch(/<script|<link|<img|url\(/i);
+});

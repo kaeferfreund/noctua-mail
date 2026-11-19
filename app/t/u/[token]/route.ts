@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { isIP } from "node:net";
 import { escapeUTF8 } from "entities";
 import { readBoundedBody } from "@/app/api/_helpers/readAuthJson";
@@ -8,9 +9,20 @@ import { createRateLimiter, getRequestIp } from "@/lib/rateLimit";
 export const dynamic = "force-dynamic";
 
 const limiter = createRateLimiter({ max: 120 });
+// The page loads nothing: its one static style block is allowed by hash, everything else is denied.
+const style = `:root{color-scheme:light dark}
+body{margin:0;padding:24px 16px;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f4f4f5;color:#18181b}
+main{max-width:28rem;margin:8vh auto 0;padding:24px;border:1px solid #d4d4d8;border-radius:12px;background:#fff}
+h1{margin:0 0 12px;font-size:1.25rem;line-height:1.3}
+p{margin:0 0 16px}
+.org{color:#52525b}
+button{font:inherit;font-weight:600;padding:10px 18px;border:0;border-radius:8px;background:#18181b;color:#fff;cursor:pointer}
+button:focus-visible{outline:3px solid #6366f1;outline-offset:2px}
+@media (prefers-color-scheme:dark){body{background:#18181b;color:#f4f4f5}main{background:#27272a;border-color:#3f3f46}.org{color:#a1a1aa}button{background:#f4f4f5;color:#18181b}}`;
+const styleHash = createHash("sha256").update(style).digest("base64");
 const headers = {
   "Cache-Control": "no-store",
-  "Content-Security-Policy": "default-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
+  "Content-Security-Policy": `default-src 'none'; style-src 'sha256-${styleHash}'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'`,
   "Referrer-Policy": "no-referrer",
   "X-Content-Type-Options": "nosniff",
   "Content-Type": "text/html; charset=utf-8",
@@ -42,8 +54,8 @@ function page(request: Request, organization: string, submitted: boolean, status
   <button name="List-Unsubscribe" value="One-Click" type="submit">${button}</button>
   </form>`;
   return new Response(`<!doctype html><html lang="${language}"><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>${heading}</title>
-<main><h1>${heading}</h1>${organization ? `<p>${escapeUTF8(organization)}</p>` : ""}
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>${heading}</title><style>${style}</style>
+<main><h1>${heading}</h1>${organization ? `<p class="org">${escapeUTF8(organization)}</p>` : ""}
 ${submitted ? `<p>${done}</p>` : form}</main></html>`,
   { status, headers: { ...headers, "Content-Language": language } });
 }
