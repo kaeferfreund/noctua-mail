@@ -105,6 +105,7 @@ test("AE: through an MCP token, the token's label and suffix are recorded and st
 
 test("AE: the MCP trace is a capped snapshot that parses back", () => {
   expect(parseOutreachVia("app")).toEqual({ kind: "app" });
+  expect(parseOutreachVia("import:klaviyo")).toEqual({ kind: "import", source: "klaviyo" });
   expect(parseOutreachVia(outreachViaMcp("Assistent", "a1b2"))).toEqual({ kind: "mcp", label: "Assistent", suffix: "a1b2" });
   expect(parseOutreachVia(outreachViaMcp("Bot (alt)", "a1b2"))).toEqual({ kind: "mcp", label: "Bot (alt)", suffix: "a1b2" });
   const long = outreachViaMcp("x".repeat(500), "s".repeat(50));

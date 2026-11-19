@@ -119,7 +119,8 @@ test("production shard-opening inventory routes every writable shard connection 
     "lib/addons/outreach/db.ts", "lib/addons/outreach/tracking/compose.ts",
     "lib/db/connection.ts", "lib/db/messages/senderKeyBackfill.ts", "lib/mail/spam/evalData.ts", "lib/membershipCleanup.ts",
     "scripts/checkShardMessageCollisions.ts", "scripts/dev-fixture/store.ts",
-    "scripts/outreach-import-klaviyo-contacts.ts", "scripts/outreach-import-klaviyo-content.ts", "scripts/outreach-rehost-images.ts", "scripts/spam-apply.ts", "scripts/verifyAdmissionCleanup.ts"
+    "scripts/outreach-import-klaviyo-contacts.ts", "scripts/outreach-import-klaviyo-content.ts", "scripts/outreach-import-klaviyo-history.ts",
+    "scripts/outreach-rehost-images.ts", "scripts/spam-apply.ts", "scripts/verifyAdmissionCleanup.ts"
   ]);
   const markerCallers = files.filter(file => /configureAccountDb\(/.test(source(file))).sort();
   expect(markerCallers).toEqual(["lib/db/connection.ts", "lib/db/messages/senderKeyBackfill.ts", "lib/membershipCleanup.ts"]);

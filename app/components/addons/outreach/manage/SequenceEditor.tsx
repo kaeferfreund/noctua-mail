@@ -199,7 +199,8 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
         </ol>
       </section>
 
-      {current && status !== "draft" ? <SequenceReportPanel sequenceId={current.id} version={reportVersion} /> : null}
+      {/* A draft has numbers too once history was imported for its steps. */}
+      {current ? <SequenceReportPanel sequenceId={current.id} version={reportVersion} onlyWithSends={status === "draft"} /> : null}
 
       {dialog === "live" ? (
         <ConfirmDialog title={status === "paused" ? t("sequences.resumeTitle") : t("sequences.goLiveTitle")}
@@ -293,12 +294,14 @@ function StepCard({ step, index, count, open, readOnly, onToggle, onChange, onMo
   );
 }
 
-function SequenceReportPanel({ sequenceId, version }: { sequenceId: string; version: number }) {
+function SequenceReportPanel({ sequenceId, version, onlyWithSends }: { sequenceId: string; version: number; onlyWithSends: boolean }) {
   const t = useTranslations("outreach");
   const { api } = useOutreachManage();
   const format = useOutreachFormat();
   const report = useResource(() => api.get<SequenceReport>(`sequences/${encodeURIComponent(sequenceId)}/report`), [api, sequenceId, version]);
   const data = report.data;
+  // For a draft the panel appears only when there is something to show, without a loading or error flash.
+  if (onlyWithSends && !data?.steps.some(step => step.stats.recipients > 0)) return null;
   return (
     <section aria-labelledby="sequence-report" className="flex flex-col gap-3">
       <h3 id="sequence-report" className="font-medium">{t("sequences.reportTitle")}</h3>
