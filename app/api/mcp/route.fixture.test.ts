@@ -142,6 +142,14 @@ fixtureTest("MCP drafts over the HTTP route against the dev fixture: create, get
     expect(inlineMail.html).not.toContain(oldUrl);
     expect(inlineUpdated.message.htmlBody).toContain(inlineUpdated.message.attachments[0].url);
     expect(inlineUpdated.message.attachments[0].url).not.toBe(oldUrl);
+
+    // An ordinary mail attachment, larger than any single-file tool limit, still reaches the Drafts mailbox whole.
+    const scan = Buffer.alloc(8 * 1024 * 1024, 0x41);
+    const large = await call("create_draft_message", { to: "patient@example.test", subject: "Befund", text: "Siehe Anhang.",
+      attachments: [{ filename: "befund.pdf", contentType: "application/pdf", dataUrl: `data:application/pdf;base64,${scan.toString("base64")}` }] });
+    const largeMail = await parsed(large.message.imapUid);
+    expect(largeMail.attachments[0]!.filename).toBe("befund.pdf");
+    expect(largeMail.attachments[0]!.content.equals(scan)).toBe(true);
   } finally {
     await drainImapConnectionPool();
     await server.stop();
