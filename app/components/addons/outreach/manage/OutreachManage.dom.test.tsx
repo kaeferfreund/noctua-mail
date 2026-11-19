@@ -101,10 +101,10 @@ describe("newsletter contacts", () => {
     const dialog = await page.findByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText("Email address"), { target: { value: "neu@example.test" } });
     await waitFor(() => expect(within(dialog).getAllByRole("option").length).toBeGreaterThan(1));
-    fireEvent.change(within(dialog).getByLabelText("Subscribe to list"), { target: { value: "list-news" } });
+    fireEvent.change(within(dialog).getByLabelText("Subscribe to list"), { target: { value: "list-beta" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Add" }));
-    await waitFor(() => expect(calls.find(call => call.path === "contacts/contact-new/subscriptions")?.body).toEqual({ listId: "list-news", action: "subscribe", consentSource: "manual" }));
-    expect(calls.find(call => call.method === "POST" && call.path === "contacts")?.body).toEqual({ email: "neu@example.test", firstName: "", lastName: "" });
+    await waitFor(() => expect(calls.find(call => call.path === "contacts/contact-new/subscriptions")?.body).toEqual({ listId: "list-beta", action: "subscribe", consentSource: "manual" }));
+    expect(calls.find(call => call.method === "POST" && call.path === "contacts")?.body).toEqual({ email: "neu@example.test" });
   });
 });
 

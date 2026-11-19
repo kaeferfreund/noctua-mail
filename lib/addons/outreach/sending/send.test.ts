@@ -69,7 +69,7 @@ test("send skips loss of consent during preparation and fails closed without uns
   expect(await sendOutreachMail(input, deps)).toEqual({ status: "skipped", reason: "recipient_unmailable" });
   deps.findRecipient = async () => contact;
   deps.unsubscribeUrls = async () => null;
-  expect(await sendOutreachMail(input, deps)).toEqual({ status: "failed", reason: "unsubscribe_unavailable" });
+  expect(await sendOutreachMail(input, deps)).toEqual({ status: "deferred", reason: "unsubscribe_unavailable" });
   expect(mails).toHaveLength(0);
 });
 

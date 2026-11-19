@@ -59,18 +59,56 @@ const sendSmtp: SendTransport = async (mail, account, identity, beforeSend) => {
   return { messageId: mail.messageId, providerMessageId: null };
 };
 
-let sesClient: import("@aws-sdk/client-sesv2").SESv2Client | undefined;
-const sendSes: SendTransport = async (mail, _account, identity, beforeSend) => {
-  const [{ SESv2Client, SendEmailCommand }, { default: nodemailer }] = await Promise.all([
+/** The provider answered that it did not accept the message; `deferred` means a configuration fault. */
+class ProviderRejection extends Error {
+  constructor(readonly status: "retry" | "deferred", readonly reason: string) { super(reason); }
+}
+
+const sesThrottling = new Set(["TooManyRequestsException", "LimitExceededException", "ThrottlingException", "Throttling"]);
+const sesConfiguration = new Set([
+  "AccountSuspendedException", "SendingPausedException", "MailFromDomainNotVerifiedException", "NotFoundException",
+  "UnrecognizedClientException", "InvalidClientTokenId", "InvalidSignatureException", "SignatureDoesNotMatch",
+  "IncompleteSignatureException", "MissingAuthenticationTokenException", "AccessDeniedException", "ExpiredTokenException", "ExpiredToken"
+]);
+/** Failures of the TCP/DNS connect itself: no request byte reached SES. */
+const connectFailures = new Set(["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH"]);
+
+/**
+ * Classifies an error of the SES API call. Only a definite non-acceptance yields an outcome: a 4xx
+ * service answer, or a failed connect. Timeouts, aborts, resets, 5xx answers and everything else
+ * return null, because SES may have accepted the message (at most once: never send it again).
+ */
+export function classifySesError(error: unknown): { status: "retry" | "deferred"; reason: string } | null {
+  if (!error || typeof error !== "object") return null;
+  const { name, code, $metadata } = error as { name?: unknown; code?: unknown; $metadata?: { httpStatusCode?: unknown } };
+  const status = $metadata?.httpStatusCode;
+  if (typeof status === "number" && status >= 400 && status < 500) {
+    if (status === 401 || status === 403 || (typeof name === "string" && sesConfiguration.has(name))) {
+      return { status: "deferred", reason: "ses_configuration_rejected" };
+    }
+    if (status === 429 || (typeof name === "string" && sesThrottling.has(name))) return { status: "retry", reason: "ses_throttled" };
+    return { status: "retry", reason: "ses_rejected" };
+  }
+  if (status === undefined && typeof code === "string" && connectFailures.has(code)) return { status: "retry", reason: "ses_connection_failed" };
+  return null;
+}
+
+type SesClient = import("@aws-sdk/client-sesv2").SESv2Client;
+let sesClient: SesClient | undefined;
+async function defaultSesClient() {
+  const config = sesEnvironment(process.env);
+  if (!config) return null;
+  const { SESv2Client } = await import("@aws-sdk/client-sesv2");
+  // The transport cannot prove whether a timed-out API call was accepted.
+  return sesClient ??= new SESv2Client({ ...config, maxAttempts: 1 });
+}
+
+export const createSesTransport = (getClient: () => Promise<SesClient | null> = defaultSesClient): SendTransport => async (mail, _account, identity, beforeSend) => {
+  const [{ SendEmailCommand }, { default: nodemailer }] = await Promise.all([
     import("@aws-sdk/client-sesv2"), import("nodemailer")
   ]);
-  const config = sesEnvironment(process.env);
-  if (!config) throw new SendingError(400, "SES ist nicht konfiguriert.", "transport_unavailable");
-  const client = sesClient ??= new SESv2Client({
-    ...config,
-    // The transport cannot prove whether a timed-out API call was accepted.
-    maxAttempts: 1
-  });
+  const client = await getClient();
+  if (!client) throw new SendingError(400, "SES ist nicht konfiguriert.", "transport_unavailable");
   const transporter = nodemailer.createTransport({
     SES: {
       sesClient: {
@@ -79,7 +117,12 @@ const sendSes: SendTransport = async (mail, _account, identity, beforeSend) => {
           if (!(command instanceof SendEmailCommand)) throw new Error("Unexpected SES command");
           const assertCurrent = await beforeSend();
           assertCurrent();
-          return client.send(command, { abortSignal: AbortSignal.timeout(60_000) });
+          try {
+            return await client.send(command, { abortSignal: AbortSignal.timeout(60_000) });
+          } catch (error) {
+            const rejection = classifySesError(error);
+            throw rejection ? new ProviderRejection(rejection.status, rejection.reason) : error;
+          }
         }
       },
       SendEmailCommand
@@ -98,7 +141,7 @@ export const defaultSendDependencies: SendDependencies = {
   now: Date.now, getAccount: getAccountById, resolveIdentity: resolveSendIdentity,
   authorize: authorizeOutbound, prepareAssertion: prepareOutboundAssertion, findRecipient: getSendableRecipient,
   unsubscribeUrls: createUnsubscribeUrls, track: prepareTrackedHtml, origin: outreachPublicOrigin, sesConfigured: isSesConfigured,
-  transport: { "mailbox-smtp": sendSmtp, ses: sendSes }
+  transport: { "mailbox-smtp": sendSmtp, ses: createSesTransport() }
 };
 
 type ContactFields = Pick<typeof sampleContact, "firstName" | "lastName" | "email">;
@@ -117,6 +160,11 @@ export type SendOutcome =
   | ({ status: "sent"; subject: string; recipients: string; sentAt: number } & Receipt)
   | { status: "skipped" | "failed" | "retry" | "deferred"; reason: string };
 
+/** Nothing was attempted because of configuration: no attempt is spent and a sequence does not advance. */
+const configurationReasons = new Set(["outreach_disabled", "transport_unavailable", "unsubscribe_unavailable",
+  "identity_unavailable", "permission_revoked", "configuration_changed"]);
+const notAttempted = (reason: string): SendOutcome => ({ status: configurationReasons.has(reason) ? "deferred" : "failed", reason });
+
 function safeUnsubscribeUrl(url: string) {
   try {
     const parsed = new URL(url);
@@ -126,6 +174,10 @@ function safeUnsubscribeUrl(url: string) {
   }
 }
 
+function textToHtml(text: string) {
+  return text.trim().split(/\r?\n(?:[ \t]*\r?\n)+/).map(paragraph => `<p>${escapeHtml(paragraph).replace(/\r?\n/g, "<br>")}</p>`).join("\n");
+}
+
 /** Checked after MIME preparation, then again synchronously at the transport boundary. */
 export async function sendOutreachMail(input: SendInput, deps = defaultSendDependencies): Promise<SendOutcome> {
   const { settings, recipient, sendId, content } = input;
@@ -133,11 +185,11 @@ export async function sendOutreachMail(input: SendInput, deps = defaultSendDepen
   let started = false;
   try {
     input.assertClaim();
-    if (!settings.enabled) return { status: "failed", reason: "outreach_disabled" };
+    if (!settings.enabled) return notAttempted("outreach_disabled");
     const account = await deps.getAccount(accountId);
     if (!account) return { status: "failed", reason: "account_missing" };
     if (settings.transport === "ses" ? !deps.sesConfigured() : !hasSmtp(account)) {
-      return { status: "failed", reason: "transport_unavailable" };
+      return notAttempted("transport_unavailable");
     }
 
     const test = "testAddress" in recipient;
@@ -154,7 +206,7 @@ export async function sendOutreachMail(input: SendInput, deps = defaultSendDepen
     const unsubscribe = test ? (testUrl ? { url: testUrl, oneClickUrl: testUrl } : null)
       : await deps.unsubscribeUrls(accountId, { sendId, contactId: recipient.contactId, listId: recipient.listId });
     if (!unsubscribe || !safeUnsubscribeUrl(unsubscribe.url) || !safeUnsubscribeUrl(unsubscribe.oneClickUrl)) {
-      return { status: "failed", reason: "unsubscribe_unavailable" };
+      return notAttempted("unsubscribe_unavailable");
     }
 
     const options = { contact, organizationName: settings.organizationName, organizationAddress: settings.organizationAddress,
@@ -164,6 +216,8 @@ export async function sendOutreachMail(input: SendInput, deps = defaultSendDepen
       return { status: "failed", reason: "content_empty" };
     }
     let { html, text } = rendered;
+    // Text-only content: the HTML part carries the same message, not only the footer.
+    if (!html.trim()) html = textToHtml(text);
     if (!hasUnsubscribeLink(html, unsubscribe.url)) {
       html = addToHtmlBody(html, `<p><a href="${escapeHtml(unsubscribe.url)}">Abmelden</a></p>`);
     }
@@ -202,15 +256,20 @@ export async function sendOutreachMail(input: SendInput, deps = defaultSendDepen
   } catch (error) {
     if (error instanceof SendStopped) {
       if (error.reason === "paused" || error.reason === "rescheduled") return { status: "deferred", reason: error.reason };
-      if (error.reason === "recipient_changed" || error.reason === "configuration_changed") return { status: "retry", reason: error.reason };
+      if (error.reason === "configuration_changed") return notAttempted(error.reason);
+      if (error.reason === "recipient_changed") return { status: "retry", reason: error.reason };
       return { status: ["cancelled", "recipient_unmailable"].includes(error.reason) ? "skipped" : "failed", reason: error.reason };
     }
-    if (error instanceof OutboundAuthorizationError) return { status: "failed", reason: "permission_revoked" };
-    if (error instanceof SenderIdentityError) return { status: "failed", reason: "identity_unavailable" };
-    if (error instanceof SendingError) return { status: "failed", reason: error.code ?? "invalid_send" };
+    if (error instanceof OutboundAuthorizationError) return notAttempted("permission_revoked");
+    if (error instanceof SenderIdentityError) return notAttempted("identity_unavailable");
+    if (error instanceof SendingError) return notAttempted(error.code ?? "invalid_send");
+    if (error instanceof ProviderRejection) return { status: error.status, reason: error.reason };
     if (settings.transport === "mailbox-smtp") {
       const smtp = getSmtpHttpError(error);
-      if (smtp?.status === 422 || smtp?.code === "smtp_configuration_error") return { status: "failed", reason: smtp.code };
+      // A refused login is a configuration fault of the mailbox, not of the recipient: hold the mail back
+      // like an SES credential error (the server refused before any message data).
+      if (smtp?.code === "smtp_configuration_error") return { status: "deferred", reason: smtp.code };
+      if (smtp?.status === 422) return { status: "failed", reason: smtp.code };
       if (smtpFailedBeforeData(error)) return { status: "retry", reason: "smtp_before_data" };
     }
     if (!started) return { status: "retry", reason: "pre_transport_failure" };

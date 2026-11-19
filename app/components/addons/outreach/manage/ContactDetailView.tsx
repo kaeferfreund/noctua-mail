@@ -1,17 +1,48 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
-import type { ContactDetail, TrackingEvent, TrackingEventsResponse } from "@/lib/addons/outreach/types";
+import type { ContactDetail, SuppressionReason, TrackingEvent, TrackingEventsResponse } from "@/lib/addons/outreach/types";
+import { AdminApiError } from "./outreachApi";
 import { useOutreachManage, usePagedResource, useResource, useUnsavedChanges } from "./manageContext";
 import { ConfirmDialog, ErrorNote, Field, Figure, LoadingNote, SectionHeader, nativeControlClass, useOutreachFormat } from "./ui";
 import { contactName } from "./ContactsSection";
 import SendsTable from "./SendsTable";
 
 const EVENT_PAGE = 50;
+
+/** The server's 409 asking for `confirmResubscribe` before a person with an unsubscribe on record is subscribed. */
+export function isResubscribeConfirmation(error: unknown) {
+  return error instanceof AdminApiError && error.status === 409 && error.code === "resubscribe_confirmation_required";
+}
+
+/** The unsubscribe date the server names in that 409 (`ResubscribeConfirmationRequired.unsubscribedAt`). */
+export function resubscribeDate(error: unknown) {
+  const value = error instanceof AdminApiError ? error.data.unsubscribedAt : null;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** Latest unsubscribe the contact view knows of, globally or from `listId`; null when none is shown. */
+export function lastUnsubscribe(contact: ContactDetail, listId: string) {
+  const member = contact.lists.find(membership => membership.listId === listId);
+  const times = [contact.emailConsent === "unsubscribed" ? contact.consentAt : null, member?.status === "unsubscribed" ? member.unsubscribedAt : null]
+    .filter((value): value is number => typeof value === "number");
+  return times.length > 0 ? Math.max(...times) : null;
+}
+
+/** The question before re-subscribing someone who unsubscribed: names the address and, when known, the date. */
+export function useResubscribeQuestion() {
+  const t = useTranslations("outreach");
+  const format = useOutreachFormat();
+  return (email: string, unsubscribedAt: number | null) => unsubscribedAt !== null
+    ? t("contacts.resubscribeDescription", { email, date: format.date(unsubscribedAt) })
+    : t("contacts.resubscribeDescriptionUndated", { email });
+}
+
+type Confirm = "delete" | "suppress" | { resubscribe: string; unsubscribedAt: number | null };
 
 export default function ContactDetailView({ contactId }: { contactId: string }) {
   const t = useTranslations("outreach");
@@ -39,38 +70,57 @@ function ContactDetailBody({ contact, path, onChange, onBack }: { contact: Conta
   const t = useTranslations("outreach");
   const { api, canEdit, isManager, lists, navigate } = useOutreachManage();
   const format = useOutreachFormat();
+  const resubscribeQuestion = useResubscribeQuestion();
   const [form, setForm] = useState({ email: contact.email, firstName: contact.firstName, lastName: contact.lastName });
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [saved, setSaved] = useState(false);
-  const [confirm, setConfirm] = useState<"delete" | "suppress" | null>(null);
+  const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [addListId, setAddListId] = useState("");
   const { ensure: ensureLists } = lists;
   useEffect(() => { ensureLists(); }, [ensureLists]);
   const dirty = form.email !== contact.email || form.firstName !== contact.firstName || form.lastName !== contact.lastName;
   const markClean = useUnsavedChanges(`contact:${contact.id}`, dirty);
+  // What is in the inputs right now; a save answer must not replace what was typed meanwhile.
+  const typed = useRef(form);
+  useEffect(() => { typed.current = form; });
 
-  const run = async (key: string, action: () => Promise<{ contact: ContactDetail } | void>) => {
+  /** Runs one write; an action may answer with the next question to ask instead of a contact. */
+  const run = async (key: string, action: () => Promise<{ contact: ContactDetail } | { ask: Confirm } | void>) => {
     setBusy(key); setError(null); setSaved(false);
     try {
       const result = await action();
-      if (result) onChange(result.contact);
-      setConfirm(null);
+      if (result && "contact" in result) onChange(result.contact);
+      setConfirm(result && "ask" in result ? result.ask : null);
       return true;
     } catch (caught) { setError(caught); return false; }
     finally { setBusy(null); }
   };
   const save = () => run("save", async () => {
-    const result = await api.send<{ contact: ContactDetail }>("PATCH", path, { email: form.email.trim(), firstName: form.firstName.trim(), lastName: form.lastName.trim() });
-    setForm({ email: result.contact.email, firstName: result.contact.firstName, lastName: result.contact.lastName });
-    setSaved(true);
+    const sent = form;
+    const result = await api.send<{ contact: ContactDetail }>("PATCH", path, { email: sent.email.trim(), firstName: sent.firstName.trim(), lastName: sent.lastName.trim() });
+    const current = typed.current;
+    // Typed during the request: keep the inputs as they are; they stay unsaved against the new contact.
+    if (current.email === sent.email && current.firstName === sent.firstName && current.lastName === sent.lastName) {
+      setForm({ email: result.contact.email, firstName: result.contact.firstName, lastName: result.contact.lastName });
+      setSaved(true);
+    }
     return result;
   });
-  const subscription = (listId: string, action: "subscribe" | "unsubscribe") => run(`list:${listId}`, async () => {
-    const result = await api.send<{ contact: ContactDetail }>("POST", `${path}/subscriptions`, { listId, action, consentSource: "manual" });
-    void lists.reload();
-    setAddListId("");
-    return result;
+  const subscription = (listId: string, action: "subscribe" | "unsubscribe", confirmResubscribe = false) => run(`list:${listId}`, async () => {
+    try {
+      const result = await api.send<{ contact: ContactDetail }>("POST", `${path}/subscriptions`,
+        { listId, action, consentSource: "manual", ...(confirmResubscribe ? { confirmResubscribe: true } : {}) });
+      void lists.reload();
+      setAddListId("");
+      return result;
+    } catch (caught) {
+      // The person unsubscribed: ask first, subscribe only on an explicit confirmation.
+      if (action === "subscribe" && !confirmResubscribe && isResubscribeConfirmation(caught)) {
+        return { ask: { resubscribe: listId, unsubscribedAt: resubscribeDate(caught) ?? lastUnsubscribe(contact, listId) } };
+      }
+      throw caught;
+    }
   });
   const setSuppressed = (suppressed: boolean) => run("suppress", () => api.send<{ contact: ContactDetail }>("POST", `${path}/suppression`, { suppressed }));
   const remove = async () => {
@@ -133,7 +183,10 @@ function ContactDetailBody({ contact, path, onChange, onBack }: { contact: Conta
             {t("contacts.suppressedSince", { reason: t(`suppression.${contact.suppressedReason}`), date: contact.suppressedAt ? format.dateTime(contact.suppressedAt) : "–" })}
           </p>
         ) : <p className="text-sm text-muted-foreground">{t("contacts.notSuppressed")}</p>}
-        {isManager ? (
+        {contact.suppressedReason && contact.suppressedReason !== "manual" ? (
+          // The server keeps bounce and complaint blocks for good; say why instead of offering a button that fails.
+          <p className="text-xs text-muted-foreground">{t(`contacts.suppressionLocked.${contact.suppressedReason as Exclude<SuppressionReason, "manual">}`)}</p>
+        ) : isManager ? (
           <div>
             {contact.suppressedReason
               ? <Button variant="outline" disabled={busy !== null} onClick={() => void setSuppressed(false)}>{t("contacts.unsuppress")}</Button>
@@ -155,11 +208,12 @@ function ContactDetailBody({ contact, path, onChange, onBack }: { contact: Conta
                   {membership.status === "unsubscribed" && membership.unsubscribedAt ? format.date(membership.unsubscribedAt)
                     : membership.subscribedAt ? format.date(membership.subscribedAt) : ""}
                 </span>
-                {canEdit ? (
-                  membership.status === "unsubscribed"
-                    ? <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void subscription(membership.listId, "subscribe")}>{t("contacts.subscribe")}</Button>
-                    : <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void subscription(membership.listId, "unsubscribe")}>{t("contacts.unsubscribe")}</Button>
-                ) : null}
+                {canEdit && membership.status !== "subscribed"
+                  ? <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void subscription(membership.listId, "subscribe")}>{t("contacts.subscribe")}</Button>
+                  : null}
+                {canEdit && membership.status !== "unsubscribed"
+                  ? <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void subscription(membership.listId, "unsubscribe")}>{t("contacts.unsubscribe")}</Button>
+                  : null}
               </li>
             ))}
           </ul>
@@ -201,6 +255,11 @@ function ContactDetailBody({ contact, path, onChange, onBack }: { contact: Conta
         <ConfirmDialog title={t("contacts.suppressTitle")} description={t("contacts.suppressDescription", { email: contact.email })}
           confirmLabel={t("contacts.suppress")} busy={busy === "suppress"} error={error}
           onCancel={() => { setConfirm(null); setError(null); }} onConfirm={() => void setSuppressed(true)} />
+      ) : null}
+      {typeof confirm === "object" && confirm !== null ? (
+        <ConfirmDialog title={t("contacts.resubscribeTitle")} description={resubscribeQuestion(contact.email, confirm.unsubscribedAt)} confirmLabel={t("contacts.resubscribeConfirm")}
+          busy={busy === `list:${confirm.resubscribe}`} error={error}
+          onCancel={() => { setConfirm(null); setError(null); }} onConfirm={() => void subscription(confirm.resubscribe, "subscribe", true)} />
       ) : null}
     </>
   );

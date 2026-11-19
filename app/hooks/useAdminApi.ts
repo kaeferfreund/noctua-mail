@@ -28,7 +28,8 @@ const errors: Record<string, string> = {
 };
 
 export class AdminApiError extends Error {
-  constructor(public status: number, public code: string, message: string) { super(message); }
+  /** `data`: the parsed error body, for answers that carry more than code and message. */
+  constructor(public status: number, public code: string, message: string, public data: Record<string, unknown> = {}) { super(message); }
 }
 
 // Narrow Noctua wrapper seam, shared by admin and mailbox settings; no raw BA calls.
@@ -40,7 +41,7 @@ export async function adminRequest<T>(request: AdminFetch, url: string, init?: R
     const message = response.status === 429
       ? `Too many attempts. Retry after ${response.headers.get("Retry-After") || "60"} seconds.`
       : errors[code] || data.message || (response.status === 401 ? "Your session expired. Sign in again." : `Request failed (${response.status}${code ? `: ${code}` : ""}).`);
-    throw new AdminApiError(response.status, code, message);
+    throw new AdminApiError(response.status, code, message, data && typeof data === "object" && !Array.isArray(data) ? data : {});
   }
   return data as T;
 }

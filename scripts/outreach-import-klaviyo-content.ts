@@ -9,11 +9,15 @@ import { itemId, sequenceInput, templateInput, validated } from "@/lib/addons/ou
 import { assertDraft, getSequence, saveSequence, saveTemplate } from "@/lib/addons/outreach/sending/store";
 import type { SequenceStepInput } from "@/lib/addons/outreach/types";
 
+// A real export carries `null` for parts a template does not have (`text`, `amp`); null means absent.
+const withoutNulls = (value: unknown) => value && typeof value === "object" && !Array.isArray(value)
+  ? Object.fromEntries(Object.entries(value).filter(([, field]) => field !== null)) : value;
 const templateExport = z.object({
-  data: z.array(z.object({ id: itemId, attributes: templateInput.pick({ name: true, html: true, text: true }) }))
+  data: z.array(z.object({ id: itemId, attributes: z.preprocess(withoutNulls, templateInput.pick({ name: true, html: true, text: true })) }))
 });
 const flowDefinition = z.object({
   entry_action_id: itemId,
+  profile_filter: z.unknown().optional(),
   triggers: z.array(z.object({ id: itemId })).length(1),
   actions: z.array(z.object({
     id: itemId, type: z.string(), data: z.unknown(), links: z.object({ next: itemId.nullable().optional() })
@@ -25,17 +29,26 @@ const flowExport = z.object({
   })
 });
 const sendEmail = z.object({
-  message: z.object({ name: z.string().optional(), subject_line: z.string(), preview_text: z.string().nullish(), template_id: itemId })
+  message: z.object({ name: z.string().nullish(), subject_line: z.string(), preview_text: z.string().nullish(), template_id: itemId,
+    additional_filters: z.unknown().optional() })
 });
-const timeDelay = z.object({ value: z.number().nonnegative(), unit: z.string() });
+const timeDelay = z.object({ value: z.number().nonnegative(), unit: z.string(),
+  delay_until_time: z.unknown().optional(), delay_until_weekdays: z.unknown().optional() });
 const units = new Map([["second", 1 / 60], ["minute", 1], ["hour", 60], ["day", 1440], ["week", 10080]]);
 
 class ImportError extends Error {}
+
+/** A real export carries unused restrictions and filters as null; empty strings, lists and objects mean the same. */
+const configured = (value: unknown): boolean => Array.isArray(value) ? value.some(configured)
+  : value !== null && typeof value === "object" ? Object.values(value).some(configured)
+  : value !== null && value !== undefined && value !== "";
 
 function parseFlow(input: unknown) {
   const { data } = validated(flowExport, input);
   const definition = data.attributes.definition ?? data.definition;
   if (!definition) throw new ImportError("Flow export is missing its definition.");
+  // Sequences cannot express these; importing without them would mail people the flow excludes.
+  if (configured(definition.profile_filter)) throw new ImportError("Flow has a profile filter, which sequences do not support.");
   const actions = new Map(definition.actions.map(action => [action.id, action]));
   if (actions.size !== definition.actions.length) throw new ImportError("Flow has duplicate action ids.");
   const visited = new Set<string>();
@@ -46,13 +59,17 @@ function parseFlow(input: unknown) {
     if (!next || visited.has(id)) throw new ImportError("Flow action chain is missing an action or contains a loop.");
     visited.add(id);
     if (next.type === "time-delay") {
-      const { value, unit } = validated(timeDelay, next.data);
+      const { value, unit, delay_until_time: time, delay_until_weekdays: weekdays } = validated(timeDelay, next.data);
+      if (configured(time) || configured(weekdays)) {
+        throw new ImportError("Flow delay waits for a time of day or weekday, which sequences do not support.");
+      }
       const factor = units.get(unit.toLowerCase().replace(/s$/, ""));
       if (!factor) throw new ImportError("Unsupported Klaviyo delay unit.");
       pendingDelay += value * factor;
     } else if (next.type === "send-email") {
       if (!Number.isSafeInteger(pendingDelay)) throw new ImportError("Flow delay must resolve to whole minutes.");
       const { message } = validated(sendEmail, next.data);
+      if (configured(message.additional_filters)) throw new ImportError("Flow email has additional filters, which sequences do not support.");
       steps.push({ templateExternalId: message.template_id,
         fields: { name: message.name ?? "", subject: message.subject_line, previewText: message.preview_text ?? "", delayMinutes: pendingDelay } });
       pendingDelay = 0;

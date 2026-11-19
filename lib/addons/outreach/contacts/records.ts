@@ -107,7 +107,8 @@ export async function upsertContact(accountId: string, input: ContactInput, now 
 
 /** Consent, suppression and send history belong to the address that earned them. */
 export function canChangeContactAddress(db: Database, row: ContactRow): boolean {
-  if (row.emailConsent !== "never" || row.suppressedReason) return false;
+  // A restored unsubscribe of an erased contact is the last record of that address's opt-out.
+  if (row.emailConsent !== "never" || row.suppressedReason || row.unsubscribedAt !== null) return false;
   return !db.query(`SELECT 1 FROM list_members WHERE accountId = ?1 AND contactId = ?2
     UNION ALL SELECT 1 FROM sends WHERE accountId = ?1 AND contactId = ?2 LIMIT 1`).get(row.accountId, row.id);
 }

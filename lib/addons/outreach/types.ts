@@ -177,8 +177,15 @@ export type ContactList = {
 
 export type ContactListInput = { name: string; description?: string; optIn?: OptInMode };
 
-/** `POST {base}/contacts/{contactId}/subscriptions` */
-export type SubscriptionChange = { listId: string; action: "subscribe" | "unsubscribe"; consentSource?: string };
+/**
+ * `POST {base}/contacts/{contactId}/subscriptions`
+ * Subscribing someone who has an unsubscribe on record (global or of that list) needs
+ * `confirmResubscribe: true`: without it the server answers 409 `resubscribe_confirmation_required`
+ * with `unsubscribedAt`, so no caller re-subscribes a person by accident.
+ */
+export type SubscriptionChange = { listId: string; action: "subscribe" | "unsubscribe"; consentSource?: string; confirmResubscribe?: boolean };
+/** Body of the 409 that asks for `confirmResubscribe`. */
+export type ResubscribeConfirmationRequired = { ok: false; code: "resubscribe_confirmation_required"; message: string; unsubscribedAt: number };
 
 /** `GET|POST {base}/api-tokens`; the secret is returned once, on creation, as `token`. */
 export type OutreachApiToken = { id: string; name: string; listIds: string[]; createdAt: number; lastUsedAt: number | null; revokedAt: number | null };

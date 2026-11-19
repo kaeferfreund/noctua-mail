@@ -7,7 +7,7 @@ import { withAuthResponse } from "@/lib/auth";
 
 export function contactErrorResponse(error: unknown) {
   if (!(error instanceof ContactError)) throw error;
-  return NextResponse.json({ ok: false, message: error.message, ...(error.code ? { code: error.code } : {}) }, {
+  return NextResponse.json({ ok: false, message: error.message, ...(error.code ? { code: error.code } : {}), ...error.details }, {
     status: error.status,
     headers: { "Cache-Control": "no-store", ...(error.status === 401 ? { "WWW-Authenticate": "Bearer" } : {}) }
   });

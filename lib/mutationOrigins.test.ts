@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { createAuthenticatedTestSession, syntheticRequestIp } from "./testAuthHarness";
@@ -28,6 +28,14 @@ beforeAll(async () => {
     smtp: { host: "smtp.example.test", port: 465, secure: true, user: "origin@example.test", password: "synthetic" } });
   fixture = await createAuthenticatedTestSession(accountId, "admin");
   await db.upsertAccount({ ...(await db.getAccountById(accountId))!, ownerUserId: fixture.user.id });
+  // The optional outreach addon answers 404 while it is off; switch it on and activate it for
+  // this mailbox so its mutation routes are held to the same origin rule as every other route.
+  process.env.NOCTUA_ADDON_OUTREACH = "1";
+  await (await import("./addons/outreach/settings")).saveOutreachSettings(accountId, { enabled: true }, fixture.user.id);
+});
+const outreachFlag = process.env.NOCTUA_ADDON_OUTREACH;
+afterAll(() => {
+  if (outreachFlag === undefined) delete process.env.NOCTUA_ADDON_OUTREACH; else process.env.NOCTUA_ADDON_OUTREACH = outreachFlag;
 });
 
 describe("complete API mutation origin inventory", () => {
@@ -41,6 +49,8 @@ describe("complete API mutation origin inventory", () => {
     // The library rejects text/plain before origin parsing; unsupported BA paths stay unavailable.
     if (file === "ba/[...all]/route.ts") expect(response.status).toBe(method === "POST" ? 415 : 404);
     else if (file === "mcp/route.ts") expect(response.status).toBe(method === "DELETE" ? 405 : 401);
+    // Server-to-server signup: no session and no browser origin, a bearer token or nothing.
+    else if (file === "addons/outreach/subscribe/route.ts") expect(response.status).toBe(401);
     else {
       expect(response.status).toBe(403);
       expect(await response.json()).toMatchObject({ code: "invalid_origin" });

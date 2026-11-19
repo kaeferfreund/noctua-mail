@@ -5,7 +5,12 @@
       "attributes": {
         "name": "Willkommen",
         "html": "<p>Hallo {{ first_name|default:'du' }}!</p>{% unsubscribe 'Abmelden' %}",
-        "text": ""
+        "text": null,
+        "amp": null,
+        "editor_type": "SYSTEM_DRAGGABLE",
+        "created": "2025-01-01T00:00:00+00:00",
+        "updated": "2025-01-01T00:00:00+00:00",
+        "screenshot_url": "https://www.example.test/screenshot.png"
       }
     },
     {
