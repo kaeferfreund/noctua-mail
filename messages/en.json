@@ -2498,6 +2498,7 @@
       "delete": "Delete",
       "deleteTitle": "Delete contact permanently?",
       "deleteDescription": "This deletes {email}, every list membership, the consent and all of this person's opens and clicks. This cannot be undone.",
+      "deleteKeepsBlock": "The address stays blocked afterwards: only a checksum is kept, not the address itself. It can be subscribed again only after the person has given new consent.",
       "deleteConfirm": "Delete contact and data"
     },
     "events": {

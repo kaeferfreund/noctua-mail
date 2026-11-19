@@ -65,14 +65,16 @@ test("erasing a contact keeps its suppression and unsubscribe for the address, a
   await eraseContact(accountId, leaver.id, 300);
   const returned = (await upsertContact(accountId, { email: "leaver@example.test" })).contact;
   const row = findContact(db, accountId, returned.id)!;
-  expect(row).toMatchObject({ emailConsent: "never", unsubscribedAt: 200 });
-  expect(subscriptionDecision(row, null, 150, true)).toBe("new_consent_required");
-  expect(subscriptionDecision(row, null, 250, true)).toBe("subscribe");
+  // The erase itself counts as the newest unsubscribe.
+  expect(row).toMatchObject({ emailConsent: "never", unsubscribedAt: 300 });
+  expect(subscriptionDecision(row, null, 250, true)).toBe("new_consent_required");
+  expect(subscriptionDecision(row, null, 350, true)).toBe("subscribe");
 
-  // Nothing to remember for a contact that never unsubscribed and was never suppressed.
+  // A contact that never unsubscribed and was never suppressed leaves a block too: the erase time.
   const plain = (await upsertContact(accountId, { email: "plain@example.test" })).contact;
   await eraseContact(accountId, plain.id, 400);
-  expect(db.query("SELECT count(*) AS n FROM erased_addresses WHERE accountId = ?").get(accountId)).toEqual({ n: 0 });
+  const plainKept = db.query("SELECT suppressedReason, suppressedAt, unsubscribedAt, erasedAt FROM erased_addresses WHERE accountId = ?").all(accountId);
+  expect(plainKept).toEqual([{ suppressedReason: null, suppressedAt: null, unsubscribedAt: 400, erasedAt: 400 }]);
   expect(db.query("SELECT count(*) AS n FROM erased_addresses WHERE accountId = ?").get("foreign")).toEqual({ n: 0 });
 });
 

@@ -2498,6 +2498,7 @@
       "delete": "Löschen",
       "deleteTitle": "Kontakt endgültig löschen?",
       "deleteDescription": "Damit werden {email}, alle Listeneinträge, die Einwilligung und alle Öffnungen und Klicks dieser Person gelöscht. Das lässt sich nicht rückgängig machen.",
+      "deleteKeepsBlock": "Die Adresse bleibt danach gesperrt: Gespeichert wird nur ein Prüfwert, nicht die Adresse selbst. Wieder eintragen lässt sie sich erst, wenn die Person neu eingewilligt hat.",
       "deleteConfirm": "Kontakt und Daten löschen"
     },
     "events": {
