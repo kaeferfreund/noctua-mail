@@ -266,7 +266,10 @@ export async function sendOutreachMail(input: SendInput, deps = defaultSendDepen
     if (error instanceof ProviderRejection) return { status: error.status, reason: error.reason };
     if (settings.transport === "mailbox-smtp") {
       const smtp = getSmtpHttpError(error);
-      if (smtp?.status === 422 || smtp?.code === "smtp_configuration_error") return { status: "failed", reason: smtp.code };
+      // A refused login is a configuration fault of the mailbox, not of the recipient: hold the mail back
+      // like an SES credential error (the server refused before any message data).
+      if (smtp?.code === "smtp_configuration_error") return { status: "deferred", reason: smtp.code };
+      if (smtp?.status === 422) return { status: "failed", reason: smtp.code };
       if (smtpFailedBeforeData(error)) return { status: "retry", reason: "smtp_before_data" };
     }
     if (!started) return { status: "retry", reason: "pre_transport_failure" };
