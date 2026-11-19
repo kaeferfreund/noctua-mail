@@ -108,7 +108,7 @@ realMailTest("compose „Senden“ with the draft id cancels the queued schedule
   expect((await claimDueScheduledSends(jobOwner(), s.sendAt, 1_000)).some(row => row.id === s.scheduleId)).toBe(false);
 });
 
-realMailTest("compose „Senden“ removes its draft on the server; a draft id of a non-draft message is left alone", async () => {
+realMailTest("compose „Senden“ removes its draft on the server; a draft id of received mail is left alone", async () => {
   // The client may be gone right after SMTP (reload, lost connection): the route itself removes the draft.
   const f = await createScheduledSendFixture(local(sink.port));
   const send = (draftId: string, subject: string) => smtpSend(f.request("POST", {
@@ -118,8 +118,13 @@ realMailTest("compose „Senden“ removes its draft on the server; a draft id o
   expect((await send(draftId, "Synthetic draft cleanup")).status).toBe(200);
   expect(await getMessageById(f.accountId, draftId)).toBeNull();
 
-  // Without the \Draft flag the id is not a draft of this session: never deleted through a send.
-  const receivedId = await f.seedDraft({ flags: ["\\Seen"] });
+  // A draft another client saved without the \Draft flag still counts by its Drafts folder.
+  const unflaggedId = await f.seedDraft({ flags: ["\\Seen"] });
+  expect((await send(unflaggedId, "Synthetic unflagged draft")).status).toBe(200);
+  expect(await getMessageById(f.accountId, unflaggedId)).toBeNull();
+
+  // Neither flagged nor in Drafts (received mail named by the id): never deleted through a send.
+  const receivedId = await f.seedDraft({ flags: ["\\Seen"], folderId: `${f.accountId}:INBOX` });
   expect((await send(receivedId, "Synthetic not a draft")).status).toBe(200);
   expect(await getMessageById(f.accountId, receivedId)).not.toBeNull();
 });

@@ -1051,9 +1051,9 @@ function ComposeOrchestratorImpl(
       // is already running (or queued) finish before we touch the draft. A
       // forward/reply auto-saves a draft on open; if its IMAP APPEND is still
       // in flight when send fires, cancelling outright would orphan that draft
-      // on the server (the discard below would run against a not-yet-known
-      // draft id). Flushing first lets the save settle and populate
-      // `composeDraftIdRef`, so the discard can delete both copies.
+      // on the server (the send would name a not-yet-known draft id). Flushing
+      // first lets the save settle and populate `composeDraftIdRef`, so the
+      // send route removes the saved draft along with the send.
       if (draftSaveTimerRef.current !== null) {
         clearTimeout(draftSaveTimerRef.current);
         draftSaveTimerRef.current = null;

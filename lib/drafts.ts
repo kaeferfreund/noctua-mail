@@ -644,32 +644,24 @@ export async function loadSendableDraft(accountId: string, draftId: string) {
 }
 
 /**
- * Send a previously-saved draft without re-opening it in compose.
- *
- * The draft is relayed from its stored raw MIME source, which helps
- * preserve the drafted MIME structure and headers — attachments,
- * `Content-ID`s, the compose-invite header, and the original
- * `Message-ID` — as stored with the draft. The cached source in this
- * path is a UTF-8 string, so this preserves headers and structure
- * without promising byte-for-byte preservation; the `latin1` round-trip
- * inside `stripBccHeader` only matters when a caller hands us a
- * `Buffer` containing binary bytes, which isn't the case here. The
- * SMTP envelope is built from the draft's parsed `to`/`cc`/`bcc` —
- * we don't re-parse the raw blob for recipients.
- *
- * Two header-level edits happen before relay:
- *   1. `stripBccHeader` — the local draft is saved with
- *      `keepBcc: true`, but the wire copy must not carry `Bcc:` or
- *      blind-carbon addresses would leak to every To/Cc recipient.
- *   2. `injectUndisclosedRecipientsToHeader` — for BCC-only drafts
- *      (no To, no Cc), insert `To: undisclosed-recipients:;` so the
- *      wire copy has a recipient header. Mirrors the `outboundTo`
- *      fallback in `/api/accounts/[accountId]/smtp/send`.
- *
- * On success the draft is removed from both the IMAP Drafts mailbox
- * and the local message store, and a copy is appended to the Sent
- * folder. The result distinguishes delivery from Sent-copy failure.
+ * The saved draft a compose send names by `draftId`, if it really is a draft: flagged
+ * `\Draft` (compose saves it so) or in the account's Drafts folder (another client may
+ * not set the flag). Anything else, e.g. received mail named by a crafted id, is never
+ * returned, so a send can't delete it. Best-effort like the cleanup it feeds: null on error.
  */
+export async function findSentComposeDraft(accountId: string, draftId: string): Promise<Message | null> {
+  try {
+    const draft = await getMessageById(accountId, draftId);
+    if (!draft) return null;
+    if (hasMessageFlag(draft.flags, "\\Draft")) return draft;
+    const draftsFolder = findDraftsFolder(await getFolders(accountId), accountId);
+    return draftsFolder && draft.folderId === draftsFolder.id ? draft : null;
+  } catch (error) {
+    console.warn("[draft-send] could not look up the sent draft", { accountId, draftId, error });
+    return null;
+  }
+}
+
 /**
  * Removes the draft a message was just sent from (tombstone, IMAP copy, local row, files).
  *
@@ -696,9 +688,17 @@ export async function removeSentDraft(params: {
     // client lags), the next Drafts sync drops this draft instead of
     // resurrecting it next to the message we just sent. Scoped enforcement
     // (Drafts-flagged only) keeps a Sent copy that shares this Message-Id
-    // untouched. Kept inside the swallowing try so a transient DB error here
-    // can't surface as a (false) send failure.
-    await recordDraftTombstone(accountId, draft.messageId, draft.mailboxPath ?? null);
+    // untouched. Own catch, as in the discard route: a failed tombstone write
+    // must not keep the draft (IMAP copy and local row) next to the sent message.
+    try {
+      await recordDraftTombstone(accountId, draft.messageId, draft.mailboxPath ?? null);
+    } catch (error) {
+      console.warn("[draft-send] tombstone write failed; removing the draft anyway", {
+        accountId,
+        draftId: draft.id,
+        error
+      });
+    }
     const attachmentIds = await getAttachmentIds(accountId, draft.id);
     if (draft.mailboxPath && typeof draft.imapUid === "number") {
       try {
@@ -727,6 +727,33 @@ export async function removeSentDraft(params: {
   }
 }
 
+/**
+ * Send a previously-saved draft without re-opening it in compose.
+ *
+ * The draft is relayed from its stored raw MIME source, which helps
+ * preserve the drafted MIME structure and headers — attachments,
+ * `Content-ID`s, the compose-invite header, and the original
+ * `Message-ID` — as stored with the draft. The cached source in this
+ * path is a UTF-8 string, so this preserves headers and structure
+ * without promising byte-for-byte preservation; the `latin1` round-trip
+ * inside `stripBccHeader` only matters when a caller hands us a
+ * `Buffer` containing binary bytes, which isn't the case here. The
+ * SMTP envelope is built from the draft's parsed `to`/`cc`/`bcc` —
+ * we don't re-parse the raw blob for recipients.
+ *
+ * Two header-level edits happen before relay:
+ *   1. `stripBccHeader` — the local draft is saved with
+ *      `keepBcc: true`, but the wire copy must not carry `Bcc:` or
+ *      blind-carbon addresses would leak to every To/Cc recipient.
+ *   2. `injectUndisclosedRecipientsToHeader` — for BCC-only drafts
+ *      (no To, no Cc), insert `To: undisclosed-recipients:;` so the
+ *      wire copy has a recipient header. Mirrors the `outboundTo`
+ *      fallback in `/api/accounts/[accountId]/smtp/send`.
+ *
+ * On success the draft is removed from both the IMAP Drafts mailbox
+ * and the local message store, and a copy is appended to the Sent
+ * folder. The result distinguishes delivery from Sent-copy failure.
+ */
 export async function sendDraftForAccount(params: {
   account: Account;
   accountId: string;

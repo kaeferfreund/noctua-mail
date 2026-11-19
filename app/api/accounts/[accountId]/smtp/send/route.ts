@@ -7,11 +7,10 @@ import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { getMessageById, upsertCalendarEvent } from "@/lib/db";
+import { upsertCalendarEvent } from "@/lib/db";
 import type { ComposeInvitePayload } from "@/lib/composeInvite";
 import { completeSend } from "@/lib/mail/completeSend";
-import { holdScheduleForDraftChange, removeSentDraft, type DraftScheduleHold } from "@/lib/drafts";
-import { hasMessageFlag } from "@/lib/messageFlags";
+import { findSentComposeDraft, holdScheduleForDraftChange, removeSentDraft, type DraftScheduleHold } from "@/lib/drafts";
 import { postSendDeadlineAt } from "@/lib/mail/imapCancellation";
 import { scheduledSendConflictResponse } from "@/app/api/_helpers/scheduledSendConflict";
 import {
@@ -235,14 +234,10 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       actor: collabActorFromSession(accountContext.session, accountContext.clientId), inReplyTo: payload.inReplyTo, references: payload.references,
       xForwardedMessageId: payload.xForwardedMessageId });
     // The draft this compose session saved goes with the send, on the server: a reload or a lost
-    // connection right after SMTP must not leave it next to the sent message. Only a message saved
-    // as a draft (\Draft flag) is removed, so a draftId can never delete received mail.
-    if (draftId) {
-      const draft = await getMessageById(accountId, draftId).catch(() => null);
-      if (draft && hasMessageFlag(draft.flags, "\\Draft")) {
-        await removeSentDraft({ account, clientId, draft, deadlineAt, sentResult });
-      }
-    }
+    // connection right after SMTP must not leave it next to the sent message. Only a real draft
+    // (\Draft flag or in the Drafts folder) is removed, so a draftId can never delete received mail.
+    const sentDraft = draftId ? await findSentComposeDraft(accountId, draftId) : null;
+    if (sentDraft) await removeSentDraft({ account, clientId, draft: sentDraft, deadlineAt, sentResult });
 
     let inviteScheduled = false;
     let inviteEventId: string | null = null;
