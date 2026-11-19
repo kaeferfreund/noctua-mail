@@ -161,9 +161,44 @@ test("the subscribe API takes a consent from a clock slightly ahead as given now
   await expect(subscribeWithApiToken(auth, { email: "far@example.test", listId: list.id, consentAt: now + CONSENT_CLOCK_SKEW_MS + 1 }, now))
     .rejects.toMatchObject({ status: 400 });
   expect(findContactByEmail(db, accountId, "far@example.test")).toBeNull();
-  // A clock that is ahead does not turn an old consent into a new one after an unsubscribe.
-  const { contactId } = await subscribeWithApiToken(auth, { email: "leaver@example.test", listId: list.id, consentAt: now - 10 }, now);
-  await changeContactSubscription(accountId, contactId, { action: "unsubscribe", listId: list.id }, now);
-  await expect(subscribeWithApiToken(auth, { email: "leaver@example.test", listId: list.id, consentAt: now + 1 }, now))
+});
+
+test("a consent stamped by a clock that runs ahead cannot outrun a later unsubscribe or erase, however often it is replayed", async () => {
+  const accountId = crypto.randomUUID();
+  await saveOutreachSettings(accountId, { enabled: true }, "manager-1", consentAt);
+  const list = await createContactList(accountId, { name: "Updates" }, consentAt);
+  const { token } = await createApiToken(accountId, "manager-1", { name: "Registration", listIds: [list.id] }, consentAt);
+  const auth = { accountId, id: token.id };
+  const db = await getOutreachDb();
+  const second = 1000, day = 24 * 60 * 60_000;
+  const leave = {
+    "list@example.test": (contactId: string) => changeContactSubscription(accountId, contactId, { action: "unsubscribe", listId: list.id }, now + second),
+    "erased@example.test": (contactId: string) => eraseContact(accountId, contactId, now + second)
+  };
+  // Accepted before the caller's stamp has passed here, then the person leaves, then the same request again.
+  for (const [email, left] of Object.entries(leave)) {
+    const claim = { email, listId: list.id, consentAt: now + CONSENT_CLOCK_SKEW_MS };
+    const { contactId } = await subscribeWithApiToken(auth, claim, now);
+    await left(contactId);
+    for (const replayedAt of [now + 2 * second, now + CONSENT_CLOCK_SKEW_MS + second, now + day]) {
+      await expect(subscribeWithApiToken(auth, claim, replayedAt)).rejects.toMatchObject({ status: 409, code: "new_consent_required" });
+    }
+  }
+  expect(await getMembership(db, accountId, findContactByEmail(db, accountId, "list@example.test")!.id, list.id)).toMatchObject({ status: "unsubscribed" });
+  expect(findContactByEmail(db, accountId, "erased@example.test")).toBeNull();
+  expect(await listSendableRecipients(accountId, { listIds: [list.id] })).toEqual([]);
+
+  // First arrival after the unsubscribe: given at `now`, stamped 30 s ahead by the caller, delivered late.
+  const late = await subscribeWithApiToken(auth, { email: "late@example.test", listId: list.id, consentAt: now - day }, now - day);
+  await changeContactSubscription(accountId, late.contactId, { action: "unsubscribe", listId: list.id }, now + 10 * second);
+  await expect(subscribeWithApiToken(auth, { email: "late@example.test", listId: list.id, consentAt: now + 30 * second }, now + 20 * second))
     .rejects.toMatchObject({ status: 409, code: "new_consent_required" });
+
+  // A consent that is later than the unsubscribe by more than the tolerance is a new one, whatever the clock.
+  const barrier = now + second;
+  await expect(subscribeWithApiToken(auth, { email: "list@example.test", listId: list.id, consentAt: barrier + CONSENT_CLOCK_SKEW_MS }, now + day))
+    .rejects.toMatchObject({ code: "new_consent_required" });
+  expect(await subscribeWithApiToken(auth, { email: "list@example.test", listId: list.id, consentAt: barrier + CONSENT_CLOCK_SKEW_MS + 1 }, now + day))
+    .toMatchObject({ ok: true, status: "subscribed", created: false });
+  expect(findContactByEmail(db, accountId, "list@example.test")).toMatchObject({ emailConsent: "subscribed", consentAt: barrier + CONSENT_CLOCK_SKEW_MS + 1 });
 });

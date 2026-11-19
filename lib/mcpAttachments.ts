@@ -21,7 +21,10 @@ export const MCP_ATTACHMENT_MAX_CONCURRENT_LOADS = 2;
  * its own (such as the outreach image upload) checks that limit itself.
  */
 export const MCP_REQUEST_BODY_MAX_BYTES = 36 * MIB;
-/** Time one MCP request body may take to arrive; long enough for the largest body on a slow uplink. */
+/**
+ * Time one MCP request body may take to arrive in full (a total deadline, not a stall timeout).
+ * The largest body needs about 2.5 Mbit/s sustained; slower uplinks fit smaller bodies only.
+ */
 export const MCP_REQUEST_BODY_TIMEOUT_MS = 120_000;
 export const MCP_ATTACHMENT_DEFAULT_TEXT_CHARS = 20_000;
 export const MCP_ATTACHMENT_MAX_TEXT_CHARS = 100_000;

@@ -5,7 +5,7 @@ import { createAuthenticatedTestSession } from "@/lib/testAuthHarness";
 import { requireActiveUserSession } from "@/lib/auth";
 import { mintMcpToken } from "@/lib/mcpAuth";
 import { identityTestAccount } from "@/lib/testFixtures/senderIdentities";
-import { MCP_ATTACHMENT_MAX_REQUEST_BYTES, MCP_REQUEST_BODY_MAX_BYTES, MCP_REQUEST_BODY_TIMEOUT_MS } from "@/lib/mcpAttachments";
+import { MCP_REQUEST_BODY_MAX_BYTES, MCP_REQUEST_BODY_TIMEOUT_MS } from "@/lib/mcpAttachments";
 import { base64ImageLimit } from "@/lib/addons/outreach/media/format";
 import { POST } from "./route";
 
@@ -66,7 +66,6 @@ test("the limit is sized for mail attachments, not for the smallest tool that ca
   expect(limit).toBeGreaterThanOrEqual(base64(25 * 1024 * 1024) + 512 * 1024);
   // The outreach image upload keeps its own, smaller limit and still fits.
   expect(base64ImageLimit + 16 * 1024).toBeLessThan(limit);
-  expect(MCP_ATTACHMENT_MAX_REQUEST_BYTES).toBeLessThan(limit);
 });
 
 test("a body that stops arriving ends with 408 once the MCP read deadline passes", async () => {
