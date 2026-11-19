@@ -13,6 +13,7 @@ export const OUTREACH_MCP_TOOL_SCOPES: Readonly<Record<string, McpScope>> = {
   upsert_contact: "drafts", save_contact_list: "drafts", subscribe_contact: "manage", unsubscribe_contact: "manage",
   // sending
   list_email_templates: "read", get_email_template: "read", save_email_template: "drafts",
+  list_email_images: "read", upload_email_image: "drafts",
   list_campaigns: "read", get_campaign: "read", get_campaign_report: "read", save_campaign: "drafts",
   schedule_campaign: "send", cancel_campaign: "send",
   list_sequences: "read", get_sequence: "read", save_sequence: "manage", set_sequence_status: "send"
