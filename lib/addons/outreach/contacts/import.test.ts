@@ -88,3 +88,44 @@ test("imports synthetic JSON:API files, previews without changes and preserves l
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("a later export with an explicit unsubscribe ends an imported subscription, with or without a timestamp", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "outreach-import-"));
+  const accountId = crypto.randomUUID();
+  const lists = join(dir, "lists.json");
+  const profiles = join(dir, "profiles.json");
+  const members = join(dir, "members");
+  const consent = Date.parse("2025-04-02T08:00:00Z");
+  const now = Date.parse("2025-04-10T08:00:00Z");
+  mkdirSync(members);
+  const write = (file: string, data: unknown[]) => Bun.write(file, JSON.stringify({ data }));
+  const profile = (id: string, email: string, marketing: object) => ({ id, attributes: { email, subscriptions: { email: { marketing } } } });
+  const subscribed = { consent: "SUBSCRIBED", consent_timestamp: new Date(consent).toISOString() };
+  try {
+    await write(lists, [{ id: "list-1", attributes: { name: "Synthetic Updates" } }]);
+    await write(join(members, "list-1.json"), ["profile-a", "profile-b", "profile-c"].map(id => ({ id })));
+    await write(profiles, [profile("profile-a", "no-time@example.test", subscribed), profile("profile-b", "same-time@example.test", subscribed),
+      profile("profile-c", "older@example.test", subscribed)]);
+    const options = { accountId, lists, profiles, members, write: true };
+    await importKlaviyoContacts(options, now);
+    const db = await getOutreachDb();
+    const list = (await listContactLists(accountId))[0];
+    const state = (email: string) => {
+      const contact = findContactByEmail(db, accountId, email)!;
+      return { emailConsent: contact.emailConsent, list: getMembership(db, accountId, contact.id, list.id)?.status };
+    };
+    expect(state("no-time@example.test")).toEqual({ emailConsent: "subscribed", list: "subscribed" });
+
+    await write(profiles, [profile("profile-a", "no-time@example.test", { consent: "UNSUBSCRIBED" }),
+      profile("profile-b", "same-time@example.test", { consent: "UNSUBSCRIBED", consent_timestamp: new Date(consent).toISOString() }),
+      // An unsubscribe that is provably older than the stored consent does not undo it.
+      profile("profile-c", "older@example.test", { consent: "UNSUBSCRIBED", consent_timestamp: new Date(consent - 1000).toISOString() })]);
+    await importKlaviyoContacts(options, now + 1000);
+    expect(state("no-time@example.test")).toEqual({ emailConsent: "unsubscribed", list: "unsubscribed" });
+    expect(findContactByEmail(db, accountId, "no-time@example.test")).toMatchObject({ consentAt: now + 1000, unsubscribedAt: now + 1000 });
+    expect(state("same-time@example.test")).toEqual({ emailConsent: "unsubscribed", list: "unsubscribed" });
+    expect(state("older@example.test")).toEqual({ emailConsent: "subscribed", list: "subscribed" });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

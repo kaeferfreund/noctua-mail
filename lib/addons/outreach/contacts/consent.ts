@@ -3,14 +3,16 @@ import { getOutreachDb } from "../db";
 import { onContactUnmailable, onListSubscribed } from "../sending";
 import type { ListMemberStatus, SubscriptionChange, SuppressionReason } from "../types";
 import { ContactError, emailSchema, parseContactInput } from "./input";
-import { findContact, findContactByEmail, getContactDetail, insertContact, requireContact, requireList, type ContactRow } from "./records";
+import { findContact, findContactByEmail, getContactDetail, insertContact, rememberErasedAddress, requireContact, requireList, type ContactRow } from "./records";
 
 type Member = { status: ListMemberStatus; subscribedAt: number | null; unsubscribedAt: number | null };
-type ConsentState = Pick<ContactRow, "emailConsent" | "consentAt" | "suppressedReason">;
+type ConsentState = Pick<ContactRow, "emailConsent" | "consentAt" | "suppressedReason" | "unsubscribedAt">;
 
 export function subscriptionDecision(contact: ConsentState, membership: Member | null, at: number, freshConsent: boolean) {
   if (contact.suppressedReason) return "contact_suppressed";
+  // The newest global unsubscribe counts for every list, also after a re-subscription to one of them.
   const unsubscribedAt = Math.max(
+    contact.unsubscribedAt ?? -1,
     contact.emailConsent === "unsubscribed" ? contact.consentAt ?? 0 : -1,
     membership?.unsubscribedAt ?? -1
   );
@@ -99,8 +101,9 @@ export function unsubscribeGlobally(db: Database, contact: ContactRow, at: numbe
     WHERE accountId = ? AND contactId = ? AND (status != 'unsubscribed' OR ? = 1)`).run(at, source, accountId, id,
     contact.emailConsent === "unsubscribed" ? 0 : 1);
   if (contact.emailConsent === "unsubscribed") return members.changes > 0;
-  db.query(`UPDATE contacts SET emailConsent = 'unsubscribed', consentAt = ?, consentSource = ?, updatedAt = max(updatedAt, ?)
-    WHERE accountId = ? AND id = ?`).run(at, source, at, accountId, id);
+  db.query(`UPDATE contacts SET emailConsent = 'unsubscribed', consentAt = ?, consentSource = ?,
+      unsubscribedAt = max(coalesce(unsubscribedAt, 0), ?), updatedAt = max(updatedAt, ?)
+    WHERE accountId = ? AND id = ?`).run(at, source, at, at, accountId, id);
   return true;
 }
 
@@ -144,10 +147,10 @@ export async function changeManualSuppression(accountId: string, contactId: stri
   return getContactDetail(accountId, contactId);
 }
 
-export async function eraseContact(accountId: string, contactId: string): Promise<void> {
+export async function eraseContact(accountId: string, contactId: string, now = Date.now()): Promise<void> {
   const db = await getOutreachDb();
   db.transaction(() => {
-    requireContact(db, accountId, contactId);
+    rememberErasedAddress(db, requireContact(db, accountId, contactId), now);
     const related = `WHERE accountId = ?1 AND (contactId = ?2 OR sendId IN (
       SELECT id FROM sends WHERE accountId = ?1 AND contactId = ?2
     ))`;

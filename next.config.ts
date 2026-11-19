@@ -22,8 +22,12 @@ const RESET_PASSWORD_ANY_SPELLING = new RegExp([..."reset-password"]
   .map((char) => `(?:${char}|${[...new Set([char.toLowerCase(), char.toUpperCase()])].map(percentEncoded).join("|")})`)
   .join(""), "i");
 
+// Outreach addon: /t/o, /t/c and /t/u carry a recipient's token in the path (the unsubscribe
+// token authorizes an unsubscribe), so no /t/ request is written to the request log.
+const OUTREACH_TOKEN_PATH = /^(?:[a-z][a-z0-9+.-]*:\/\/[^/]*)?\/+(?:t|%74|%54)(?:\/|$|\?)/i;
+
 const nextConfig: NextConfig = {
-  logging: { incomingRequests: { ignore: [RESET_PASSWORD_ANY_SPELLING] } },
+  logging: { incomingRequests: { ignore: [RESET_PASSWORD_ANY_SPELLING, OUTREACH_TOKEN_PATH] } },
   async headers() {
     return [{ source: "/reset-password", headers: [
       {key:"Cache-Control",value:"no-store"},{key:"Referrer-Policy",value:"no-referrer"}

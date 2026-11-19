@@ -112,7 +112,10 @@ function importProfile(db: Database, accountId: string, item: unknown, now: numb
   // Existing unsubscribes win ties and take precedence over a timestamp-free export.
   const canSubscribe = (row.emailConsent === "never" || newerConsent) && consent === "subscribed"
     && subscriptionDecision(row, null, consentAt ?? now, consentAt !== null) === "subscribe";
-  const canUnsubscribe = consent === "unsubscribed" && (row.emailConsent === "never" || newerConsent);
+  // An explicit unsubscribe applies unless the stored consent is provably later; without a
+  // timestamp the import time is recorded.
+  const canUnsubscribe = consent === "unsubscribed" && row.emailConsent !== "unsubscribed"
+    && (consentAt === null || row.consentAt === null || consentAt >= row.consentAt);
   if (canUnsubscribe) unsubscribeGlobally(db, row, consentAt ?? now, "klaviyo");
   if (row.externalId !== id || canSubscribe || canUnsubscribe || applySuppression) {
     row = db.query(`UPDATE contacts SET externalId = ?,
@@ -184,7 +187,7 @@ function dryRunDatabase(accountId: string) {
   const source = new Database(file, { readonly: true });
   try {
     source.transaction(() => {
-      for (const table of ["contacts", "lists", "list_members", "sends"] as const) {
+      for (const table of ["contacts", "lists", "list_members", "erased_addresses", "sends"] as const) {
         // Sends are only used to reject unsafe address changes. Copy their keys, not message data.
         if (table === "sends") {
           const insert = preview.query("INSERT INTO sends (id, accountId, contactId, kind, status, queuedAt) VALUES (?, ?, ?, 'mail', 'sent', 0)");

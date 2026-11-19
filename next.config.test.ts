@@ -80,4 +80,20 @@ describe("next.config request logging", () => {
       expect({ url, ignored: ignored(url) }).toEqual({ url, ignored: false });
     }
   });
+
+  test("keeps the outreach token paths out of the incoming request log", async () => {
+    const config = (await import("./next.config")).default;
+    const logging = config.logging as { incomingRequests: { ignore: RegExp[] } };
+    const ignored = (url: string) => logging.incomingRequests.ignore.some((pattern) => pattern.test(url));
+
+    for (const url of [
+      "/t/u/synthetic-token", "/t/o/synthetic-token.gif", "/t/c/synthetic-token?x=1", "/t/ses-events",
+      "//t/u/synthetic-token", "/%74/u/synthetic-token", "/%54/u/synthetic-token", "/T/u/synthetic-token",
+      "https://links.example.test/t/u/synthetic-token"
+    ]) expect({ url, ignored: ignored(url) }).toEqual({ url, ignored: true });
+
+    for (const url of ["/", "/topics", "/api/accounts/t/messages", "/api/t/u/x", "/calendar?t=/t/u/x"]) {
+      expect({ url, ignored: ignored(url) }).toEqual({ url, ignored: false });
+    }
+  });
 });

@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import "@/lib/testDbHarness";
 import { getOutreachDb } from "../db";
 import type { EmailConsent, ListMemberStatus, SuppressionReason } from "../types";
-import { changeContactSubscription, changeManualSuppression, eraseContact, getMembership, subscriptionDecision } from "./consent";
+import { changeContactSubscription, changeManualSuppression, eraseContact, getMembership, subscriptionDecision, unsubscribeGlobally } from "./consent";
 import { getSendableRecipient, listSendableRecipients, suppressContact } from "./index";
 import { archiveContactList, createContactList, findContact, getContactDetail, patchContact, searchContacts, upsertContact } from "./records";
 
@@ -22,7 +22,58 @@ test.each<ConsentCase>([
   ["subscribed", 20, null, "unsubscribed", 30, 40, true, "subscribe"]
 ])("consent policy %#", (emailConsent, consentAt, suppressedReason, status, unsubscribedAt, at, fresh, decision) => {
   const membership = status ? { status, subscribedAt: null, unsubscribedAt } : null;
-  expect(subscriptionDecision({ emailConsent, consentAt, suppressedReason }, membership, at, fresh)).toBe(decision);
+  expect(subscriptionDecision({ emailConsent, consentAt, suppressedReason, unsubscribedAt: null }, membership, at, fresh)).toBe(decision);
+});
+
+test("a global unsubscribe keeps blocking older consents after a re-subscription to another list", async () => {
+  const accountId = crypto.randomUUID();
+  const listA = await createContactList(accountId, { name: "List A" });
+  const listB = await createContactList(accountId, { name: "List B" });
+  const { contact } = await upsertContact(accountId, { email: "returning@example.test" });
+  await changeContactSubscription(accountId, contact.id, { action: "subscribe", listId: listA.id }, 100);
+  const db = await getOutreachDb();
+  db.transaction(() => unsubscribeGlobally(db, findContact(db, accountId, contact.id)!, 200)).immediate();
+  await changeContactSubscription(accountId, contact.id, { action: "subscribe", listId: listA.id }, 300);
+  const row = findContact(db, accountId, contact.id)!;
+  expect(row).toMatchObject({ emailConsent: "subscribed", consentAt: 300, unsubscribedAt: 200 });
+  // A consent for list B that predates the unsubscribe arrives late: it must not apply.
+  expect(subscriptionDecision(row, getMembership(db, accountId, contact.id, listB.id), 150, true)).toBe("new_consent_required");
+  expect(subscriptionDecision(row, getMembership(db, accountId, contact.id, listB.id), 200, true)).toBe("new_consent_required");
+  expect(subscriptionDecision(row, getMembership(db, accountId, contact.id, listB.id), 250, true)).toBe("subscribe");
+  expect(await getSendableRecipient(accountId, contact.id, { listId: listB.id })).toBeNull();
+});
+
+test("erasing a contact keeps its suppression and unsubscribe for the address, as a hash only", async () => {
+  const accountId = crypto.randomUUID();
+  const list = await createContactList(accountId, { name: "Erase list" });
+  const db = await getOutreachDb();
+
+  const blocked = (await upsertContact(accountId, { email: "Complaint@example.test" })).contact;
+  await suppressContact(accountId, { contactId: blocked.id, reason: "complaint", at: 500 });
+  await eraseContact(accountId, blocked.id, 600);
+  const kept = db.query("SELECT * FROM erased_addresses WHERE accountId = ?").all(accountId) as Array<Record<string, unknown>>;
+  expect(kept).toHaveLength(1);
+  expect(JSON.stringify(kept)).not.toContain("example.test");
+  const again = (await upsertContact(accountId, { email: "complaint@example.test" })).contact;
+  expect(again).toMatchObject({ suppressedReason: "complaint", suppressedAt: 500 });
+  await expect(changeContactSubscription(accountId, again.id, { action: "subscribe", listId: list.id }, 700)).rejects.toMatchObject({ code: "contact_suppressed" });
+  expect(db.query("SELECT count(*) AS n FROM erased_addresses WHERE accountId = ?").get(accountId)).toEqual({ n: 0 });
+
+  const leaver = (await upsertContact(accountId, { email: "leaver@example.test" })).contact;
+  await changeContactSubscription(accountId, leaver.id, { action: "subscribe", listId: list.id }, 100);
+  db.transaction(() => unsubscribeGlobally(db, findContact(db, accountId, leaver.id)!, 200)).immediate();
+  await eraseContact(accountId, leaver.id, 300);
+  const returned = (await upsertContact(accountId, { email: "leaver@example.test" })).contact;
+  const row = findContact(db, accountId, returned.id)!;
+  expect(row).toMatchObject({ emailConsent: "never", unsubscribedAt: 200 });
+  expect(subscriptionDecision(row, null, 150, true)).toBe("new_consent_required");
+  expect(subscriptionDecision(row, null, 250, true)).toBe("subscribe");
+
+  // Nothing to remember for a contact that never unsubscribed and was never suppressed.
+  const plain = (await upsertContact(accountId, { email: "plain@example.test" })).contact;
+  await eraseContact(accountId, plain.id, 400);
+  expect(db.query("SELECT count(*) AS n FROM erased_addresses WHERE accountId = ?").get(accountId)).toEqual({ n: 0 });
+  expect(db.query("SELECT count(*) AS n FROM erased_addresses WHERE accountId = ?").get("foreign")).toEqual({ n: 0 });
 });
 
 test("campaign selection deduplicates members, honors exclusions, and rechecks consent and list status", async () => {

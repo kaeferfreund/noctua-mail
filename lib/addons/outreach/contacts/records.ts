@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { createHash } from "crypto";
 import { getOutreachDb } from "../db";
 import { newOutreachId } from "../ids";
 import { getSendStats, listSendSummaries } from "../tracking";
@@ -6,12 +7,16 @@ import type { Contact, ContactDetail, ContactInput, ContactList, ContactListInpu
 import { ContactError, type contactFilters } from "./input";
 import type { z } from "zod";
 
-export type ContactRow = Omit<Contact, "properties"> & { emailLower: string; properties: string; externalId: string | null };
+export type ContactRow = Omit<Contact, "properties"> & {
+  emailLower: string; properties: string; externalId: string | null;
+  /** Newest global unsubscribe; survives a later re-subscription (see `subscriptionDecision`). */
+  unsubscribedAt: number | null;
+};
 export type ListRow = Omit<ContactList, "memberCount"> & { externalId: string | null };
 export type ContactFilters = z.output<typeof contactFilters>;
 
-export function contactFromRow({ emailLower, externalId, properties, ...contact }: ContactRow): Contact {
-  void emailLower; void externalId;
+export function contactFromRow({ emailLower, externalId, unsubscribedAt, properties, ...contact }: ContactRow): Contact {
+  void emailLower; void externalId; void unsubscribedAt;
   return { ...contact, properties: JSON.parse(properties) };
 }
 
@@ -37,13 +42,42 @@ export function requireList(db: Database, accountId: string, listId: string): Li
   return row;
 }
 
+const emailHash = (emailLower: string) => createHash("sha256").update(emailLower).digest("hex");
+
+/**
+ * Erasing a contact must not erase the reason it may never be mailed. A suppression and the
+ * newest unsubscribe (global or of any list) stay behind as a hash of the address.
+ */
+export function rememberErasedAddress(db: Database, row: ContactRow, now: number) {
+  const listUnsubscribedAt = (db.query("SELECT max(unsubscribedAt) AS at FROM list_members WHERE accountId = ? AND contactId = ?")
+    .get(row.accountId, row.id) as { at: number | null }).at;
+  const times = [row.unsubscribedAt, row.emailConsent === "unsubscribed" ? row.consentAt ?? now : null, listUnsubscribedAt]
+    .filter((value): value is number => value !== null);
+  if (!row.suppressedReason && !times.length) return;
+  db.query(`INSERT INTO erased_addresses (accountId, emailHash, suppressedReason, suppressedAt, unsubscribedAt, erasedAt)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(accountId, emailHash) DO UPDATE SET suppressedReason = excluded.suppressedReason,
+      suppressedAt = excluded.suppressedAt, unsubscribedAt = excluded.unsubscribedAt, erasedAt = excluded.erasedAt`)
+    .run(row.accountId, emailHash(row.emailLower), row.suppressedReason, row.suppressedAt, times.length ? Math.max(...times) : null, now);
+}
+
+/** A contact that takes an address takes over what was remembered for it. */
+function restoreErasedAddress(db: Database, row: ContactRow): ContactRow {
+  const kept = db.query(`DELETE FROM erased_addresses WHERE accountId = ? AND emailHash = ?
+    RETURNING suppressedReason, suppressedAt, unsubscribedAt`).get(row.accountId, emailHash(row.emailLower)) as
+    Pick<ContactRow, "suppressedReason" | "suppressedAt" | "unsubscribedAt"> | null;
+  if (!kept) return row;
+  return db.query(`UPDATE contacts SET suppressedReason = ?, suppressedAt = ?, unsubscribedAt = ? WHERE accountId = ? AND id = ? RETURNING *`)
+    .get(kept.suppressedReason, kept.suppressedAt, kept.unsubscribedAt, row.accountId, row.id) as ContactRow;
+}
+
 export function insertContact(db: Database, accountId: string, input: ContactInput, source: string, now: number): ContactRow {
   const email = input.email.toLowerCase();
-  return db.query(
+  return restoreErasedAddress(db, db.query(
     `INSERT INTO contacts (id, accountId, email, emailLower, firstName, lastName, properties, source, createdAt, updatedAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
   ).get(newOutreachId("con"), accountId, email, email, input.firstName ?? "", input.lastName ?? "",
-    JSON.stringify(input.properties ?? {}), source, now, now) as ContactRow;
+    JSON.stringify(input.properties ?? {}), source, now, now) as ContactRow);
 }
 
 export function updateContactFields(db: Database, row: ContactRow, input: Partial<ContactInput>, now: number): ContactRow {
@@ -52,10 +86,12 @@ export function updateContactFields(db: Database, row: ContactRow, input: Partia
   const lastName = input.lastName ?? row.lastName;
   const properties = input.properties === undefined ? row.properties : JSON.stringify(input.properties);
   if (email === row.email && firstName === row.firstName && lastName === row.lastName && properties === row.properties) return row;
-  return db.query(
+  const updated = db.query(
     `UPDATE contacts SET email = ?, emailLower = ?, firstName = ?, lastName = ?, properties = ?, updatedAt = ?
      WHERE accountId = ? AND id = ? RETURNING *`
   ).get(email, email.toLowerCase(), firstName, lastName, properties, now, row.accountId, row.id) as ContactRow;
+  // Only a contact without consent or history can change its address; the new address may be a remembered one.
+  return updated.emailLower === row.emailLower ? updated : restoreErasedAddress(db, updated);
 }
 
 export async function upsertContact(accountId: string, input: ContactInput, now = Date.now()) {
