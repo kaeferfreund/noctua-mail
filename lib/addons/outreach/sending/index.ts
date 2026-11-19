@@ -1,24 +1,18 @@
-/**
- * Sending area (owner: sending task): templates, campaigns, sequences, transport, scheduler.
- * Public surface used by the other areas and by the core seams.
- * The signatures are the contract; the bodies below are placeholders of the base branch.
- */
+import { outreachAddonEnabled } from "../config";
+import { getOutreachDb } from "../db";
+import { cancelContact, enroll } from "./queue";
 
-/** SES is usable: region and credentials are present in the environment (never stored in the database). */
-export function isSesConfigured(env: Record<string, string | undefined> = process.env): boolean {
-  void env;
-  return false;
-}
+export { isSesConfigured } from "./send";
+export { startOutreachScheduler } from "./scheduler";
 
-/** A contact was subscribed to a list: enroll it once in every `live` sequence triggered by that list. */
+/** Enroll new subscriptions once in each live sequence for their list. */
 export async function onListSubscribed(accountId: string, event: { listId: string; contactId: string; at: number }): Promise<void> {
-  void accountId; void event;
+  if (!outreachAddonEnabled()) return;
+  enroll(await getOutreachDb(), accountId, event);
 }
 
-/** A contact unsubscribed, was suppressed or erased: cancel its active enrollments and queued sends. */
+/** Cancel active enrollments and queued sends after loss of consent or suppression. */
 export async function onContactUnmailable(accountId: string, contactId: string): Promise<void> {
-  void accountId; void contactId;
+  if (!outreachAddonEnabled()) return;
+  cancelContact(await getOutreachDb(), accountId, contactId, Date.now());
 }
-
-/** Started once per server process from instrumentation.ts, only when the addon flag is on. */
-export function startOutreachScheduler(): void {}
