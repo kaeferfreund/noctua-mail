@@ -8,7 +8,10 @@ import { createRateLimiter, getRequestIp } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 
-const limiter = createRateLimiter({ max: 120 });
+// Viewing and submitting have budgets of their own. One-click unsubscribes (RFC 8058) arrive from a
+// mail provider's shared addresses, so the submit budget covers a whole campaign's recipients at once.
+const viewLimiter = createRateLimiter({ max: 120 });
+const submitLimiter = createRateLimiter({ max: 2_000 });
 // The page loads nothing: its one static style block is allowed by hash, everything else is denied.
 const style = `:root{color-scheme:light dark}
 body{margin:0;padding:24px 16px;font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f4f4f5;color:#18181b}
@@ -42,22 +45,24 @@ function pickLanguage(header: string | null): "de" | "en" {
 
 const copy = {
   de: { heading: "Newsletter abbestellen", description: "Mit diesem Formular können Sie den Newsletter abbestellen.",
-    button: "Abbestellen", done: "Wenn der Link gültig ist, wurde die Adresse vom Newsletter abgemeldet." },
+    button: "Abbestellen", done: "Wenn der Link gültig ist, wurde die Adresse vom Newsletter abgemeldet.",
+    busy: "Die Abmeldung ist gerade nicht möglich. Bitte versuchen Sie es in einer Minute erneut." },
   en: { heading: "Unsubscribe from the newsletter", description: "Use this form to unsubscribe from the newsletter.",
-    button: "Unsubscribe", done: "If this link is valid, the address has been unsubscribed from the newsletter." }
+    button: "Unsubscribe", done: "If this link is valid, the address has been unsubscribed from the newsletter.",
+    busy: "Unsubscribing is not possible right now. Please try again in a minute." }
 };
 
 function page(request: Request, organization: string, submitted: boolean, status = 200) {
   const language = pickLanguage(request.headers.get("accept-language"));
-  const { heading, description, button, done } = copy[language];
-  const form = `<p>${description}</p><form method="post">
+  const { heading, description, button, done, busy } = copy[language];
+  const form = `${status === 429 ? `<p>${busy}</p>` : `<p>${description}</p>`}<form method="post">
   <button name="List-Unsubscribe" value="One-Click" type="submit">${button}</button>
   </form>`;
   return new Response(`<!doctype html><html lang="${language}"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>${heading}</title><style>${style}</style>
 <main><h1>${heading}</h1>${organization ? `<p class="org">${escapeUTF8(organization)}</p>` : ""}
 ${submitted ? `<p>${done}</p>` : form}</main></html>`,
-  { status, headers: { ...headers, "Content-Language": language } });
+  { status, headers: { ...headers, "Content-Language": language, ...(status === 429 ? { "Retry-After": "60" } : {}) } });
 }
 
 async function validForm(request: Request) {
@@ -79,14 +84,15 @@ async function validForm(request: Request) {
 
 export async function GET(request: Request, { params }: RouteParams) {
   if (!outreachAddonEnabled()) return new Response(null, { status: 404, headers });
-  if (limiter.isLimited(getRequestIp(request))) return new Response(null, { status: 429, headers });
+  if (viewLimiter.isLimited(getRequestIp(request))) return new Response(null, { status: 429, headers });
   return page(request, await getUnsubscribeOrganization((await params).token), false);
 }
 
 export async function POST(request: Request, { params }: RouteParams) {
   if (!outreachAddonEnabled()) return new Response(null, { status: 404, headers });
   const ip = getRequestIp(request);
-  if (limiter.isLimited(ip)) return new Response(null, { status: 429, headers });
+  // A refused submit says so and keeps the form; it never shows the confirmation.
+  if (submitLimiter.isLimited(ip)) return page(request, "", false, 429);
   if (!(await validForm(request))) return page(request, "", false, 400);
   await unsubscribeByToken((await params).token, {
     ip: isIP(ip) ? ip : null,
