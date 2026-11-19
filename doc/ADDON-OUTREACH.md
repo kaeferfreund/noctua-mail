@@ -74,9 +74,25 @@ opens, clicks, unsubscribes, deliveries, bounces and complaints.
 | `POST /t/u/{token}` | unsubscribe (form and RFC 8058 one-click) |
 | `POST /t/ses-events` | Amazon SNS notifications for SES (signature and topic verified) |
 
-Rate limited per client address (`TRUSTED_PROXY_HOPS` as in the rest of the app). An event
-is `machine` when it comes from Apple Mail Privacy Protection, an image proxy, a link scanner
-or arrives within seconds of delivery; machine events are stored but not counted as opens.
+Open and click events share a per-client budget of 120 requests per minute. The routes use
+`TRUSTED_PROXY_HOPS` to resolve the client address. When the budget runs out, the GIF and
+stored redirects still work.
+
+Open and click events from HEAD requests, Apple Mail Privacy Protection user-agent signatures
+(including a bare `Mozilla/5.0`), known security gateways and crawlers, or the first five seconds
+after SMTP acceptance are marked `machine`. The client and operating system come from user-agent
+patterns. Gmail and Yahoo image-proxy GET opens count as human opens, including in the first
+five seconds. Their IP and location belong to the proxy. These rules are estimates based on
+request metadata. Counts of human opens and clicks exclude machine events.
+
+Repeated opens within 60 seconds for the same send, IP and user agent collapse into one event
+per classification (human or machine). With immediate IP truncation, a short-lived,
+in-memory digest distinguishes clients on the same network. The IP is retained only at
+/24 (IPv4) or /48 (IPv6) after the mailbox retention window. Location comes from the optional
+local database.
+
+For open and click event pages, pass the returned `nextBefore` unchanged as `before`. The
+cursor is the last event's ID and distinguishes events with the same timestamp.
 
 ## REST
 
