@@ -183,7 +183,8 @@ export function assertClaim(db: Database, row: QueueRow, settings: OutreachAccou
       || now - saved.claimedAt >= leaseMaxMs) throw new SendStopped("interrupted");
   const live = rows<{ enabled: number; updatedAt: number }>(db, "SELECT enabled, updatedAt FROM account_settings WHERE accountId = ?")
     .get(row.accountId);
-  if (!live?.enabled) throw new SendStopped("cancelled");
+  // Disabling the addon for the mailbox is configuration: the row waits instead of being spent.
+  if (!live?.enabled) throw new SendStopped("configuration_changed");
   if (live.updatedAt !== settings.updatedAt) throw new SendStopped("configuration_changed");
 
   if (row.kind === "campaign") {

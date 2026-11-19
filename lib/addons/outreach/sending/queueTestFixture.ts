@@ -11,6 +11,8 @@ export const fixtureAccountId = "account";
 export const fixtureListId = "list";
 export const fixtureStart = 1_000_000;
 const actor = "editor";
+/** List ids are unique across mailboxes. */
+const listFor = (accountId: string) => accountId === fixtureAccountId ? fixtureListId : `${fixtureListId}-${accountId}`;
 
 export type FixtureSend = {
   id: string; accountId: string; kind: string; campaignId: string | null; sequenceId: string | null; sequenceStepId: string | null;
@@ -26,7 +28,7 @@ export function createQueueFixture(db: Database, options: { accountIds?: string[
   for (const accountId of accountIds) {
     db.query(`INSERT INTO account_settings (accountId, enabled, sendRatePerMinute, organizationName, updatedAt)
       VALUES (?, 1, ?, 'Verein', 0)`).run(accountId, sendRatePerMinute);
-    db.query("INSERT INTO lists (accountId, id, name, createdAt, updatedAt) VALUES (?, ?, 'Liste', 0, 0)").run(accountId, fixtureListId);
+    db.query("INSERT INTO lists (accountId, id, name, createdAt, updatedAt) VALUES (?, ?, 'Liste', 0, 0)").run(accountId, listFor(accountId));
   }
   let now = fixtureStart;
   const recipients = new Map<string, SendableRecipient[]>();
@@ -35,17 +37,17 @@ export function createQueueFixture(db: Database, options: { accountIds?: string[
     const email = `${contactId}@example.test`;
     db.query(`INSERT INTO contacts (accountId, id, email, emailLower, firstName, emailConsent, createdAt, updatedAt)
       VALUES (?, ?, ?, ?, ?, 'subscribed', 0, 0)`).run(accountId, contactId, email, email, firstName);
-    db.query("INSERT INTO list_members (accountId, listId, contactId, status) VALUES (?, ?, ?, 'subscribed')").run(accountId, fixtureListId, contactId);
+    db.query("INSERT INTO list_members (accountId, listId, contactId, status) VALUES (?, ?, ?, 'subscribed')").run(accountId, listFor(accountId), contactId);
     recipients.set(accountId, [...recipients.get(accountId) ?? [], { contactId, email, firstName, lastName: "", properties: {} }]);
   }
   function campaign(accountId = fixtureAccountId, subject = "Betreff") {
-    const draft = saveCampaign(db, accountId, actor, { name: "Kampagne", subject, html: "<p>Mail</p>", listIds: [fixtureListId] });
+    const draft = saveCampaign(db, accountId, actor, { name: "Kampagne", subject, html: "<p>Mail</p>", listIds: [listFor(accountId)] });
     db.query("UPDATE campaigns SET status = 'scheduled', sendAt = ?, scheduledByUserId = ? WHERE accountId = ? AND id = ?")
       .run(now, actor, accountId, draft.id);
     return draft;
   }
   function sequence(steps: SequenceStepInput[], accountId = fixtureAccountId) {
-    const draft = saveSequence(db, accountId, { name: "Sequenz", triggerListId: fixtureListId, steps });
+    const draft = saveSequence(db, accountId, { name: "Sequenz", triggerListId: listFor(accountId), steps });
     db.query("UPDATE sequences SET status = 'live', statusChangedByUserId = ? WHERE accountId = ? AND id = ?").run(actor, accountId, draft.id);
     return draft;
   }
