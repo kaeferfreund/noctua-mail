@@ -24,14 +24,15 @@ function nextStep(db: Database, accountId: string, sequenceId: string, contactId
   return rows<NextStep>(db, `SELECT p.id, p.position, p.delayMinutes, p.subject FROM sequence_steps p
     WHERE p.accountId = ? AND p.sequenceId = ? AND p.position >= ? AND p.enabled = 1
       AND NOT EXISTS (SELECT 1 FROM sends s WHERE s.accountId = p.accountId AND s.sequenceStepId = p.id
-        AND s.contactId = ? AND s.kind = 'sequence' AND NOT (s.status = 'skipped' AND s.error = 'step_changed'))
+        AND s.contactId = ? AND s.kind = 'sequence' AND s.source = 'native'
+        AND NOT (s.status = 'skipped' AND s.error = 'step_changed'))
     ORDER BY p.position LIMIT 1`).get(accountId, sequenceId, position, contactId);
 }
 
 /** Time the next step's delay counts from: the last attempt that reached the transport, else the enrollment. */
 function sequenceBasis(db: Database, enrollment: Pick<Enrollment, "accountId" | "sequenceId" | "contactId" | "enrolledAt">) {
   const prior = rows<{ at: number }>(db, `SELECT COALESCE(sentAt, claimedAt) AS at FROM sends
-    WHERE accountId = ? AND sequenceId = ? AND contactId = ? AND kind = 'sequence'
+    WHERE accountId = ? AND sequenceId = ? AND contactId = ? AND kind = 'sequence' AND source = 'native'
       AND status IN ('sent','failed') AND COALESCE(sentAt, claimedAt) IS NOT NULL
     ORDER BY at DESC LIMIT 1`).get(enrollment.accountId, enrollment.sequenceId, enrollment.contactId);
   return prior?.at ?? enrollment.enrolledAt;
@@ -164,7 +165,7 @@ export function expandSequences(db: Database, accountId: string, now: number) {
       if (!step || dueAt > now) continue;
       db.query(`INSERT INTO sends (id, accountId, kind, sequenceId, sequenceStepId, contactId, subject, status, trackOpens, trackClicks, userId, sendAt, queuedAt)
         VALUES (?, ?, 'sequence', ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?)
-        ON CONFLICT (sequenceStepId, contactId) WHERE sequenceStepId IS NOT NULL AND kind = 'sequence' DO UPDATE SET
+        ON CONFLICT (sequenceStepId, contactId, source) WHERE sequenceStepId IS NOT NULL AND kind = 'sequence' DO UPDATE SET
           status = 'queued', error = NULL, attempts = 0, claimOwner = NULL, subject = excluded.subject, trackOpens = excluded.trackOpens,
           trackClicks = excluded.trackClicks, userId = excluded.userId, sendAt = excluded.sendAt, queuedAt = excluded.queuedAt
         WHERE sends.accountId = excluded.accountId AND sends.status = 'skipped' AND sends.error = 'step_changed'`).run(newOutreachId("snd"), accountId, enrollment.sequenceId, step.id, enrollment.contactId,

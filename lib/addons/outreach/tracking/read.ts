@@ -143,10 +143,14 @@ export async function listSendSummaries(accountId: string, filter: SendFilter, p
 export async function listLinkStats(accountId: string, filter: SendFilter): Promise<Array<{ url: string; clicks: number; uniqueClicks: number }>> {
   const { where, args } = sendFilter(accountId, filter);
   const db = await getOutreachDb();
-  return db.prepare(`WITH targets AS (
+  return db.prepare(`WITH selected AS (
+    SELECT s.id, s.accountId, s.source FROM sends s WHERE ${where.join(" AND ")}
+  ), targets AS (
     SELECT DISTINCT l.accountId, l.sendId, l.url
-    FROM sends s JOIN tracking_links l ON l.accountId = s.accountId AND l.sendId = s.id AND l.kind = 'click' AND l.url IS NOT NULL
-    WHERE ${where.join(" AND ")}
+    FROM selected s JOIN tracking_links l ON l.accountId = s.accountId AND l.sendId = s.id AND l.kind = 'click' AND l.url IS NOT NULL
+    UNION
+    SELECT e.accountId, e.sendId, e.url FROM selected s JOIN tracking_events e ON ${eventForSend}
+    WHERE s.source = 'klaviyo' AND e.type = 'click' AND e.url IS NOT NULL
   )
   SELECT l.url, COUNT(e.id) AS clicks, COUNT(DISTINCT e.sendId) AS uniqueClicks
   FROM targets l LEFT JOIN tracking_events e ON e.accountId = l.accountId AND e.sendId = l.sendId

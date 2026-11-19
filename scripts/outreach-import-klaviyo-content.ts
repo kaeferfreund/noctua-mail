@@ -29,7 +29,7 @@ const flowExport = z.object({
   })
 });
 const sendEmail = z.object({
-  message: z.object({ name: z.string().nullish(), subject_line: z.string(), preview_text: z.string().nullish(), template_id: itemId,
+  message: z.object({ id: itemId.optional(), name: z.string().nullish(), subject_line: z.string(), preview_text: z.string().nullish(), template_id: itemId,
     additional_filters: z.unknown().optional() })
 });
 const timeDelay = z.object({ value: z.number().nonnegative(), unit: z.string(),
@@ -43,7 +43,7 @@ const configured = (value: unknown): boolean => Array.isArray(value) ? value.som
   : value !== null && typeof value === "object" ? Object.values(value).some(configured)
   : value !== null && value !== undefined && value !== "";
 
-function parseFlow(input: unknown) {
+export function parseFlow(input: unknown) {
   const { data } = validated(flowExport, input);
   const definition = data.attributes.definition ?? data.definition;
   if (!definition) throw new ImportError("Flow export is missing its definition.");
@@ -52,7 +52,7 @@ function parseFlow(input: unknown) {
   const actions = new Map(definition.actions.map(action => [action.id, action]));
   if (actions.size !== definition.actions.length) throw new ImportError("Flow has duplicate action ids.");
   const visited = new Set<string>();
-  const steps: Array<{ templateExternalId: string; fields: SequenceStepInput }> = [];
+  const steps: Array<{ actionId: string; templateExternalId: string; messageId?: string; fields: SequenceStepInput }> = [];
   let pendingDelay = 0;
   for (let id: string | null | undefined = definition.entry_action_id; id;) {
     const next = actions.get(id);
@@ -70,7 +70,7 @@ function parseFlow(input: unknown) {
       if (!Number.isSafeInteger(pendingDelay)) throw new ImportError("Flow delay must resolve to whole minutes.");
       const { message } = validated(sendEmail, next.data);
       if (configured(message.additional_filters)) throw new ImportError("Flow email has additional filters, which sequences do not support.");
-      steps.push({ templateExternalId: message.template_id,
+      steps.push({ actionId: next.id, templateExternalId: message.template_id, messageId: message.id,
         fields: { name: message.name ?? "", subject: message.subject_line, previewText: message.preview_text ?? "", delayMinutes: pendingDelay } });
       pendingDelay = 0;
     } else {
@@ -83,7 +83,7 @@ function parseFlow(input: unknown) {
 }
 
 /** v1 has no sequences.externalId. Derive a stable, account-scoped sequence id from the flow id. */
-function sequenceId(accountId: string, externalId: string) {
+export function sequenceId(accountId: string, externalId: string) {
   return `seq_klaviyo_${createHash("sha256").update(JSON.stringify([accountId, externalId])).digest("hex")}`;
 }
 

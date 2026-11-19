@@ -3,9 +3,10 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { initOutreachSchema } from "../db";
+import { initOutreachSchema, OUTREACH_SCHEMA_VERSION } from "../db";
 import { renderContent, sampleContact } from "../sending/render";
 import { OUTREACH_IMAGE_MAX_BYTES } from "../types";
+import { removeHistorySchema } from "../testFixtures/legacySchema";
 import { decodeImageBase64, listOutreachImages, prepareImage, saveOutreachImage } from "./index";
 
 let db: Database;
@@ -35,12 +36,15 @@ test("storage deduplicates concurrent uploads across mailboxes and retains the f
   }
 });
 
-test("v4 upgrades add only image storage, preserving existing template data", () => {
+test("v4 upgrades add image storage and preserve existing template and send data", () => {
+  removeHistorySchema(db);
   db.exec("DROP TABLE images; PRAGMA user_version = 4");
   db.query("INSERT INTO templates (id, accountId, name, createdAt, updatedAt) VALUES ('template', 'a', 'Test', 1, 1)").run();
+  db.query("INSERT INTO sends (id, accountId, kind, status, queuedAt) VALUES ('send', 'a', 'mail', 'sent', 1)").run();
   initOutreachSchema(db);
-  expect(db.query("PRAGMA user_version").get()).toEqual({ user_version: 5 });
+  expect(db.query("PRAGMA user_version").get()).toEqual({ user_version: OUTREACH_SCHEMA_VERSION });
   expect(db.query("SELECT name FROM templates WHERE accountId = 'a'").get()).toEqual({ name: "Test" });
+  expect(db.query("SELECT id, status, source FROM sends WHERE accountId = 'a'").get()).toEqual({ id: "send", status: "sent", source: "native" });
   expect(listOutreachImages(db, "a")).toEqual([]);
 });
 
