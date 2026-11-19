@@ -1,14 +1,16 @@
-import { beforeAll, expect, test } from "bun:test";
+import { beforeAll, expect, jest, test } from "bun:test";
 import { ErrorCode } from "@modelcontextprotocol/sdk/types.js";
 import { dbModulePromise } from "@/lib/testDbHarness";
 import { createAuthenticatedTestSession } from "@/lib/testAuthHarness";
 import { requireActiveUserSession } from "@/lib/auth";
 import { mintMcpToken } from "@/lib/mcpAuth";
 import { identityTestAccount } from "@/lib/testFixtures/senderIdentities";
+import { MCP_ATTACHMENT_MAX_REQUEST_BYTES, MCP_REQUEST_BODY_MAX_BYTES, MCP_REQUEST_BODY_TIMEOUT_MS } from "@/lib/mcpAttachments";
+import { base64ImageLimit } from "@/lib/addons/outreach/media/format";
 import { POST } from "./route";
 
 const origin = "http://localhost:3000";
-const limit = 7_006_892;
+const limit = MCP_REQUEST_BODY_MAX_BYTES;
 let token: string;
 
 beforeAll(async () => {
@@ -56,4 +58,41 @@ test("the same limit accepts one complete request and caps a batch as a whole", 
   expect(response.status).toBe(200);
   expect(await response.json()).toEqual({ jsonrpc: "2.0", id: 1, result: {} });
   expect((await post(`[${nearLimit}]`, token)).status).toBe(413);
+});
+
+test("the limit is sized for mail attachments, not for the smallest tool that carries a file", () => {
+  const base64 = (bytes: number) => 4 * Math.ceil(bytes / 3);
+  // A draft with 25 MiB of attachments fits, with room for its text and the JSON-RPC envelope.
+  expect(limit).toBeGreaterThanOrEqual(base64(25 * 1024 * 1024) + 512 * 1024);
+  // The outreach image upload keeps its own, smaller limit and still fits.
+  expect(base64ImageLimit + 16 * 1024).toBeLessThan(limit);
+  expect(MCP_ATTACHMENT_MAX_REQUEST_BYTES).toBeLessThan(limit);
+});
+
+test("a body that stops arriving ends with 408 once the MCP read deadline passes", async () => {
+  jest.useFakeTimers();
+  try {
+    let cancelled = false;
+    let sent = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) { if (!sent) { sent = true; controller.enqueue(new TextEncoder().encode("{")); } },
+      cancel() { cancelled = true; }
+    }, { highWaterMark: 0 });
+    const settled = post(body, token).then(response => response, error => error as unknown);
+    const pendingAfter = async (ms: number) => {
+      jest.advanceTimersByTime(ms);
+      return Promise.race([settled, new Promise(resolve => setImmediate(() => resolve("pending")))]);
+    };
+    for (let i = 0; i < 20 && !sent; i++) await new Promise(resolve => setImmediate(resolve));
+    expect(sent).toBe(true);
+    // The short deadline of the self-service auth routes must not apply here.
+    expect(await pendingAfter(MCP_REQUEST_BODY_TIMEOUT_MS - 1)).toBe("pending");
+    const response = await pendingAfter(1) as Response;
+    expect(response.status).toBe(408);
+    expect(await response.json()).toEqual({ jsonrpc: "2.0", id: null,
+      error: { code: ErrorCode.InvalidRequest, message: "Request body timed out" } });
+    expect(cancelled).toBe(true);
+  } finally {
+    jest.useRealTimers();
+  }
 });

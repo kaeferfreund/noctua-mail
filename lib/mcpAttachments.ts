@@ -15,6 +15,14 @@ export const MCP_ATTACHMENT_MAX_SOURCE_BYTES = 12 * MIB;
 export const MCP_ATTACHMENT_MAX_REQUEST_BYTES = 10 * MIB;
 /** Attachment loads running at the same time in this process; further calls wait. */
 export const MCP_ATTACHMENT_MAX_CONCURRENT_LOADS = 2;
+/**
+ * Largest MCP HTTP request body (one call or a batch). Sized for a draft that carries about
+ * 25 MiB of attachments as base64 data URLs plus its text; every tool with a tighter limit of
+ * its own (such as the outreach image upload) checks that limit itself.
+ */
+export const MCP_REQUEST_BODY_MAX_BYTES = 36 * MIB;
+/** Time one MCP request body may take to arrive; long enough for the largest body on a slow uplink. */
+export const MCP_REQUEST_BODY_TIMEOUT_MS = 120_000;
 export const MCP_ATTACHMENT_DEFAULT_TEXT_CHARS = 20_000;
 export const MCP_ATTACHMENT_MAX_TEXT_CHARS = 100_000;
 
