@@ -9,7 +9,7 @@ import { importKlaviyoContacts } from "@/scripts/outreach-import-klaviyo-contact
 import { getOutreachDb } from "../db";
 import { registerOutreachContactTools } from "../mcp/contacts";
 import { saveOutreachSettings } from "../settings";
-import { createApiToken, subscribeWithApiToken } from "./apiTokens";
+import { CONSENT_CLOCK_SKEW_MS, createApiToken, subscribeWithApiToken } from "./apiTokens";
 import { changeContactSubscription, eraseContact, getMembership } from "./consent";
 import { getSendableRecipient, listSendableRecipients } from "./index";
 import { createContactList, findContactByEmail, upsertContact } from "./records";
@@ -143,4 +143,27 @@ test("AA: the Klaviyo import does not activate an erased address with an older c
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("the subscribe API takes a consent from a clock slightly ahead as given now, and refuses one further off", async () => {
+  const accountId = crypto.randomUUID();
+  await saveOutreachSettings(accountId, { enabled: true }, "manager-1", consentAt);
+  const list = await createContactList(accountId, { name: "Updates" }, consentAt);
+  const { token } = await createApiToken(accountId, "manager-1", { name: "Registration", listIds: [list.id] }, consentAt);
+  const auth = { accountId, id: token.id };
+  const db = await getOutreachDb();
+  // One millisecond ahead is what two servers with ordinary clock drift produce.
+  for (const [email, ahead] of [["ms@example.test", 1], ["edge@example.test", CONSENT_CLOCK_SKEW_MS]] as const) {
+    expect(await subscribeWithApiToken(auth, { email, listId: list.id, consentAt: now + ahead }, now)).toMatchObject({ ok: true, status: "subscribed" });
+    // Stored as this server's time, so the consent never lies in the future of later checks.
+    expect(findContactByEmail(db, accountId, email)).toMatchObject({ emailConsent: "subscribed", consentAt: now });
+  }
+  await expect(subscribeWithApiToken(auth, { email: "far@example.test", listId: list.id, consentAt: now + CONSENT_CLOCK_SKEW_MS + 1 }, now))
+    .rejects.toMatchObject({ status: 400 });
+  expect(findContactByEmail(db, accountId, "far@example.test")).toBeNull();
+  // A clock that is ahead does not turn an old consent into a new one after an unsubscribe.
+  const { contactId } = await subscribeWithApiToken(auth, { email: "leaver@example.test", listId: list.id, consentAt: now - 10 }, now);
+  await changeContactSubscription(accountId, contactId, { action: "unsubscribe", listId: list.id }, now);
+  await expect(subscribeWithApiToken(auth, { email: "leaver@example.test", listId: list.id, consentAt: now + 1 }, now))
+    .rejects.toMatchObject({ status: 409, code: "new_consent_required" });
 });

@@ -139,7 +139,9 @@ cursor is the last event's ID and distinguishes events with the same timestamp.
 `GET /api/addons/outreach/status` → `OutreachStatusResponse` (answers also with the flag off).
 
 `POST /api/addons/outreach/subscribe` with `Authorization: Bearer <api token>` →
-`SubscribeRequest` / `SubscribeResponse` (server to server, no session).
+`SubscribeRequest` / `SubscribeResponse` (server to server, no session). `consentAt` is epoch
+milliseconds; a value up to five minutes ahead of this server's clock is stored as "now" (the
+caller's clock may run ahead), anything further in the future answers 400.
 
 Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 
