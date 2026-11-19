@@ -14,7 +14,7 @@ export function getOutreachDbPath() {
 }
 
 /** Bump with every schema change and add the step to `migrate`. */
-export const OUTREACH_SCHEMA_VERSION = 2;
+export const OUTREACH_SCHEMA_VERSION = 3;
 
 /**
  * Schema v1. Every table carries `accountId` (the mailbox that owns the row); every query
@@ -297,6 +297,10 @@ const SCHEMA_V2 = `
   );
 `;
 
+const SCHEMA_V3 = `
+  ALTER TABLE tracking_events ADD COLUMN linkToken TEXT;
+`;
+
 function migrate(db: Database) {
   const current = Number((db.prepare("PRAGMA user_version").get() as { user_version?: number } | null)?.user_version ?? 0);
   if (current > OUTREACH_SCHEMA_VERSION) {
@@ -306,6 +310,7 @@ function migrate(db: Database) {
   db.transaction(() => {
     if (current < 1) db.exec(SCHEMA_V1);
     if (current < 2) db.exec(SCHEMA_V2);
+    if (current < 3) db.exec(SCHEMA_V3);
     db.exec(`PRAGMA user_version = ${OUTREACH_SCHEMA_VERSION}`);
   }).immediate();
 }

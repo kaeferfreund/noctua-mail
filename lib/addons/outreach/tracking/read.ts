@@ -2,7 +2,7 @@ import type { SQLQueryBindings } from "bun:sqlite";
 import { z } from "zod";
 import { getOutreachDb } from "../db";
 import { TRACKING_EVENT_TYPES, type MessageTrackingSummary, type OutreachOverview, type SendStats, type SendSummary, type TrackingEvent, type TrackingEventsResponse } from "../types";
-import { DAY_MS } from "./ip";
+import { DAY_MS, trackingIpExpiryCutoff, truncateTrackingIp } from "./ip";
 import type { SendFilter } from "./index";
 
 export const EMPTY_SEND_STATS: SendStats = { recipients: 0, queued: 0, sent: 0, failed: 0, skipped: 0, opened: 0, clicked: 0,
@@ -28,13 +28,21 @@ function sendFilter(accountId: string, filter: SendFilter) {
   return { where, args };
 }
 
-type EventRow = Omit<TrackingEvent, "machine" | "ipTruncated"> & { machine: number; ipTruncated: number };
+type EventRow = Omit<TrackingEvent, "machine" | "ipTruncated"> & {
+  machine: number; ipTruncated: number; ipRetentionDays: number | null;
+};
+const eventUrl = `COALESCE(e.url, (SELECT link.url FROM tracking_links link
+  WHERE link.token = e.linkToken AND link.accountId = e.accountId AND link.sendId = e.sendId AND link.kind = 'click'))`;
 const eventColumns = `e.id, e.sendId, e.contactId, e.type, e.at, e.ip, e.ipTruncated, e.country, e.region, e.city,
-  e.userAgent, e.clientName, e.clientOs, e.clientType, e.machine, e.url`;
+  e.userAgent, e.clientName, e.clientOs, e.clientType, e.machine, ${eventUrl} AS url, a.ipRetentionDays`;
 const eventForSend = "e.accountId = s.accountId AND e.sendId = s.id";
 
-function asEvent(row: EventRow): TrackingEvent {
-  return { ...row, machine: row.machine === 1, ipTruncated: row.ipTruncated === 1 };
+function asEvent({ ipRetentionDays, ...row }: EventRow, now: number): TrackingEvent {
+  const { ip, machine, ipTruncated, ...event } = row;
+  if (ip !== null && ipTruncated === 0 && event.at <= trackingIpExpiryCutoff(now, ipRetentionDays)) {
+    return { ...event, ip: truncateTrackingIp(ip), machine: machine === 1, ipTruncated: true };
+  }
+  return { ...event, ip, machine: machine === 1, ipTruncated: ipTruncated === 1 };
 }
 
 type MessageRow = Pick<MessageTrackingSummary, "sendId" | "kind" | "messageId" | "recipients" | "subject" | "sentAt"> & {
@@ -65,10 +73,11 @@ export async function getMessageTracking(accountId: string, selector: { messageI
     COUNT(*) FILTER (WHERE type = 'bounce' AND machine = 0) AS bounced
     FROM tracking_events WHERE accountId = ? AND sendId = ?`).get(accountId, row.sendId) as MessageCounts;
   const last = db.prepare(`SELECT ${eventColumns} FROM tracking_events e
+    LEFT JOIN account_settings a ON a.accountId = e.accountId
     WHERE e.accountId = ? AND e.sendId = ? AND e.machine = 0 AND e.type IN ('open', 'click')
     ORDER BY e.at DESC, e.id DESC LIMIT 1`).get(accountId, row.sendId) as EventRow | null;
   return { ...row, ...counts, trackOpens: Boolean(row.trackOpens), trackClicks: Boolean(row.trackClicks),
-    bounced: counts.bounced > 0, lastEvent: last ? asEvent(last) : null };
+    bounced: counts.bounced > 0, lastEvent: last ? asEvent(last, Date.now()) : null };
 }
 
 export async function getSendStats(accountId: string, filter: SendFilter): Promise<SendStats> {
@@ -141,7 +150,7 @@ export async function listLinkStats(accountId: string, filter: SendFilter): Prom
   )
   SELECT l.url, COUNT(e.id) AS clicks, COUNT(DISTINCT e.sendId) AS uniqueClicks
   FROM targets l LEFT JOIN tracking_events e ON e.accountId = l.accountId AND e.sendId = l.sendId
-    AND e.type = 'click' AND e.machine = 0 AND e.url = l.url
+    AND e.type = 'click' AND e.machine = 0 AND ${eventUrl} = l.url
   GROUP BY l.url ORDER BY clicks DESC, l.url`).all(...args) as Array<{ url: string; clicks: number; uniqueClicks: number }>;
 }
 
@@ -180,9 +189,11 @@ export async function listTrackingEvents(accountId: string, filter: z.infer<type
   const limit = filter.limit ?? 50;
   const db = await getOutreachDb();
   const rows = db.prepare(`SELECT ${eventColumns} FROM tracking_events e
+    LEFT JOIN account_settings a ON a.accountId = e.accountId
     LEFT JOIN sends s ON s.accountId = e.accountId AND s.id = e.sendId
     WHERE ${where.join(" AND ")} ORDER BY e.at DESC, e.id DESC LIMIT ?`).all(...args, limit + 1) as EventRow[];
-  return { ok: true, events: rows.slice(0, limit).map(asEvent), nextBefore: rows.length > limit ? rows[limit - 1].id : null };
+  const now = Date.now();
+  return { ok: true, events: rows.slice(0, limit).map(row => asEvent(row, now)), nextBefore: rows.length > limit ? rows[limit - 1].id : null };
 }
 
 export async function getOutreachOverview(accountId: string, now = Date.now()): Promise<OutreachOverview> {
