@@ -64,7 +64,7 @@ test("REST enforces flag, editor permissions, same-origin JSON and campaign/sequ
     const raced = saveCampaign(db, accountId, editor.user.id, input);
     await expect(scheduleAction(db, { accountId, authorization: {
       request: request(editor, `campaigns/${raced.id}/schedule`, "POST", { sendAt: null, dryRun: true })
-    } }, raced.id, { sendAt: null, dryRun: true }, async () => {
+    }, via: "app" }, raced.id, { sendAt: null, dryRun: true }, async () => {
       saveCampaign(db, accountId, editor.user.id, { subject: "Parallel geändert" }, raced.id);
       return [];
     })).rejects.toMatchObject({ code: "campaign_changed" });

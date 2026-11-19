@@ -22,7 +22,12 @@ export type OutreachManageContextValue = {
   lists: SharedResource<ContactList[]>;
   templates: SharedResource<EmailTemplateSummary[]>;
   identities: SharedResource<SenderIdentity[]>;
+  /** Members of the mailbox (`/api/accounts/{accountId}/members`), to name who scheduled work. */
+  members: SharedResource<OutreachMember[]>;
 };
+
+/** The fields of a mailbox member the area shows. */
+export type OutreachMember = { userId: string; email: string; name: string | null };
 
 export const OutreachManageContext = createContext<OutreachManageContextValue | null>(null);
 

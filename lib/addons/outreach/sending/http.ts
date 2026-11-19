@@ -8,11 +8,12 @@ import { requireOutreachContext, type AccountRouteParams } from "@/app/api/addon
 import { OutboundAuthorizationError } from "@/lib/outboundAuthorization";
 import { SenderIdentityError } from "@/lib/senderIdentityError";
 import { getOutreachDb } from "../db";
+import { OUTREACH_VIA_APP } from "../via";
 import { itemId, SendingError, validated } from "./input";
 
 type Mode = "read" | "preview" | "json" | "command" | "delete";
 type RouteInput = {
-  db: Database; accountId: string; userId: string; authorization: { request: Request };
+  db: Database; accountId: string; userId: string; authorization: { request: Request }; via: typeof OUTREACH_VIA_APP;
   body: unknown; params: Awaited<AccountRouteParams["params"]>; query: URLSearchParams;
 };
 
@@ -42,7 +43,7 @@ export function sendingRoute(mode: Mode, handler: (input: RouteInput) => unknown
           body = JSON.parse(new TextDecoder().decode(bytes));
         }
         return NextResponse.json(await handler({ db: await dependencies.db(), accountId: context.accountId,
-          userId: context.userId, authorization: { request }, body, params: await params, query: new URL(request.url).searchParams }));
+          userId: context.userId, authorization: { request }, via: OUTREACH_VIA_APP, body, params: await params, query: new URL(request.url).searchParams }));
       } catch (error) {
         if (error instanceof OutboundAuthorizationError) return error.response;
         if (error instanceof SenderIdentityError || error instanceof SendingError) {

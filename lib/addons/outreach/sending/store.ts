@@ -108,18 +108,16 @@ export function resolveContent(db: Database, accountId: string, item: Required<C
 }
 
 type CampaignRow = Omit<Campaign, "listIds" | "excludedListIds" | "trackOpens" | "trackClicks"> & {
-  listIds: string; excludedListIds: string; trackOpens: number; trackClicks: number; scheduledByUserId: string | null;
+  listIds: string; excludedListIds: string; trackOpens: number; trackClicks: number;
 };
 
 function campaignFromRow(row: CampaignRow): Campaign {
-  const { scheduledByUserId: _scheduler, ...campaign } = row;
-  void _scheduler;
-  return { ...campaign, listIds: JSON.parse(row.listIds), excludedListIds: JSON.parse(row.excludedListIds),
+  return { ...row, listIds: JSON.parse(row.listIds), excludedListIds: JSON.parse(row.excludedListIds),
     trackOpens: row.trackOpens === 1, trackClicks: row.trackClicks === 1 };
 }
 
 const campaignFields = `id, accountId, name, subject, previewText, senderIdentityId, templateId, html, text,
-  listIds, excludedListIds, status, trackOpens, trackClicks, sendAt, startedAt, finishedAt, createdAt, updatedAt, scheduledByUserId`;
+  listIds, excludedListIds, status, trackOpens, trackClicks, sendAt, startedAt, finishedAt, createdAt, updatedAt, scheduledByUserId, scheduledVia`;
 export function campaignRow(db: Database, accountId: string, id: string) {
   return rows<CampaignRow>(db, `SELECT ${campaignFields} FROM campaigns WHERE accountId = ? AND id = ?`).get(accountId, id);
 }
@@ -185,11 +183,11 @@ export async function campaignReport(db: Database, accountId: string, id: string
 }
 
 type SequenceRow = Omit<Sequence, "steps" | "trackOpens" | "trackClicks"> & {
-  trackOpens: number; trackClicks: number; statusChangedByUserId: string | null;
+  trackOpens: number; trackClicks: number;
 };
 type StepRow = Omit<SequenceStep, "enabled"> & { enabled: number };
 
-const sequenceFields = "id, accountId, name, triggerListId, senderIdentityId, status, trackOpens, trackClicks, createdAt, updatedAt, statusChangedByUserId";
+const sequenceFields = "id, accountId, name, triggerListId, senderIdentityId, status, trackOpens, trackClicks, createdAt, updatedAt, statusChangedByUserId, statusChangedVia";
 const stepFields = "id, position, delayMinutes, name, subject, previewText, templateId, html, text, enabled";
 export function sequenceRow(db: Database, accountId: string, id: string) {
   return rows<SequenceRow>(db, `SELECT ${sequenceFields} FROM sequences WHERE accountId = ? AND id = ?`).get(accountId, id);
@@ -201,11 +199,9 @@ export function sequenceStep(db: Database, accountId: string, sequenceId: string
 }
 
 function sequenceFromRow(db: Database, row: SequenceRow): Sequence {
-  const { statusChangedByUserId: _actor, ...sequence } = row;
-  void _actor;
   const steps = rows<StepRow>(db, `SELECT ${stepFields} FROM sequence_steps
     WHERE accountId = ? AND sequenceId = ? ORDER BY position`).all(row.accountId, row.id);
-  return { ...sequence, trackOpens: row.trackOpens === 1, trackClicks: row.trackClicks === 1,
+  return { ...row, trackOpens: row.trackOpens === 1, trackClicks: row.trackClicks === 1,
     steps: steps.map(step => ({ ...step, enabled: step.enabled === 1 })) };
 }
 

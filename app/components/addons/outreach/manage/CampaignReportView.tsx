@@ -6,7 +6,7 @@ import { Ban, RefreshCw } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import type { CampaignReport } from "@/lib/addons/outreach/types";
 import { useOutreachManage, usePagedResource } from "./manageContext";
-import { CampaignStatusBadge, ConfirmDialog, ErrorNote, LoadingNote, SectionHeader, StatsFigures, useOutreachFormat } from "./ui";
+import { CampaignStatusBadge, ConfirmDialog, ErrorNote, LoadingNote, SectionHeader, StatsFigures, TraceLine, useOutreachFormat } from "./ui";
 import type { CampaignMeta } from "./CampaignEditor";
 import { campaignWhen } from "./CampaignsSection";
 import SendsTable from "./SendsTable";
@@ -65,6 +65,7 @@ export default function CampaignReportView({ campaign, scheduledRecipients, onCh
             : t("campaigns.sendingTo", { count: scheduledRecipients, formatted: format.number(scheduledRecipients) })}
         </p>
       ) : null}
+      <TraceLine action="scheduled" userId={shown.scheduledByUserId} via={shown.scheduledVia} />
       <dl className="grid grid-cols-1 gap-x-4 gap-y-1 rounded-lg border p-4 text-sm sm:grid-cols-[auto_minmax(0,1fr)]">
         <dt className="text-muted-foreground">{t("content.subject")}</dt><dd className="truncate">{shown.subject || "–"}</dd>
         <dt className="text-muted-foreground">{t("campaigns.lists")}</dt><dd>{listNames(shown.listIds) || "–"}</dd>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
@@ -10,7 +10,9 @@ import { formatDate, formatNumber, formatTime } from "@/lib/i18n/format";
 import type { UiLocale } from "@/lib/i18n/config";
 import type { CampaignStatus, SendStats, SequenceStatus } from "@/lib/addons/outreach/types";
 import { cn } from "@/lib/utils";
+import { parseOutreachVia } from "@/lib/addons/outreach/via";
 import { outreachErrorKey } from "./outreachApi";
+import { useOutreachManage } from "./manageContext";
 import styles from "./OutreachManage.module.css";
 
 /** Class of the area's scoped baseline (no preflight in this app); portalled dialogs carry it too. */
@@ -178,5 +180,28 @@ export function RowButton({ onClick, children, label }: { onClick: () => void; c
       className="flex w-full min-w-0 flex-col gap-1 rounded-md px-3 py-2 text-left outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring max-md:min-h-11 sm:flex-row sm:items-center sm:gap-3">
       {children}
     </button>
+  );
+}
+
+/**
+ * Who scheduled a campaign or last switched a sequence, and through what: the app or an MCP token
+ * (`scheduledVia` / `statusChangedVia`). Rows from before the trace existed show nothing; a user who
+ * is no longer a member of the mailbox stays unnamed.
+ */
+export function TraceLine({ action, userId, via }: { action: "scheduled" | "live" | "paused"; userId: string | null; via: string | null }) {
+  const t = useTranslations("outreach");
+  const { members } = useOutreachManage();
+  const parsed = parseOutreachVia(via);
+  const traced = parsed !== null;
+  const { ensure } = members;
+  useEffect(() => { if (traced) ensure(); }, [ensure, traced]);
+  // Wait for the members instead of switching from the unnamed to the named sentence.
+  if (!parsed || (members.data === null && !members.error)) return null;
+  const member = userId ? members.data?.find(entry => entry.userId === userId) : undefined;
+  const through = parsed.kind === "app" ? t("trace.viaApp") : t("trace.viaMcp", { label: parsed.label, suffix: parsed.suffix });
+  return (
+    <p className="text-xs text-muted-foreground">
+      {t(`trace.${action}`, { who: member ? "known" : "unknown", name: member ? member.name || member.email : "", via: through })}
+    </p>
   );
 }

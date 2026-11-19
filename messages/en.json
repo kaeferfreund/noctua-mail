@@ -2773,6 +2773,13 @@
       "reportTitle": "Report per step",
       "enrollments": "{active} running · {completed} completed · {cancelled} ended",
       "stepSent": "{sent} sent"
+    },
+    "trace": {
+      "scheduled": "{who, select, known {Scheduled by {name}} other {Scheduled}} {via}",
+      "live": "{who, select, known {Switched live by {name}} other {Switched live}} {via}",
+      "paused": "{who, select, known {Paused by {name}} other {Paused}} {via}",
+      "viaApp": "in the app",
+      "viaMcp": "through the MCP token “{label}” (…{suffix})"
     }
   },
   "outreachTracking": {

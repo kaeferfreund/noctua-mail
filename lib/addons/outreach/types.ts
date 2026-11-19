@@ -249,6 +249,10 @@ export type Campaign = {
   sendAt: number | null;
   startedAt: number | null;
   finishedAt: number | null;
+  /** Who scheduled the campaign; the scheduled sends act for this user. Null for a draft. */
+  scheduledByUserId: string | null;
+  /** How: `"app"` or `"mcp:<label> (…<suffix>)"` (see `via.ts`); null for a draft and for campaigns scheduled before this was recorded. */
+  scheduledVia: string | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -313,6 +317,10 @@ export type Sequence = {
   status: SequenceStatus;
   trackOpens: boolean;
   trackClicks: boolean;
+  /** Who last switched the status (live or paused); live sends act for this user. */
+  statusChangedByUserId: string | null;
+  /** How: `"app"` or `"mcp:<label> (…<suffix>)"` (see `via.ts`); null before the first change and for changes before this was recorded. */
+  statusChangedVia: string | null;
   steps: SequenceStep[];
   createdAt: number;
   updatedAt: number;
