@@ -78,7 +78,7 @@ export default function ApiTokensSection({ accountId, apiFetch }: { accountId: s
     setRevokingId(token.id);
     setError("");
     try {
-      await adminRequest(apiFetch, outreachApiPath(accountId, `api-tokens/${encodeURIComponent(token.id)}`), jsonMutation("DELETE", {}));
+      await adminRequest(apiFetch, outreachApiPath(accountId, `api-tokens/${encodeURIComponent(token.id)}`), { method: "DELETE" });
       setTokens(current => current.filter(item => item.id !== token.id));
     } catch {
       setError(t("revokeFailed"));
