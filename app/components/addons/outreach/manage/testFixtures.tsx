@@ -51,7 +51,7 @@ export const CONTACT_DETAIL: ContactDetail = {
   lastSends: [sendSummary(1), sendSummary(2, { subject: "Willkommen", kind: "sequence", campaignId: null, sequenceId: "seq-welcome" })]
 };
 
-const HTML = `<!doctype html><html><body style="font-family:sans-serif;margin:0;background:#f4f4f5">
+const HTML = `<!doctype html><html><body style="margin:0;background:#f4f4f5">
 <table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px">
 <table width="560" style="background:#fff;border-radius:8px;padding:24px"><tr><td>
 <h1 style="font-size:22px;margin:0 0 12px">Hallo {{ first_name|default:"zusammen" }},</h1>
