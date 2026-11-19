@@ -16,6 +16,8 @@ const OFF: OutreachStatus = { ...UNLOADED, loaded: true };
 
 let current = UNLOADED;
 let pending: Promise<void> | null = null;
+/** Number of the newest status request; an older answer that arrives later is dropped. */
+let generation = 0;
 const listeners = new Set<() => void>();
 
 function publish(next: OutreachStatus) {
@@ -24,23 +26,26 @@ function publish(next: OutreachStatus) {
 }
 
 async function load() {
+  const request = ++generation;
+  const publishIfNewest = (next: OutreachStatus) => { if (request === generation) publish(next); };
   try {
     const response = await fetch("/api/addons/outreach/status", { cache: "no-store" });
     const body = response.ok ? await response.json() as Partial<OutreachStatusResponse> | null : null;
     // Anything that is not a complete status answer means "off" (also a stubbed fetch in tests).
-    publish(body?.ok === true && typeof body.available === "boolean" && Array.isArray(body.accounts)
+    publishIfNewest(body?.ok === true && typeof body.available === "boolean" && Array.isArray(body.accounts)
       ? { loaded: true, available: body.available, accounts: body.accounts, sesConfigured: body.sesConfigured === true, trackingConfigured: body.trackingConfigured === true }
       : OFF);
   } catch {
     // The addon is optional: any failure means "not there" for this page load.
-    publish(OFF);
+    publishIfNewest(OFF);
   }
 }
 
 /** Asks the server again, for example after the settings tab activated the addon for a mailbox. */
 export function refreshOutreachStatus() {
-  pending = load().finally(() => { pending = null; });
-  return pending;
+  const request = load().finally(() => { if (pending === request) pending = null; });
+  pending = request;
+  return request;
 }
 
 function subscribe(listener: () => void) {
@@ -64,5 +69,6 @@ export function isOutreachEnabledFor(status: OutreachStatus, accountId: string |
 /** Test seam: reset the module cache between DOM tests. */
 export function resetOutreachStatusForTests(next: OutreachStatus = UNLOADED) {
   pending = null;
+  generation++;
   publish(next);
 }
