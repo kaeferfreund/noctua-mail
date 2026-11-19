@@ -44,8 +44,11 @@ export function rewriteTrackedHtml(db: Database, input: TrackedHtmlInput, origin
   const edits = new Map<number, { end: number; replacement: string }>();
   let bodyEnd: number | undefined;
   let htmlEnd: number | undefined;
+  // A caller that names the contact (campaign and sequence mail) gets links only while the send
+  // still belongs to that contact: an erase in between must not bring the contact id back.
   const insert = db.prepare(`INSERT INTO tracking_links (token, accountId, sendId, kind, url, contactId, createdAt)
-    SELECT ?, accountId, id, ?, ?, COALESCE(?, contactId), ? FROM sends WHERE accountId = ? AND id = ?`);
+    SELECT ?1, accountId, id, ?2, ?3, COALESCE(?4, contactId), ?5 FROM sends
+    WHERE accountId = ?6 AND id = ?7 AND (?4 IS NULL OR contactId = ?4)`);
   const now = Date.now();
 
   function tokenFor(kind: "open" | "click", url: string | null): string {

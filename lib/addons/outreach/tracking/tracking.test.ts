@@ -408,3 +408,14 @@ test("an unfinished text element or comment leaves neither pixel markup nor a pi
   }
   expect(db.prepare("SELECT token FROM tracking_links WHERE accountId = ? AND kind = 'open'").all(accountId)).toEqual([]);
 });
+
+test("a send that no longer belongs to the named contact gets no tracking links", async () => {
+  const db = await seedSend();
+  const input = { accountId, sendId: "send-a", html: `<a href="${target}">Link</a>`, trackOpens: true, trackClicks: true };
+  expect(await prepareTrackedHtml({ ...input, contactId: "contact-send-a" })).toContain("/t/c/");
+  const before = db.prepare("SELECT count(*) AS n FROM tracking_links WHERE sendId = 'send-a'").get() as { n: number };
+  // The contact is erased while its mail is being prepared: the send row stays, anonymized.
+  db.prepare("UPDATE sends SET contactId = NULL, recipients = '' WHERE accountId = ? AND id = 'send-a'").run(accountId);
+  await expect(prepareTrackedHtml({ ...input, contactId: "contact-send-a" })).rejects.toThrow();
+  expect(db.prepare("SELECT count(*) AS n FROM tracking_links WHERE sendId = 'send-a'").get()).toEqual(before);
+});
