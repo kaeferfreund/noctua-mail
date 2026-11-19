@@ -44,6 +44,7 @@ import FolderBadges from "../folder/FolderBadges";
 import CalendarEventPreview from "./CalendarEventPreview";
 import { RemoveAttachmentConfirmDialog } from "./AttachmentRemoval";
 import MessageRecipientMetaField from "./MessageRecipientMetaField";
+import MessageTrackingStatus from "@/app/components/addons/outreach/tracking/MessageTrackingStatus";
 import CategoryBadge from "../CategoryBadge";
 import SpamBadge, { SpamCorrectionButton } from "../SpamBadge";
 import { ScheduledSendBar } from "../scheduledSend/ScheduledSend";
@@ -917,6 +918,7 @@ function ThreadMessageCard({
               })()}
             </div>
             {isDraftMessage(message) && !isCollapsed && <ScheduledSendBar message={message} />}
+            {!isCollapsed && <MessageTrackingStatus message={message} folder={folderById(message.folderId)} ownAddresses={userEmail} isDraft={isDraftMessage(message)} dateFormat={dateFormat} />}
             {getUnsubscribeCapability(message) && !isCollapsed && (
               <div className={styles.unsubscribeBanner}>
                 <span className={styles.unsubscribeText}>{t("mailingListMessage")}</span>
