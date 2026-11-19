@@ -120,6 +120,7 @@ test("non-managers see the settings read-only, without save button and token sec
   const activate = await page.findByRole("switch", { name: "Activate for this mailbox" });
   expect(page.getByText("Only managers of this mailbox can change these settings.")).toBeTruthy();
   expect(activate.hasAttribute("disabled")).toBe(true);
+  expect(activate.getAttribute("aria-checked")).toBe("true");
   expect((page.getByRole("textbox", { name: "Organization name" }) as HTMLInputElement).disabled).toBe(true);
   expect(page.queryByRole("button", { name: "Save" })).toBeNull();
   expect(page.container.querySelector("[data-outreach-api-tokens]")).toBeNull();

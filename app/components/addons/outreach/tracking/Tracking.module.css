@@ -23,7 +23,7 @@
 
 .statusToggle {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
   max-width: 100%;
   padding: var(--space-1) var(--space-2);
@@ -33,7 +33,14 @@
   color: inherit;
   font: inherit;
   text-align: start;
+  /* Buttons do not wrap by default in the app; this line wraps on phones. */
+  white-space: normal;
   cursor: pointer;
+}
+
+.statusToggle > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .statusToggle:hover {
@@ -52,7 +59,6 @@
 
 .chevron,
 .chevronOpen {
-  flex-shrink: 0;
   transition: transform 120ms ease;
 }
 
