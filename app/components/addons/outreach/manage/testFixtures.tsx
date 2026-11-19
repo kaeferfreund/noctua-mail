@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Theme } from "@radix-ui/themes";
 import type { AccountRole } from "@/lib/data";
-import type { Campaign, CampaignReport, Contact, ContactDetail, ContactList, EmailTemplate, OutreachOverview, Sequence, SendStats, SendSummary } from "@/lib/addons/outreach/types";
+import type { Campaign, CampaignReport, Contact, ContactDetail, ContactList, EmailTemplate, OutreachImage, OutreachOverview, Sequence, SendStats, SendSummary } from "@/lib/addons/outreach/types";
 import OutreachManage from "./OutreachManage";
 import type { OutreachLocation } from "./location";
 
@@ -104,6 +104,13 @@ export const SEQUENCE: Sequence = {
   ]
 };
 
+/** Images of the mailbox, oldest first (the dialog shows them newest first). */
+export const IMAGES: OutreachImage[] = [
+  { id: "img-header", accountId: ACCOUNT_ID, url: `/t/m/${"a1".repeat(32)}.png`, contentType: "image/png", bytes: 48_213, width: 1200, height: 400, filename: "kopfzeile.png", createdAt: T0 - 40 * DAY },
+  { id: "img-team", accountId: ACCOUNT_ID, url: `/t/m/${"b2".repeat(32)}.jpg`, contentType: "image/jpeg", bytes: 231_877, width: 800, height: 600, filename: "team-foto.jpg", createdAt: T0 - 10 * DAY },
+  { id: "img-badge", accountId: ACCOUNT_ID, url: `/t/m/${"c3".repeat(32)}.webp`, contentType: "image/webp", bytes: 9_120, width: null, height: null, filename: "siegel.webp", createdAt: T0 - DAY }
+];
+
 export const MEMBERS = [
   { userId: "user-erika", email: "erika@example.test", name: "Erika Beispiel", role: "editor", isOwner: false },
   { userId: "user-max", email: "max@example.test", name: null, role: "manager", isOwner: true }
@@ -114,7 +121,8 @@ export function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
-export type Call = { method: string; path: string; query: URLSearchParams; body: unknown };
+/** `body`: parsed JSON for JSON writes, the raw body (e.g. an uploaded `File`) otherwise. */
+export type Call = { method: string; path: string; query: URLSearchParams; headers: Headers; body: unknown };
 export type Handler = (call: Call) => Response | Promise<Response> | undefined;
 
 /**
@@ -128,7 +136,10 @@ export function stubFetch(handlers: Handler[] = []) {
     const url = new URL(String(input), "http://localhost");
     const method = (init?.method ?? "GET").toUpperCase();
     const path = url.pathname.startsWith(base) ? url.pathname.slice(base.length) : url.pathname;
-    const call: Call = { method, path, query: url.searchParams, body: init?.body ? JSON.parse(String(init.body)) : undefined };
+    const headers = new Headers(init?.headers);
+    const raw = init?.body || undefined;
+    const body = typeof raw === "string" && headers.get("Content-Type") !== "application/octet-stream" ? JSON.parse(raw) : raw;
+    const call: Call = { method, path, query: url.searchParams, headers, body };
     calls.push(call);
     for (const handler of handlers) {
       const response = await handler(call);
@@ -143,6 +154,7 @@ function defaults({ method, path }: Call): Response {
   if (method !== "GET") return json({ ok: true });
   if (path === "overview") return json(OVERVIEW);
   if (path === "lists") return json({ ok: true, lists: LISTS });
+  if (path === "images") return json({ ok: true, images: IMAGES });
   if (path === "templates") return json({ ok: true, templates: [TEMPLATE].map(({ html: _html, text: _text, ...summary }) => summary) });
   if (path === `templates/${TEMPLATE.id}`) return json({ ok: true, template: TEMPLATE });
   if (path === "contacts") return json({ ok: true, contacts: CONTACTS, total: 512, page: 1, pageSize: 50 });
