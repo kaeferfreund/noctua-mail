@@ -93,17 +93,20 @@ test("a bounce retries when the receipt commits immediately after the send looku
   }
 });
 
-test("unmatched SES events retry until seven days after their signed publication timestamp", async () => {
+test("an SES event for a send still in progress retries until seven days after its signed publication timestamp", async () => {
   const db = initOutreachSchema(new Database(":memory:"));
   const publishedAt = 1000;
   let now = publishedAt + 7 * 24 * 60 * 60_000 - 1;
   try {
+    db.query("INSERT INTO account_settings (accountId, enabled, updatedAt) VALUES ('mailbox', 1, 0)").run();
+    db.query(`INSERT INTO sends (id, accountId, kind, contactId, status, queuedAt)
+      VALUES ('send', 'mailbox', 'campaign', 'contact', 'sending', 0)`).run();
     const deps: NonNullable<Parameters<typeof applySesEvent>[2]> = {
       db: async () => db, now: () => now,
       suppress: async () => { throw new Error("unmatched suppression"); },
       record: async () => { throw new Error("unmatched event"); }
     };
-    const event = { eventType: "Complaint", mail: { messageId: "missing" }, complaint: {} };
+    const event = { eventType: "Complaint", mail: { messageId: "missing", tags: { noctua_send_id: ["send"] } }, complaint: {} };
     await expect(applySesEvent("notification", event, deps, publishedAt)).rejects.toThrow("SES receipt not found");
     now++;
     await expect(applySesEvent("notification", event, deps, publishedAt)).resolves.toBeUndefined();
