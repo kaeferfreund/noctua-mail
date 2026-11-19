@@ -8,7 +8,7 @@ import type {
 } from "../types";
 import { SendingError } from "./input";
 import { normalizeTemplate, type Content } from "./render";
-import { rescheduleSequenceStep } from "./queue";
+import { carrySequenceEnrollments } from "./queue";
 
 export function required<T>(value: T | null | undefined): T {
   if (value == null) throw new SendingError(404, "Eintrag nicht gefunden.");
@@ -276,11 +276,8 @@ export function saveSequence(db: Database, accountId: string, input: SequenceInp
         db.query(`INSERT INTO sequence_steps (id, accountId, sequenceId, position, name, delayMinutes, enabled, templateId, subject, previewText, html, text)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(stepId, accountId, id, position, step.name ?? previous?.name ?? "",
           delayMinutes, +enabled, templateId, ...contentArgs(content));
-        const original = current?.steps[position];
-        if (enabled && original?.enabled && delayMinutes !== original.delayMinutes) {
-          rescheduleSequenceStep(db, accountId, id, stepId, position, (delayMinutes - original.delayMinutes) * 60_000);
-        }
       }
+      if (current) carrySequenceEnrollments(db, accountId, id, current.steps, now);
     }
     return getSequence(db, accountId, id);
   }).immediate();

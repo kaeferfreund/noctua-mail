@@ -1,19 +1,20 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Account } from "@/lib/data";
 import type { AdminFetch } from "@/app/hooks/useAdminApi";
 import { DEFAULT_APP_TITLE } from "@/lib/appBranding";
 import { useWindowTitle } from "@/lib/ui/windowTitle";
 import { emptyDeepLink, serializeDeepLink } from "@/lib/navigation/deepLinks";
 import { isOutreachEnabledFor, useOutreachStatus } from "../useOutreachStatus";
-import OutreachManage from "./OutreachManage";
+import OutreachManage, { type OutreachLeaveGuard } from "./OutreachManage";
 import { outreachPageHref, parseOutreachLocation, type OutreachLocation } from "./location";
 
 type Me = { accounts?: Account[] };
+type Place = { accountId: string; location: OutreachLocation };
 
-function readLocation(): { accountId: string; location: OutreachLocation } {
+function readLocation(): Place {
   const params = new URLSearchParams(window.location.search);
   return { accountId: params.get("accountId") ?? "", location: parseOutreachLocation(params) };
 }
@@ -25,12 +26,28 @@ function readLocation(): { accountId: string; location: OutreachLocation } {
 export default function OutreachManagePage({ fetchImpl = fetch }: { fetchImpl?: AdminFetch }) {
   const t = useTranslations("outreach");
   const status = useOutreachStatus();
-  const [place, setPlace] = useState<{ accountId: string; location: OutreachLocation } | null>(null);
+  const [place, setPlace] = useState<Place | null>(null);
+  const shownPlace = useRef<Place | null>(null);
+  const leaveGuard = useRef<OutreachLeaveGuard>(null);
   const [account, setAccount] = useState<Account | null | undefined>(undefined);
   useWindowTitle(account ? `${t("title")} · ${account.email}` : `${t("title")} · ${DEFAULT_APP_TITLE}`);
 
+  useEffect(() => { shownPlace.current = place; }, [place]);
   useEffect(() => {
-    const sync = () => setPlace(readLocation());
+    const sync = () => {
+      const next = readLocation();
+      const shown = shownPlace.current;
+      if (shown && leaveGuard.current?.blocks()) {
+        // Back/Forward already moved the history: put the editor's entry back and ask first.
+        window.history.pushState(null, "", outreachPageHref(shown.accountId, shown.location));
+        leaveGuard.current.ask(() => {
+          window.history.pushState(null, "", outreachPageHref(next.accountId, next.location));
+          setPlace(next);
+        });
+        return;
+      }
+      setPlace(next);
+    };
     sync();
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
@@ -59,7 +76,7 @@ export default function OutreachManagePage({ fetchImpl = fetch }: { fetchImpl?: 
   return (
     <div className="h-[var(--app-height,100dvh)] pt-[var(--sat,0px)]">
       <OutreachManage accountId={accountId} accountLabel={account.name?.trim() || account.email} role={account.accessRole ?? "viewer"}
-        location={place.location} onLocationChange={onLocationChange} mailHref={mailHref} fetchImpl={fetchImpl} />
+        location={place.location} onLocationChange={onLocationChange} mailHref={mailHref} fetchImpl={fetchImpl} leaveGuard={leaveGuard} />
     </div>
   );
 }

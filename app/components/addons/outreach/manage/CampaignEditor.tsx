@@ -7,7 +7,7 @@ import { Button } from "@/app/components/ui/button";
 import type { Campaign, CampaignInput, CampaignScheduleResponse } from "@/lib/addons/outreach/types";
 import { useOutreachManage, useUnsavedChanges } from "./manageContext";
 import { ConfirmDialog, ErrorNote, Field, SectionHeader, nativeControlClass, useOutreachFormat } from "./ui";
-import { ContentFields, type ContentValue } from "./HtmlContent";
+import { ContentFields, hasContent, type ContentValue } from "./HtmlContent";
 import { ListChecklist, SenderSelect, TrackingSwitches } from "./SendingFields";
 
 type Form = Required<Pick<CampaignInput, "name" | "senderIdentityId" | "listIds" | "excludedListIds" | "trackOpens" | "trackClicks">> & ContentValue;
@@ -67,12 +67,15 @@ export default function CampaignEditor({ campaign, onScheduled }: { campaign: Ca
 
   /** Saves pending changes; returns the stored campaign (creating it the first time). */
   const persist = async (): Promise<Campaign> => {
-    const body: CampaignInput = { ...form, name: form.name.trim() };
+    const sent = form;
+    const body: CampaignInput = { ...sent, name: sent.name.trim() };
     const result = current
       ? await api.send<{ campaign: Campaign }>("PATCH", `campaigns/${encodeURIComponent(current.id)}`, body)
       : await api.send<{ campaign: Campaign }>("POST", "campaigns", body);
     const next = formOf(result.campaign);
-    setCurrent(result.campaign); setSaved(next); setForm(next);
+    setCurrent(result.campaign); setSaved(next);
+    // Input typed while the request ran stays and remains unsaved.
+    setForm(previous => previous === sent ? next : previous);
     return result.campaign;
   };
   const run = async (key: string, action: () => Promise<void>) => {
@@ -120,7 +123,7 @@ export default function CampaignEditor({ campaign, onScheduled }: { campaign: Ca
   const laterInvalid = when === "later" && (!Number.isFinite(laterAt) || laterAt <= dialogOpenedAt);
   const missing = [
     !form.subject.trim() && t("campaigns.missing.subject"),
-    !form.html.trim() && t("campaigns.missing.content"),
+    !hasContent(form) && t("campaigns.missing.content"),
     form.listIds.length === 0 && t("campaigns.missing.lists")
   ].filter((value): value is string => Boolean(value));
 
@@ -168,7 +171,7 @@ export default function CampaignEditor({ campaign, onScheduled }: { campaign: Ca
                 <input type="email" required className={nativeControlClass} value={testTo} onChange={event => setTestTo(event.target.value)} />
               </Field>
             </div>
-            <Button type="submit" variant="outline" disabled={busy !== null || !testTo.trim() || !form.name.trim() || !form.html.trim()}>
+            <Button type="submit" variant="outline" disabled={busy !== null || !testTo.trim() || !form.name.trim() || !hasContent(form)}>
               {busy === "test" ? t("actions.working") : t("campaigns.sendTest")}
             </Button>
           </form>

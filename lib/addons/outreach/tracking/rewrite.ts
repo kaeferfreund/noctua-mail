@@ -49,12 +49,22 @@ export function rewriteTrackedHtml(db: Database, input: TrackedHtmlInput, origin
   const insert = db.prepare(`INSERT INTO tracking_links (token, accountId, sendId, kind, url, contactId, createdAt)
     SELECT ?1, accountId, id, ?2, ?3, COALESCE(?4, contactId), ?5 FROM sends
     WHERE accountId = ?6 AND id = ?7 AND (?4 IS NULL OR contactId = ?4)`);
+  // A retry of the same send reuses its tokens instead of piling up new ones.
+  const existing = db.prepare(`SELECT l.token FROM tracking_links l
+    JOIN sends s ON s.accountId = l.accountId AND s.id = l.sendId
+    WHERE l.accountId = ?1 AND l.sendId = ?2 AND l.kind = ?3 AND l.url IS ?4 AND (?5 IS NULL OR s.contactId = ?5)
+    ORDER BY l.createdAt, l.token LIMIT 1`);
   const now = Date.now();
+  const ownOrigin = new URL(origin).origin;
+  let createdOpenToken = false;
 
   function tokenFor(kind: "open" | "click", url: string | null): string {
+    const reused = existing.get(input.accountId, input.sendId, kind, url, input.contactId ?? null) as { token: string } | null;
+    if (reused) return reused.token;
     const token = newOutreachToken();
     const { changes } = insert.run(token, kind, url, input.contactId ?? null, now, input.accountId, input.sendId);
     if (changes !== 1) throw new Error("Tracking send does not exist");
+    if (kind === "open") createdOpenToken = true;
     return token;
   }
 
@@ -69,7 +79,9 @@ export function rewriteTrackedHtml(db: Database, input: TrackedHtmlInput, origin
     if (!href || !span || edits.has(span.startOffset)) continue;
     if (href.value.length > MAX_TRACKED_URL_LENGTH) continue;
     const url = httpTarget(href.value);
-    if (!url || url.href.length > MAX_TRACKED_URL_LENGTH || url.pathname.startsWith("/t/") || keep.has(url.href)) continue;
+    if (!url || url.href.length > MAX_TRACKED_URL_LENGTH || keep.has(url.href)) continue;
+    // Only the addon's own tracking links are exempt; another site's /t/ path is an ordinary link.
+    if (url.origin === ownOrigin && url.pathname.startsWith("/t/")) continue;
     let token = targets.get(url.href);
     if (!token) {
       token = tokenFor("click", url.href);
@@ -97,6 +109,9 @@ export function rewriteTrackedHtml(db: Database, input: TrackedHtmlInput, origin
   for (const node of htmlElements(parse(withPixel))) {
     if (node.tagName === "img" && node.attrs.some(attr => attr.name === "src" && attr.value === src)) return withPixel;
   }
-  db.prepare("DELETE FROM tracking_links WHERE accountId = ? AND sendId = ? AND token = ?").run(input.accountId, input.sendId, token);
+  // A reused token may still be in an earlier attempt's mail.
+  if (createdOpenToken) {
+    db.prepare("DELETE FROM tracking_links WHERE accountId = ? AND sendId = ? AND token = ?").run(input.accountId, input.sendId, token);
+  }
   return html;
 }

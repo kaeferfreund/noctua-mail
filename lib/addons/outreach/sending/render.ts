@@ -3,14 +3,18 @@ import { escapeHtml } from "@/lib/html/strip";
 import { htmlToPlainText } from "@/lib/mail/spam/input";
 import { TEMPLATE_PLACEHOLDERS, type RenderResponse } from "../types";
 
-const placeholder = /{{\s*([^{}]*?)\s*}}|{%\s*([^{}]*?)\s*%}/g;
+// Each part can match a character in one way only, so a failed match costs linear time.
+// The captures are trimmed by `placeholderParts` (`\s` and `String#trim` cover the same characters).
+const placeholder = /{{([^{}]*)}}|{%((?:[^{}%]|%(?!}))*)%}/g;
+const placeholderParts = (variable: string | undefined, tag: string | undefined) => [variable?.trim(), tag?.trim()] as const;
 const expression = /^([\w.]+)(?:\s*\|\s*default\s*:\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'))?$/;
 const known = new Set<string>(TEMPLATE_PLACEHOLDERS);
 const urlAttributes = new Set(["href", "src", "background", "action", "formaction", "poster", "cite", "longdesc", "data"]);
 const rawText = new Set(["script", "style", "xmp", "iframe", "noembed", "noframes", "noscript", "plaintext"]);
 
 export function normalizeTemplate(value: string, html = false): string {
-  return value.replaceAll(placeholder, (match, variable: string | undefined, tag: string | undefined) => {
+  return value.replaceAll(placeholder, (match, rawVariable: string | undefined, rawTag: string | undefined) => {
+    const [variable, tag] = placeholderParts(rawVariable, rawTag);
     if (tag === "unsubscribe_link") return "{{ unsubscribe_url }}";
     if (tag === "current_year") return "{{ current_year }}";
     const unsubscribe = tag?.match(/^unsubscribe(?:\s+(['"])(.*?)\1)?$/s);
@@ -36,8 +40,18 @@ type RenderOptions = {
   now: number;
 };
 
+/** Strips the ASCII whitespace a URL attribute ignores (no regex: long runs must not backtrack). */
+function trimUrlWhitespace(value: string) {
+  const space = (char: string | undefined) => char === " " || char === "\t" || char === "\n" || char === "\f" || char === "\r";
+  let start = 0;
+  let end = value.length;
+  while (start < end && space(value[start])) start++;
+  while (end > start && space(value[end - 1])) end--;
+  return value.slice(start, end);
+}
+
 function documentOrFragment(html: string) {
-  return /^(?:\s|<!--[\s\S]*?-->)*(?:<!doctype\b|<html\b|<head\b|<body\b)/i.test(html) ? parse(html) : parseFragment(html);
+  return /^(?:\s|<!--(?:(?!-->)[\s\S])*-->)*(?:<!doctype\b|<html\b|<head\b|<body\b)/i.test(html) ? parse(html) : parseFragment(html);
 }
 
 function visit(node: Tree.Node, callback: (node: Tree.Node) => void) {
@@ -54,7 +68,8 @@ export function renderContent(content: Content, options: RenderOptions): RenderR
     current_year: String(new Date(options.now).getUTCFullYear()), unsubscribe_url: options.unsubscribeUrl
   };
 
-  const resolve = (variable: string | undefined, tag: string | undefined) => {
+  const resolve = (rawVariable: string | undefined, rawTag: string | undefined) => {
+    const [variable, tag] = placeholderParts(rawVariable, rawTag);
     const parsed = variable?.match(expression);
     if (!parsed || !known.has(parsed[1])) {
       warnings.add(`Unbekannter Platzhalter: ${(variable ?? tag ?? "").slice(0, 120)}`);
@@ -74,12 +89,15 @@ export function renderContent(content: Content, options: RenderOptions): RenderR
     return `${marker}${tokens.length - 1}z`;
   });
   const document = documentOrFragment(encoded);
-  const replace = (value: string, mode: "text" | "url" | "blocked" = "text") => value.replaceAll(markers, (match, index) => {
+  const replace = (value: string, mode: "text" | "url" | "comment" | "blocked" = "text") => value.replaceAll(markers, (_match, index, offset: number) => {
     const token = tokens[Number(index)];
     if (mode === "blocked") return "";
     if (mode === "text") return token.value;
-    // The server-generated URL can fill a complete attribute. Other values are URL components.
-    if (token.name === "unsubscribe_url" && value === match && token.value === options.unsubscribeUrl && /^https?:\/\//i.test(token.value)) {
+    // Comment data is serialized verbatim: escaped, a value can close neither the comment nor an attribute in it.
+    if (mode === "comment") return escapeHtml(token.value);
+    // The server-generated URL can start an attribute (a query or fragment may follow). Other values are URL components.
+    if (token.name === "unsubscribe_url" && !trimUrlWhitespace(value.slice(0, offset)) && token.value === options.unsubscribeUrl
+      && /^https?:\/\//i.test(token.value)) {
       return token.value;
     }
     return encodeURIComponent(Buffer.from(token.value).toString());
@@ -91,6 +109,8 @@ export function renderContent(content: Content, options: RenderOptions): RenderR
           || node.tagName === "meta" || node.tagName === "script";
         const dynamic = attr.value.includes(marker);
         attr.value = replace(attr.value, blocked ? "blocked" : urlAttributes.has(attr.name) ? "url" : "text");
+        // A URL attribute ignores surrounding ASCII whitespace; drop it so the link matches the unsubscribe URL.
+        if (dynamic && urlAttributes.has(attr.name)) attr.value = trimUrlWhitespace(attr.value);
         // Check the assembled URL too: static text and encoded values can jointly form a scheme.
         if (dynamic && urlAttributes.has(attr.name) && /^[a-z][a-z\d+.-]*:/i.test(attr.value.replace(/[\x00-\x20]/g, ""))
           && !/^(https?|mailto|tel|cid):/i.test(attr.value.trim())) attr.value = "";
@@ -100,7 +120,8 @@ export function renderContent(content: Content, options: RenderOptions): RenderR
       const parent = node.parentNode;
       node.value = replace(node.value, parent && "tagName" in parent && rawText.has(parent.tagName) ? "blocked" : "text");
     }
-    if ("data" in node) node.data = replace(node.data, "blocked");
+    // Outlook renders the markup of conditional comments (`<!--[if mso]>…<![endif]-->`).
+    if ("data" in node) node.data = replace(node.data, "comment");
   });
   // Markers in tag/attribute names (and malformed markup) cannot carry a substitution.
   const html = serialize(document).replaceAll(markers, "");

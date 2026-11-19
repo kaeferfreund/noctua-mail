@@ -68,6 +68,9 @@ export async function scheduleCampaign(db: Database, actor: SendingActor, id: st
   if (!campaign.listIds.length) throw new SendingError(400, "Wähle mindestens eine Empfängerliste.");
   const { identity, userId, assertAuthorized } = await checkTransportAndSender(actor, campaign.senderIdentityId);
   const recipients = (await listRecipients(accountId, campaign)).length;
+  if (!input.dryRun && !recipients) {
+    throw new SendingError(409, "Die Kampagne erreicht derzeit niemanden: In den gewählten Listen ist kein Kontakt eingetragen, der den Newsletter erhalten darf.", "no_recipients");
+  }
   const preview = input.dryRun ? await campaignSummary(campaign) : null;
   const next = db.transaction(() => {
     assertAuthorized();

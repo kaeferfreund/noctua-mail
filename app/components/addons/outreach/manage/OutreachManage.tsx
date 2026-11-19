@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useImperativeHandle, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import { ArrowLeft, FileCode2, LayoutDashboard, ListChecks, Megaphone, Repeat, Users } from "lucide-react";
 import type { AccountRole, SenderIdentity } from "@/lib/data";
 import type { AdminFetch } from "@/app/hooks/useAdminApi";
@@ -23,6 +23,14 @@ const ICONS: Record<OutreachSection, ReactNode> = {
   templates: <FileCode2 />, campaigns: <Megaphone />, sequences: <Repeat />
 };
 
+/** Lets the page send browser Back/Forward through the unsaved-changes dialog. */
+export type OutreachLeaveGuard = {
+  /** Whether an editor holds unsaved changes. */
+  blocks: () => boolean;
+  /** Opens the unsaved-changes dialog; `leave` runs when the user discards the changes. */
+  ask: (leave: () => void) => void;
+};
+
 export type OutreachManageProps = {
   accountId: string;
   /** Mailbox label shown in the header (name or address). */
@@ -33,22 +41,25 @@ export type OutreachManageProps = {
   /** Link back to the mail program. */
   mailHref: string;
   fetchImpl?: AdminFetch;
+  leaveGuard?: Ref<OutreachLeaveGuard>;
 };
 
 /** The newsletter area of one mailbox: section navigation, shared data and the unsaved-changes guard. */
-export default function OutreachManage({ accountId, accountLabel, role, location, onLocationChange, mailHref, fetchImpl = fetch }: OutreachManageProps) {
+export default function OutreachManage({ accountId, accountLabel, role, location, onLocationChange, mailHref, fetchImpl = fetch, leaveGuard }: OutreachManageProps) {
   const t = useTranslations("outreach");
   const api = useMemo(() => createOutreachApi(accountId, fetchImpl), [accountId, fetchImpl]);
   const dirty = useRef(new Set<string>());
-  const [pending, setPending] = useState<OutreachLocation | null>(null);
+  /** The way out the unsaved-changes dialog is asking about. */
+  const [pending, setPending] = useState<{ leave: () => void } | null>(null);
 
   const setDirty = useCallback((key: string, value: boolean) => {
     if (value) dirty.current.add(key); else dirty.current.delete(key);
   }, []);
   const navigate = useCallback((next: OutreachLocation) => {
-    if (dirty.current.size > 0) { setPending(next); return; }
+    if (dirty.current.size > 0) { setPending({ leave: () => onLocationChange(next) }); return; }
     onLocationChange(next);
   }, [onLocationChange]);
+  useImperativeHandle(leaveGuard, () => ({ blocks: () => dirty.current.size > 0, ask: leave => setPending({ leave }) }), []);
 
   const lists = useSharedResource(() => api.get<{ lists: ContactList[] }>("lists").then(body => body.lists), accountId);
   const templates = useSharedResource(() => api.get<{ templates: EmailTemplateSummary[] }>("templates").then(body => body.templates), accountId);
@@ -103,7 +114,7 @@ export default function OutreachManage({ accountId, accountLabel, role, location
       {pending ? (
         <ConfirmDialog title={t("unsaved.title")} description={t("unsaved.description")} confirmLabel={t("unsaved.discard")} destructive busy={false}
           onCancel={() => setPending(null)}
-          onConfirm={() => { dirty.current.clear(); const next = pending; setPending(null); onLocationChange(next); }} />
+          onConfirm={() => { dirty.current.clear(); setPending(null); pending.leave(); }} />
       ) : null}
     </OutreachManageContext.Provider>
   );
