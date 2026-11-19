@@ -19,8 +19,9 @@ const defaults = { db: getOutreachDb, suppress: suppressContact, record: recordT
 
 const marker = "json_extract(CASE WHEN json_valid(detail) THEN detail END, '$.snsMessageId')";
 const providerEvents = "type IN ('bounce','complaint','delivered')";
+const unmatchedRetryMs = 7 * 24 * 60 * 60_000;
 
-export async function applySesEvent(snsMessageId: string, input: unknown, deps = defaults) {
+export async function applySesEvent(snsMessageId: string, input: unknown, deps = defaults, publishedAt?: number) {
   const parsed = payload.safeParse(input);
   if (!parsed.success) return;
   const event = parsed.data;
@@ -57,17 +58,17 @@ export async function applySesEvent(snsMessageId: string, input: unknown, deps =
   const at = Date.parse(when ?? "");
   const mailAt = Number.isFinite(at) ? at : deps.now();
 
+  const lookup = rows<{ id: string; contactId: string | null; kind: string; pending: number }>(db, `SELECT id, contactId, kind, 0 AS pending FROM sends
+    WHERE accountId = ?1 AND providerMessageId = ?2 AND status = 'sent' AND kind IN ('campaign','sequence','test')
+    UNION ALL
+    SELECT id, contactId, kind, 1 AS pending FROM sends
+    WHERE accountId = ?1 AND id = ?3 AND status = 'sending' AND kind IN ('campaign','sequence','test')
+    ORDER BY pending LIMIT 1`);
   for (const accountId of outreachAccounts(db, false)) {
-    const send = rows<{ id: string; contactId: string | null }>(db, `SELECT id, contactId FROM sends
-      WHERE accountId = ? AND providerMessageId = ? AND status = 'sent' AND kind IN ('campaign','sequence') LIMIT 1`)
-      .get(accountId, event.mail.messageId);
-    if (!send) {
-      // SES can deliver an event before the send receipt has committed.
-      const id = event.mail.tags?.noctua_send_id?.[0];
-      if (id && db.query(`SELECT 1 FROM sends WHERE accountId = ? AND id = ? AND status = 'sending'
-        AND kind IN ('campaign','sequence')`).get(accountId, id)) throw new Error("SES receipt pending");
-      continue;
-    }
+    const send = lookup.get(accountId, event.mail.messageId, event.mail.tags?.noctua_send_id?.[0] ?? null);
+    // A pending tag is not proof that this provider id belongs to the send.
+    if (!send || send.pending) continue;
+    if (send.kind === "test") return;
     if (seen.get(accountId, snsMessageId)) return;
     // Suppression is idempotent and precedes the replay marker so a failure
     // remains retryable. Never trust an address supplied by the SNS payload.
@@ -79,4 +80,6 @@ export async function applySesEvent(snsMessageId: string, input: unknown, deps =
     }
     return;
   }
+  if (deps.now() - (publishedAt ?? mailAt) < unmatchedRetryMs) throw new Error("SES receipt not found");
+  console.warn("[outreach] expired unmatched SES event");
 }

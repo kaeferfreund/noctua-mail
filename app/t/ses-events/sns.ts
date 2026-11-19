@@ -68,8 +68,9 @@ const limiter = createRateLimiter({ max: 600 });
 const globalLimiter = createRateLimiter({ max: 3600 });
 const defaults = {
   enabled: outreachAddonEnabled, topic: () => process.env.NOCTUA_OUTREACH_SES_EVENTS_TOPIC_ARN,
-  isLimited: (request: Request) => globalLimiter.isLimited("sns") || limiter.isLimited(getRequestIp(request)),
-  fetch: globalThis.fetch as SnsFetch, verify: createSnsVerifier(), apply: applySesEvent
+  isLimited: (request: Request) => limiter.isLimited(getRequestIp(request)) || globalLimiter.isLimited("sns"),
+  fetch: globalThis.fetch as SnsFetch, verify: createSnsVerifier(),
+  apply: (messageId: string, event: unknown, publishedAt: number) => applySesEvent(messageId, event, undefined, publishedAt)
 };
 
 export function createSnsHandler(deps = defaults) {
@@ -120,7 +121,7 @@ export function createSnsHandler(deps = defaults) {
       } else if (message.Type === "Notification") {
         let notification: unknown;
         try { notification = JSON.parse(message.Message); } catch { return new Response(null, { status: 400 }); }
-        await deps.apply(message.MessageId, notification);
+        await deps.apply(message.MessageId, notification, Date.parse(message.Timestamp));
       }
       return new Response(null, { status: 200 });
     } catch {

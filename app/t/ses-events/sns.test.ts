@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { X509Certificate } from "node:crypto";
 import { createSnsHandler, createSnsVerifier } from "./sns";
+import { POST } from "./route";
 import signed from "./sns.fixture.json";
 
 const topic = "arn:aws:sns:eu-central-1:000000000000:test-topic";
@@ -76,4 +77,30 @@ test("SNS confirms only the verified topic and allowed HTTPS host, coalescing a 
   const results = await Promise.all([handler(request(message)), handler(request(message))]);
   expect(results.map(result => result.status)).toEqual([200, 200]);
   expect(f.calls.map(url => url.hostname)).toEqual([host]);
+});
+
+test("requests over the per-address limit leave budget for a second address", async () => {
+  const saved = { flag: process.env.NOCTUA_ADDON_OUTREACH, topic: process.env.NOCTUA_OUTREACH_SES_EVENTS_TOPIC_ARN };
+  process.env.NOCTUA_ADDON_OUTREACH = "1";
+  process.env.NOCTUA_OUTREACH_SES_EVENTS_TOPIC_ARN = topic;
+  const from = (ip: string) => new Request("https://mail.example.test/t/ses-events", {
+    method: "POST", headers: { "x-forwarded-for": Array<string>(16).fill(ip).join(", ") }, body: "invalid JSON"
+  });
+  try {
+    for (let i = 0; i < 3600; i++) await POST(from("192.0.2.1"));
+    expect((await POST(from("192.0.2.1"))).status).toBe(429);
+    expect((await POST(from("192.0.2.2"))).status).toBe(400);
+  } finally {
+    if (saved.flag === undefined) delete process.env.NOCTUA_ADDON_OUTREACH; else process.env.NOCTUA_ADDON_OUTREACH = saved.flag;
+    if (saved.topic === undefined) delete process.env.NOCTUA_OUTREACH_SES_EVENTS_TOPIC_ARN; else process.env.NOCTUA_OUTREACH_SES_EVENTS_TOPIC_ARN = saved.topic;
+  }
+});
+
+test("SNS retries a verified notification when applying it fails", async () => {
+  const f = fixture();
+  f.deps.apply = async (_id, _event, publishedAt) => {
+    expect(publishedAt).toBe(Date.parse(notification.Timestamp));
+    throw new Error("SES receipt not found");
+  };
+  expect((await createSnsHandler(f.deps)(request(notification))).status).toBe(503);
 });
