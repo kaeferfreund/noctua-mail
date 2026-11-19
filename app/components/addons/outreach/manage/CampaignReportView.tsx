@@ -43,33 +43,35 @@ export default function CampaignReportView({ campaign, scheduledRecipients, onCh
   };
   const refresh = () => void report.reload();
 
-  const pending = campaign.status === "scheduled" || campaign.status === "sending";
+  // Status, times and actions follow the newest state: the reloaded report or a newer prop (after cancelling).
+  const shown: CampaignMeta = report.data && report.data.campaign.updatedAt >= campaign.updatedAt ? report.data.campaign : campaign;
+  const pending = shown.status === "scheduled" || shown.status === "sending";
   const stats = report.data?.stats;
   const listNames = (ids: string[]) => ids.map(id => lists.data?.find(list => list.id === id)?.name ?? t("campaigns.unknownList")).join(", ");
 
   return (
     <>
-      <SectionHeader title={campaign.name || t("campaigns.untitled")} description={campaignWhen(campaign, t, format.dateTime)}
+      <SectionHeader title={shown.name || t("campaigns.untitled")} description={campaignWhen(shown, t, format.dateTime)}
         onBack={() => navigate({ section: "campaigns" })}
         actions={<>
-          <CampaignStatusBadge status={campaign.status} />
+          <CampaignStatusBadge status={shown.status} />
           <Button variant="ghost" size="sm" onClick={refresh} disabled={report.loading}><RefreshCw />{t("actions.refresh")}</Button>
           {canEdit && pending ? <Button variant="destructive" onClick={() => { setError(null); setConfirmCancel(true); }}><Ban />{t("campaigns.cancel")}</Button> : null}
         </>} />
-      {scheduledRecipients !== null ? (
+      {scheduledRecipients !== null && pending ? (
         <p role="status" className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
-          {campaign.sendAt && campaign.status === "scheduled"
-            ? t("campaigns.scheduledFor", { count: scheduledRecipients, formatted: format.number(scheduledRecipients), date: format.dateTime(campaign.sendAt) })
+          {shown.sendAt && shown.status === "scheduled"
+            ? t("campaigns.scheduledFor", { count: scheduledRecipients, formatted: format.number(scheduledRecipients), date: format.dateTime(shown.sendAt) })
             : t("campaigns.sendingTo", { count: scheduledRecipients, formatted: format.number(scheduledRecipients) })}
         </p>
       ) : null}
       <dl className="grid grid-cols-1 gap-x-4 gap-y-1 rounded-lg border p-4 text-sm sm:grid-cols-[auto_minmax(0,1fr)]">
-        <dt className="text-muted-foreground">{t("content.subject")}</dt><dd className="truncate">{campaign.subject || "–"}</dd>
-        <dt className="text-muted-foreground">{t("campaigns.lists")}</dt><dd>{listNames(campaign.listIds) || "–"}</dd>
-        {campaign.excludedListIds.length > 0 ? <><dt className="text-muted-foreground">{t("campaigns.excludedLists")}</dt><dd>{listNames(campaign.excludedListIds)}</dd></> : null}
+        <dt className="text-muted-foreground">{t("content.subject")}</dt><dd className="truncate">{shown.subject || "–"}</dd>
+        <dt className="text-muted-foreground">{t("campaigns.lists")}</dt><dd>{listNames(shown.listIds) || "–"}</dd>
+        {shown.excludedListIds.length > 0 ? <><dt className="text-muted-foreground">{t("campaigns.excludedLists")}</dt><dd>{listNames(shown.excludedListIds)}</dd></> : null}
         <dt className="text-muted-foreground">{t("sending.tracking")}</dt>
-        <dd>{campaign.trackOpens || campaign.trackClicks
-          ? [campaign.trackOpens && t("sending.trackOpens"), campaign.trackClicks && t("sending.trackClicks")].filter(Boolean).join(", ")
+        <dd>{shown.trackOpens || shown.trackClicks
+          ? [shown.trackOpens && t("sending.trackOpens"), shown.trackClicks && t("sending.trackClicks")].filter(Boolean).join(", ")
           : t("sending.trackingOff")}</dd>
       </dl>
       <ErrorNote error={paged.error} onRetry={() => void report.reload()} />
@@ -123,7 +125,7 @@ export default function CampaignReportView({ campaign, scheduledRecipients, onCh
       ) : null}
       {confirmCancel ? (
         <ConfirmDialog title={t("campaigns.cancelTitle")}
-          description={campaign.status === "sending" ? t("campaigns.cancelSendingDescription") : t("campaigns.cancelScheduledDescription")}
+          description={shown.status === "sending" ? t("campaigns.cancelSendingDescription") : t("campaigns.cancelScheduledDescription")}
           confirmLabel={t("campaigns.cancel")} destructive busy={busy} error={error}
           onCancel={() => setConfirmCancel(false)} onConfirm={() => void cancel()} />
       ) : null}

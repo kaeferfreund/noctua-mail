@@ -75,8 +75,8 @@ export function HtmlPreview({ subject, html, text }: { subject: string; html: st
   const { api } = useOutreachManage();
   const [live, setLive] = useState(html);
   const [contact, setContact] = useState<Contact | null>(null);
-  // A server rendering belongs to the source it was made from; editing the source hides it.
-  const source = JSON.stringify([subject, html, text ?? ""]);
+  // A server rendering belongs to the source and the contact it was made for; changing either hides it.
+  const source = JSON.stringify([subject, html, text ?? "", contact?.id ?? null]);
   const [renderedFor, setRenderedFor] = useState<{ source: string; result: RenderResponse } | null>(null);
   const rendered = renderedFor?.source === source ? renderedFor.result : null;
   const setRendered = (result: RenderResponse | null) => setRenderedFor(result ? { source, result } : null);
@@ -175,9 +175,16 @@ export function ContactPicker({ label, value, onChange }: { label: string; value
 
 export type ContentValue = { subject: string; previewText: string; templateId: string | null; html: string; text: string };
 
+/** Content the server can send: an own body, or a referenced template that fills an empty one. */
+export function hasContent(value: Pick<ContentValue, "templateId" | "html" | "text">) {
+  return Boolean(value.html.trim() || value.text.trim() || value.templateId);
+}
+
 /**
  * Subject, preview text and body of a campaign or sequence step: either copied from a saved
- * template (and kept in sync only when chosen again) or written as own HTML.
+ * template (and kept in sync only when chosen again) or written as own HTML. A template
+ * reference with an empty own body (as the flow import writes it) shows the template's body;
+ * the server fills it in the same way when sending.
  */
 export function ContentFields({ value, onChange, readOnly, idPrefix }: { value: ContentValue; onChange: (value: ContentValue) => void; readOnly?: boolean; idPrefix: string }) {
   const t = useTranslations("outreach");
@@ -185,30 +192,49 @@ export function ContentFields({ value, onChange, readOnly, idPrefix }: { value: 
   const [mode, setMode] = useState<"template" | "own">(value.templateId ? "template" : "own");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const [referenced, setReferenced] = useState<EmailTemplate | null>(null);
+  // Bumped by every source switch and edit: a template answer that arrives later is dropped.
+  const request = useRef(0);
   const { ensure } = templates;
   useEffect(() => { ensure(); }, [ensure]);
+  const referenceId = value.templateId && !value.html.trim() && !value.text.trim() ? value.templateId : null;
+  useEffect(() => {
+    if (!referenceId) return;
+    let active = true;
+    api.get<{ template: EmailTemplate }>(`templates/${encodeURIComponent(referenceId)}`)
+      .then(({ template }) => { if (active) setReferenced(template); })
+      .catch(caught => { if (active) setError(caught); });
+    return () => { active = false; };
+  }, [api, referenceId]);
+  const reference = referenceId && referenced?.id === referenceId ? referenced : null;
+  const shown = reference ? { html: reference.html, text: reference.text } : { html: value.html, text: value.text };
+  const edit = (next: ContentValue) => { request.current++; setLoading(false); onChange(next); };
   const chooseTemplate = async (templateId: string) => {
-    if (!templateId) { onChange({ ...value, templateId: null }); return; }
+    if (!templateId) { edit({ ...value, templateId: null }); return; }
+    const current = ++request.current;
     setLoading(true); setError(null);
     try {
       const { template } = await api.get<{ template: EmailTemplate }>(`templates/${encodeURIComponent(templateId)}`);
+      if (current !== request.current) return;
       onChange({
         subject: value.subject.trim() ? value.subject : template.subject,
         previewText: value.previewText.trim() ? value.previewText : template.previewText,
         templateId: template.id, html: template.html, text: template.text
       });
-    } catch (caught) { setError(caught); }
-    finally { setLoading(false); }
+    } catch (caught) { if (current === request.current) setError(caught); }
+    finally { if (current === request.current) setLoading(false); }
   };
+  // Own HTML starts from what the preview shows; the text version is derived from it when sending.
+  const switchToOwn = () => { setMode("own"); edit({ ...value, templateId: null, html: shown.html, text: "" }); };
   const available = (templates.data ?? []).filter(template => !template.archivedAt || template.id === value.templateId);
   return (
     <div className="flex flex-col gap-3">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <Field label={t("content.subject")}>
-          <input readOnly={readOnly} className={nativeControlClass} value={value.subject} onChange={event => onChange({ ...value, subject: event.target.value })} />
+          <input readOnly={readOnly} className={nativeControlClass} value={value.subject} onChange={event => edit({ ...value, subject: event.target.value })} />
         </Field>
         <Field label={t("content.previewText")} hint={t("content.previewTextHint")}>
-          <input readOnly={readOnly} className={nativeControlClass} value={value.previewText} onChange={event => onChange({ ...value, previewText: event.target.value })} />
+          <input readOnly={readOnly} className={nativeControlClass} value={value.previewText} onChange={event => edit({ ...value, previewText: event.target.value })} />
         </Field>
       </div>
       <fieldset className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm" disabled={readOnly}>
@@ -218,7 +244,7 @@ export function ContentFields({ value, onChange, readOnly, idPrefix }: { value: 
           <input type="radio" name={`${idPrefix}-source`} checked={mode === "template"} onChange={() => setMode("template")} />{t("content.fromTemplate")}
         </label>
         <label className="flex items-center gap-2 max-md:min-h-11">
-          <input type="radio" name={`${idPrefix}-source`} checked={mode === "own"} onChange={() => { setMode("own"); onChange({ ...value, templateId: null }); }} />{t("content.ownHtml")}
+          <input type="radio" name={`${idPrefix}-source`} checked={mode === "own"} onChange={switchToOwn} />{t("content.ownHtml")}
         </label>
       </fieldset>
       {mode === "template" ? (
@@ -232,10 +258,10 @@ export function ContentFields({ value, onChange, readOnly, idPrefix }: { value: 
       <ErrorNote error={error ?? templates.error} />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {mode === "own"
-          ? <HtmlSourceEditor label={t("content.html")} value={value.html} readOnly={readOnly} onChange={html => onChange({ ...value, html })} />
+          ? <HtmlSourceEditor label={t("content.html")} value={value.html} readOnly={readOnly} onChange={html => edit({ ...value, html, text: "" })} />
           : null}
         <div className={mode === "own" ? undefined : "lg:col-span-2"}>
-          <HtmlPreview subject={value.subject} html={value.html} text={value.text} />
+          <HtmlPreview subject={value.subject} html={shown.html} text={shown.text} />
         </div>
       </div>
     </div>
