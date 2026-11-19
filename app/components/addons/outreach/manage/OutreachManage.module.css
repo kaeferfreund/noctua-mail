@@ -1,0 +1,35 @@
+/* The app has no Tailwind preflight (see app/globals.css); the newsletter area is written
+   against it, so this scoped baseline removes the user-agent margins, list markers and button
+   chrome of its own elements. It sits in the base layer, so every utility class still wins. */
+@layer base {
+  .root :where(p, h1, h2, h3, h4, dl, dd, ul, ol, fieldset, legend, figure) {
+    margin: 0;
+    padding: 0;
+  }
+
+  .root :where(h1, h2, h3, h4) {
+    font-size: inherit;
+    font-weight: inherit;
+  }
+
+  .root :where(ul, ol) {
+    list-style: none;
+  }
+
+  .root :where(fieldset) {
+    border: 0;
+    min-width: 0;
+  }
+
+  .root :where(button) {
+    padding: 0;
+    font: inherit;
+    letter-spacing: inherit;
+    color: inherit;
+    background-color: transparent;
+  }
+
+  .root :where(table) {
+    border-collapse: collapse;
+  }
+}
