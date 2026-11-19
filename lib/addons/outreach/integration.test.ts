@@ -171,3 +171,63 @@ test("a failed welcome enrollment rolls back API and editor subscriptions, which
   expect(db.query("SELECT count(*) AS count FROM sequence_enrollments WHERE accountId = ? AND sequenceId = ?")
     .get(accountId, sequence.id)).toEqual({ count: 2 });
 });
+
+test("a configuration fault holds the welcome series back instead of burning its steps; a text-only step arrives readable", async () => {
+  const accountId = crypto.randomUUID();
+  const db = await getOutreachDb();
+  await saveOutreachSettings(accountId, { enabled: true, transport: "mailbox-smtp" }, "manager-1");
+  const list = await createContactList(accountId, { name: "Welcome" });
+  const sequence = saveSequence(db, accountId, { name: "Welcome series", triggerListId: list.id, steps: [
+    { delayMinutes: 0, subject: "Willkommen", text: "Hallo {{ first_name }},\nschön, dass du da bist.\n\nBis bald" },
+    { delayMinutes: 1440, subject: "Tag zwei", html: "<p>Zweite Mail</p>" }
+  ] });
+  db.query("UPDATE sequences SET status = 'live', statusChangedByUserId = 'editor-1' WHERE accountId = ? AND id = ?").run(accountId, sequence.id);
+  const { token } = await createApiToken(accountId, "manager-1", { name: "Registration", listIds: [list.id] });
+  let now = Date.now() - 10 * 60_000;
+  await subscribeWithApiToken({ accountId, id: token.id }, { email: "kim@example.test", firstName: "Kim", listId: list.id }, now - 60_000);
+  const contact = findContactByEmail(db, accountId, "kim@example.test")!;
+
+  const mails: Array<{ to: string; subject: string; html: string; text: string }> = [];
+  // The mailbox has no usable SMTP at first, as after a restart with a broken configuration.
+  let smtp: { host: string; port: number; secure: boolean; user: string; password: string } = { host: "", port: 0, secure: false, user: "", password: "" };
+  const scheduler = new OutreachScheduler({
+    db: getOutreachDb, now: () => now, recipients: listSendableRecipients, settings: getOutreachSettings, retention: async () => 0,
+    send: input => sendOutreachMail(input, {
+      ...defaultSendDependencies, now: () => now,
+      getAccount: async () => ({ id: accountId, smtp }) as unknown as Account,
+      resolveIdentity: async () => ({ id: "identity-1", email: "news@example.test", displayName: "Example News", replyTo: undefined }),
+      authorize: (async () => ({})) as unknown as typeof defaultSendDependencies.authorize,
+      prepareAssertion: (async () => () => {}) as unknown as typeof defaultSendDependencies.prepareAssertion,
+      transport: {
+        ses: async () => { throw new Error("SES must not be used in this test"); },
+        "mailbox-smtp": async (mail, _account, _identity, beforeSend) => {
+          (await beforeSend())();
+          mails.push(mail);
+          return { messageId: mail.messageId, providerMessageId: null };
+        }
+      }
+    })
+  });
+  const enrollment = () => db.query("SELECT status, nextStepPosition FROM sequence_enrollments WHERE accountId = ? AND contactId = ?").get(accountId, contact.id);
+  const before = enrollment();
+
+  // Several passes with the fault: nothing is sent, nothing fails, the enrollment stays where it is.
+  for (let pass = 0; pass < 3; pass++) { await scheduler.tick(); now += 60_000; }
+  expect(mails).toHaveLength(0);
+  expect(enrollment()).toEqual(before);
+  expect(db.query("SELECT status, attempts FROM sends WHERE accountId = ? AND contactId = ?").all(accountId, contact.id)).toEqual([{ status: "queued", attempts: 0 }]);
+
+  // The configuration is repaired: the same step goes out on the next pass.
+  smtp = { host: "smtp.example.test", port: 587, secure: false, user: "news@example.test", password: "synthetic" };
+  await scheduler.tick();
+  expect(mails).toHaveLength(1);
+  expect(mails[0]).toMatchObject({ to: "kim@example.test", subject: "Willkommen" });
+  // Text-only content: the HTML part carries the message itself, with its line breaks.
+  expect(mails[0].html).toContain("<p>Hallo Kim,<br>schön, dass du da bist.</p>");
+  expect(mails[0].html).toContain("<p>Bis bald</p>");
+  expect(mails[0].text).toContain("Hallo Kim,\nschön, dass du da bist.");
+  expect(await getSendStats(accountId, { sequenceId: sequence.id })).toMatchObject({ sent: 1, failed: 0 });
+  expect(enrollment()).toMatchObject({ status: "active" });
+  expect(enrollment()).not.toEqual(before);
+  await scheduler.stop();
+});
