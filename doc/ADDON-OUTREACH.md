@@ -155,8 +155,11 @@ cursor is the last event's ID and distinguishes events with the same timestamp.
 
 `POST /api/addons/outreach/subscribe` with `Authorization: Bearer <api token>` →
 `SubscribeRequest` / `SubscribeResponse` (server to server, no session). `consentAt` is epoch
-milliseconds; a value up to five minutes ahead of this server's clock is stored as "now" (the
-caller's clock may run ahead), anything further in the future answers 400.
+milliseconds. The caller's clock may differ from this server's by up to 60 seconds: a value up to
+that far ahead is stored as "now", anything further in the future answers 400. Against a recorded
+unsubscribe or erase the claim counts 60 seconds earlier than stated, so the same request never
+becomes "newer" by being sent again; a new consent must therefore be later than the unsubscribe by
+more than 60 seconds, otherwise the answer is 409 `new_consent_required`.
 
 Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 
@@ -248,6 +251,7 @@ needs `send`, consent changes need `manage`. Tools: `get_message_tracking`,
 `list_campaigns`, `get_campaign`, `list_sequences` and `get_sequence` return the trace fields of
 the REST shapes; `schedule_campaign` and `set_sequence_status` record the calling token.
 
-Authenticated `/api/mcp` requests have a 7,006,892-byte body limit, including the entire body
-of a JSON-RPC batch. The limit fits one 5 MiB image encoded as base64 plus 16 KiB for the envelope.
-Larger requests receive HTTP 413.
+Authenticated `/api/mcp` requests have a 36 MiB body limit, including the entire body of a
+JSON-RPC batch. It is sized for a draft with about 25 MiB of attachments; the image upload checks
+its own 5 MiB limit. Larger requests receive HTTP 413, and a body that has not arrived completely
+after 120 seconds receives HTTP 408.

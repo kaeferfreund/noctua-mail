@@ -17,8 +17,9 @@ function sources(dir: string): string[] {
 
 test("every Radix Themes Select list is popper content", () => {
   const offenders = sources(join(import.meta.dir)).flatMap(file =>
-    [...readFileSync(file, "utf8").matchAll(/<Select\.Content\b[^>]*>/g)]
-      .filter(match => !/\bposition="popper"/.test(match[0]))
+    // `=>` inside a prop does not end the tag; quotes and braces around the value may vary.
+    [...readFileSync(file, "utf8").matchAll(/<Select\.Content\b(?:=>|[^>])*>/g)]
+      .filter(match => !/\bposition=(?:"popper"|'popper'|\{\s*["'`]popper["'`]\s*\})/.test(match[0]))
       .map(match => `${file.slice(import.meta.dir.length + 1)}: ${match[0]}`));
   expect(offenders).toEqual([]);
 });

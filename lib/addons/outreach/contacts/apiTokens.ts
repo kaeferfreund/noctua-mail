@@ -64,8 +64,12 @@ export async function authenticateSubscribeToken(header: string | null): Promise
   return { id: row.id, accountId: row.accountId };
 }
 
-/** How far ahead of this server a subscribing server's clock may run. */
-export const CONSENT_CLOCK_SKEW_MS = 5 * 60_000;
+/**
+ * How far a subscribing server's clock may differ from ours. A `consentAt` up to this far ahead is
+ * accepted, and every claimed `consentAt` counts against an unsubscribe or erase as if it had been
+ * given this much earlier.
+ */
+export const CONSENT_CLOCK_SKEW_MS = 60_000;
 
 export async function subscribeWithApiToken({ accountId, id }: AuthenticatedToken, input: SubscribeRequest, now = Date.now()): Promise<SubscribeResponse> {
   const db = await getOutreachDb();
@@ -84,10 +88,14 @@ export async function subscribeWithApiToken({ accountId, id }: AuthenticatedToke
     const claimed = input.consentAt ?? now;
     if (claimed > now + CONSENT_CLOCK_SKEW_MS) throw new ContactError("consentAt cannot be in the future");
     const at = Math.min(claimed, now);
+    // Stored as arrival time at the latest, but the same claim must not grow newer with every retry:
+    // a stamp from a clock that runs ahead would otherwise outrun an unsubscribe or erase recorded
+    // after the first acceptance. Against those, the claim counts as its earliest possible true time.
+    const decisionAt = input.consentAt === undefined ? at : claimed - CONSENT_CLOCK_SKEW_MS;
     const existing = findContactByEmail(db, accountId, input.email);
     const contact = existing ? updateContactFields(db, existing, input, now) : insertContact(db, accountId, input, "api", now);
     subscribeToList(db, contact, input.listId, {
-      at, source: input.consentSource ?? "api", explicit: input.consentAt !== undefined
+      at, decisionAt, source: input.consentSource ?? "api", explicit: input.consentAt !== undefined
     }, now);
     db.query("UPDATE api_tokens SET lastUsedAt = ? WHERE accountId = ? AND id = ?").run(now, accountId, id);
     return { contactId: contact.id, created: !existing };
