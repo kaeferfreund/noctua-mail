@@ -30,7 +30,6 @@ import {
 } from "@/lib/composeInvite";
 import { extractComposeInviteDraftFromSource } from "@/lib/composeInviteMetadata";
 import {
-  buildAccountDraftDiscardPath,
   buildAccountMessageSourcePath,
   buildAccountSmtpSendPath
 } from "@/lib/accountApiPaths";
@@ -1052,9 +1051,9 @@ function ComposeOrchestratorImpl(
       // is already running (or queued) finish before we touch the draft. A
       // forward/reply auto-saves a draft on open; if its IMAP APPEND is still
       // in flight when send fires, cancelling outright would orphan that draft
-      // on the server (the discard below would run against a not-yet-known
-      // draft id). Flushing first lets the save settle and populate
-      // `composeDraftIdRef`, so the discard can delete both copies.
+      // on the server (the send would name a not-yet-known draft id). Flushing
+      // first lets the save settle and populate `composeDraftIdRef`, so the
+      // send route removes the saved draft along with the send.
       if (draftSaveTimerRef.current !== null) {
         clearTimeout(draftSaveTimerRef.current);
         draftSaveTimerRef.current = null;
@@ -1118,18 +1117,11 @@ function ComposeOrchestratorImpl(
         // replace the shared draft ref while delivery is in flight.
         const sentDraftId = sendDraftId;
         acceptedDraftId = sentDraftId;
-        if (sentDraftId && activeAccountId) {
+        // The send route already removed this draft on the server (also when the page
+        // reloads mid-send); the UI only drops it from the list.
+        if (sentDraftId) {
           suppressDraftDeleteReconcile(sentDraftId);
           removeDraftFromUi(sentDraftId);
-          try {
-            await apiFetch(buildAccountDraftDiscardPath(activeAccountId, sentDraftId), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({})
-            });
-          } catch {
-            // ignore draft cleanup errors
-          }
         }
         const sentView = composeView;
         if (isSendSession()) {
