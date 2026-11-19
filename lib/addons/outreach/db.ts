@@ -14,7 +14,7 @@ export function getOutreachDbPath() {
 }
 
 /** Bump with every schema change and add the step to `migrate`. */
-export const OUTREACH_SCHEMA_VERSION = 1;
+export const OUTREACH_SCHEMA_VERSION = 2;
 
 /**
  * Schema v1. Every table carries `accountId` (the mailbox that owns the row); every query
@@ -275,6 +275,28 @@ const SCHEMA_V1 = `
   CREATE INDEX IF NOT EXISTS idx_events_retention ON tracking_events (ipTruncated, at);
 `;
 
+/**
+ * Schema v2 (consent bookkeeping that must survive a re-subscription and an erase).
+ * `contacts.unsubscribedAt`: the newest global unsubscribe; a later consent for one list
+ * does not clear it, so an older consent for another list can never be applied afterwards.
+ * `erased_addresses`: what remains of an erased contact that was suppressed or had
+ * unsubscribed — a SHA-256 of the lower-cased address and the dates, nothing else. A contact
+ * created later for the same address takes the block over.
+ */
+const SCHEMA_V2 = `
+  ALTER TABLE contacts ADD COLUMN unsubscribedAt INTEGER;
+  UPDATE contacts SET unsubscribedAt = consentAt WHERE emailConsent = 'unsubscribed';
+  CREATE TABLE IF NOT EXISTS erased_addresses (
+    accountId TEXT NOT NULL,
+    emailHash TEXT NOT NULL,
+    suppressedReason TEXT,
+    suppressedAt INTEGER,
+    unsubscribedAt INTEGER,
+    erasedAt INTEGER NOT NULL,
+    PRIMARY KEY (accountId, emailHash)
+  );
+`;
+
 function migrate(db: Database) {
   const current = Number((db.prepare("PRAGMA user_version").get() as { user_version?: number } | null)?.user_version ?? 0);
   if (current > OUTREACH_SCHEMA_VERSION) {
@@ -283,6 +305,7 @@ function migrate(db: Database) {
   if (current === OUTREACH_SCHEMA_VERSION) return;
   db.transaction(() => {
     if (current < 1) db.exec(SCHEMA_V1);
+    if (current < 2) db.exec(SCHEMA_V2);
     db.exec(`PRAGMA user_version = ${OUTREACH_SCHEMA_VERSION}`);
   }).immediate();
 }

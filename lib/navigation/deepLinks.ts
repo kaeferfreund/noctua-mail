@@ -1,7 +1,7 @@
 /** Public, version-independent URL state for the single-page mail shell. */
 import { withoutInviteFragment } from "@/lib/inviteLink";
 import { normalizeDomainKey, parseDomainFolderRole, type DomainFolderRole } from "@/lib/domainView";
-export const SETTINGS_SECTIONS = ["account", "identities", "signatures", "preferences", "notifications", "categorization", "calendar", "topics", "translation", "mcp", "recipient-aliases", "members", "spam"] as const;
+export const SETTINGS_SECTIONS = ["account", "identities", "signatures", "preferences", "notifications", "categorization", "calendar", "topics", "translation", "mcp", "recipient-aliases", "members", "spam", "outreach"] as const;
 export const ADMIN_SECTIONS = ["users", "mailboxes", "invites", "audit", "spam", "domains"] as const;
 export const GROUPS = ["none", "date", "week", "sender", "domain", "year", "folder", "event"] as const;
 export const PANELS = ["process", "exception", "reminder", "calendar", "mail-check"] as const;
