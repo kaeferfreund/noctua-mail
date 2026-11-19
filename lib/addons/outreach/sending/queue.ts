@@ -23,8 +23,17 @@ function nextStep(db: Database, accountId: string, sequenceId: string, contactId
   return rows<NextStep>(db, `SELECT p.id, p.position, p.delayMinutes, p.subject FROM sequence_steps p
     WHERE p.accountId = ? AND p.sequenceId = ? AND p.position >= ? AND p.enabled = 1
       AND NOT EXISTS (SELECT 1 FROM sends s WHERE s.accountId = p.accountId AND s.sequenceStepId = p.id
-        AND s.contactId = ? AND s.kind = 'sequence')
+        AND s.contactId = ? AND s.kind = 'sequence' AND NOT (s.status = 'skipped' AND s.error = 'step_changed'))
     ORDER BY p.position LIMIT 1`).get(accountId, sequenceId, position, contactId);
+}
+
+/** Time the next step's delay counts from: the last attempt that reached the transport, else the enrollment. */
+function sequenceBasis(db: Database, enrollment: Pick<Enrollment, "accountId" | "sequenceId" | "contactId" | "enrolledAt">) {
+  const prior = rows<{ at: number }>(db, `SELECT COALESCE(sentAt, claimedAt) AS at FROM sends
+    WHERE accountId = ? AND sequenceId = ? AND contactId = ? AND kind = 'sequence'
+      AND status IN ('sent','failed') AND COALESCE(sentAt, claimedAt) IS NOT NULL
+    ORDER BY at DESC LIMIT 1`).get(enrollment.accountId, enrollment.sequenceId, enrollment.contactId);
+  return prior?.at ?? enrollment.enrolledAt;
 }
 
 /** The subscription hook is repeatable even after cancellation or completion. */
@@ -63,17 +72,49 @@ export function expandCampaign(db: Database, campaign: Campaign, recipients: Sen
   }).immediate();
 }
 
-// nextSendAt already encodes the enrollment or preceding attempt's completion time.
-export function rescheduleSequenceStep(db: Database, accountId: string, sequenceId: string, stepId: string, position: number, delayChangeMs: number) {
-  db.query(`UPDATE sequence_enrollments SET nextSendAt = nextSendAt + ?
-    WHERE accountId = ? AND sequenceId = ? AND nextStepPosition = ? AND status = 'active'`)
-    .run(delayChangeMs, accountId, sequenceId, position);
+type StepState = Pick<SequenceStep, "id" | "position" | "delayMinutes" | "enabled">;
+
+/**
+ * Carry active enrollments across a save of the step list. `before` is the step list before the save.
+ * An enrollment waits for the steps at and after its position. After the save it waits at the first of
+ * those steps that still exists (in the new order); when none is left it is complete. nextSendAt encodes
+ * the preceding attempt's completion time plus the awaited step's delay, so a delay edit of the awaited
+ * step shifts it, while a different awaited step or a step enabled again counts from that basis anew.
+ */
+export function carrySequenceEnrollments(db: Database, accountId: string, sequenceId: string, before: StepState[], now: number) {
+  const after = new Map(rows<Omit<StepState, "enabled"> & { enabled: number }>(db, `SELECT id, position, delayMinutes, enabled
+    FROM sequence_steps WHERE accountId = ? AND sequenceId = ?`).all(accountId, sequenceId).map(step => [step.id, step]));
+  const ordered = [...before].sort((a, b) => a.position - b.position);
+  const enrollments = rows<Enrollment>(db, `SELECT * FROM sequence_enrollments
+    WHERE accountId = ? AND sequenceId = ? AND status = 'active'`).all(accountId, sequenceId);
+  const update = db.query(`UPDATE sequence_enrollments SET status = ?, nextStepPosition = ?, nextSendAt = ?, finishedAt = ?
+    WHERE accountId = ? AND id = ? AND status = 'active'`);
+  for (const enrollment of enrollments) {
+    const ahead = ordered.filter(step => step.position >= enrollment.nextStepPosition);
+    if (!ahead.length) continue;
+    const kept = ahead.flatMap(step => after.has(step.id) ? [{ before: step, after: after.get(step.id)! }] : []);
+    if (!kept.length) {
+      update.run("completed", null, null, now, accountId, enrollment.id);
+      continue;
+    }
+    const target = kept.reduce((first, step) => step.after.position < first.after.position ? step : first);
+    let due = enrollment.nextSendAt;
+    if (target.before !== ahead[0] || (target.after.enabled && !target.before.enabled)) {
+      due = sequenceBasis(db, enrollment) + target.after.delayMinutes * 60_000;
+    } else if (target.after.enabled && target.before.enabled) {
+      due += (target.after.delayMinutes - target.before.delayMinutes) * 60_000;
+    }
+    if (target.after.position !== enrollment.nextStepPosition || due !== enrollment.nextSendAt) {
+      update.run("active", target.after.position, due, null, accountId, enrollment.id);
+    }
+  }
   // A retry's sendAt is its back-off deadline. The claim also checks the enrollment's due date.
   db.query(`UPDATE sends AS s SET sendAt = e.nextSendAt
-    FROM sequence_enrollments e WHERE s.accountId = ? AND s.sequenceId = ? AND s.sequenceStepId = ?
-      AND s.kind = 'sequence' AND s.status = 'queued' AND s.attempts = 0
+    FROM sequence_enrollments e JOIN sequence_steps p ON p.accountId = e.accountId AND p.sequenceId = e.sequenceId
+      AND p.position = e.nextStepPosition
+    WHERE s.accountId = ? AND s.sequenceId = ? AND s.kind = 'sequence' AND s.status = 'queued' AND s.attempts = 0
       AND e.accountId = s.accountId AND e.sequenceId = s.sequenceId AND e.contactId = s.contactId
-      AND e.status = 'active' AND e.nextStepPosition = ?`).run(accountId, sequenceId, stepId, position);
+      AND e.status = 'active' AND p.id = s.sequenceStepId AND s.sendAt IS NOT e.nextSendAt`).run(accountId, sequenceId);
 }
 
 function moveEnrollment(db: Database, enrollment: Enrollment, step: NextStep | null, due: number, now: number) {
@@ -88,26 +129,29 @@ export function expandSequences(db: Database, accountId: string, now: number) {
        JOIN sequences q ON q.accountId = e.accountId AND q.id = e.sequenceId
        WHERE e.accountId = ? AND e.status = 'active' AND e.nextSendAt <= ? AND q.status = 'live'`).all(accountId, now);
     for (const enrollment of due) {
-      // An edited or disabled step may have a pending retry. Keep its row for reporting
-      // but release the enrollment to the current step at its position.
+      // A removed or moved step, or a disabled one whose send is due, may have a pending row. Keep it for
+      // reporting but release the enrollment to the current step at its position. A disabled step's row
+      // waits until it is due, like a contact waiting for that step; the step can be enabled again meanwhile.
+      // nextStep and the insert below take a step_changed row up again when its step comes up later.
       db.query(`UPDATE sends AS s SET status = 'skipped', error = 'step_changed'
         WHERE s.accountId = ? AND s.sequenceId = ? AND s.contactId = ? AND s.kind = 'sequence' AND s.status = 'queued'
           AND NOT EXISTS (SELECT 1 FROM sequence_steps p WHERE p.accountId = s.accountId AND p.sequenceId = s.sequenceId
-            AND p.id = s.sequenceStepId AND p.position = ? AND p.enabled = 1)`).run(accountId, enrollment.sequenceId, enrollment.contactId, enrollment.nextStepPosition);
+            AND p.id = s.sequenceStepId AND p.position = ? AND (p.enabled = 1 OR s.sendAt > ?))`)
+        .run(accountId, enrollment.sequenceId, enrollment.contactId, enrollment.nextStepPosition, now);
       const pending = db.query(`SELECT 1 FROM sends WHERE accountId = ? AND sequenceId = ? AND contactId = ?
         AND kind = 'sequence' AND status IN ('queued','sending') LIMIT 1`).get(accountId, enrollment.sequenceId, enrollment.contactId);
       if (pending) continue;
       const step = nextStep(db, accountId, enrollment.sequenceId, enrollment.contactId, enrollment.nextStepPosition);
-      const prior = rows<{ at: number }>(db, `SELECT COALESCE(sentAt, claimedAt) AS at FROM sends
-        WHERE accountId = ? AND sequenceId = ? AND contactId = ? AND kind = 'sequence'
-          AND status IN ('sent','failed') AND COALESCE(sentAt, claimedAt) IS NOT NULL
-        ORDER BY at DESC LIMIT 1`).get(accountId, enrollment.sequenceId, enrollment.contactId);
       const dueAt = !step || step.position === enrollment.nextStepPosition ? enrollment.nextSendAt
-        : (prior?.at ?? enrollment.enrolledAt) + step.delayMinutes * 60_000;
+        : sequenceBasis(db, enrollment) + step.delayMinutes * 60_000;
       moveEnrollment(db, enrollment, step, dueAt, now);
       if (!step || dueAt > now) continue;
       db.query(`INSERT INTO sends (id, accountId, kind, sequenceId, sequenceStepId, contactId, subject, status, trackOpens, trackClicks, userId, sendAt, queuedAt)
-        VALUES (?, ?, 'sequence', ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING`).run(newOutreachId("snd"), accountId, enrollment.sequenceId, step.id, enrollment.contactId, step.subject,
+        VALUES (?, ?, 'sequence', ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?)
+        ON CONFLICT (sequenceStepId, contactId) WHERE sequenceStepId IS NOT NULL AND kind = 'sequence' DO UPDATE SET
+          status = 'queued', error = NULL, attempts = 0, claimOwner = NULL, subject = excluded.subject, trackOpens = excluded.trackOpens,
+          trackClicks = excluded.trackClicks, userId = excluded.userId, sendAt = excluded.sendAt, queuedAt = excluded.queuedAt
+        WHERE sends.accountId = excluded.accountId AND sends.status = 'skipped' AND sends.error = 'step_changed'`).run(newOutreachId("snd"), accountId, enrollment.sequenceId, step.id, enrollment.contactId, step.subject,
         enrollment.trackOpens, enrollment.trackClicks, enrollment.userId, dueAt, now);
     }
   }).immediate();
