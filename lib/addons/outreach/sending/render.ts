@@ -1,4 +1,4 @@
-import { parse, parseFragment, serialize, type DefaultTreeAdapterTypes as Tree } from "parse5";
+import { defaultTreeAdapter, parse, parseFragment, serialize, type DefaultTreeAdapterTypes as Tree } from "parse5";
 import { escapeHtml } from "@/lib/html/strip";
 import { htmlToPlainText } from "@/lib/mail/spam/input";
 import { TEMPLATE_PLACEHOLDERS, type RenderResponse } from "../types";
@@ -37,7 +37,7 @@ type RenderOptions = {
 };
 
 function documentOrFragment(html: string) {
-  return /^\s*(?:<!doctype\b|<html\b|<head\b|<body\b)/i.test(html) ? parse(html) : parseFragment(html);
+  return /^(?:\s|<!--[\s\S]*?-->)*(?:<!doctype\b|<html\b|<head\b|<body\b)/i.test(html) ? parse(html) : parseFragment(html);
 }
 
 function visit(node: Tree.Node, callback: (node: Tree.Node) => void) {
@@ -110,17 +110,44 @@ export function renderContent(content: Content, options: RenderOptions): RenderR
   return { ok: true, subject, html, text, warnings: [...warnings] };
 }
 
+function htmlBody(tree: Tree.Document | Tree.DocumentFragment): Tree.Element | Tree.DocumentFragment | undefined {
+  if (tree.nodeName === "#document-fragment") return tree;
+  const html = tree.childNodes.find(node => "tagName" in node && node.tagName === "html") as Tree.Element;
+  return html.childNodes.find((node): node is Tree.Element => "tagName" in node && node.tagName === "body");
+}
+
+const inert = new Set(["template", "script", "style", "noscript"]);
+
 export function hasUnsubscribeLink(html: string, url: string) {
-  let found = false;
-  visit(documentOrFragment(html), node => {
-    if ("tagName" in node && node.tagName === "a" && node.attrs.some(attr => attr.name === "href" && attr.value === url)) found = true;
-  });
-  return found;
+  function hasLink(node: Tree.Node): boolean {
+    if ("tagName" in node) {
+      if (inert.has(node.tagName) || node.attrs.some(attr => attr.name === "hidden")) return false;
+      if (node.tagName === "a" && node.attrs.some(attr => attr.name === "href" && attr.value === url)) return true;
+    }
+    return "childNodes" in node && node.childNodes.some(hasLink);
+  }
+  const body = htmlBody(documentOrFragment(html));
+  return body ? hasLink(body) : false;
 }
 
 export function addToHtmlBody(html: string, snippet: string, atStart = false) {
-  const boundary = atStart ? /<body\b[^>]*>/i : /<\/body\s*>/i;
-  return boundary.test(html)
-    ? html.replace(boundary, match => atStart ? match + snippet : snippet + match)
-    : atStart ? snippet + html : html + snippet;
+  const tree = documentOrFragment(html);
+  const body = htmlBody(tree);
+  if (!body) return snippet + html;
+  // A hidden body also hides the footer. Preserve its original content in a hidden container.
+  if ("attrs" in body) {
+    const hidden = body.attrs.findIndex(attr => attr.name === "hidden");
+    if (hidden !== -1) {
+      body.attrs.splice(hidden, 1);
+      const [container] = parseFragment("<div hidden></div>").childNodes as Tree.Element[];
+      for (const child of body.childNodes.splice(0)) defaultTreeAdapter.appendChild(container, child);
+      defaultTreeAdapter.appendChild(body, container);
+    }
+  }
+  const first = atStart ? body.childNodes[0] : undefined;
+  for (const node of parseFragment(snippet).childNodes) {
+    if (first) defaultTreeAdapter.insertBefore(body, node, first);
+    else defaultTreeAdapter.appendChild(body, node);
+  }
+  return serialize(tree);
 }

@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import { z } from "zod";
 import { escapeHtml } from "@/lib/html/strip";
 import { addToHtmlBody, hasUnsubscribeLink, renderContent, sampleContact, type Content } from "./render";
@@ -50,8 +51,11 @@ type SendDependencies = {
 
 const sendSmtp: SendTransport = async (mail, account, identity, beforeSend) => {
   const raw = await buildRawMessage(account, mail, identity);
-  const assertCurrent = await beforeSend();
-  await sendRawSmtpMessage(account, raw, { from: identity.email, to: [mail.to] }, assertCurrent);
+  const stream = Readable.from((async function* () {
+    (await beforeSend())();
+    yield raw;
+  })(), { objectMode: false });
+  await sendRawSmtpMessage(account, stream, { from: identity.email, to: [mail.to] });
   return { messageId: mail.messageId, providerMessageId: null };
 };
 
@@ -106,7 +110,7 @@ type SendInput = {
 };
 
 export class SendStopped extends Error {
-  constructor(readonly reason: "paused" | "cancelled" | "interrupted" | "recipient_unmailable" | "recipient_changed" | "configuration_changed") { super(reason); }
+  constructor(readonly reason: "paused" | "rescheduled" | "cancelled" | "interrupted" | "recipient_unmailable" | "recipient_changed" | "configuration_changed") { super(reason); }
 }
 
 export type SendOutcome =
@@ -197,19 +201,19 @@ export async function sendOutreachMail(input: SendInput, deps = defaultSendDepen
     return { status: "sent", ...result, subject: mail.subject, recipients: mail.to, sentAt: deps.now() };
   } catch (error) {
     if (error instanceof SendStopped) {
-      if (error.reason === "paused") return { status: "deferred", reason: error.reason };
+      if (error.reason === "paused" || error.reason === "rescheduled") return { status: "deferred", reason: error.reason };
       if (error.reason === "recipient_changed" || error.reason === "configuration_changed") return { status: "retry", reason: error.reason };
       return { status: ["cancelled", "recipient_unmailable"].includes(error.reason) ? "skipped" : "failed", reason: error.reason };
     }
     if (error instanceof OutboundAuthorizationError) return { status: "failed", reason: "permission_revoked" };
     if (error instanceof SenderIdentityError) return { status: "failed", reason: "identity_unavailable" };
     if (error instanceof SendingError) return { status: "failed", reason: error.code ?? "invalid_send" };
-    if (!started) return { status: "retry", reason: "pre_transport_failure" };
     if (settings.transport === "mailbox-smtp") {
       const smtp = getSmtpHttpError(error);
       if (smtp?.status === 422 || smtp?.code === "smtp_configuration_error") return { status: "failed", reason: smtp.code };
       if (smtpFailedBeforeData(error)) return { status: "retry", reason: "smtp_before_data" };
     }
+    if (!started) return { status: "retry", reason: "pre_transport_failure" };
     return { status: "failed", reason: "send_uncertain" };
   }
 }

@@ -1,4 +1,8 @@
 import { expect, test } from "bun:test";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { startSmtpSink } from "@/lib/testFixtures/mail/smtp-sink";
 import type { Account } from "@/lib/data";
 import { markSmtpUpstreamFailure } from "@/lib/mail/smtpError";
 import { defaultOutreachSettings } from "../settings";
@@ -114,4 +118,41 @@ test("does not retry an SES failure once the call has started", async () => {
     throw new Error("SDK request failed");
   };
   expect(await sendOutreachMail(ses, deps)).toEqual({ status: "failed", reason: "send_uncertain" });
+});
+
+test("SMTP rechecks consent after RCPT and aborts DATA without accepting a message", async () => {
+  const { deps } = fixture();
+  const scratch = await mkdtemp(join(tmpdir(), "outreach-smtp-"));
+  let unsubscribed = false;
+  let revokeAtEnvelope = true;
+  const sink = await startSmtpSink({ port: 0, user: "test", pass: "synthetic", out: scratch,
+    rejectRecipient: () => { if (revokeAtEnvelope) unsubscribed = true; return undefined; }
+  });
+  try {
+    deps.getAccount = async () => ({ smtp: { host: "127.0.0.1", port: sink.port, secure: false, user: "test", password: "synthetic" } }) as Account;
+    deps.findRecipient = async () => unsubscribed ? null : contact;
+    deps.transport["mailbox-smtp"] = defaultSendDependencies.transport["mailbox-smtp"];
+    expect(await sendOutreachMail(input, deps)).toEqual({ status: "skipped", reason: "recipient_unmailable" });
+    expect(unsubscribed).toBe(true);
+    expect(sink.received).toHaveLength(0);
+
+    revokeAtEnvelope = false;
+    unsubscribed = false;
+    expect(await sendOutreachMail(input, deps)).toMatchObject({ status: "sent" });
+    expect(sink.received).toHaveLength(1);
+    expect(sink.received[0].source.toString()).toContain("Subject: Hallo Alex");
+  } finally {
+    await sink.stop();
+    await rm(scratch, { recursive: true });
+  }
+});
+
+test("send adds a visible unsubscribe footer after inert template and hidden links", async () => {
+  const { deps, mails } = fixture();
+  const anchor = '<a href="{{ unsubscribe_url }}">Abmelden</a>';
+  const html = `<!-- leading comment --><html><body><template>${anchor}</template>
+    <div hidden>${anchor}</div><style>/* </body> */</style><p>Visible</p></body></html>`;
+  await sendOutreachMail({ ...input, content: { ...input.content, html } }, deps);
+  expect(mails[0].html).toContain(`<p>Visible</p><p><a href="${unsubscribe.url}">Abmelden</a></p></body>`);
+  expect(mails[0].html).toContain("<style>/* </body> */</style>");
 });
