@@ -6,6 +6,7 @@ import { newOutreachId } from "../ids";
 import type { SendableRecipient } from "../contacts";
 import type { Campaign, OutreachAccountSettings, SendStatus, SequenceStep } from "../types";
 import { SendStopped, type SendOutcome } from "./send";
+import { renderContent } from "./render";
 
 export type QueueRow = {
   id: string; accountId: string; kind: "campaign" | "sequence"; campaignId: string | null; sequenceId: string | null;
@@ -58,6 +59,18 @@ export function cancelContact(db: Database, accountId: string, contactId: string
   }).immediate();
 }
 
+/** A row shows the subject as its recipient will see it until the send stores the subject it used. */
+function recipientSubject(db: Database, accountId: string, contactId: string, subject: string, now: number) {
+  if (!/{[{%]/.test(subject)) return subject;
+  const contact = rows<{ firstName: string; lastName: string; email: string }>(db, `SELECT firstName, lastName, email FROM contacts
+    WHERE accountId = ? AND id = ?`).get(accountId, contactId);
+  if (!contact) return subject;
+  const organization = rows<{ organizationName: string; organizationAddress: string }>(db, `SELECT organizationName, organizationAddress
+    FROM account_settings WHERE accountId = ?`).get(accountId);
+  return renderContent({ subject, html: "", text: "" }, { contact, organizationName: organization?.organizationName ?? "",
+    organizationAddress: organization?.organizationAddress ?? "", unsubscribeUrl: "", now }).subject;
+}
+
 export function expandCampaign(db: Database, campaign: Campaign, recipients: SendableRecipient[], now: number) {
   db.transaction(() => {
     const changed = db.query(`UPDATE campaigns SET status = 'sending', startedAt = ?, updatedAt = ?
@@ -65,10 +78,13 @@ export function expandCampaign(db: Database, campaign: Campaign, recipients: Sen
     if (!changed.changes) return;
     const insert = db.query(`INSERT INTO sends (id, accountId, kind, campaignId, contactId, recipients, subject, status,
       trackOpens, trackClicks, userId, sendAt, queuedAt)
-      SELECT ?, c.accountId, 'campaign', c.id, p.id, p.email, c.subject, 'queued', c.trackOpens, c.trackClicks, c.scheduledByUserId, ?, ?
+      SELECT ?, c.accountId, 'campaign', c.id, p.id, p.email, ?, 'queued', c.trackOpens, c.trackClicks, c.scheduledByUserId, ?, ?
       FROM campaigns c JOIN contacts p ON p.accountId = c.accountId AND p.id = ?
       WHERE c.accountId = ? AND c.id = ? ON CONFLICT DO NOTHING`);
-    for (const contact of recipients) insert.run(newOutreachId("snd"), now, now, contact.contactId, campaign.accountId, campaign.id);
+    for (const contact of recipients) {
+      insert.run(newOutreachId("snd"), recipientSubject(db, campaign.accountId, contact.contactId, campaign.subject, now), now, now,
+        contact.contactId, campaign.accountId, campaign.id);
+    }
   }).immediate();
 }
 
@@ -151,7 +167,8 @@ export function expandSequences(db: Database, accountId: string, now: number) {
         ON CONFLICT (sequenceStepId, contactId) WHERE sequenceStepId IS NOT NULL AND kind = 'sequence' DO UPDATE SET
           status = 'queued', error = NULL, attempts = 0, claimOwner = NULL, subject = excluded.subject, trackOpens = excluded.trackOpens,
           trackClicks = excluded.trackClicks, userId = excluded.userId, sendAt = excluded.sendAt, queuedAt = excluded.queuedAt
-        WHERE sends.accountId = excluded.accountId AND sends.status = 'skipped' AND sends.error = 'step_changed'`).run(newOutreachId("snd"), accountId, enrollment.sequenceId, step.id, enrollment.contactId, step.subject,
+        WHERE sends.accountId = excluded.accountId AND sends.status = 'skipped' AND sends.error = 'step_changed'`).run(newOutreachId("snd"), accountId, enrollment.sequenceId, step.id, enrollment.contactId,
+        recipientSubject(db, accountId, enrollment.contactId, step.subject, now),
         enrollment.trackOpens, enrollment.trackClicks, enrollment.userId, dueAt, now);
     }
   }).immediate();
@@ -289,10 +306,10 @@ export function recoverInterrupted(db: Database, accountId: string, now: number,
   }).immediate();
 }
 
+/** A campaign is sent when it reached at least one recipient; one whose rows all failed, were skipped or never existed failed. */
 export function finishCampaigns(db: Database, accountId: string, now: number) {
   db.query(`UPDATE campaigns AS c SET status = CASE WHEN EXISTS (SELECT 1 FROM sends s WHERE s.accountId = c.accountId AND s.campaignId = c.id
-      AND s.kind = 'campaign' AND s.status = 'failed') AND NOT EXISTS (SELECT 1 FROM sends s WHERE s.accountId = c.accountId AND s.campaignId = c.id
-      AND s.kind = 'campaign' AND s.status <> 'failed') THEN 'failed' ELSE 'sent' END, finishedAt = ?, updatedAt = ?
+      AND s.kind = 'campaign' AND s.status = 'sent') THEN 'sent' ELSE 'failed' END, finishedAt = ?, updatedAt = ?
     WHERE c.accountId = ? AND c.status = 'sending' AND NOT EXISTS (SELECT 1 FROM sends s WHERE s.accountId = c.accountId AND s.campaignId = c.id
       AND s.kind = 'campaign' AND s.status IN ('queued','sending'))`).run(now, now, accountId);
 }
