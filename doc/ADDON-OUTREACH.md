@@ -96,10 +96,16 @@ opens, clicks, unsubscribes, deliveries, bounces and complaints.
 
 ## Import Klaviyo email history
 
-Run `bun scripts/outreach-import-klaviyo-history.ts --account example --archive /path/to/archive/raw`
-for a read-only preview. Add `--write` to import into the outreach database selected by
-`NOCTUA_DATA_DIR`. The command reports counts only. Import flow content first to include
-history for its matching sequence steps.
+Run `bun scripts/outreach-import-klaviyo-history.ts --account example --archive /path/to/archive`
+(the archive folder or its `raw` folder) for a read-only preview. Add `--write` to import into the
+outreach database selected by `NOCTUA_DATA_DIR`. The command reports counts only. Import flow
+content first to include history for its matching sequence steps.
+
+Order on a running installation: deploy and start the server release that carries the importer's
+schema version, back up `outreach.db`, then import. The importer never migrates the database; a
+write run stops with a message when the file is at another schema version, because a server of an
+older release that still has the file open would stop working on the newer schema. A schema bump
+has no way back to the previous release other than restoring that backup.
 
 The import adds sent campaigns, historical sends and their delivery, open, click, bounce,
 complaint and message-linked unsubscribe events. Missing profiles and addresses without a
@@ -108,6 +114,12 @@ IPs for matching contacts are truncated according to the mailbox setting. Campai
 its archived image URLs. The import never queues mail, enrolls anyone or updates consent.
 Replaying the same archive leaves existing history unchanged. Erasing a contact deletes their
 imported sends and events and records opaque send IDs to prevent replay of those rows.
+
+Anonymous rows keep the Klaviyo event id (and a send id derived from the Klaviyo profile id) so a
+replay changes nothing. Together with the archive, which still holds the addresses, they can be
+traced back to a person: how long the archive is kept decides how anonymous they are, and an erase
+in Noctua does not touch the archive. An address that was erased here before the import and has a
+contact again gets its old history attached; check for earlier erases before importing.
 
 ## Public routes (`/t/*`, no session, no cookies)
 

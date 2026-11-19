@@ -1,10 +1,12 @@
+import { Database } from "bun:sqlite";
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { eraseContact } from "@/lib/addons/outreach/contacts/consent";
 import { getContactDetail, upsertContact } from "@/lib/addons/outreach/contacts/records";
-import { closeOutreachDb, getOutreachDb } from "@/lib/addons/outreach/db";
+import { closeOutreachDb, getOutreachDb, getOutreachDbPath, OUTREACH_SCHEMA_VERSION } from "@/lib/addons/outreach/db";
+import { removeHistorySchema } from "@/lib/addons/outreach/testFixtures/legacySchema";
 import { enroll, expandSequences } from "@/lib/addons/outreach/sending/queue";
 import { OutreachScheduler } from "@/lib/addons/outreach/sending/scheduler";
 import { applySesEvent } from "@/lib/addons/outreach/sending/sesEvents";
@@ -12,7 +14,7 @@ import { campaignReport, listCampaigns, sequenceReport } from "@/lib/addons/outr
 import { getOutreachOverview, listTrackingEvents } from "@/lib/addons/outreach/tracking";
 import { DAY_MS } from "@/lib/addons/outreach/tracking/ip";
 import { importContent, sequenceId } from "./outreach-import-klaviyo-content";
-import { importKlaviyoHistory } from "./outreach-import-klaviyo-history";
+import { assertCurrentHistorySchema, HistoryImportError, historyArchiveDir, importKlaviyoHistory } from "./outreach-import-klaviyo-history";
 import { readKlaviyoHistoryArchive } from "./outreach-klaviyo-history-archive";
 
 const accountId = "history-test";
@@ -248,4 +250,28 @@ test("a flow message with no matching saved step is counted and skipped", async 
   db.query("UPDATE sequence_steps SET templateId = NULL WHERE sequenceId = ? AND position = 1").run(seqId);
   expect(report(true).skipped.missingStep).toBe(1);
   expect(db.query("SELECT subject FROM sends WHERE sequenceId = ?").all(seqId)).toEqual([{ subject: "flow-first" }]);
+});
+
+test("a write run refuses a database of another schema version and leaves it untouched", async () => {
+  // No file yet: the server has never run with the addon.
+  expect(() => assertCurrentHistorySchema(getOutreachDbPath())).toThrow(HistoryImportError);
+  const db = await getOutreachDb();
+  expect(() => assertCurrentHistorySchema(getOutreachDbPath())).not.toThrow();
+  // The file of a server that still runs the previous release.
+  removeHistorySchema(db);
+  closeOutreachDb();
+  expect(() => assertCurrentHistorySchema(getOutreachDbPath())).toThrow(`needs ${OUTREACH_SCHEMA_VERSION}`);
+  const untouched = new Database(getOutreachDbPath(), { readonly: true });
+  expect(untouched.query("PRAGMA user_version").get()).toEqual({ user_version: OUTREACH_SCHEMA_VERSION - 1 });
+  expect(untouched.query("SELECT 1 FROM sqlite_master WHERE name = 'klaviyo_erased_sends'").get()).toBeNull();
+  untouched.close();
+});
+
+test("the archive folder or its raw folder is accepted", () => {
+  const raw = join(dir, "archive", "raw");
+  mkdirSync(raw, { recursive: true });
+  writeFileSync(join(raw, "events.json"), "{}");
+  expect(historyArchiveDir(join(dir, "archive"))).toBe(raw);
+  expect(historyArchiveDir(raw)).toBe(raw);
+  expect(historyArchiveDir(join(dir, "elsewhere"))).toBe(join(dir, "elsewhere"));
 });

@@ -1,6 +1,7 @@
 import { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { closeOutreachDb, getOutreachDb, getOutreachDbPath, initOutreachSchema, klaviyoEventIdSql, OUTREACH_SCHEMA_VERSION } from "@/lib/addons/outreach/db";
 import { itemId, validated } from "@/lib/addons/outreach/sending/input";
@@ -104,8 +105,9 @@ export function importKlaviyoHistory(db: Database, options: { accountId: string;
     if (!Number.isFinite(event.at)) { if (!dropped) skipped.invalidTimestamp++; continue; }
     if (archiveEventIds.has(event.id)) { if (!dropped) skipped.duplicateEvent++; continue; }
     archiveEventIds.add(event.id);
-    if (!mails.has(id)) mails.set(id, { message, events: [], totals: mailTotals(message.kind) });
+    // A mail with nothing but dropped events was never sent to anyone: no campaign row for it.
     if (!type) continue;
+    if (!mails.has(id)) mails.set(id, { message, events: [], totals: mailTotals(message.kind) });
     const flag = type === "open" ? event.properties.machine_open : type === "click" ? event.properties["Bot Click"] : false;
     mails.get(id)!.events.push({ ...event, type, machine: flag === true || stringField(flag).toLowerCase() === "true" });
   }
@@ -206,8 +208,9 @@ export function importKlaviyoHistory(db: Database, options: { accountId: string;
       const contactId = saved ? saved.contactId === contact?.id ? saved.contactId : null : contact?.id ?? null;
       if (!saved && contactId && key) {
         const column = campaignId ? "campaignId" : "sequenceStepId";
-        if (occupied.has(key) || db.query(`SELECT 1 FROM sends WHERE accountId = ? AND ${column} = ? AND contactId = ? AND kind = ?`)
-          .get(accountId, target, contactId, message.kind)) {
+        // A native send of the same step does not occupy the historical one (they differ in `source`).
+        if (occupied.has(key) || db.query(`SELECT 1 FROM sends WHERE accountId = ? AND ${column} = ? AND contactId = ? AND kind = ?
+          AND source = 'klaviyo'`).get(accountId, target, contactId, message.kind)) {
           skipped.duplicateSend++;
           skipped.duplicateSendEvents += items.length;
           continue;
@@ -279,14 +282,42 @@ export function importKlaviyoHistory(db: Database, options: { accountId: string;
   return write ? transaction.immediate() : transaction.deferred();
 }
 
+/** Shown to the operator as is: says what to do, carries no row data. */
+export class HistoryImportError extends Error {}
+
+/**
+ * The importer never migrates the addon database. A server of an older release that still has the
+ * file open would break on the newer schema (its scheduler statements stop matching), so the file
+ * must already be at this build's schema: deploy and start the matching server first.
+ */
+export function assertCurrentHistorySchema(file: string) {
+  if (!existsSync(file)) throw new HistoryImportError(`No outreach database at ${file}. Start the server with the addon enabled first.`);
+  const db = new Database(file, { readonly: true });
+  try {
+    const version = Number((db.query("PRAGMA user_version").get() as { user_version?: number } | null)?.user_version ?? 0);
+    if (version !== OUTREACH_SCHEMA_VERSION) {
+      throw new HistoryImportError(`The outreach database has schema version ${version}; this importer needs ${OUTREACH_SCHEMA_VERSION}. `
+        + "Deploy and start the server release that carries that schema first, back up outreach.db, then import. Nothing was changed.");
+    }
+  } finally {
+    db.close();
+  }
+}
+
+/** Accepts the archive folder itself or the `raw` folder inside it. */
+export function historyArchiveDir(dir: string) {
+  return !existsSync(join(dir, "events.json")) && existsSync(join(dir, "raw", "events.json")) ? join(dir, "raw") : dir;
+}
+
 async function main() {
   const { values } = parseArgs({ options: {
     account: { type: "string" }, archive: { type: "string" }, write: { type: "boolean" }
   } });
   const accountId = validated(itemId, values.account);
   if (!values.archive?.trim()) throw new Error("Missing archive directory");
-  const archive = readKlaviyoHistoryArchive(values.archive);
+  const archive = readKlaviyoHistoryArchive(historyArchiveDir(values.archive));
   const file = getOutreachDbPath();
+  if (values.write) assertCurrentHistorySchema(file);
   const db = values.write ? await getOutreachDb()
     : existsSync(file) ? new Database(file, { readonly: true }) : initOutreachSchema(new Database(":memory:"));
   try {
@@ -299,8 +330,9 @@ async function main() {
 
 if (import.meta.main) {
   try { await main(); }
-  catch {
-    console.error("Could not import Klaviyo history. Check the account, archive, and outreach database.");
+  catch (error) {
+    console.error(error instanceof HistoryImportError ? error.message
+      : "Could not import Klaviyo history. Check the account, archive, and outreach database.");
     process.exitCode = 1;
   }
 }
