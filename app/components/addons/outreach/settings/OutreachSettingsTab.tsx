@@ -34,11 +34,17 @@ type Form = {
   organizationAddress: string;
 };
 
-function toForm(settings: OutreachAccountSettings): Form {
+/** True when the identities were loaded and the stored default sender is not among them (deleted). */
+function senderMissing(settings: OutreachAccountSettings, identities: SenderIdentity[] | null) {
+  return identities !== null && settings.senderIdentityId !== null && !identities.some(identity => identity.id === settings.senderIdentityId);
+}
+
+/** The form for stored settings; a deleted default sender becomes "mailbox default", so saving does not store it again. */
+function toForm(settings: OutreachAccountSettings, identities: SenderIdentity[] | null): Form {
   return {
     enabled: settings.enabled,
     transport: settings.transport,
-    senderIdentityId: settings.senderIdentityId,
+    senderIdentityId: senderMissing(settings, identities) ? null : settings.senderIdentityId,
     trackMailDefault: settings.trackMailDefault,
     ipRetentionDays: String(settings.ipRetentionDays),
     sendRatePerMinute: String(settings.sendRatePerMinute),
@@ -80,7 +86,8 @@ function OutreachSettingsForm({ accountId, canManage, apiFetch = fetch, onClose 
   const status = useOutreachStatus();
   const [settings, setSettings] = useState<OutreachAccountSettings | null>(null);
   const [form, setForm] = useState<Form | null>(null);
-  const [identities, setIdentities] = useState<SenderIdentity[]>([]);
+  // null: the identities could not be loaded, so a stored sender is not known to be missing.
+  const [identities, setIdentities] = useState<SenderIdentity[] | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ kind: "saved" | "error"; text: string } | null>(null);
@@ -91,11 +98,11 @@ function OutreachSettingsForm({ accountId, canManage, apiFetch = fetch, onClose 
       adminRequest<{ settings: OutreachAccountSettings }>(apiFetch, outreachApiPath(accountId, "settings")),
       // Sender identities only fill the picker; without them the mailbox default stays selectable.
       adminRequest<{ identities: SenderIdentity[] }>(apiFetch, `/api/accounts/${encodeURIComponent(accountId)}/identities`)
-        .then(data => data.identities ?? [], () => [] as SenderIdentity[])
+        .then(data => data.identities ?? [], () => null)
     ]).then(([data, list]) => {
       if (!active) return;
       setSettings(data.settings);
-      setForm(toForm(data.settings));
+      setForm(toForm(data.settings, list));
       setIdentities(list);
       setLoadState("ready");
     }, () => { if (active) setLoadState("error"); });
@@ -108,7 +115,8 @@ function OutreachSettingsForm({ accountId, canManage, apiFetch = fetch, onClose 
   };
 
   const patch = form ? toPatch(form) : null;
-  const dirty = Boolean(settings && form && JSON.stringify(toForm(settings)) !== JSON.stringify(form));
+  // Against the stored values as they are, so a deleted sender replaced by "mailbox default" counts as a change.
+  const dirty = Boolean(settings && form && JSON.stringify(toForm(settings, null)) !== JSON.stringify(form));
   const readOnly = !canManage || saving;
 
   const save = async () => {
@@ -118,7 +126,7 @@ function OutreachSettingsForm({ accountId, canManage, apiFetch = fetch, onClose 
     try {
       const data = await adminRequest<{ settings: OutreachAccountSettings }>(apiFetch, outreachApiPath(accountId, "settings"), jsonMutation("PUT", patch));
       setSettings(data.settings);
-      setForm(toForm(data.settings));
+      setForm(toForm(data.settings, identities));
       setNotice({ kind: "saved", text: t("saved") });
       // Compose switch, reader line and navigation read the activation from the shared status.
       void refreshOutreachStatus();
@@ -129,7 +137,9 @@ function OutreachSettingsForm({ accountId, canManage, apiFetch = fetch, onClose 
     }
   };
 
-  const senderValue = form?.senderIdentityId && identities.some(identity => identity.id === form.senderIdentityId) ? form.senderIdentityId : MAILBOX_SENDER;
+  const identityList = identities ?? [];
+  const senderValue = form?.senderIdentityId && identityList.some(identity => identity.id === form.senderIdentityId) ? form.senderIdentityId : MAILBOX_SENDER;
+  const showSenderMissing = Boolean(settings && form && senderMissing(settings, identities) && form.senderIdentityId === null);
 
   return (
     <Flex direction="column" gap="4" style={{ height: "100%", minHeight: 0 }} data-outreach-settings="">
@@ -174,12 +184,15 @@ function OutreachSettingsForm({ accountId, canManage, apiFetch = fetch, onClose 
                       </Select.Content>
                     </Select.Root>
                   </Field>
+                  {showSenderMissing && (
+                    <Callout.Root size="1" color="amber"><Callout.Icon><Info size={14} /></Callout.Icon><Callout.Text>{t("senderMissing")}</Callout.Text></Callout.Root>
+                  )}
                   <Field label={t("sender")} hint={t("senderHint")}>
                     <Select.Root value={senderValue} disabled={readOnly} onValueChange={value => update({ senderIdentityId: value === MAILBOX_SENDER ? null : value })}>
                       <Select.Trigger />
                       <Select.Content>
                         <Select.Item value={MAILBOX_SENDER}>{t("senderMailbox")}</Select.Item>
-                        {identities.filter(identity => identity.enabled || identity.id === form.senderIdentityId).map(identity => (
+                        {identityList.filter(identity => identity.enabled || identity.id === form.senderIdentityId).map(identity => (
                           <Select.Item key={identity.id} value={identity.id}>
                             {identity.displayName ? `${identity.displayName} <${identity.email}>` : identity.email}
                           </Select.Item>
