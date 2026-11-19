@@ -171,6 +171,12 @@ function importMember(db: Database, accountId: string, listId: string, contact: 
     return;
   }
   const joinedAt = timestamp(object(entry.attributes).joined_group_at, now);
+  // A join that is not provably later than an unsubscribe on record (global or of this list) is
+  // no consent for this list. Suppression is enforced at send time, as for the other lists.
+  if (status === "subscribed" && subscriptionDecision(contact, old, joinedAt ?? now, joinedAt !== null) === "new_consent_required") {
+    skip(summary, "unsubscribed_after_join");
+    return;
+  }
   writeMembership(db, accountId, contact.id, listId, {
     status,
     subscribedAt: status === "subscribed" ? joinedAt ?? contact.consentAt : old?.subscribedAt ?? null,

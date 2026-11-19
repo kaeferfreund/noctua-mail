@@ -2,7 +2,8 @@ import { z } from "zod";
 import { EMAIL_CONSENTS, OPT_IN_MODES } from "../types";
 
 export class ContactError extends Error {
-  constructor(message: string, public status = 400, public code?: string) {
+  /** `details` are added to the JSON error body (for example `unsubscribedAt`). */
+  constructor(message: string, public status = 400, public code?: string, public details?: Record<string, unknown>) {
     super(message);
   }
 }
@@ -43,7 +44,8 @@ export const listInput = z.strictObject({
 export const subscriptionInput = z.strictObject({
   listId: idSchema,
   action: z.enum(["subscribe", "unsubscribe"]),
-  consentSource: consentSourceSchema.optional()
+  consentSource: consentSourceSchema.optional(),
+  confirmResubscribe: z.boolean().optional()
 });
 
 export const suppressionInput = z.strictObject({ suppressed: z.boolean() });
