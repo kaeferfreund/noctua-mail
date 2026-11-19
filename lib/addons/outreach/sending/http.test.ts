@@ -46,6 +46,11 @@ test("REST enforces flag, editor permissions, same-origin JSON and campaign/sequ
     const route = `campaigns/${campaign.id}`;
     const campaignAt = { params: Promise.resolve({ accountId, campaignId: campaign.id }) };
     expect((await scheduleCampaign(request(viewer, `${route}/schedule`, "POST", { sendAt: null }), campaignAt)).status).toBe(403);
+    // A dry run answers the count after the same checks and leaves the draft a draft.
+    expect((await scheduleCampaign(request(viewer, `${route}/schedule`, "POST", { sendAt: null, dryRun: true }), campaignAt)).status).toBe(403);
+    const dryRun = await scheduleCampaign(request(editor, `${route}/schedule`, "POST", { sendAt: null, dryRun: true }), campaignAt);
+    expect(await dryRun.json()).toMatchObject({ ok: true, campaign: { status: "draft", sendAt: null }, recipients: 0 });
+    expect((await editCampaign(request(editor, route, "PATCH", { subject: "Betreff" }), campaignAt)).status).toBe(200);
     const scheduled = await scheduleCampaign(request(editor, `${route}/schedule`, "POST", { sendAt: null }), campaignAt);
     expect(await scheduled.json()).toMatchObject({ ok: true, campaign: { status: "scheduled" }, recipients: 0 });
     expect((await editCampaign(request(editor, route, "PATCH", { subject: "Neu" }), campaignAt)).status).toBe(409);

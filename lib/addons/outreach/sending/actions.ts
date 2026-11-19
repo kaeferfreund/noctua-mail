@@ -50,6 +50,11 @@ export async function scheduleCampaign(db: Database, actor: SendingActor, id: st
   if (!campaign.listIds.length) throw new SendingError(400, "Wähle mindestens eine Empfängerliste.");
   const { identity, userId, assertAuthorized } = await checkTransportAndSender(actor, campaign.senderIdentityId);
   const recipients = (await listSendableRecipients(accountId, campaign)).length;
+  if (input.dryRun) {
+    // The same checks as a real scheduling, so the confirmation shows what would happen.
+    assertContent(resolveContent(db, accountId, campaign));
+    return { ok: true, campaign: await campaignSummary(campaign), recipients };
+  }
   const next = db.transaction(() => {
     assertAuthorized();
     const live = getCampaign(db, accountId, id);

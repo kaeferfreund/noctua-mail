@@ -54,6 +54,8 @@ export default function CampaignEditor({ campaign, onScheduled }: { campaign: Ca
   const [when, setWhen] = useState<"now" | "later">("now");
   /** When the send dialog opened: a later send time must lie after it. */
   const [dialogOpenedAt, setDialogOpenedAt] = useState(0);
+  /** Who the campaign would reach right now, as the server counts it (consent, suppression, excluded lists). */
+  const [recipientCount, setRecipientCount] = useState(0);
   const [sendAt, setSendAt] = useState(() => localInputValue(Date.now() + DEFAULT_SCHEDULE_OFFSET_MS));
   const dirty = !sameForm(form, saved);
   const markClean = useUnsavedChanges(`campaign:${current?.id ?? "new"}`, canEdit && dirty);
@@ -86,6 +88,14 @@ export default function CampaignEditor({ campaign, onScheduled }: { campaign: Ca
     await api.send("POST", `campaigns/${encodeURIComponent(stored.id)}/test`, { to: testTo.trim() });
     setNotice(t("campaigns.testSent", { to: testTo.trim() }));
   });
+  /** Saves the draft and asks the server who it would reach, so the confirmation shows the real number. */
+  const openSchedule = () => run("count", async () => {
+    const stored = dirty || !current ? await persist() : current;
+    const result = await api.send<CampaignScheduleResponse>("POST", `campaigns/${encodeURIComponent(stored.id)}/schedule`, { sendAt: null, dryRun: true });
+    setRecipientCount(result.recipients);
+    setDialogOpenedAt(Date.now());
+    setDialog("schedule");
+  });
   const schedule = () => run("schedule", async () => {
     const stored = dirty || !current ? await persist() : current;
     const at = when === "now" ? null : new Date(sendAt).getTime();
@@ -103,7 +113,6 @@ export default function CampaignEditor({ campaign, onScheduled }: { campaign: Ca
 
   const listById = new Map((lists.data ?? []).map(list => [list.id, list]));
   const included = form.listIds.map(id => listById.get(id)).filter(list => list !== undefined);
-  const upperBound = included.reduce((sum, list) => sum + list.memberCount, 0);
   const laterAt = new Date(sendAt).getTime();
   const laterInvalid = when === "later" && (!Number.isFinite(laterAt) || laterAt <= dialogOpenedAt);
   const missing = [
@@ -122,7 +131,7 @@ export default function CampaignEditor({ campaign, onScheduled }: { campaign: Ca
           <Button variant="outline" disabled={busy !== null || !form.name.trim() || (!dirty && Boolean(current))} onClick={() => void save()}>
             {busy === "save" ? t("actions.working") : t("actions.save")}
           </Button>
-          <Button disabled={busy !== null || !form.name.trim() || missing.length > 0} onClick={() => { setError(null); setDialogOpenedAt(Date.now()); setDialog("schedule"); }}><Send />{t("campaigns.sendOrSchedule")}</Button>
+          <Button disabled={busy !== null || !form.name.trim() || missing.length > 0} onClick={() => void openSchedule()}><Send />{busy === "count" ? t("actions.working") : t("campaigns.sendOrSchedule")}</Button>
         </> : undefined} />
       <ErrorNote error={dialog ? null : error} />
       {notice ? <p role="status" className="text-sm text-muted-foreground">{notice}</p> : null}
@@ -165,7 +174,7 @@ export default function CampaignEditor({ campaign, onScheduled }: { campaign: Ca
 
       {dialog === "schedule" ? (
         <ConfirmDialog title={t("campaigns.scheduleTitle")}
-          description={t("campaigns.scheduleDescription", { count: upperBound, formatted: format.number(upperBound), lists: included.map(list => list.name).join(", ") })}
+          description={t("campaigns.scheduleDescription", { count: recipientCount, formatted: format.number(recipientCount), lists: included.map(list => list.name).join(", ") })}
           confirmLabel={when === "now" ? t("campaigns.confirmSendNow") : t("campaigns.confirmSchedule")}
           busy={busy === "schedule"} error={error} disabled={laterInvalid}
           onCancel={() => { setDialog(null); setError(null); }} onConfirm={() => void schedule()}>

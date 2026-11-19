@@ -2656,7 +2656,7 @@
       "sendTest": "Send test",
       "testSent": "Test sent to {to}.",
       "scheduleTitle": "Send campaign?",
-      "scheduleDescription": "{count, plural, =0 {The chosen lists currently have no subscribed members.} one {The chosen lists ({lists}) have at most {formatted} subscribed member together.} other {The chosen lists ({lists}) have at most {formatted} subscribed members together.}}",
+      "scheduleDescription": "{count, plural, =0 {Nobody would receive this campaign right now: no one on the chosen lists ({lists}) is subscribed and mailable.} one {The campaign goes to {formatted} recipient from the lists {lists}.} other {The campaign goes to {formatted} recipients from the lists {lists}.}}",
       "recipientsNote": "The server removes duplicate, excluded, unsubscribed and blocked addresses. It reports the exact number of recipients once the campaign is scheduled.",
       "whenLegend": "Time",
       "sendNow": "Send now",

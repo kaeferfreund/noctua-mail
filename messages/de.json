@@ -2656,7 +2656,7 @@
       "sendTest": "Test senden",
       "testSent": "Test an {to} gesendet.",
       "scheduleTitle": "Kampagne senden?",
-      "scheduleDescription": "{count, plural, =0 {Die gewählten Listen haben derzeit keine angemeldeten Mitglieder.} one {Die gewählten Listen ({lists}) haben zusammen höchstens {formatted} angemeldetes Mitglied.} other {Die gewählten Listen ({lists}) haben zusammen höchstens {formatted} angemeldete Mitglieder.}}",
+      "scheduleDescription": "{count, plural, =0 {Aktuell würde niemand diese Kampagne erhalten: Auf den gewählten Listen ({lists}) ist niemand angemeldet und versandfähig.} one {Die Kampagne geht an {formatted} Empfänger aus den Listen {lists}.} other {Die Kampagne geht an {formatted} Empfänger aus den Listen {lists}.}}",
       "recipientsNote": "Doppelte, ausgenommene, abgemeldete und gesperrte Adressen zieht der Server ab. Die genaue Empfängerzahl nennt er, sobald die Kampagne eingeplant ist.",
       "whenLegend": "Zeitpunkt",
       "sendNow": "Jetzt senden",
