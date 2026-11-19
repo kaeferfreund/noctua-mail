@@ -2,24 +2,34 @@ import { rows } from "./sql";
 import type { Database } from "bun:sqlite";
 import { authorizeOutbound, prepareOutboundAssertion, type OutboundAuthorization } from "@/lib/outboundAuthorization";
 import { resolveSendIdentity } from "@/lib/sendIdentity";
+import { SenderIdentityError } from "@/lib/senderIdentityError";
 import { getAccountById } from "@/lib/serverDb";
 import { validateScheduledSendAt } from "@/lib/scheduledSend";
 import { outreachPublicOrigin } from "../config";
 import { listSendableRecipients } from "../contacts";
 import { newOutreachId } from "../ids";
 import { getOutreachSettings } from "../settings";
-import type { CampaignScheduleRequest, CampaignScheduleResponse, SequenceStatus, TestSendRequest } from "../types";
+import type { CampaignScheduleRequest, CampaignScheduleResponse, SequenceInput, SequenceStatus, TestSendRequest } from "../types";
 import { SendingError } from "./input";
 import { renderContent, sampleContact } from "./render";
 import { hasSmtp, isSesConfigured, sendOutreachMail, SendStopped } from "./send";
 import { sendOwner } from "./lease";
-import { assertContent, assertDraft, campaignSummary, getCampaign, getSequence, required, resolveContent, snapshotSequenceTemplates } from "./store";
+import { assertContent, assertDraft, campaignSummary, getCampaign, getSequence, required, resolveContent, saveSequence, snapshotSequenceTemplates } from "./store";
 
 export type SendingActor = { accountId: string; authorization: OutboundAuthorization };
 
 function assertLists(db: Database, accountId: string, ids: readonly string[]) {
   const query = db.query("SELECT 1 FROM lists WHERE accountId = ? AND id = ? AND archivedAt IS NULL");
   if (!ids.length || ids.some(id => !query.get(accountId, id))) throw new SendingError(400, "Wähle eine aktive Kontaktliste.");
+}
+
+async function resolveOutreachIdentity(accountId: string, identityId: string | null | undefined) {
+  try {
+    return await resolveSendIdentity({ accountId, identityId: identityId ?? undefined });
+  } catch (error) {
+    if (!(error instanceof SenderIdentityError)) throw error;
+    throw new SendingError(409, "Wähle eine aktive Absenderidentität für dieses Postfach.", "identity_unavailable");
+  }
 }
 
 async function checkTransportAndSender(actor: SendingActor, identityId: string | null) {
@@ -30,7 +40,7 @@ async function checkTransportAndSender(actor: SendingActor, identityId: string |
   if (!account || (settings.transport === "ses" ? !isSesConfigured() : !hasSmtp(account))) {
     throw new SendingError(400, "Der Versandtransport ist nicht konfiguriert.", "transport_unavailable");
   }
-  const identity = await resolveSendIdentity({ accountId, identityId: identityId ?? settings.senderIdentityId ?? undefined });
+  const identity = await resolveOutreachIdentity(accountId, identityId ?? settings.senderIdentityId);
   const authorized = await authorizeOutbound(actor.authorization, { accountId, minRole: "editor", identity });
   const assertAuthorized = await prepareOutboundAssertion(authorized);
   return { settings, identity, userId: authorized.userId, assertAuthorized };
@@ -40,35 +50,40 @@ function assertUnchanged<T>(start: T, current: T) {
   if (JSON.stringify(start) !== JSON.stringify(current)) throw new SendingError(409, "Der Eintrag wurde inzwischen geändert.");
 }
 
-export async function scheduleCampaign(db: Database, actor: SendingActor, id: string, input: CampaignScheduleRequest): Promise<CampaignScheduleResponse> {
+function campaignChanged() {
+  return new SendingError(409, "Der Entwurf wurde inzwischen geändert. Prüfe die Kampagne erneut.", "campaign_changed");
+}
+
+export async function scheduleCampaign(db: Database, actor: SendingActor, id: string, input: CampaignScheduleRequest,
+  listRecipients = listSendableRecipients): Promise<CampaignScheduleResponse> {
   const { accountId } = actor;
   const campaign = getCampaign(db, accountId, id);
+  if (input.expectedUpdatedAt !== undefined && (campaign.updatedAt !== input.expectedUpdatedAt || campaign.status !== "draft")) {
+    throw campaignChanged();
+  }
   assertDraft(campaign);
   const scheduled = input.sendAt === null ? null : validateScheduledSendAt(input.sendAt);
   if (scheduled && !scheduled.ok) throw new SendingError(400, "Ungültiger Versandzeitpunkt.");
   assertLists(db, accountId, [...campaign.listIds, ...campaign.excludedListIds]);
   if (!campaign.listIds.length) throw new SendingError(400, "Wähle mindestens eine Empfängerliste.");
   const { identity, userId, assertAuthorized } = await checkTransportAndSender(actor, campaign.senderIdentityId);
-  const recipients = (await listSendableRecipients(accountId, campaign)).length;
-  if (input.dryRun) {
-    // The same checks as a real scheduling, so the confirmation shows what would happen.
-    assertContent(resolveContent(db, accountId, campaign));
-    return { ok: true, campaign: await campaignSummary(campaign), recipients };
-  }
+  const recipients = (await listRecipients(accountId, campaign)).length;
+  const preview = input.dryRun ? await campaignSummary(campaign) : null;
   const next = db.transaction(() => {
     assertAuthorized();
     const live = getCampaign(db, accountId, id);
-    assertUnchanged(campaign, live);
+    if (JSON.stringify(live) !== JSON.stringify(campaign)) throw campaignChanged();
     assertLists(db, accountId, [...live.listIds, ...live.excludedListIds]);
     const content = resolveContent(db, accountId, live);
     assertContent(content);
+    if (preview) return live;
     const now = Date.now();
     db.query(`UPDATE campaigns SET status = 'scheduled', scheduledByUserId = ?, sendAt = ?, updatedAt = ?,
       senderIdentityId = ?, subject = ?, previewText = ?, html = ?, text = ?
-      WHERE accountId = ? AND id = ? AND status = 'draft'`).run(userId, scheduled?.sendAt ?? now, now, identity.id, content.subject, content.previewText, content.html, content.text, accountId, id);
+      WHERE accountId = ? AND id = ? AND status = 'draft'`).run(userId, scheduled?.sendAt ?? now, Math.max(now, live.updatedAt + 1), identity.id, content.subject, content.previewText, content.html, content.text, accountId, id);
     return getCampaign(db, accountId, id);
   }).immediate();
-  return { ok: true, campaign: await campaignSummary(next), recipients };
+  return { ok: true, campaign: preview ?? await campaignSummary(next), recipients };
 }
 
 export async function cancelCampaign(db: Database, actor: SendingActor, id: string) {
@@ -86,6 +101,19 @@ export async function cancelCampaign(db: Database, actor: SendingActor, id: stri
     db.query(`UPDATE sends SET status = 'skipped', error = 'cancelled'
       WHERE accountId = ? AND kind = 'campaign' AND campaignId = ? AND status = 'queued'`).run(accountId, id);
     return getCampaign(db, accountId, id);
+  }).immediate();
+}
+
+export async function editSequence(db: Database, accountId: string, id: string, input: SequenceInput) {
+  const sequence = getSequence(db, accountId, id);
+  if (sequence.status === "draft" || input.senderIdentityId === undefined) {
+    return saveSequence(db, accountId, input, { id });
+  }
+  const identityId = input.senderIdentityId ?? (await getOutreachSettings(accountId)).senderIdentityId;
+  await resolveOutreachIdentity(accountId, identityId);
+  return db.transaction(() => {
+    assertUnchanged(sequence, getSequence(db, accountId, id));
+    return saveSequence(db, accountId, input, { id });
   }).immediate();
 }
 

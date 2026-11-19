@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getOutreachDb } from "../db";
-import { cancelCampaign, scheduleCampaign, setSequenceStatus } from "../sending/actions";
+import { cancelCampaign, editSequence, scheduleCampaign, setSequenceStatus } from "../sending/actions";
 import { campaignInput, itemId, scheduleInput, sequenceInput, statusInput, templateInput } from "../sending/input";
 import {
   campaignReport, getCampaign, getSequence, getTemplate, listCampaigns, listSequences, listTemplates, saveCampaign,
@@ -57,11 +57,11 @@ export function registerOutreachSendingTools(host: OutreachMcpHost) {
     return result("Campaign draft saved", { ok: true, campaign: saveCampaign(await getOutreachDb(), accountId, userId, input, campaignId) });
   });
   server.registerTool("schedule_campaign", {
-    description: "Schedule a campaign to send to its eligible subscribers. Pass null to send now; otherwise use epoch milliseconds.",
+    description: "Schedule a campaign for its eligible subscribers. Use null to send now or epoch milliseconds to send later. Use dryRun to preview and pass campaign.updatedAt as expectedUpdatedAt when confirming.",
     inputSchema: scheduleInput.extend({ ...mailbox.shape, ...campaignId }), annotations: send
   }, async args => {
     const ctx = await outreachAccount(args.accountId, "editor");
-    return result("Campaign scheduled", await scheduleCampaign(await getOutreachDb(), actor(ctx), args.campaignId, args));
+    return result(args.dryRun ? "Campaign preview" : "Campaign scheduled", await scheduleCampaign(await getOutreachDb(), actor(ctx), args.campaignId, args));
   });
   server.registerTool("cancel_campaign", {
     description: "Cancel remaining sends of a scheduled or running campaign.",
@@ -84,7 +84,9 @@ export function registerOutreachSendingTools(host: OutreachMcpHost) {
     inputSchema: sequenceInput.extend({ ...mailbox.shape, sequenceId: itemId.optional() }), annotations: edit
   }, async ({ accountId: requested, sequenceId, ...input }) => {
     const { accountId } = await outreachAccount(requested, "editor");
-    return result("Sequence saved", { ok: true, sequence: saveSequence(await getOutreachDb(), accountId, input, { id: sequenceId }) });
+    const db = await getOutreachDb();
+    const sequence = sequenceId ? await editSequence(db, accountId, sequenceId, input) : saveSequence(db, accountId, input);
+    return result("Sequence saved", { ok: true, sequence });
   });
   server.registerTool("set_sequence_status", {
     description: "Set a sequence live or pause it. Going live enables automatic sends to new subscribers on the trigger list and resumes overdue sends.",

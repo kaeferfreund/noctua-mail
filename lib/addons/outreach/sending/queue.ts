@@ -56,10 +56,24 @@ export function expandCampaign(db: Database, campaign: Campaign, recipients: Sen
     if (!changed.changes) return;
     const insert = db.query(`INSERT INTO sends (id, accountId, kind, campaignId, contactId, recipients, subject, status,
       trackOpens, trackClicks, userId, sendAt, queuedAt)
-      SELECT ?, accountId, 'campaign', id, ?, ?, subject, 'queued', trackOpens, trackClicks, scheduledByUserId, ?, ?
-      FROM campaigns WHERE accountId = ? AND id = ? ON CONFLICT DO NOTHING`);
-    for (const contact of recipients) insert.run(newOutreachId("snd"), contact.contactId, contact.email, now, now, campaign.accountId, campaign.id);
+      SELECT ?, c.accountId, 'campaign', c.id, p.id, p.email, c.subject, 'queued', c.trackOpens, c.trackClicks, c.scheduledByUserId, ?, ?
+      FROM campaigns c JOIN contacts p ON p.accountId = c.accountId AND p.id = ?
+      WHERE c.accountId = ? AND c.id = ? ON CONFLICT DO NOTHING`);
+    for (const contact of recipients) insert.run(newOutreachId("snd"), now, now, contact.contactId, campaign.accountId, campaign.id);
   }).immediate();
+}
+
+// nextSendAt already encodes the enrollment or preceding attempt's completion time.
+export function rescheduleSequenceStep(db: Database, accountId: string, sequenceId: string, stepId: string, position: number, delayChangeMs: number) {
+  db.query(`UPDATE sequence_enrollments SET nextSendAt = nextSendAt + ?
+    WHERE accountId = ? AND sequenceId = ? AND nextStepPosition = ? AND status = 'active'`)
+    .run(delayChangeMs, accountId, sequenceId, position);
+  // A retry's sendAt is its back-off deadline. The claim also checks the enrollment's due date.
+  db.query(`UPDATE sends AS s SET sendAt = e.nextSendAt
+    FROM sequence_enrollments e WHERE s.accountId = ? AND s.sequenceId = ? AND s.sequenceStepId = ?
+      AND s.kind = 'sequence' AND s.status = 'queued' AND s.attempts = 0
+      AND e.accountId = s.accountId AND e.sequenceId = s.sequenceId AND e.contactId = s.contactId
+      AND e.status = 'active' AND e.nextStepPosition = ?`).run(accountId, sequenceId, stepId, position);
 }
 
 function moveEnrollment(db: Database, enrollment: Enrollment, step: NextStep | null, due: number, now: number) {
@@ -111,8 +125,10 @@ export function claimSend(db: Database, accountId: string, owner: string, now: n
       WHERE accountId = ? AND id = (SELECT s.id FROM sends s WHERE s.accountId = sends.accountId AND s.status = 'queued'
         AND s.sendAt <= ? AND (
           (s.kind = 'campaign' AND EXISTS (SELECT 1 FROM campaigns c WHERE c.accountId = s.accountId AND c.id = s.campaignId AND c.status = 'sending'))
-          OR (s.kind = 'sequence' AND EXISTS (SELECT 1 FROM sequences q WHERE q.accountId = s.accountId AND q.id = s.sequenceId AND q.status = 'live'))
-        ) ORDER BY s.sendAt, s.queuedAt, s.id LIMIT 1) AND status = ? RETURNING *`).get(owner, now, accountId, now, "queued");
+          OR (s.kind = 'sequence' AND EXISTS (SELECT 1 FROM sequences q WHERE q.accountId = s.accountId AND q.id = s.sequenceId AND q.status = 'live')
+            AND NOT EXISTS (SELECT 1 FROM sequence_enrollments e WHERE e.accountId = s.accountId AND e.sequenceId = s.sequenceId
+              AND e.contactId = s.contactId AND e.status = 'active' AND e.nextSendAt > ?))
+        ) ORDER BY s.sendAt, s.queuedAt, s.id LIMIT 1) AND status = ? RETURNING *`).get(owner, now, accountId, now, now, "queued");
   }).immediate();
 }
 
@@ -133,19 +149,21 @@ export function assertClaim(db: Database, row: QueueRow, settings: OutreachAccou
       AND EXISTS (SELECT 1 FROM list_members m JOIN lists l ON l.accountId = m.accountId AND l.id = m.listId
         WHERE m.accountId = c.accountId AND m.contactId = ? AND m.status = 'subscribed'
           AND l.archivedAt IS NULL AND m.listId IN (SELECT value FROM json_each(c.listIds)))
-      AND NOT EXISTS (SELECT 1 FROM list_members m JOIN lists l ON l.accountId = m.accountId AND l.id = m.listId
+      AND NOT EXISTS (SELECT 1 FROM list_members m
         WHERE m.accountId = c.accountId AND m.contactId = ? AND m.status = 'subscribed'
-          AND l.archivedAt IS NULL AND m.listId IN (SELECT value FROM json_each(c.excludedListIds)))`)
+          AND m.listId IN (SELECT value FROM json_each(c.excludedListIds)))`)
       .get(row.accountId, row.campaignId, row.contactId, row.contactId);
     if (!eligible) throw new SendStopped("recipient_unmailable");
   } else {
     const sequence = rows<{ status: string; triggerListId: string | null }>(db,
       "SELECT status, triggerListId FROM sequences WHERE accountId = ? AND id = ?").get(row.accountId, row.sequenceId);
     if (sequence?.status === "paused") throw new SendStopped("paused");
-    if (sequence?.status !== "live" || !db.query(`SELECT 1 FROM sequence_enrollments e JOIN sequence_steps p
+    const enrollment = rows<{ nextSendAt: number }>(db, `SELECT e.nextSendAt FROM sequence_enrollments e JOIN sequence_steps p
         ON p.accountId = e.accountId AND p.sequenceId = e.sequenceId AND p.position = e.nextStepPosition
         WHERE e.accountId = ? AND e.sequenceId = ? AND e.contactId = ? AND e.status = 'active' AND p.id = ? AND p.enabled = 1`)
-      .get(row.accountId, row.sequenceId, row.contactId, row.sequenceStepId)) throw new SendStopped("cancelled");
+      .get(row.accountId, row.sequenceId, row.contactId, row.sequenceStepId);
+    if (sequence?.status !== "live" || !enrollment) throw new SendStopped("cancelled");
+    if (enrollment.nextSendAt > now) throw new SendStopped("rescheduled");
     if (!db.query(`SELECT 1 FROM list_members m JOIN lists l ON l.accountId = m.accountId AND l.id = m.listId
         WHERE m.accountId = ? AND m.listId = ? AND m.contactId = ? AND m.status = 'subscribed' AND l.archivedAt IS NULL`)
       .get(row.accountId, sequence.triggerListId, row.contactId)) throw new SendStopped("recipient_unmailable");
@@ -178,8 +196,13 @@ export function settleSend(db: Database, row: QueueRow, outcome: SendOutcome, no
           : db.query(`SELECT 1 FROM sequence_enrollments WHERE accountId = ? AND sequenceId = ? AND contactId = ? AND status = 'active'`)
             .get(accountId, row.sequenceId, row.contactId);
         if (parentOpen) {
-          db.query(`UPDATE sends SET status = 'queued', error = ?, claimOwner = NULL, sendAt = ?, attempts = ?
-            WHERE accountId = ? AND id = ? AND claimOwner = ? AND status = 'sending'`).run(outcome.reason, now + delay, attempts - Number(outcome.status === "deferred"), accountId, id, claimOwner);
+          db.query(`UPDATE sends AS s SET status = 'queued', error = ?1, claimOwner = NULL,
+            sendAt = CASE WHEN ?3 = 0 THEN max(?2, coalesce((SELECT e.nextSendAt FROM sequence_enrollments e
+              JOIN sequence_steps p ON p.accountId = e.accountId AND p.sequenceId = e.sequenceId AND p.position = e.nextStepPosition
+              WHERE e.accountId = s.accountId AND e.sequenceId = s.sequenceId AND e.contactId = s.contactId
+                AND e.status = 'active' AND p.id = s.sequenceStepId), ?2)) ELSE ?2 END, attempts = ?3
+            WHERE accountId = ?4 AND id = ?5 AND claimOwner = ?6 AND status = 'sending'`)
+            .run(outcome.reason, now + delay, attempts - Number(outcome.status === "deferred"), accountId, id, claimOwner);
           return;
         }
         outcome = { status: "skipped", reason: "cancelled" };
@@ -188,9 +211,13 @@ export function settleSend(db: Database, row: QueueRow, outcome: SendOutcome, no
       }
     }
 
+    const contact = outcome.status === "sent" && rows<{ id: string }>(db, `SELECT c.id FROM sends s JOIN contacts c
+      ON c.accountId = s.accountId AND c.id = s.contactId WHERE s.accountId = ? AND s.id = ?`).get(accountId, id);
     const result = outcome.status === "sent"
-      ? db.query(`UPDATE sends SET status = 'sent', error = NULL, claimOwner = NULL, messageId = ?, providerMessageId = ?, subject = ?, recipients = ?, sentAt = ?
-          WHERE accountId = ? AND id = ? AND claimOwner = ? AND status = 'sending'`).run(outcome.messageId, outcome.providerMessageId, outcome.subject, outcome.recipients, outcome.sentAt, accountId, id, claimOwner)
+      ? db.query(`UPDATE sends SET status = 'sent', error = NULL, claimOwner = NULL, messageId = ?, providerMessageId = ?, contactId = ?, subject = ?, recipients = ?, sentAt = ?
+          WHERE accountId = ? AND id = ? AND claimOwner = ? AND status = 'sending'`).run(
+          outcome.messageId, outcome.providerMessageId, contact ? contact.id : null, contact ? outcome.subject : "", contact ? outcome.recipients : "",
+          outcome.sentAt, accountId, id, claimOwner)
       : db.query(`UPDATE sends SET status = ?, error = ?, claimOwner = NULL WHERE accountId = ? AND id = ? AND claimOwner = ? AND status = 'sending'`).run(outcome.status, outcome.reason, accountId, id, claimOwner);
     if (result.changes && row.kind === "sequence") {
       if (outcome.status === "skipped" && outcome.reason === "recipient_unmailable") {

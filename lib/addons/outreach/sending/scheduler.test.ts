@@ -7,7 +7,7 @@ import { initOutreachSchema } from "../db";
 import type { SendableRecipient } from "../contacts";
 import { defaultOutreachSettings } from "../settings";
 import { OutreachScheduler } from "./scheduler";
-import { cancelContact, claimSend, enroll, expandCampaign, expandSequences } from "./queue";
+import { cancelContact, claimSend, enroll, expandCampaign, expandSequences, settleSend } from "./queue";
 import { SendStopped } from "./send";
 import { saveCampaign, saveSequence } from "./store";
 
@@ -183,7 +183,7 @@ test("sequence enrolls once, waits from accepted send time, resumes overdue and 
   }
 });
 
-test("revalidates campaign exclusions added after fan-out", async () => {
+test("revalidates an archived campaign exclusion added after fan-out", async () => {
   const db = new Database(":memory:");
   try {
     const f = createFixture(db);
@@ -194,9 +194,120 @@ test("revalidates campaign exclusions added after fan-out", async () => {
       .run(JSON.stringify(["excluded"]), accountId, campaign.id);
     expandCampaign(db, campaign, f.recipients, start);
     db.query("INSERT INTO list_members (accountId, listId, contactId, status) VALUES (?, 'excluded', 'first', 'subscribed')").run(accountId);
+    db.query("UPDATE lists SET archivedAt = ? WHERE accountId = ? AND id = 'excluded'").run(start, accountId);
     await new OutreachScheduler(f.deps).tick();
     expect(f.sends()[0]).toMatchObject({ status: "skipped", error: "recipient_unmailable" });
     expect(f.mails).toHaveLength(0);
+  } finally {
+    db.close();
+  }
+});
+
+test("campaign fan-out drops deleted contacts and reads the current address for surviving contacts", async () => {
+  const scratch = mkdtempSync(join(tmpdir(), "outreach-fanout-"));
+  const path = join(scratch, "test.db");
+  const db = new Database(path);
+  const writer = new Database(path);
+  try {
+    const f = createFixture(db);
+    f.addContact("gone");
+    f.addContact("changed");
+    f.campaign();
+    f.deps.recipients = async () => {
+      writer.query("DELETE FROM contacts WHERE accountId = ? AND id = 'gone'").run(accountId);
+      writer.query("UPDATE contacts SET email = 'new@example.test' WHERE accountId = ? AND id = 'changed'").run(accountId);
+      return f.recipients;
+    };
+    f.deps.send = async () => ({ status: "retry", reason: "smtp_before_data" });
+    await new OutreachScheduler(f.deps).tick();
+    expect(f.sends().map(({ contactId, recipients }) => ({ contactId, recipients })))
+      .toEqual([{ contactId: "changed", recipients: "new@example.test" }]);
+  } finally {
+    writer.close();
+    db.close();
+    rmSync(scratch, { recursive: true });
+  }
+});
+
+test("sequence delay edits reschedule pending steps and preserve a later retry back-off", async () => {
+  const db = new Database(":memory:");
+  try {
+    const f = createFixture(db);
+    const sequence = f.sequence();
+    for (const [contactId, at] of [["pending", start], ["retry", start], ["waiting", start + 60_000]] as const) {
+      f.addContact(contactId);
+      enroll(db, accountId, { listId, contactId, at });
+    }
+    expandSequences(db, accountId, start + 60_000);
+    db.query("UPDATE sends SET attempts = 1, sendAt = ? WHERE accountId = ? AND contactId = 'retry'")
+      .run(start + 600_000, accountId);
+    saveSequence(db, accountId, { steps: sequence.steps.map((step, index) => ({ ...step, delayMinutes: index ? step.delayMinutes : 4 })) },
+      { id: sequence.id });
+    expect(f.enrollment("waiting")).toMatchObject({ nextSendAt: start + 300_000 });
+    expect(f.enrollment("pending")).toMatchObject({ nextSendAt: start + 240_000 });
+    expect(f.sends().find(send => send.contactId === "pending")).toMatchObject({ sendAt: start + 240_000 });
+    expect(f.sends().find(send => send.contactId === "retry")).toMatchObject({ sendAt: start + 600_000 });
+
+    const changeDelay = (delayMinutes: number) => saveSequence(db, accountId, {
+      steps: sequence.steps.map((step, index) => index === 0 ? { ...step, delayMinutes } : step)
+    }, { id: sequence.id });
+    changeDelay(20);
+    expect(claimSend(db, accountId, "owner", start + 600_000)).toBeNull();
+    changeDelay(1);
+    const first = claimSend(db, accountId, "owner", start + 600_000)!;
+    settleSend(db, first, { status: "skipped", reason: "cancelled" }, start + 600_000);
+    expect(claimSend(db, accountId, "owner", start + 600_000)).toMatchObject({ contactId: "retry" });
+  } finally {
+    db.close();
+  }
+});
+
+test("sequence attempts use live tracking choices and refuse MIME prepared before a tracking edit", async () => {
+  const db = new Database(":memory:");
+  try {
+    const f = createFixture(db);
+    const sequence = f.sequence();
+    f.addContact("first");
+    enroll(db, accountId, { listId, contactId: "first", at: start });
+    expandSequences(db, accountId, start + 60_000);
+    saveSequence(db, accountId, { trackOpens: false, trackClicks: false }, { id: sequence.id });
+    f.time(start + 60_000);
+    const choices: boolean[][] = [];
+    const blocks: unknown[] = [];
+    f.deps.send = async input => {
+      choices.push([input.trackOpens, input.trackClicks]);
+      saveSequence(db, accountId, { trackOpens: true, trackClicks: true }, { id: sequence.id });
+      try { input.assertClaim(); } catch (error) { blocks.push(error); }
+      return { status: "retry", reason: "configuration_changed" };
+    };
+    await new OutreachScheduler(f.deps).tick();
+    expect(choices).toEqual([[false, false]]);
+    expect(blocks).toEqual([new SendStopped("configuration_changed")]);
+  } finally {
+    db.close();
+  }
+});
+
+test("a delay edit during a claim defers the step to its new due date without spending an attempt", async () => {
+  const db = new Database(":memory:");
+  try {
+    const f = createFixture(db);
+    const sequence = f.sequence();
+    f.addContact("first");
+    enroll(db, accountId, { listId, contactId: "first", at: start });
+    f.time(start + 60_000);
+    const { settings } = f.deps;
+    f.deps.settings = async account => {
+      saveSequence(db, account, { steps: sequence.steps.map((step, index) => index === 0 ? { ...step, delayMinutes: 10 } : step) },
+        { id: sequence.id });
+      return settings(account);
+    };
+    f.deps.send = async input => {
+      expect(() => input.assertClaim()).toThrow(new SendStopped("rescheduled"));
+      return { status: "deferred", reason: "rescheduled" };
+    };
+    await new OutreachScheduler(f.deps).tick();
+    expect(f.sends()[0]).toMatchObject({ status: "queued", sendAt: start + 600_000, attempts: 0 });
   } finally {
     db.close();
   }

@@ -252,7 +252,7 @@ export type CampaignInput = Partial<Pick<Campaign, "name" | "subject" | "preview
  * `POST {base}/campaigns/{id}/schedule` — `sendAt: null` sends now. Answers the number of recipients it will reach.
  * `dryRun: true` runs every check and answers the count without scheduling anything.
  */
-export type CampaignScheduleRequest = { sendAt: number | null; dryRun?: boolean };
+export type CampaignScheduleRequest = { sendAt: number | null; dryRun?: boolean; expectedUpdatedAt?: number };
 export type CampaignScheduleResponse = { ok: true; campaign: CampaignSummary; recipients: number };
 /** `POST {base}/campaigns/{id}/test` — one rendered copy to an address, never counted in the report. */
 export type TestSendRequest = { to: string; contactId?: string };

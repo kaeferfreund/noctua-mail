@@ -99,16 +99,24 @@ export class OutreachScheduler {
       settleSend(db, row, { status: "skipped", reason: "step_changed" }, this.deps.now());
       return;
     }
+    const trackOpens = sequence?.trackOpens ?? row.trackOpens;
+    const trackClicks = sequence?.trackClicks ?? row.trackClicks;
+    if (trackOpens !== row.trackOpens || trackClicks !== row.trackClicks) {
+      db.query(`UPDATE sends SET trackOpens = ?, trackClicks = ?
+        WHERE accountId = ? AND id = ? AND claimOwner = ? AND status = 'sending'`)
+        .run(trackOpens, trackClicks, accountId, row.id, row.claimOwner);
+    }
     const outcome = await this.deps.send({
       settings, content: item, sendId: row.id,
       recipient: { contactId, listId: sequence?.triggerListId }, authorization: { scheduledByUserId: userId },
-      identityId: campaign?.senderIdentityId ?? sequence?.senderIdentityId ?? null, trackOpens: row.trackOpens === 1,
-      trackClicks: row.trackClicks === 1, assertClaim: () => {
+      identityId: campaign?.senderIdentityId ?? sequence?.senderIdentityId ?? null, trackOpens: trackOpens === 1,
+      trackClicks: trackClicks === 1, assertClaim: () => {
         assertClaim(db, row, settings, this.deps.now());
         if (sequence) {
           const live = sequenceRow(db, accountId, sequence.id);
           const liveStep = sequenceStep(db, accountId, sequence.id, sequenceStepId);
-          if (live?.senderIdentityId !== sequence.senderIdentityId || JSON.stringify(liveStep) !== JSON.stringify(step)) {
+          if (!live || live.senderIdentityId !== sequence.senderIdentityId || live.trackOpens !== trackOpens
+              || live.trackClicks !== trackClicks || JSON.stringify(liveStep) !== JSON.stringify(step)) {
             throw new SendStopped("configuration_changed");
           }
         }

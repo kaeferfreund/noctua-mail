@@ -3,12 +3,13 @@ import "@/lib/testDbHarness";
 import type { Account } from "@/lib/data";
 import { POST as unsubscribePost } from "@/app/t/u/[token]/route";
 import { createApiToken, subscribeWithApiToken } from "./contacts/apiTokens";
-import { createContactList, findContactByEmail, getContactDetail } from "./contacts/records";
+import { changeContactSubscription, eraseContact, getMembership } from "./contacts/consent";
+import { createContactList, findContactByEmail, getContactDetail, upsertContact } from "./contacts/records";
 import { getSendableRecipient, listSendableRecipients } from "./contacts";
 import { getOutreachDb } from "./db";
 import { OutreachScheduler } from "./sending/scheduler";
 import { defaultSendDependencies, sendOutreachMail } from "./sending/send";
-import { saveSequence } from "./sending/store";
+import { saveCampaign, saveSequence } from "./sending/store";
 import { getOutreachSettings, saveOutreachSettings } from "./settings";
 import { getMessageTracking, getSendStats, trackingClickResponse, trackingOpenResponse } from "./tracking";
 
@@ -114,4 +115,59 @@ test("signup → welcome series → tracked mail → click → unsubscribe stops
   // A late signup without a new consent time does not bring the person back.
   await expect(subscribeWithApiToken({ accountId, id: token.id }, { email: "erika@example.test", listId: list.id })).rejects.toMatchObject({ code: "new_consent_required" });
   await scheduler.stop();
+});
+
+test("an accepted send settles anonymously if the contact was erased before its receipt", async () => {
+  const accountId = crypto.randomUUID();
+  const db = await getOutreachDb();
+  await saveOutreachSettings(accountId, { enabled: true }, "editor");
+  const { contact } = await upsertContact(accountId, { email: "erased@example.test" });
+  const list = await createContactList(accountId, { name: "List" });
+  await changeContactSubscription(accountId, contact.id, { listId: list.id, action: "subscribe" });
+  const campaign = saveCampaign(db, accountId, "editor", { subject: "Hallo {{ first_name }}", listIds: [list.id] });
+  const now = Date.now();
+  db.query("UPDATE campaigns SET status = 'scheduled', sendAt = ?, scheduledByUserId = 'editor' WHERE accountId = ? AND id = ?")
+    .run(now, accountId, campaign.id);
+  const scheduler = new OutreachScheduler({
+    db: getOutreachDb, now: () => now, recipients: listSendableRecipients, settings: getOutreachSettings, retention: async () => 0,
+    send: async input => {
+      input.assertClaim();
+      await eraseContact(accountId, contact.id);
+      return { status: "sent", recipients: contact.email, subject: "Hallo Alex", sentAt: now + 1,
+        messageId: "<sent@example.test>", providerMessageId: "receipt" };
+    }
+  });
+  await scheduler.tick();
+  expect(db.query("SELECT contactId, status, recipients, subject, sentAt, providerMessageId FROM sends WHERE accountId = ? AND campaignId = ?")
+    .get(accountId, campaign.id)).toEqual({ contactId: null, status: "sent", recipients: "", subject: "", sentAt: now + 1, providerMessageId: "receipt" });
+});
+
+test("a failed welcome enrollment rolls back API and editor subscriptions, which can then be retried", async () => {
+  const accountId = crypto.randomUUID();
+  const db = await getOutreachDb();
+  await saveOutreachSettings(accountId, { enabled: true }, "editor");
+  const list = await createContactList(accountId, { name: "Welcome" });
+  const sequence = saveSequence(db, accountId, { triggerListId: list.id, steps: [{ subject: "Willkommen", text: "Hallo" }] });
+  db.query("UPDATE sequences SET status = 'live' WHERE accountId = ? AND id = ?").run(accountId, sequence.id);
+  const { token } = await createApiToken(accountId, "editor", { name: "Registration", listIds: [list.id] });
+  const { contact } = await upsertContact(accountId, { email: "manual@example.test" });
+  const subscribeApi = () => subscribeWithApiToken({ accountId, id: token.id }, { listId: list.id, email: "signup@example.test" });
+  const subscribeEditor = () => changeContactSubscription(accountId, contact.id, { listId: list.id, action: "subscribe" });
+  db.exec(`CREATE TEMP TRIGGER fail_enrollment BEFORE INSERT ON sequence_enrollments
+    WHEN NEW.accountId = '${accountId}' BEGIN SELECT RAISE(ABORT, 'synthetic enrollment failure'); END`);
+  try {
+    await expect(subscribeApi()).rejects.toThrow("synthetic enrollment failure");
+    await expect(subscribeEditor()).rejects.toThrow("synthetic enrollment failure");
+    expect(findContactByEmail(db, accountId, "signup@example.test")).toBeNull();
+    expect(getMembership(db, accountId, contact.id, list.id)).toBeNull();
+  } finally {
+    db.exec("DROP TRIGGER fail_enrollment");
+  }
+
+  await subscribeApi();
+  await subscribeEditor();
+  await subscribeApi();
+  await subscribeEditor();
+  expect(db.query("SELECT count(*) AS count FROM sequence_enrollments WHERE accountId = ? AND sequenceId = ?")
+    .get(accountId, sequence.id)).toEqual({ count: 2 });
 });

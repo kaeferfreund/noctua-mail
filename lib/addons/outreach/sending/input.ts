@@ -34,6 +34,6 @@ export const sequenceInput = z.object({
   trackOpens: z.boolean().optional(), trackClicks: z.boolean().optional(), steps: z.array(stepInput).max(200).optional()
 }).partial();
 export const renderInput = z.object({ subject, html: body, text: body.optional(), contactId: itemId.optional() });
-export const scheduleInput = z.object({ sendAt: z.number().int().nullable(), dryRun: z.boolean().optional() });
+export const scheduleInput = z.object({ sendAt: z.number().int().nullable(), dryRun: z.boolean().optional(), expectedUpdatedAt: z.number().int().nonnegative().optional() });
 export const statusInput = z.object({ status: z.enum(["live", "paused"]) });
 export const testInput = z.object({ to: z.email().max(254), contactId: itemId.optional() });

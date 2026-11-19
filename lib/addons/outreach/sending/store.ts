@@ -8,6 +8,7 @@ import type {
 } from "../types";
 import { SendingError } from "./input";
 import { normalizeTemplate, type Content } from "./render";
+import { rescheduleSequenceStep } from "./queue";
 
 export function required<T>(value: T | null | undefined): T {
   if (value == null) throw new SendingError(404, "Eintrag nicht gefunden.");
@@ -140,8 +141,8 @@ export async function listCampaigns(db: Database, accountId: string) {
 
 export function saveCampaign(db: Database, accountId: string, userId: string, input: CampaignInput, id?: string) {
   return db.transaction(() => {
-    const now = Date.now();
     const current = id ? getCampaign(db, accountId, id) : undefined;
+    const now = Math.max(Date.now(), (current?.updatedAt ?? -1) + 1);
     if (current) assertDraft(current);
     const nextId = current?.id ?? newOutreachId("cmp");
     const templateId = input.templateId === undefined ? current?.templateId ?? null : input.templateId;
@@ -270,10 +271,15 @@ export function saveSequence(db: Database, accountId: string, input: SequenceInp
           ? resolveContent(db, accountId, { ...authored, templateId })
           : authored;
         if (current && current.status !== "draft" && enabled) assertContent(content);
+        const stepId = previous?.id ?? newOutreachId("stp");
+        const delayMinutes = step.delayMinutes ?? previous?.delayMinutes ?? 0;
         db.query(`INSERT INTO sequence_steps (id, accountId, sequenceId, position, name, delayMinutes, enabled, templateId, subject, previewText, html, text)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(previous?.id ?? newOutreachId("stp"), accountId, id, position, step.name ?? previous?.name ?? "",
-          step.delayMinutes ?? previous?.delayMinutes ?? 0, +enabled,
-          templateId, ...contentArgs(content));
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(stepId, accountId, id, position, step.name ?? previous?.name ?? "",
+          delayMinutes, +enabled, templateId, ...contentArgs(content));
+        const original = current?.steps[position];
+        if (enabled && original?.enabled && delayMinutes !== original.delayMinutes) {
+          rescheduleSequenceStep(db, accountId, id, stepId, position, (delayMinutes - original.delayMinutes) * 60_000);
+        }
       }
     }
     return getSequence(db, accountId, id);
