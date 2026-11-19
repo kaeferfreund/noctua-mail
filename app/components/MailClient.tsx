@@ -5138,16 +5138,20 @@ export default function MailClient({
     applyPlace: requested => {
       const targetView = requested.query.trim() || requested.badges.length ? null : requested.view;
       const calendarAvailable = targetView ? targetView === "virtual:invite-deck" : requested.badges.includes("calendar");
+      // The domain view needs the active mailbox to be one of the domain's.
+      const domain = requested.domain && currentAccount && mailboxGroupDomain(currentAccount.email) === requested.domain
+        ? requested.domain : null;
+      // In the domain view the active folder is the active mailbox's folder of the shown role, not
+      // the folder it had before: thread grouping and the sender/recipient column follow that folder.
+      const domainRoleFolder = domain && currentAccount ? findDomainRoleFolder(accountFolders, currentAccount.id, requested.domainRole) : null;
       const target: DeepLinkState = { ...requested,
-        folderId: requested.scope === "all" ? "" : accountFolders.some(folder => folder.id === requested.folderId)
-          ? requested.folderId : inboxFolder?.id ?? "",
+        folderId: requested.scope === "all" ? "" : domainRoleFolder ? domainRoleFolder.id
+          : accountFolders.some(folder => folder.id === requested.folderId) ? requested.folderId : inboxFolder?.id ?? "",
         messageId: "", view: targetView,
         group: requested.group === "event" && !calendarAvailable ? "date" : requested.group,
         settings: requested.settings && currentAccount ? settingsTabVisible(requested.settings, currentAccount.accessRole) ? requested.settings : "preferences" : null,
         admin: isAdminUser ? requested.admin : null,
-        // The domain view needs the active mailbox to be one of the domain's.
-        domain: requested.domain && currentAccount && mailboxGroupDomain(currentAccount.email) === requested.domain
-          ? requested.domain : null,
+        domain,
         domainRole: requested.domain ? requested.domainRole : "inbox"
       };
       if (target.domain) target.view = null;
