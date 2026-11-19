@@ -9,30 +9,43 @@ import { outreachApiPath } from "../useOutreachStatus";
  * `outreachErrorKey` turns them into one of the `outreach.errors.*` messages.
  */
 export type OutreachApi = {
-  get<T>(path: string, query?: Record<string, string | number | boolean | null | undefined>): Promise<T>;
+  get<T>(path: string, query?: Query): Promise<T>;
   send<T>(method: "POST" | "PATCH" | "PUT" | "DELETE", path: string, body?: unknown): Promise<T>;
+  /** A `POST` with raw bytes as `application/octet-stream` (image upload). */
+  upload<T>(path: string, query: Record<string, string>, body: Blob): Promise<T>;
 };
+
+type Query = Record<string, string | number | boolean | null | undefined>;
+
+function withQuery(url: string, query?: Query) {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value !== undefined && value !== null && value !== "") params.set(key, String(value));
+  }
+  const search = params.toString();
+  return `${url}${search ? `?${search}` : ""}`;
+}
 
 export function createOutreachApi(accountId: string, fetchImpl: AdminFetch = fetch): OutreachApi {
   return {
     get(path, query) {
-      const params = new URLSearchParams();
-      for (const [key, value] of Object.entries(query ?? {})) {
-        if (value !== undefined && value !== null && value !== "") params.set(key, String(value));
-      }
-      const search = params.toString();
-      return adminRequest(fetchImpl, `${outreachApiPath(accountId, path)}${search ? `?${search}` : ""}`);
+      return adminRequest(fetchImpl, withQuery(outreachApiPath(accountId, path), query));
     },
     send(method, path, body) {
       // The DELETE routes accept only an empty body; every other write is a JSON write.
       return adminRequest(fetchImpl, outreachApiPath(accountId, path), method === "DELETE" ? { method } : jsonMutation(method, body ?? {}));
+    },
+    upload(path, query, body) {
+      return adminRequest(fetchImpl, withQuery(outreachApiPath(accountId, path), query), {
+        method: "POST", headers: { "Content-Type": "application/octet-stream" }, body
+      });
     }
   };
 }
 
 export type OutreachErrorKey =
   | "errors.disabled" | "errors.conflict" | "errors.invalid" | "errors.forbidden" | "errors.notFound"
-  | "errors.session" | "errors.rateLimited" | "errors.offline" | "errors.generic";
+  | "errors.session" | "errors.rateLimited" | "errors.offline" | "errors.tooLarge" | "errors.unsupportedType" | "errors.generic";
 
 /** Maps a failed request to a translated message key plus the server's own text where it helps (400/409). */
 export function outreachErrorKey(error: unknown): { key: OutreachErrorKey; detail: string | null } {
@@ -45,6 +58,8 @@ export function outreachErrorKey(error: unknown): { key: OutreachErrorKey; detai
     case 403: return { key: "errors.forbidden", detail: null };
     case 404: return { key: "errors.notFound", detail: null };
     case 409: return { key: "errors.conflict", detail };
+    case 413: return { key: "errors.tooLarge", detail: null };
+    case 415: return { key: "errors.unsupportedType", detail: null };
     case 429: return { key: "errors.rateLimited", detail: null };
     default: return { key: "errors.generic", detail: null };
   }
