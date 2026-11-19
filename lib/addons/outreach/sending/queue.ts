@@ -121,14 +121,15 @@ export function claimSend(db: Database, accountId: string, owner: string, now: n
     const recent = rows<{ count: number }>(db, `SELECT count(*) AS count FROM sends
       WHERE accountId = ? AND kind IN ('campaign','sequence') AND claimedAt > ?`).get(accountId, now - 60_000);
     if ((recent?.count ?? 0) >= settings.sendRatePerMinute) return null;
-    return rows<QueueRow>(db, `UPDATE sends SET status = 'sending', claimOwner = ?, claimedAt = ?, attempts = attempts + 1
-      WHERE accountId = ? AND id = (SELECT s.id FROM sends s WHERE s.accountId = sends.accountId AND s.status = 'queued'
-        AND s.sendAt <= ? AND (
+    // The subquery is bound to the parameter, not to the outer row, so it runs once per claim.
+    return rows<QueueRow>(db, `UPDATE sends SET status = 'sending', claimOwner = ?1, claimedAt = ?2, attempts = attempts + 1
+      WHERE accountId = ?3 AND id = (SELECT s.id FROM sends s WHERE s.accountId = ?3 AND s.status = 'queued'
+        AND s.sendAt <= ?2 AND (
           (s.kind = 'campaign' AND EXISTS (SELECT 1 FROM campaigns c WHERE c.accountId = s.accountId AND c.id = s.campaignId AND c.status = 'sending'))
           OR (s.kind = 'sequence' AND EXISTS (SELECT 1 FROM sequences q WHERE q.accountId = s.accountId AND q.id = s.sequenceId AND q.status = 'live')
             AND NOT EXISTS (SELECT 1 FROM sequence_enrollments e WHERE e.accountId = s.accountId AND e.sequenceId = s.sequenceId
-              AND e.contactId = s.contactId AND e.status = 'active' AND e.nextSendAt > ?))
-        ) ORDER BY s.sendAt, s.queuedAt, s.id LIMIT 1) AND status = ? RETURNING *`).get(owner, now, accountId, now, now, "queued");
+              AND e.contactId = s.contactId AND e.status = 'active' AND e.nextSendAt > ?2))
+        ) ORDER BY s.sendAt, s.queuedAt, s.id LIMIT 1) AND status = 'queued' RETURNING *`).get(owner, now, accountId);
   }).immediate();
 }
 
