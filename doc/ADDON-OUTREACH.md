@@ -99,6 +99,7 @@ opens, clicks, unsubscribes, deliveries, bounces and complaints.
 | --- | --- |
 | `GET /t/o/{token}.gif` | open pixel; always answers the same 1×1 GIF, also for unknown tokens |
 | `GET /t/c/{token}` | click; 302 only to the URL stored for the token, 404 otherwise |
+| `GET /t/m/{sha256}.{ext}` | an uploaded image; content-addressed, cached for a year, no event recorded |
 | `GET /t/u/{token}` | unsubscribe confirmation page (German and English) |
 | `POST /t/u/{token}` | unsubscribe (form and RFC 8058 one-click); its own budget of 2,000 submissions per minute per client, apart from the 120 page views, and a refused submission never shows the confirmation |
 | `POST /t/ses-events` | Amazon SNS notifications for SES (signature and topic verified) |
@@ -159,6 +160,8 @@ Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 | GET, POST | `{base}/templates` | `EmailTemplateInput` → `{ok, templates: EmailTemplateSummary[]}` / `{ok, template}` |
 | GET, PATCH, DELETE | `{base}/templates/{templateId}` | `Partial<EmailTemplateInput>` → `{ok, template}`; DELETE archives |
 | POST | `{base}/render` | `{subject, html, text?, contactId?}` → `RenderResponse` |
+| GET | `{base}/images` | → `OutreachImageListResponse` |
+| POST | `{base}/images?filename=` | file bytes as `application/octet-stream` → `OutreachImageUploadResponse` (PNG, JPEG, GIF, WebP; at most 5 MiB) |
 | GET, POST | `{base}/campaigns` | `CampaignInput` → `{ok, campaigns: CampaignSummary[]}` / `{ok, campaign}` |
 | GET, PATCH, DELETE | `{base}/campaigns/{campaignId}` | `CampaignInput` → `{ok, campaign: Campaign}`; only drafts change or delete. `Campaign` and `CampaignSummary` carry `scheduledByUserId` and `scheduledVia` |
 | POST | `{base}/campaigns/{campaignId}/test` | `TestSendRequest` → `{ok}` |

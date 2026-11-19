@@ -226,6 +226,40 @@ export type EmailTemplateInput = { name: string; subject?: string; previewText?:
 /** `POST {base}/render` — body `{ subject, html, text?, contactId? }`; renders with the contact or sample data. */
 export type RenderResponse = { ok: true; subject: string; html: string; text: string; warnings: string[] };
 
+// ---------------------------------------------------------------- images
+
+/**
+ * Images for templates, campaigns and sequence steps, kept by the addon and served publicly
+ * from `/t/m/{sha256}.{ext}` (long cache, content-addressed, also while the addon is switched
+ * off). Content stores the root-relative `url`; rendering for sending makes it absolute with the
+ * public origin, so templates do not depend on the host name. Raster images only (no SVG).
+ */
+export const OUTREACH_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"] as const;
+export type OutreachImageType = (typeof OUTREACH_IMAGE_TYPES)[number];
+export const OUTREACH_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+
+export type OutreachImage = {
+  id: string;
+  accountId: string;
+  /** Root-relative public path, e.g. `/t/m/3f…9a.png`; put this into `<img src>`. */
+  url: string;
+  contentType: OutreachImageType;
+  bytes: number;
+  width: number | null;
+  height: number | null;
+  /** Name it was uploaded with, for display only. */
+  filename: string;
+  createdAt: number;
+};
+/** `GET {base}/images` */
+export type OutreachImageListResponse = { ok: true; images: OutreachImage[] };
+/**
+ * `POST {base}/images?filename=<name>` with `Content-Type: application/octet-stream` and the file
+ * bytes as the body (same-origin, editor). The type is taken from the bytes, not from the name.
+ * Uploading the same bytes again answers the existing image with `created: false`.
+ */
+export type OutreachImageUploadResponse = { ok: true; image: OutreachImage; created: boolean };
+
 // ---------------------------------------------------------------- campaigns
 
 export const CAMPAIGN_STATUSES = ["draft", "scheduled", "sending", "sent", "cancelled", "failed"] as const;
