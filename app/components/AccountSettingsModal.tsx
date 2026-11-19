@@ -25,6 +25,8 @@ import TranslationTabContent from "@/app/components/account-settings/tabs/Transl
 import SpamTabContent from "@/app/components/account-settings/tabs/SpamTabContent";
 import NotificationsTabContent from "@/app/components/account-settings/tabs/NotificationsTabContent";
 import { type OverflowTabItem } from "@/app/components/account-settings/OverflowTabsList";
+import OutreachSettingsTab from "@/app/components/addons/outreach/settings/OutreachSettingsTab";
+import { useOutreachStatus } from "@/app/components/addons/outreach/useOutreachStatus";
 export type ManageTab =
   | "account"
   | "identities"
@@ -38,7 +40,8 @@ export type ManageTab =
   | "mcp"
   | "recipient-aliases"
   | "members"
-  | "spam";
+  | "spam"
+  | "outreach";
 
 function deriveImapSecurity(imap: Account["imap"]): "tls" | "starttls" | "none" {
   if (imap.secure) return "tls";
@@ -101,6 +104,8 @@ export default function AccountSettingsModal({
 }: Props) {
   const { messages: senderMessages } = useSenderMessages();
   const t = useTranslations("Settings");
+  const tOutreach = useTranslations("outreachTracking.settings");
+  const outreachAvailable = useOutreachStatus().available;
   const isMobile = useIsMobile();
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [localAccount, setLocalAccount] = useState<Account>(initialAccount);
@@ -158,8 +163,10 @@ export default function AccountSettingsModal({
     ];
     items.push({ value: "members", label: t("tabs.members"), disabled: !isExistingAccount });
     if (isAdminUser) items.push({ value: "spam", label: t("tabs.spam"), disabled: !isExistingAccount });
+    // Optional addon: the tab exists only while the server flag is on.
+    if (outreachAvailable) items.push({ value: "outreach", label: tOutreach("tab"), disabled: !isExistingAccount });
     return items.filter(tab => settingsTabVisible(tab.value, initialAccount.accessRole, isExistingAccount));
-  }, [initialAccount.accessRole, isAdminUser, isExistingAccount, senderMessages.identitiesTitle, t]);
+  }, [initialAccount.accessRole, isAdminUser, isExistingAccount, outreachAvailable, senderMessages.identitiesTitle, t, tOutreach]);
   const activeTab = tabItems.some(tab => tab.value === manageTab && !tab.disabled) ? manageTab : (tabItems.find(tab => tab.value === "preferences" && !tab.disabled)?.value ?? tabItems.find(tab => !tab.disabled)?.value ?? "preferences");
 
   if (!isOpen) return null;
@@ -372,6 +379,10 @@ export default function AccountSettingsModal({
 
             {isAdminUser && isExistingAccount && <Tabs.Content value="spam" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>
               <SpamTabContent key={localAccount.id} accountId={localAccount.id} apiFetch={apiFetch} />
+            </Tabs.Content>}
+
+            {outreachAvailable && isExistingAccount && <Tabs.Content value="outreach" style={{ flex: "1 1 auto", minHeight: 0, overflow: "hidden" }}>
+              <OutreachSettingsTab accountId={localAccount.id} canManage={initialAccount.accessRole === "manager"} apiFetch={apiFetch} onClose={onClose} />
             </Tabs.Content>}
 
             {initialAccount.accessRole === "manager" && <Tabs.Content value="members" style={{ flex: "1 1 auto", minHeight: 0, overflow: "auto" }}>

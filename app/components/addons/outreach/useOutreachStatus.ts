@@ -26,8 +26,11 @@ function publish(next: OutreachStatus) {
 async function load() {
   try {
     const response = await fetch("/api/addons/outreach/status", { cache: "no-store" });
-    const body = response.ok ? await response.json() as OutreachStatusResponse : null;
-    publish(body?.ok ? { loaded: true, available: body.available, accounts: body.accounts, sesConfigured: body.sesConfigured, trackingConfigured: body.trackingConfigured } : OFF);
+    const body = response.ok ? await response.json() as Partial<OutreachStatusResponse> | null : null;
+    // Anything that is not a complete status answer means "off" (also a stubbed fetch in tests).
+    publish(body?.ok === true && typeof body.available === "boolean" && Array.isArray(body.accounts)
+      ? { loaded: true, available: body.available, accounts: body.accounts, sesConfigured: body.sesConfigured === true, trackingConfigured: body.trackingConfigured === true }
+      : OFF);
   } catch {
     // The addon is optional: any failure means "not there" for this page load.
     publish(OFF);
