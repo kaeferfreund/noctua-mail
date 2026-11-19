@@ -24,8 +24,8 @@ export function createOutreachApi(accountId: string, fetchImpl: AdminFetch = fet
       return adminRequest(fetchImpl, `${outreachApiPath(accountId, path)}${search ? `?${search}` : ""}`);
     },
     send(method, path, body) {
-      // DELETE and body-less POSTs still declare JSON so the same-origin check sees a JSON write.
-      return adminRequest(fetchImpl, outreachApiPath(accountId, path), jsonMutation(method, body ?? {}));
+      // The DELETE routes accept only an empty body; every other write is a JSON write.
+      return adminRequest(fetchImpl, outreachApiPath(accountId, path), method === "DELETE" ? { method } : jsonMutation(method, body ?? {}));
     }
   };
 }
