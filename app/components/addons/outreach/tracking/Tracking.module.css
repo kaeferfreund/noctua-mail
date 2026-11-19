@@ -1,0 +1,116 @@
+/* Outreach addon: compose switch and the reader's tracking status line. Theme tokens only. */
+
+.composeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+}
+
+.composeLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.status {
+  margin-top: var(--space-2);
+  font-size: var(--font-size-1);
+  color: var(--gray-11);
+}
+
+.statusToggle {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  max-width: 100%;
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-2);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  /* Buttons do not wrap by default in the app; this line wraps on phones. */
+  white-space: normal;
+  cursor: pointer;
+}
+
+.statusToggle > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.statusToggle:hover {
+  background: var(--gray-a3);
+}
+
+.statusToggle:focus-visible {
+  outline: 2px solid var(--focus-8);
+  outline-offset: 1px;
+}
+
+.statusText {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.chevron,
+.chevronOpen {
+  transition: transform 120ms ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--gray-a5);
+  border-radius: var(--radius-2);
+  background: var(--gray-a2);
+}
+
+.panel p {
+  margin: 0;
+}
+
+.eventList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--gray-a4);
+}
+
+.event:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.eventHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.eventMeta,
+.eventUrl {
+  overflow-wrap: anywhere;
+}

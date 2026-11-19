@@ -46,6 +46,7 @@ import { formatComposePageTitle } from "@/lib/appBranding";
 import { decidePostSendSentSync, type SyncMode } from "@/lib/syncPolicy";
 import { logSyncPolicyCall } from "@/lib/syncPolicyLogging";
 import { buildSendPayload } from "./buildSendPayload";
+import { ComposeTrackingSwitch, useComposeTracking } from "@/app/components/addons/outreach/tracking/ComposeTracking";
 import ComposeInlineCard from "./ComposeInlineCard";
 import ComposeMessageField from "./ComposeMessageField";
 import ComposeMinimized from "./ComposeMinimized";
@@ -976,6 +977,9 @@ function ComposeOrchestratorImpl(
     return { invitePayload };
   };
 
+  // Outreach addon: empty send field unless the switch is offered (flag on, mailbox activated, HTML/Markdown).
+  const composeTracking = useComposeTracking({ accountId: activeAccountId, format: composeTab, sessionKey: composeOpenedAt });
+
   const [scheduleSendOpen, setScheduleSendOpen] = useState(false);
   const openScheduleSend = () => {
     if (sendingMailRef.current || deliveredRef.current || !readSendPreconditions()) return;
@@ -1081,7 +1085,7 @@ function ComposeOrchestratorImpl(
       const res = await apiFetch(buildAccountSmtpSendPath(activeAccountId), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sendDraftId ? { ...smtpPayload, draftId: sendDraftId } : smtpPayload)
+        body: JSON.stringify({ ...smtpPayload, ...composeTracking.sendField(composeFormat), ...(sendDraftId ? { draftId: sendDraftId } : {}) })
       });
       if (res.ok) {
         const sendResult = (await res.json().catch(() => null)) as
@@ -1494,6 +1498,7 @@ function ComposeOrchestratorImpl(
   const visibleComposeAttachments = composeAttachments.filter((item) => !item.inline);
 
   const composeMessageField = (
+    <>
     <ComposeMessageField
       darkMode={darkMode}
       composeMode={composeMode}
@@ -1595,6 +1600,8 @@ function ComposeOrchestratorImpl(
       addComposeFiles={addComposeFiles}
       addDroppedFiles={addDroppedFiles}
     />
+    <ComposeTrackingSwitch tracking={composeTracking} />
+    </>
   );
 
   const contextValue: ComposeContextValue = {

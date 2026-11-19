@@ -59,6 +59,13 @@ identity checks as the manual send routes.
 `accountId`; every query filters by it. Shapes that cross a boundary are in
 `lib/addons/outreach/types.ts`.
 
+Consent rules live in `lib/addons/outreach/contacts/consent.ts`. A contact is mailed only with
+consent, without a suppression and while subscribed to the list. `contacts.unsubscribedAt` keeps
+the newest global unsubscribe even after a re-subscription, so a consent older than it can never
+be applied to any list. Erasing a contact removes its data; if it was suppressed or had
+unsubscribed, `erased_addresses` keeps a SHA-256 of the address with the reason and dates, and a
+contact created later for that address takes the block over.
+
 A `sends` row is one tracked outgoing mail: per recipient for campaigns and sequences, per
 message for a normal mail (then several recipients share one row, so an open means "someone
 opened"). `tracking_links` maps the opaque public tokens to a send; `tracking_events` holds
