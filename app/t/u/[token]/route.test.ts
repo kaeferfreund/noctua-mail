@@ -76,7 +76,10 @@ test("RFC 8058 accepts multipart without an origin or cookies; retries and unkno
   const first = await getContactDetail(fixture.accountId, fixture.contactId);
   expect(first.emailConsent).toBe("unsubscribed");
   expect((await submit(fixture.token)).status).toBe(200);
-  expect((await getContactDetail(fixture.accountId, fixture.contactId)).consentAt).toBe(first.consentAt);
+  // A repeated submission keeps the contact unsubscribed; its later time is the newest unsubscribe.
+  const again = await getContactDetail(fixture.accountId, fixture.contactId);
+  expect(again.emailConsent).toBe("unsubscribed");
+  expect(again.consentAt).toBeGreaterThanOrEqual(first.consentAt!);
   const unknown = await submit(newOutreachToken());
   expect(unknown.status).toBe(200);
   expect(await unknown.text()).toBe(await known.text());

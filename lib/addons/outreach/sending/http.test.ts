@@ -68,11 +68,15 @@ test("REST enforces flag, editor permissions, same-origin JSON and campaign/sequ
       saveCampaign(db, accountId, editor.user.id, { subject: "Parallel geändert" }, raced.id);
       return [];
     })).rejects.toMatchObject({ code: "campaign_changed" });
+    // Scheduling needs at least one recipient.
+    db.query(`INSERT INTO contacts (accountId, id, email, emailLower, emailConsent, createdAt, updatedAt)
+      VALUES (?, ?, 'reader@example.test', 'reader@example.test', 'subscribed', 0, 0)`).run(accountId, `${accountId}-reader`);
+    db.query("INSERT INTO list_members (accountId, listId, contactId, status) VALUES (?, ?, ?, 'subscribed')").run(accountId, accountId, `${accountId}-reader`);
     const refreshed = await scheduleCampaign(request(editor, `${route}/schedule`, "POST", { sendAt: null, dryRun: true }), campaignAt);
     const { campaign: refreshedCampaign } = await refreshed.json();
     const scheduled = await scheduleCampaign(request(editor, `${route}/schedule`, "POST",
       { sendAt: null, expectedUpdatedAt: refreshedCampaign.updatedAt }), campaignAt);
-    expect(await scheduled.json()).toMatchObject({ ok: true, campaign: { status: "scheduled" }, recipients: 0 });
+    expect(await scheduled.json()).toMatchObject({ ok: true, campaign: { status: "scheduled" }, recipients: 1 });
     expect((await editCampaign(request(editor, route, "PATCH", { subject: "Neu" }), campaignAt)).status).toBe(409);
     expect((await cancelCampaign(request(editor, `${route}/cancel`, "POST"), campaignAt)).status).toBe(200);
     expect((await cancelCampaign(request(editor, `${route}/cancel`, "POST"), campaignAt)).status).toBe(409);

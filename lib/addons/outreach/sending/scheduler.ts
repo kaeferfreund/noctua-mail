@@ -9,11 +9,15 @@ import { outreachAddonEnabled } from "../config";
 import { outreachAccounts } from "./accounts";
 import { sendOwner } from "./lease";
 import { assertClaim, claimSend, expandCampaign, expandSequences, finishCampaigns, recoverInterrupted, settleSend, type QueueRow } from "./queue";
-import { sendOutreachMail, SendStopped } from "./send";
+import { sendOutreachMail, SendStopped, type SendOutcome } from "./send";
 import { campaignRow, getCampaign, sequenceRow, sequenceStep } from "./store";
 
 const tickMs = 15_000;
 const retentionMs = 60 * 60_000;
+/** One mailbox's claims per pass: the highest send rate (600 a minute) for one tick, and at most one tick of wall-clock time. */
+const claimBudget = { claims: 150, ms: tickMs };
+/** Deferrals that concern only the claimed row. Any other deferral is a configuration problem of the whole mailbox. */
+const rowDeferrals = new Set(["paused", "rescheduled"]);
 
 const defaults = {
   db: getOutreachDb, now: Date.now, recipients: listSendableRecipients, settings: getOutreachSettings,
@@ -26,7 +30,7 @@ export class OutreachScheduler {
   private pending: Promise<void> | undefined;
   private stopped = false;
   private nextRetentionAt = 0;
-  constructor(private readonly deps: typeof defaults = defaults) {}
+  constructor(private readonly deps: typeof defaults = defaults, private readonly budget = claimBudget) {}
 
   start() {
     if (this.timer || this.stopped) return;
@@ -69,36 +73,45 @@ export class OutreachScheduler {
     recoverInterrupted(db, accountId, now);
     const scheduled = rows<{ id: string }>(db, `SELECT id FROM campaigns
       WHERE accountId = ? AND status = 'scheduled' AND sendAt <= ? ORDER BY sendAt, id`).all(accountId, now);
+    // One campaign that cannot be expanded must not hold up the mailbox's other work.
     for (const row of scheduled) {
       if (this.stopped || isShuttingDown()) return;
-      const campaign = getCampaign(db, accountId, row.id);
-      expandCampaign(db, campaign, await this.deps.recipients(accountId, campaign), now);
+      try {
+        const campaign = getCampaign(db, accountId, row.id);
+        expandCampaign(db, campaign, await this.deps.recipients(accountId, campaign), now);
+      } catch {
+        console.warn("[outreach] campaign expansion failed; will retry");
+      }
     }
-    expandSequences(db, accountId, this.deps.now());
-    while (!this.stopped && !isShuttingDown()) {
+    try {
+      expandSequences(db, accountId, this.deps.now());
+    } catch {
+      console.warn("[outreach] sequence expansion failed; will retry");
+    }
+    const started = this.deps.now();
+    for (let claims = 0; claims < this.budget.claims && !this.stopped && !isShuttingDown(); claims += 1) {
       const at = this.deps.now();
+      if (at - started >= this.budget.ms) break;
       const row = claimSend(db, accountId, this.owner, at);
       if (!row) break;
-      await this.attempt(db, row);
+      const outcome = await this.attempt(db, row);
+      // Nothing was attempted because of the mailbox's configuration: the row waits for a later pass.
+      if (outcome.status === "deferred" && !rowDeferrals.has(outcome.reason)) break;
     }
     finishCampaigns(db, accountId, this.deps.now());
   }
 
-  private async attempt(db: Database, row: QueueRow) {
+  private async attempt(db: Database, row: QueueRow): Promise<SendOutcome> {
     const { accountId, campaignId, sequenceId, sequenceStepId, contactId, userId } = row;
     if (!contactId || !userId) {
-      settleSend(db, row, { status: "failed", reason: "send_context_missing" }, this.deps.now());
-      return;
+      return this.settle(db, row, { status: "failed", reason: "send_context_missing" });
     }
     const settings = await this.deps.settings(accountId);
     const sequence = sequenceId ? sequenceRow(db, accountId, sequenceId) : null;
     const campaign = campaignId ? campaignRow(db, accountId, campaignId) : null;
     const step = sequence ? sequenceStep(db, accountId, sequence.id, sequenceStepId) : null;
     const item = campaign ?? (step?.enabled ? step : null);
-    if (!item) {
-      settleSend(db, row, { status: "skipped", reason: "step_changed" }, this.deps.now());
-      return;
-    }
+    if (!item) return this.settle(db, row, { status: "skipped", reason: "step_changed" });
     const trackOpens = sequence?.trackOpens ?? row.trackOpens;
     const trackClicks = sequence?.trackClicks ?? row.trackClicks;
     if (trackOpens !== row.trackOpens || trackClicks !== row.trackClicks) {
@@ -122,7 +135,12 @@ export class OutreachScheduler {
         }
       }
     });
+    return this.settle(db, row, outcome);
+  }
+
+  private settle(db: Database, row: QueueRow, outcome: SendOutcome) {
     settleSend(db, row, outcome, this.deps.now());
+    return outcome;
   }
 }
 
