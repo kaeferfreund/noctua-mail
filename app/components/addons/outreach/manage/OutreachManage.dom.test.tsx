@@ -178,7 +178,8 @@ describe("newsletter campaigns", () => {
     const scheduleCalls = () => calls.filter(call => call.path.endsWith("/schedule")).map(call => call.body);
     expect(scheduleCalls()).toEqual([{ sendAt: null, dryRun: true }]);
     fireEvent.click(within(dialog).getByRole("button", { name: "Send now" }));
-    await waitFor(() => expect(scheduleCalls()).toEqual([{ sendAt: null, dryRun: true }, { sendAt: null }]));
+    // The confirmed call names the draft version the count was made for.
+    await waitFor(() => expect(scheduleCalls()).toEqual([{ sendAt: null, dryRun: true }, { sendAt: null, expectedUpdatedAt: DRAFT.updatedAt }]));
     expect(await page.findByText("Sending to 398 recipients has started.")).toBeTruthy();
     expect(page.getByRole("button", { name: "Cancel sending" })).toBeTruthy();
   });
