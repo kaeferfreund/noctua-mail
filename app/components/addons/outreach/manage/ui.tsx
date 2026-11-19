@@ -185,8 +185,8 @@ export function RowButton({ onClick, children, label }: { onClick: () => void; c
 
 /**
  * Who scheduled a campaign or last switched a sequence, and through what: the app or an MCP token
- * (`scheduledVia` / `statusChangedVia`). Rows from before the trace existed show nothing; a user who
- * is no longer a member of the mailbox stays unnamed.
+ * (`scheduledVia` / `statusChangedVia`). History imported from Klaviyo says so instead. Rows from
+ * before the trace existed show nothing; a user who is no longer a member of the mailbox stays unnamed.
  */
 export function TraceLine({ action, userId, via }: { action: "scheduled" | "live" | "paused"; userId: string | null; via: string | null }) {
   const t = useTranslations("outreach");
@@ -196,7 +196,8 @@ export function TraceLine({ action, userId, via }: { action: "scheduled" | "live
   const { ensure } = members;
   useEffect(() => { if (traced) ensure(); }, [ensure, traced]);
   // Wait for the members instead of switching from the unnamed to the named sentence.
-  if (!parsed || parsed.kind === "import" || (members.data === null && !members.error)) return null;
+  if (parsed?.kind === "import") return <p className="text-xs text-muted-foreground">{t("trace.imported")}</p>;
+  if (!parsed || (members.data === null && !members.error)) return null;
   const member = userId ? members.data?.find(entry => entry.userId === userId) : undefined;
   const through = parsed.kind === "app" ? t("trace.viaApp") : t("trace.viaMcp", { label: parsed.label, suffix: parsed.suffix });
   return (

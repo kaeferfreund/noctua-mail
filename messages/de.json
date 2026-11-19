@@ -2798,7 +2798,8 @@
       "live": "{who, select, known {Aktiv geschaltet von {name}} other {Aktiv geschaltet}} {via}",
       "paused": "{who, select, known {Pausiert von {name}} other {Pausiert}} {via}",
       "viaApp": "in der App",
-      "viaMcp": "über das MCP-Token „{label}“ (…{suffix})"
+      "viaMcp": "über das MCP-Token „{label}“ (…{suffix})",
+      "imported": "Aus Klaviyo importiert"
     }
   },
   "outreachTracking": {
