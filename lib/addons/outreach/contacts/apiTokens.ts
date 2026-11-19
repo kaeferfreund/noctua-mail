@@ -64,6 +64,9 @@ export async function authenticateSubscribeToken(header: string | null): Promise
   return { id: row.id, accountId: row.accountId };
 }
 
+/** How far ahead of this server a subscribing server's clock may run. */
+export const CONSENT_CLOCK_SKEW_MS = 5 * 60_000;
+
 export async function subscribeWithApiToken({ accountId, id }: AuthenticatedToken, input: SubscribeRequest, now = Date.now()): Promise<SubscribeResponse> {
   const db = await getOutreachDb();
   const result = db.transaction(() => {
@@ -76,8 +79,11 @@ export async function subscribeWithApiToken({ accountId, id }: AuthenticatedToke
     if (!(JSON.parse(token.listIds) as string[]).includes(input.listId)) throw new ContactError("List is outside the token scope", 403);
     const list = requireList(db, accountId, input.listId);
     if (list.optIn === "double") throw new ContactError("Double opt-in is not supported", 409, "double_opt_in_unsupported");
-    const at = input.consentAt ?? now;
-    if (at > now) throw new ContactError("consentAt cannot be in the future");
+    // The caller is another server whose clock may run ahead of ours: a consent slightly in the
+    // future is one given just now. Anything further off is a wrong clock or unit and is refused.
+    const claimed = input.consentAt ?? now;
+    if (claimed > now + CONSENT_CLOCK_SKEW_MS) throw new ContactError("consentAt cannot be in the future");
+    const at = Math.min(claimed, now);
     const existing = findContactByEmail(db, accountId, input.email);
     const contact = existing ? updateContactFields(db, existing, input, now) : insertContact(db, accountId, input, "api", now);
     subscribeToList(db, contact, input.listId, {

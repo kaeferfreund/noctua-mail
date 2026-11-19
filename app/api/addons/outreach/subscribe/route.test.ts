@@ -58,7 +58,8 @@ test("validates input strictly and stores only the token digest", async () => {
     { email, properties: { nested: { value: "Synthetic" } } },
     { email, firstName: "a".repeat(201) },
     { email, properties: Object.fromEntries(Array.from({ length: 51 }, (_, i) => [`key${i}`, i])) },
-    { email, consentAt: Date.now() + 60_000 },
+    // Beyond the tolerance for a caller whose clock runs ahead.
+    { email, consentAt: Date.now() + 10 * 60_000 },
     { email, emailConsent: "subscribed" }
   ]) expect((await subscribe(secret, { listId: allowed.id, ...input })).status).toBe(400);
   expect((await subscribe(secret, { email, listId: allowed.id }, { "Content-Type": "text/plain" })).status).toBe(400);
