@@ -64,6 +64,26 @@ export async function notifyContactUnmailable(accountId: string, contactId: stri
   }
 }
 
+/**
+ * A person with an unsubscribe on record (global, or of this list) is subscribed again by an editor or
+ * an MCP client only on purpose: the caller repeats the request with `confirmResubscribe: true`.
+ */
+function requireResubscribeConfirmation(db: Database, contact: ContactRow, listId: string) {
+  // A suppression cannot be confirmed away; `subscribeToList` answers it.
+  if (contact.suppressedReason) return;
+  const member = getMembership(db, contact.accountId, contact.id, listId);
+  // A retry of an active subscription changes nothing.
+  if (contact.emailConsent === "subscribed" && member?.status === "subscribed") return;
+  const unsubscribedAt = Math.max(
+    contact.unsubscribedAt ?? -1,
+    contact.emailConsent === "unsubscribed" ? contact.consentAt ?? 0 : -1,
+    member?.status === "unsubscribed" ? member.unsubscribedAt ?? 0 : -1
+  );
+  if (unsubscribedAt < 0) return;
+  throw new ContactError(`The contact unsubscribed on ${new Date(unsubscribedAt).toISOString()}; send confirmResubscribe: true to subscribe it again`,
+    409, "resubscribe_confirmation_required", { unsubscribedAt });
+}
+
 export async function changeContactSubscription(accountId: string, contactId: string, change: SubscriptionChange, now = Date.now()) {
   const db = await getOutreachDb();
   db.transaction(() => {
@@ -72,6 +92,7 @@ export async function changeContactSubscription(accountId: string, contactId: st
     const source = change.consentSource ?? "manual";
     if (change.action === "subscribe") {
       if (list.optIn === "double") throw new ContactError("Double opt-in is not supported", 409, "double_opt_in_unsupported");
+      if (!change.confirmResubscribe) requireResubscribeConfirmation(db, contact, list.id);
       return subscribeToList(db, contact, list.id, { at: now, source, explicit: true }, now);
     }
     const member = getMembership(db, accountId, contactId, list.id);
@@ -90,7 +111,15 @@ export function unsubscribeGlobally(db: Database, contact: ContactRow, at: numbe
   const members = db.query(`UPDATE list_members SET status = 'unsubscribed', unsubscribedAt = max(coalesce(unsubscribedAt, 0), ?), source = ?
     WHERE accountId = ? AND contactId = ? AND (status != 'unsubscribed' OR ? = 1)`).run(at, source, accountId, id,
     contact.emailConsent === "unsubscribed" ? 0 : 1);
-  if (contact.emailConsent === "unsubscribed") return members.changes > 0;
+  if (contact.emailConsent === "unsubscribed") {
+    // A later unsubscribe is the one that counts against a late consent; a replay changes nothing.
+    db.query(`UPDATE contacts SET consentSource = CASE WHEN coalesce(consentAt, 0) < ?1 THEN ?2 ELSE consentSource END,
+        consentAt = max(coalesce(consentAt, 0), ?1), unsubscribedAt = max(coalesce(unsubscribedAt, 0), ?1),
+        updatedAt = max(updatedAt, ?1)
+      WHERE accountId = ?3 AND id = ?4 AND (coalesce(consentAt, 0) < ?1 OR coalesce(unsubscribedAt, 0) < ?1)`)
+      .run(at, source, accountId, id);
+    return members.changes > 0;
+  }
   db.query(`UPDATE contacts SET emailConsent = 'unsubscribed', consentAt = ?, consentSource = ?,
       unsubscribedAt = max(coalesce(unsubscribedAt, 0), ?), updatedAt = max(updatedAt, ?)
     WHERE accountId = ? AND id = ?`).run(at, source, at, at, accountId, id);

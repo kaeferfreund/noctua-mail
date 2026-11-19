@@ -301,13 +301,20 @@ const SCHEMA_V3 = `
   ALTER TABLE tracking_events ADD COLUMN linkToken TEXT;
 `;
 
-function migrate(db: Database) {
+function schemaVersion(db: Database) {
   const current = Number((db.prepare("PRAGMA user_version").get() as { user_version?: number } | null)?.user_version ?? 0);
   if (current > OUTREACH_SCHEMA_VERSION) {
     throw new Error(`outreach.db has schema version ${current}; this build supports up to ${OUTREACH_SCHEMA_VERSION}`);
   }
-  if (current === OUTREACH_SCHEMA_VERSION) return;
+  return current;
+}
+
+function migrate(db: Database) {
+  if (schemaVersion(db) === OUTREACH_SCHEMA_VERSION) return;
   db.transaction(() => {
+    // Read again under the write lock: another process may have migrated the file meanwhile.
+    const current = schemaVersion(db);
+    if (current === OUTREACH_SCHEMA_VERSION) return;
     if (current < 1) db.exec(SCHEMA_V1);
     if (current < 2) db.exec(SCHEMA_V2);
     if (current < 3) db.exec(SCHEMA_V3);
@@ -316,7 +323,9 @@ function migrate(db: Database) {
 }
 
 const key = Symbol.for("noctua.outreachDb");
-const host = globalThis as typeof globalThis & { [key]?: { path: string; db: Database } };
+const openingKey = Symbol.for("noctua.outreachDb.opening");
+type Opening = { path: string; promise: Promise<Database> };
+const host = globalThis as typeof globalThis & { [key]?: { path: string; db: Database }; [openingKey]?: Opening };
 let shutdownHookRegistered = false;
 
 /** Test seam: open the addon schema on any handle (for example `new Database(":memory:")`). */
@@ -337,19 +346,40 @@ export async function getOutreachDb(): Promise<Database> {
   const dbPath = getOutreachDbPath();
   const open = host[key];
   if (open && open.path === dbPath) return open.db;
-  if (open) closeOutreachDb();
-  const { Database: DatabaseCtor } = await import("bun:sqlite" /* webpackIgnore: true */);
-  mkdirSync(path.dirname(dbPath), { recursive: true });
-  const db = initOutreachSchema(new DatabaseCtor(dbPath));
-  host[key] = { path: dbPath, db };
-  if (!shutdownHookRegistered) {
-    shutdownHookRegistered = true;
-    onShutdown("outreach:db", "close", () => closeOutreachDb());
+  // Concurrent first calls share one opening, so they get one handle.
+  const opening = host[openingKey];
+  if (opening && opening.path === dbPath) return opening.promise;
+  if (open || opening) closeOutreachDb();
+  const pending = { path: dbPath } as Opening;
+  pending.promise = openOutreachDb(pending);
+  host[openingKey] = pending;
+  return pending.promise;
+}
+
+async function openOutreachDb(pending: Opening): Promise<Database> {
+  const dbPath = pending.path;
+  try {
+    const { Database: DatabaseCtor } = await import("bun:sqlite" /* webpackIgnore: true */);
+    mkdirSync(path.dirname(dbPath), { recursive: true });
+    const db = initOutreachSchema(new DatabaseCtor(dbPath));
+    if (host[openingKey] !== pending) {
+      // Closed (or the path changed) while opening: hand out the current handle instead.
+      db.close();
+      return getOutreachDb();
+    }
+    host[key] = { path: dbPath, db };
+    if (!shutdownHookRegistered) {
+      shutdownHookRegistered = true;
+      onShutdown("outreach:db", "close", () => closeOutreachDb());
+    }
+    return db;
+  } finally {
+    if (host[openingKey] === pending) host[openingKey] = undefined;
   }
-  return db;
 }
 
 export function closeOutreachDb() {
+  host[openingKey] = undefined;
   const open = host[key];
   if (!open) return;
   host[key] = undefined;
