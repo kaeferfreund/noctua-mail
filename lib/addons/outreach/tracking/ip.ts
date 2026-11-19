@@ -1,7 +1,12 @@
 import { isIP } from "node:net";
 import type { CityResponse, Reader } from "maxmind";
+import { OUTREACH_DEFAULT_IP_RETENTION_DAYS } from "../config";
 
 export const DAY_MS = 86_400_000;
+
+export function trackingIpExpiryCutoff(now: number, retentionDays?: number | null): number {
+  return retentionDays === 0 ? Number.MAX_SAFE_INTEGER : now - (retentionDays ?? OUTREACH_DEFAULT_IP_RETENTION_DAYS) * DAY_MS;
+}
 
 export function normalizeTrackingIp(value?: string | null): string | null {
   const ip = value?.trim().toLowerCase();

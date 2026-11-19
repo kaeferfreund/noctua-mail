@@ -1,10 +1,11 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
+import { afterEach, beforeEach, expect, spyOn, test } from "bun:test";
+import { Database } from "bun:sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GET as getOpen, HEAD as headOpen } from "@/app/t/o/[filename]/route";
 import { GET as getClick, HEAD as headClick } from "@/app/t/c/[token]/route";
-import { closeOutreachDb, getOutreachDb } from "../db";
+import { closeOutreachDb, getOutreachDb, initOutreachSchema } from "../db";
 import { newOutreachToken } from "../ids";
 import { saveOutreachSettings } from "../settings";
 import { getMessageTracking, getOutreachOverview, getSendStats, listLinkStats, listSendSummaries, listTrackingEvents,
@@ -37,6 +38,9 @@ afterEach(() => {
 
 async function seedSend(id = "send-a", mailbox = accountId, kind = "campaign", sentAt = Date.now() - 60_000) {
   const db = await getOutreachDb();
+  const email = `${id}@example.test`;
+  db.prepare("INSERT INTO contacts (id, accountId, email, emailLower, createdAt, updatedAt) VALUES (?, ?, ?, ?, 0, 0)")
+    .run(`contact-${id}`, mailbox, email, email);
   db.prepare(`INSERT INTO sends (id, accountId, kind, campaignId, contactId, messageId, recipients, subject, status, queuedAt, sentAt)
     VALUES (?, ?, ?, 'campaign-a', ?, ?, 'recipient@example.test', 'Synthetic mail', 'sent', ?, ?)`)
     .run(id, mailbox, kind, `contact-${id}`, `<${id}@example.test>`, sentAt, sentAt);
@@ -169,8 +173,15 @@ test("IP retention is per mailbox, bounded, idempotent and normalizes mapped IPv
   const extra = db.prepare(`INSERT INTO tracking_events (accountId, sendId, type, at, ip) VALUES ('mailbox-b', 'send-b', 'click', ?, '192.0.2.2')`);
   for (let i = 0; i < 500; i++) extra.run(now + i);
   expect(await runTrackingRetention(now + 2 * DAY_MS - 1)).toBe(0);
-  expect(await runTrackingRetention(now + 3 * DAY_MS)).toBe(500);
-  expect(await runTrackingRetention(now + 3 * DAY_MS)).toBe(1);
+  let remainingBetweenBatches: unknown;
+  const pendingRetention = runTrackingRetention(now + 3 * DAY_MS);
+  await new Promise<void>(resolve => setImmediate(() => {
+    remainingBetweenBatches = db.prepare("SELECT COUNT(*) AS total FROM tracking_events WHERE accountId = ? AND ipTruncated = 0")
+      .get("mailbox-b");
+    resolve();
+  }));
+  expect(await pendingRetention).toBe(501);
+  expect(remainingBetweenBatches).toEqual({ total: 1 });
   expect(await runTrackingRetention(now + 3 * DAY_MS)).toBe(0);
   const retained = await listTrackingEvents("mailbox-b", { type: "open" });
   expect(retained.events[0]).toMatchObject({ ip: "2001:db8:123::", ipTruncated: true });
@@ -239,4 +250,161 @@ test("read models count unique human sends, preserve individual counts and page 
   db.prepare(`INSERT INTO lists (id, accountId, name, createdAt, updatedAt) VALUES ('list-a', ?, 'Synthetic', ?, ?)`).run(accountId, now, now);
   expect(await getOutreachOverview(accountId, now)).toMatchObject({ lists: 1, last30Days: stats });
   expect(await getOutreachOverview(accountId, now + 31 * DAY_MS)).toMatchObject({ last30Days: { recipients: 0 } });
+});
+
+test("in-flight public events and explicit-contact events cannot restore erased data", async () => {
+  const db = await seedSend();
+  const contactId = "contact-send-a";
+  const html = await rewrite(`<a href="${target}">Link</a>`);
+  const token = html.match(/\/t\/c\/([\w-]+)/)![1];
+  const filename = html.match(/\/t\/o\/([\w-]+\.gif)/)![1];
+  const geoKey = Symbol.for("noctua.outreachGeoIp");
+  const host = globalThis as typeof globalThis & { [geoKey]?: Promise<unknown> };
+  const original = host[geoKey];
+  const geo = Promise.withResolvers<null>();
+  host[geoKey] = geo.promise;
+  process.env.NOCTUA_OUTREACH_GEOIP_DB = join(dir, "synthetic.mmdb");
+  const ip = "192.0.2.50";
+  const request = new Request(origin, { headers: { "x-real-ip": ip } });
+  const open = getOpen(request, { params: Promise.resolve({ filename }) });
+  const click = getClick(request, { params: Promise.resolve({ token }) });
+  const unsubscribe = recordTrackingEvent({ accountId, sendId: "send-a", contactId, type: "unsubscribe", ip });
+  try {
+    // Let the routes resolve their tokens and reach the paused location lookup.
+    await new Promise<void>(resolve => setImmediate(resolve));
+    db.transaction(() => {
+      db.prepare("DELETE FROM tracking_links WHERE accountId = ? AND sendId = 'send-a'").run(accountId);
+      db.prepare("UPDATE sends SET contactId = NULL, recipients = '', subject = '' WHERE accountId = ? AND id = 'send-a'").run(accountId);
+      db.prepare("DELETE FROM contacts WHERE accountId = ? AND id = ?").run(accountId, contactId);
+    }).immediate();
+    geo.resolve(null);
+    const [pixel, redirect] = await Promise.all([open, click, unsubscribe]);
+    expect(pixel.status).toBe(200);
+    expect(redirect.status).toBe(302);
+    expect((await listTrackingEvents(accountId, {})).events).toEqual([]);
+    expect(db.prepare("SELECT id FROM tracking_events WHERE accountId = ?").all(accountId)).toEqual([]);
+  } finally {
+    geo.resolve(null);
+    await Promise.allSettled([open, click, unsubscribe]);
+    host[geoKey] = original;
+  }
+});
+
+test("event listings and the message summary truncate expired IPs before retention runs", async () => {
+  const db = await seedSend();
+  await seedSend("send-b", "mailbox-b");
+  for (const [mailbox, sendId] of [[accountId, "send-a"], ["mailbox-b", "send-b"]]) {
+    await recordTrackingEvent({ accountId: mailbox, sendId, type: "click", ip: "2001:db8:123:4567::89" });
+  }
+  await saveOutreachSettings(accountId, { ipRetentionDays: 0 }, "user-a");
+  const masked = { ip: "2001:db8:123::", ipTruncated: true };
+  expect((await listTrackingEvents(accountId, {})).events).toMatchObject([masked]);
+  expect(await getMessageTracking(accountId, { sendId: "send-a" })).toMatchObject({ lastEvent: masked });
+  expect((await listTrackingEvents("mailbox-b", {})).events).toMatchObject([{ ip: "2001:db8:123:4567::89", ipTruncated: false }]);
+  expect(db.prepare("SELECT ip, ipTruncated FROM tracking_events WHERE accountId = ?").get(accountId))
+    .toEqual({ ip: "2001:db8:123:4567::89", ipTruncated: 0 });
+});
+
+test("malformed paths and unknown tokens leave the event budget available to genuine requests", async () => {
+  const db = await seedSend();
+  const html = await rewrite(`<a href="${target}">Link</a>`);
+  const filename = html.match(/\/t\/o\/([\w-]+\.gif)/)![1];
+  const token = html.match(/\/t\/c\/([\w-]+)/)![1];
+  const request = new Request(origin); // No trusted client address: the shared unknown bucket.
+  for (let i = 0; i < 125; i++) {
+    expect((await getOpen(request, { params: Promise.resolve({ filename: "bad.gif" }) })).status).toBe(200);
+    const guess = newOutreachToken();
+    expect((await getOpen(request, { params: Promise.resolve({ filename: `${guess}.gif` }) })).status).toBe(200);
+    expect((await getClick(request, { params: Promise.resolve({ token: guess }) })).status).toBe(404);
+  }
+  const repeatedGuess = newOutreachToken();
+  const prepare = spyOn(db, "prepare");
+  try {
+    for (let i = 0; i < 3; i++) {
+      await getOpen(request, { params: Promise.resolve({ filename: "bad.gif" }) });
+      await getOpen(request, { params: Promise.resolve({ filename: `${repeatedGuess}.gif` }) });
+      await getClick(request, { params: Promise.resolve({ token: repeatedGuess }) });
+    }
+    expect(prepare).toHaveBeenCalledTimes(2);
+  } finally {
+    prepare.mockRestore();
+  }
+  expect((await getOpen(request, { params: Promise.resolve({ filename }) })).status).toBe(200);
+  expect((await getClick(request, { params: Promise.resolve({ token }) })).status).toBe(302);
+  expect(db.prepare("SELECT type FROM tracking_events WHERE accountId = ? ORDER BY id").all(accountId))
+    .toEqual([{ type: "open" }, { type: "click" }]);
+});
+
+test("v2 event URLs survive migration and new clicks are stored by token", async () => {
+  const legacyDb = new Database(":memory:");
+  try {
+    legacyDb.exec(`CREATE TABLE tracking_events (accountId TEXT, type TEXT, at INTEGER, url TEXT);
+      PRAGMA user_version = 2;`);
+    legacyDb.prepare("INSERT INTO tracking_events (accountId, type, at, url) VALUES (?, 'bounce', 0, 'Synthetic bounce')").run(accountId);
+    initOutreachSchema(legacyDb);
+    expect(legacyDb.prepare("SELECT url, linkToken FROM tracking_events WHERE accountId = ?").get(accountId))
+      .toEqual({ url: "Synthetic bounce", linkToken: null });
+  } finally {
+    legacyDb.close();
+  }
+
+  const db = await seedSend();
+  const html = await rewrite(`<a href="${target.replace("&", "&amp;")}">Link</a>`);
+  const token = html.match(/\/t\/c\/([\w-]+)/)![1];
+  const request = new Request(origin, { headers: { "x-real-ip": "192.0.2.51" } });
+  await getClick(request, { params: Promise.resolve({ token }) });
+  expect(db.prepare("SELECT url FROM tracking_events WHERE accountId = ?").get(accountId)).toEqual({ url: null });
+  expect(db.prepare("SELECT linkToken FROM tracking_events WHERE accountId = ?").get(accountId)).toEqual({ linkToken: token });
+  db.prepare("INSERT INTO tracking_events (accountId, sendId, type, at, url) VALUES (?, 'send-a', 'click', 0, ?)").run(accountId, target);
+  expect(await listLinkStats(accountId, {})).toEqual([{ url: target, clicks: 2, uniqueClicks: 1 }]);
+  expect((await listTrackingEvents(accountId, {})).events.map(event => event.url)).toEqual([target, target]);
+  expect(await getMessageTracking(accountId, { sendId: "send-a" })).toMatchObject({ lastEvent: { url: target } });
+});
+
+test("the per-send cap limits opens and clicks together while the public responses still work", async () => {
+  const db = await seedSend();
+  const html = await rewrite(`<a href="${target}">Link</a>`);
+  const token = html.match(/\/t\/c\/([\w-]+)/)![1];
+  const filename = html.match(/\/t\/o\/([\w-]+\.gif)/)![1];
+  db.prepare(`WITH RECURSIVE ids(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM ids WHERE n < 1999)
+    INSERT INTO tracking_events (accountId, sendId, type, at) SELECT ?, 'send-a', 'click', 0 FROM ids`).run(accountId);
+  const request = new Request(origin, { headers: { "x-real-ip": "192.0.2.52" } });
+  await getOpen(request, { params: Promise.resolve({ filename }) });
+  expect((await getClick(request, { params: Promise.resolve({ token }) })).headers.get("location")).toBe(target);
+  expect((await getOpen(request, { params: Promise.resolve({ filename }) })).status).toBe(200);
+  await recordTrackingEvent({ accountId, sendId: "send-a", type: "bounce", url: "Synthetic bounce" });
+  expect(await getMessageTracking(accountId, { sendId: "send-a" }))
+    .toMatchObject({ opens: 1, clicks: 1999, bounced: true });
+});
+
+test("oversized URLs stay untouched", async () => {
+  await seedSend();
+  const prefix = "https://target.example.test/";
+  const maxLength = 2048;
+  const eligible = `<a href="${prefix + "a".repeat(maxLength - prefix.length)}">Eligible</a>`;
+  const oversized = `<a href="${prefix + "a".repeat(maxLength - prefix.length + 1)}">Oversized</a>`;
+  const html = await rewrite(eligible + oversized);
+  expect(html).toContain(oversized);
+  expect(html).toMatch(/\/t\/c\/[\w-]+">Eligible<\/a>/);
+});
+
+test("rewriting preserves the interpretation of hrefs with non-ASCII whitespace", async () => {
+  await seedSend();
+  const untouched = ['<a href="https://target.example.test/invoice&nbsp;">Suffix</a>',
+    '<a href="&nbsp;https://target.example.test/invoice">Prefix</a>'];
+  const html = await rewrite(untouched.join("") + '<a href=" &#9;https://target.example.test/invoice&#13; ">Padded</a>');
+  for (const tag of untouched) expect(html).toContain(tag);
+  expect(html).toMatch(/\/t\/c\/[\w-]+">Padded<\/a>/);
+});
+
+test("an unfinished text element or comment leaves neither pixel markup nor a pixel token", async () => {
+  const db = await seedSend();
+  for (const ending of ["<textarea>Ende", "<!-- Ende", '<p title="Ende']) {
+    const link = `<a href="${target}">Link</a>`;
+    const html = await rewrite(link + ending);
+    expect(html).toMatch(/\/t\/c\/[\w-]+">Link<\/a>/);
+    expect(html).toEndWith(ending);
+    expect(html).not.toContain("/t/o/");
+  }
+  expect(db.prepare("SELECT token FROM tracking_links WHERE accountId = ? AND kind = 'open'").all(accountId)).toEqual([]);
 });

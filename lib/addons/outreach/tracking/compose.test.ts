@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, expect, setSystemTime } from "bun:test";
+import { Database } from "bun:sqlite";
+import { setImmediate } from "node:timers/promises";
 import MailComposer from "nodemailer/lib/mail-composer/index.js";
 import { simpleParser } from "mailparser";
 import { POST as sendCompose } from "@/app/api/accounts/[accountId]/smtp/send/route";
@@ -23,6 +25,7 @@ const payload = { to: "recipient@example.test", bcc: "blind@example.test", subje
 let imap: Awaited<ReturnType<typeof startImapServer>>;
 let smtp: Awaited<ReturnType<typeof startSmtpSink>>;
 let rejectRecipient = false;
+let onSmtpConnection: (() => void) | undefined;
 let out: string;
 
 beforeAll(async () => {
@@ -32,6 +35,7 @@ beforeAll(async () => {
   out = join(process.env.NOCTUA_DATA_DIR!, "tracking-smtp");
   imap = await startImapServer({ host: "127.0.0.1", port: 0, user, pass: password });
   smtp = await startSmtpSink({ host: "127.0.0.1", port: 0, user, pass: password, out,
+    onConnection: () => onSmtpConnection?.(),
     rejectRecipient: () => rejectRecipient ? "550 5.1.1 Synthetic rejection" : undefined });
 });
 
@@ -113,7 +117,7 @@ mailTest("SMTP gets tracked HTML while Sent keeps the same headers and original 
 mailTest("a tracking write failure rolls back the send row and SMTP still gets the original HTML", async () => {
   const f = await setup();
   const db = await getOutreachDb();
-  db.exec(`CREATE TEMP TRIGGER forbid_test_link BEFORE INSERT ON tracking_links
+  db.exec(`CREATE TRIGGER forbid_test_link BEFORE INSERT ON tracking_links
     BEGIN SELECT RAISE(ABORT, 'synthetic tracking storage failure'); END`);
   const result = await f.send();
   expect(result.status).toBe(200);
@@ -130,8 +134,60 @@ mailTest("SMTP rejection marks the tracked send failed without creating a Sent c
   rejectRecipient = true;
   const result = await f.send();
   expect(result.status).toBeGreaterThanOrEqual(400);
+  await setImmediate();
   expect(smtp.received).toHaveLength(0);
   expect(imap.store.get("Sent").messages).toHaveLength(before);
   const db = await getOutreachDb();
   expect(db.prepare("SELECT status, sentAt FROM sends WHERE accountId = ?").all(f.accountId)).toEqual([{ status: "failed", sentAt: null }]);
+});
+
+mailTest("a competing SQLite writer does not delay SMTP or change the untracked mail", async () => {
+  const f = await setup();
+  const db = await getOutreachDb();
+  const writer = new Database(getOutreachDbPath(), { create: false, readwrite: true });
+  try {
+    writer.exec("BEGIN IMMEDIATE");
+    const startedAt = performance.now();
+    let smtpStartedAfter = Infinity;
+    onSmtpConnection = () => { smtpStartedAfter = performance.now() - startedAt; };
+    const result = await f.send();
+    expect(result.status).toBe(200);
+    expect(smtpStartedAfter).toBeLessThan(1_000);
+    const { messageId } = await result.json();
+    expect((await simpleParser(smtp.received[0].source)).html).toBe(html + "\n");
+    expect(smtp.received[0].source).toEqual(stripBccHeader(sentCopy(messageId)!));
+    expect(db.prepare("SELECT status FROM sends WHERE accountId = ?").all(f.accountId)).toEqual([]);
+    expect(db.prepare("PRAGMA busy_timeout").get()).toEqual({ timeout: 15000 });
+  } finally {
+    onSmtpConnection = undefined;
+    writer.close();
+  }
+});
+
+mailTest("the Sent copy completes while a post-SMTP tracking write waits for another writer", async () => {
+  const f = await setup();
+  const db = await getOutreachDb();
+  const writer = new Database(getOutreachDbPath(), { create: false, readwrite: true });
+  let status: { status: string } | null;
+  try {
+    // Tracking preparation has already committed when SMTP opens its connection.
+    onSmtpConnection = () => writer.exec("BEGIN IMMEDIATE");
+    const result = await f.send();
+    expect(result.status).toBe(200);
+    const { messageId, sentCopy: state } = await result.json();
+    expect(state).toBe("appended");
+    expect(sentCopy(messageId)).toBeDefined();
+    const readStatus = db.prepare("SELECT status FROM sends WHERE accountId = ? AND messageId = ?");
+    expect(readStatus.get(f.accountId, messageId)).toEqual({ status: "sending" });
+    writer.exec("ROLLBACK");
+    const deadline = performance.now() + 1_000;
+    do {
+      await Bun.sleep(20);
+      status = readStatus.get(f.accountId, messageId);
+    } while (status?.status === "sending" && performance.now() < deadline);
+    expect(status).toEqual({ status: "sent" });
+  } finally {
+    onSmtpConnection = undefined;
+    writer.close();
+  }
 });

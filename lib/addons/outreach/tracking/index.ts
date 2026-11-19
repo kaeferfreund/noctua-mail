@@ -46,6 +46,8 @@ export type NewTrackingEvent = {
   ip?: string | null;
   userAgent?: string | null;
   url?: string | null;
+  /** Public open/click token, checked again before storing the event. */
+  linkToken?: string;
   detail?: Record<string, unknown>;
 };
 
