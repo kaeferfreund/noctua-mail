@@ -2499,7 +2499,7 @@
     },
     "sendStatus": {
       "queued": "Wartet",
-      "sending": "Wird gesendet",
+      "sending": "Wird gesendet …",
       "sent": "Gesendet",
       "failed": "Fehlgeschlagen",
       "skipped": "Übersprungen"
@@ -2554,7 +2554,7 @@
       "subject": "Betreff",
       "previewText": "Vorschautext",
       "previewTextHint": "Erscheint in vielen Postfächern hinter dem Betreff.",
-      "source": "Inhalt",
+      "source": "Quelle",
       "fromTemplate": "Aus Vorlage",
       "ownHtml": "Eigenes HTML",
       "template": "Vorlage",
@@ -2615,7 +2615,7 @@
       "status": {
         "draft": "Entwurf",
         "scheduled": "Geplant",
-        "sending": "Wird gesendet",
+        "sending": "Wird gesendet …",
         "sent": "Gesendet",
         "cancelled": "Abgebrochen",
         "failed": "Fehlgeschlagen"

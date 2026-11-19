@@ -11,6 +11,10 @@ import type { UiLocale } from "@/lib/i18n/config";
 import type { CampaignStatus, SendStats, SequenceStatus } from "@/lib/addons/outreach/types";
 import { cn } from "@/lib/utils";
 import { outreachErrorKey } from "./outreachApi";
+import styles from "./OutreachManage.module.css";
+
+/** Class of the area's scoped baseline (no preflight in this app); portalled dialogs carry it too. */
+export const outreachRootClass = styles.root;
 
 export { nativeControlClass } from "@/app/components/account-settings/Field";
 export { default as Field } from "@/app/components/account-settings/Field";
@@ -68,7 +72,7 @@ export function SectionHeader({ title, description, actions, onBack }: { title: 
         <h2 className="truncate text-lg font-semibold">{title}</h2>
         {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
       </div>
-      {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex flex-wrap items-center gap-2 max-sm:basis-full max-sm:justify-end">{actions}</div> : null}
     </div>
   );
 }
@@ -80,7 +84,7 @@ export function ConfirmDialog({ title, description, children, confirmLabel, dest
   const t = useTranslations("outreach");
   return (
     <Dialog open onOpenChange={open => { if (!open && !busy) onCancel(); }}>
-      <DialogContent showCloseButton={!busy} className="sm:max-w-md">
+      <DialogContent showCloseButton={!busy} className={cn(outreachRootClass, "sm:max-w-md")}>
         <DialogTitle>{title}</DialogTitle>
         <DialogDescription>{description}</DialogDescription>
         {children}

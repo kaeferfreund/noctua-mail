@@ -10,7 +10,7 @@ import type { ContactList, EmailTemplateSummary } from "@/lib/addons/outreach/ty
 import { cn } from "@/lib/utils";
 import { createOutreachApi } from "./outreachApi";
 import { OUTREACH_SECTIONS, OutreachManageContext, useSharedResource, type OutreachLocation, type OutreachManageContextValue, type OutreachSection } from "./manageContext";
-import { ConfirmDialog } from "./ui";
+import { ConfirmDialog, outreachRootClass } from "./ui";
 import OverviewSection from "./OverviewSection";
 import ContactsSection from "./ContactsSection";
 import ListsSection from "./ListsSection";
@@ -66,7 +66,7 @@ export default function OutreachManage({ accountId, accountLabel, role, location
 
   return (
     <OutreachManageContext.Provider value={value}>
-      <div className="flex h-full min-h-0 flex-col bg-background text-foreground md:flex-row">
+      <div data-shell="newsletter" className={cn(outreachRootClass, "flex h-full min-h-0 flex-col bg-background text-foreground md:flex-row")}>
         <nav aria-label={t("nav.label")} className="flex shrink-0 flex-col gap-2 border-b p-3 md:w-56 md:border-r md:border-b-0">
           <div className="flex items-center gap-2">
             <a href={mailHref} className="inline-flex size-8 items-center justify-center rounded-md outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring max-md:size-11"

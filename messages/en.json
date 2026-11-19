@@ -2554,7 +2554,7 @@
       "subject": "Subject",
       "previewText": "Preview text",
       "previewTextHint": "Shown after the subject in many inboxes.",
-      "source": "Content",
+      "source": "Source",
       "fromTemplate": "From template",
       "ownHtml": "Own HTML",
       "template": "Template",

@@ -148,7 +148,7 @@ function ContactDetailBody({ contact, path, onChange, onBack }: { contact: Conta
           <ul className="divide-y">
             {contact.lists.map(membership => (
               <li key={membership.listId} className="flex flex-wrap items-center gap-2 py-2">
-                <button type="button" className="min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline"
+                <button type="button" className="min-w-0 flex-1 truncate text-left text-sm font-medium hover:underline max-sm:basis-full"
                   onClick={() => navigate({ section: "contacts", listId: membership.listId })}>{membership.listName}</button>
                 <Badge variant={membership.status === "subscribed" ? "secondary" : "outline"}>{t(`memberStatus.${membership.status}`)}</Badge>
                 <span className="text-xs text-muted-foreground">

@@ -3,12 +3,13 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/app/components/ui/dialog";
 import { EMAIL_CONSENTS, type Contact, type ContactDetail, type ContactListResponse, type EmailConsent } from "@/lib/addons/outreach/types";
 import { useOutreachManage, useResource } from "./manageContext";
-import { EmptyState, ErrorNote, Field, LoadingNote, RowButton, SectionHeader, nativeControlClass, useOutreachFormat } from "./ui";
+import { EmptyState, ErrorNote, Field, LoadingNote, RowButton, SectionHeader, nativeControlClass, useOutreachFormat, outreachRootClass } from "./ui";
 import ContactDetailView from "./ContactDetailView";
 
 const PAGE_SIZE = 50;
@@ -151,7 +152,7 @@ function AddContactDialog({ defaultListId, onClose, onCreated }: { defaultListId
   };
   return (
     <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={cn(outreachRootClass, "sm:max-w-md")}>
         <DialogTitle>{t("contacts.addTitle")}</DialogTitle>
         <DialogDescription>{t("contacts.addDescription")}</DialogDescription>
         {existing ? (

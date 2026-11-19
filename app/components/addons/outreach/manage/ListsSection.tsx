@@ -3,12 +3,13 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { Archive, Pencil, Plus, Users } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/app/components/ui/dialog";
 import { OPT_IN_MODES, type ContactList, type ContactListInput, type OptInMode } from "@/lib/addons/outreach/types";
 import { useOutreachManage } from "./manageContext";
-import { ConfirmDialog, EmptyState, ErrorNote, Field, LoadingNote, SectionHeader, nativeControlClass, useOutreachFormat } from "./ui";
+import { ConfirmDialog, EmptyState, ErrorNote, Field, LoadingNote, SectionHeader, nativeControlClass, useOutreachFormat, outreachRootClass } from "./ui";
 
 export default function ListsSection() {
   const t = useTranslations("outreach");
@@ -101,7 +102,7 @@ function ListDialog({ list, onClose, onSaved }: { list: ContactList | null; onCl
   };
   return (
     <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={cn(outreachRootClass, "sm:max-w-md")}>
         <DialogTitle>{list ? t("lists.editTitle") : t("lists.newTitle")}</DialogTitle>
         <DialogDescription>{t("lists.dialogDescription")}</DialogDescription>
         <form id="outreach-list-form" className="flex flex-col gap-3" onSubmit={event => { event.preventDefault(); void submit(); }}>
