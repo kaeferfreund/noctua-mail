@@ -10,14 +10,23 @@ export async function createUnsubscribeUrls(accountId: string, target: { sendId:
   const origin = outreachPublicOrigin();
   if (!origin) return null;
   const db = await getOutreachDb();
-  const token = newOutreachToken();
-  // Test mail may be sent to a different address from the profile used to render it.
-  const inserted = db.query(`INSERT INTO tracking_links (token, accountId, sendId, contactId, listId, kind, createdAt)
-    SELECT ?1, s.accountId, s.id, CASE WHEN s.kind = 'test' THEN NULL ELSE c.id END, ?2, 'unsubscribe', ?3 FROM sends s
-    LEFT JOIN contacts c ON c.accountId = s.accountId AND c.id = ?4
-    WHERE s.accountId = ?5 AND s.id = ?6 AND (s.kind = 'test' OR s.contactId = c.id)`)
-    .run(token, target.listId ?? null, Date.now(), target.contactId, accountId, target.sendId);
-  if (!inserted.changes) return null;
+  const token = db.transaction(() => {
+    // A retry of the same send gets the token of its earlier attempt.
+    const reused = db.query(`SELECT l.token FROM tracking_links l JOIN sends s ON s.accountId = l.accountId AND s.id = l.sendId
+      WHERE l.accountId = ?1 AND l.sendId = ?2 AND l.kind = 'unsubscribe' AND l.listId IS ?3
+        AND (s.kind = 'test' OR (s.contactId = ?4 AND l.contactId = ?4))
+      ORDER BY l.createdAt, l.token LIMIT 1`).get(accountId, target.sendId, target.listId ?? null, target.contactId) as { token: string } | null;
+    if (reused) return reused.token;
+    const token = newOutreachToken();
+    // Test mail may be sent to a different address from the profile used to render it.
+    const inserted = db.query(`INSERT INTO tracking_links (token, accountId, sendId, contactId, listId, kind, createdAt)
+      SELECT ?1, s.accountId, s.id, CASE WHEN s.kind = 'test' THEN NULL ELSE c.id END, ?2, 'unsubscribe', ?3 FROM sends s
+      LEFT JOIN contacts c ON c.accountId = s.accountId AND c.id = ?4
+      WHERE s.accountId = ?5 AND s.id = ?6 AND (s.kind = 'test' OR s.contactId = c.id)`)
+      .run(token, target.listId ?? null, Date.now(), target.contactId, accountId, target.sendId);
+    return inserted.changes ? token : null;
+  }).immediate();
+  if (!token) return null;
   const url = `${origin}/t/u/${token}`;
   return { url, oneClickUrl: url };
 }

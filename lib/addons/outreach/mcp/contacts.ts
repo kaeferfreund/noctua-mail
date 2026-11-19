@@ -69,9 +69,12 @@ export function registerOutreachContactTools(host: OutreachMcpHost) {
     server.registerTool(`${action}_contact`, {
       title: action === "subscribe" ? "Subscribe a contact to a list" : "Unsubscribe a contact from a list",
       description: action === "subscribe"
-        ? "Record fresh email consent and subscribe the contact to one list. This can enroll the contact in a live newsletter sequence."
+        ? "Record fresh email consent and subscribe the contact to one list. This can enroll the contact in a live newsletter sequence. "
+          + "If the contact has unsubscribed before (globally or from this list), the call fails with resubscribe_confirmation_required "
+          + "and the unsubscribe date; only after the person has asked to receive mail again, repeat it with confirmResubscribe: true."
         : "Unsubscribe the contact from one list.",
-      inputSchema: subscriptionInput.omit({ action: true }).extend({ ...account, contactId: idSchema }),
+      inputSchema: subscriptionInput.omit({ action: true, ...(action === "unsubscribe" ? { confirmResubscribe: true } : {}) })
+        .extend({ ...account, contactId: idSchema }),
       annotations: { destructiveHint: action === "unsubscribe", idempotentHint: true, openWorldHint: action === "subscribe" }
     }, async ({ accountId, contactId, ...change }) => {
       const mailbox = await host.outreachAccount(accountId, "editor");

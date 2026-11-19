@@ -33,7 +33,7 @@ test("a global unsubscribe keeps blocking older consents after a re-subscription
   await changeContactSubscription(accountId, contact.id, { action: "subscribe", listId: listA.id }, 100);
   const db = await getOutreachDb();
   db.transaction(() => unsubscribeGlobally(db, findContact(db, accountId, contact.id)!, 200)).immediate();
-  await changeContactSubscription(accountId, contact.id, { action: "subscribe", listId: listA.id }, 300);
+  await changeContactSubscription(accountId, contact.id, { action: "subscribe", listId: listA.id, confirmResubscribe: true }, 300);
   const row = findContact(db, accountId, contact.id)!;
   expect(row).toMatchObject({ emailConsent: "subscribed", consentAt: 300, unsubscribedAt: 200 });
   // A consent for list B that predates the unsubscribe arrives late: it must not apply.
