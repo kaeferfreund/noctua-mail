@@ -2378,6 +2378,8 @@
       "rateLimited": "Too many requests in a short time. Try again in a moment.",
       "offline": "The server cannot be reached. Check the connection and try again.",
       "generic": "That did not work. Try again.",
+      "tooLarge": "The file is too large for the server.",
+      "unsupportedType": "This file type is not accepted.",
       "detail": "(Server: {detail})"
     },
     "unsaved": {
@@ -2590,6 +2592,23 @@
       "backToLive": "Back to the live preview",
       "liveHint": "Live preview of the source, placeholders not yet replaced. Scripts are off.",
       "emptyPreview": "No content yet."
+    },
+    "images": {
+      "insert": "Insert image",
+      "title": "Insert image",
+      "description": "Upload an image from your device or pick one of this mailbox. It is inserted into the HTML source at the cursor.",
+      "uploadSection": "Upload from device",
+      "fileInput": "Image file from device",
+      "upload": "Upload from device …",
+      "uploading": "Uploading …",
+      "allowed": "PNG, JPEG, GIF or WebP, at most {maxSize}.",
+      "maxSize": "{size} MB",
+      "refusedType": "This file is not a PNG, JPEG, GIF or WebP image.",
+      "refusedSize": "The file is larger than {maxSize}.",
+      "librarySection": "Images of this mailbox",
+      "empty": "No images uploaded yet.",
+      "dimensions": "{width} × {height} px",
+      "permanentHint": "Uploaded images cannot be removed again, because mail that was already sent keeps pointing to them. They can be fetched publicly by their address."
     },
     "templates": {
       "title": "Templates",

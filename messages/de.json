@@ -2378,6 +2378,8 @@
       "rateLimited": "Zu viele Anfragen in kurzer Zeit. Versuch es gleich noch einmal.",
       "offline": "Der Server ist nicht erreichbar. Prüfe die Verbindung und versuch es erneut.",
       "generic": "Das hat nicht geklappt. Versuch es erneut.",
+      "tooLarge": "Die Datei ist zu groß für den Server.",
+      "unsupportedType": "Dieser Dateityp wird nicht angenommen.",
       "detail": "(Server: {detail})"
     },
     "unsaved": {
@@ -2590,6 +2592,23 @@
       "backToLive": "Zurück zur Live-Vorschau",
       "liveHint": "Live-Vorschau des Quelltexts, Platzhalter noch nicht ersetzt. Skripte sind abgeschaltet.",
       "emptyPreview": "Noch kein Inhalt."
+    },
+    "images": {
+      "insert": "Bild einfügen",
+      "title": "Bild einfügen",
+      "description": "Lade ein Bild vom Gerät hoch oder wähle eines aus diesem Postfach. Es wird an der Cursorposition in den HTML-Quelltext eingefügt.",
+      "uploadSection": "Vom Gerät hochladen",
+      "fileInput": "Bilddatei vom Gerät",
+      "upload": "Vom Gerät hochladen …",
+      "uploading": "Wird hochgeladen …",
+      "allowed": "PNG, JPEG, GIF oder WebP, höchstens {maxSize}.",
+      "maxSize": "{size} MB",
+      "refusedType": "Diese Datei ist kein PNG-, JPEG-, GIF- oder WebP-Bild.",
+      "refusedSize": "Die Datei ist größer als {maxSize}.",
+      "librarySection": "Bilder dieses Postfachs",
+      "empty": "Noch keine Bilder hochgeladen.",
+      "dimensions": "{width} × {height} px",
+      "permanentHint": "Hochgeladene Bilder lassen sich nicht wieder entfernen, weil bereits versendete Mails weiter auf sie verweisen. Sie sind über ihre Adresse öffentlich abrufbar."
     },
     "templates": {
       "title": "Vorlagen",

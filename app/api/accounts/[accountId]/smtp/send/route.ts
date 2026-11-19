@@ -10,7 +10,8 @@ import { randomUUID } from "crypto";
 import { upsertCalendarEvent } from "@/lib/db";
 import type { ComposeInvitePayload } from "@/lib/composeInvite";
 import { completeSend } from "@/lib/mail/completeSend";
-import { holdScheduleForDraftChange, type DraftScheduleHold } from "@/lib/drafts";
+import { findSentComposeDraft, holdScheduleForDraftChange, removeSentDraft, type DraftScheduleHold } from "@/lib/drafts";
+import { postSendDeadlineAt } from "@/lib/mail/imapCancellation";
 import { scheduledSendConflictResponse } from "@/app/api/_helpers/scheduledSendConflict";
 import {
   normalizeCalendarAttachments,
@@ -228,9 +229,15 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
 
     tracking?.finish("sent");
     await scheduleHold?.complete();
-    const sentResult = await completeSend({ account, clientId, raw: result.raw, messageId,
+    const deadlineAt = postSendDeadlineAt();
+    const sentResult = await completeSend({ account, clientId, deadlineAt, raw: result.raw, messageId,
       actor: collabActorFromSession(accountContext.session, accountContext.clientId), inReplyTo: payload.inReplyTo, references: payload.references,
       xForwardedMessageId: payload.xForwardedMessageId });
+    // The draft this compose session saved goes with the send, on the server: a reload or a lost
+    // connection right after SMTP must not leave it next to the sent message. Only a real draft
+    // (\Draft flag or in the Drafts folder) is removed, so a draftId can never delete received mail.
+    const sentDraft = draftId ? await findSentComposeDraft(accountId, draftId) : null;
+    if (sentDraft) await removeSentDraft({ account, clientId, draft: sentDraft, deadlineAt, sentResult });
 
     let inviteScheduled = false;
     let inviteEventId: string | null = null;

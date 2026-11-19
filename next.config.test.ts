@@ -88,6 +88,7 @@ describe("next.config request logging", () => {
 
     for (const url of [
       "/t/u/synthetic-token", "/t/o/synthetic-token.gif", "/t/c/synthetic-token?x=1", "/t/ses-events",
+      `/t/m/${"a".repeat(64)}.png`,
       "//t/u/synthetic-token", "/%74/u/synthetic-token", "/%54/u/synthetic-token", "/T/u/synthetic-token",
       "https://links.example.test/t/u/synthetic-token"
     ]) expect({ url, ignored: ignored(url) }).toEqual({ url, ignored: true });

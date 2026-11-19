@@ -2,12 +2,13 @@
 
 import { useTranslations } from "next-intl";
 import { useEffect, useId, useRef, useState } from "react";
-import { Braces, Eye, X } from "lucide-react";
+import { Braces, Eye, ImagePlus, X } from "lucide-react";
 import { Button } from "@/app/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/app/components/ui/dropdown-menu";
-import { TEMPLATE_PLACEHOLDERS, type Contact, type ContactListResponse, type EmailTemplate, type RenderResponse } from "@/lib/addons/outreach/types";
+import { TEMPLATE_PLACEHOLDERS, type Contact, type ContactListResponse, type EmailTemplate, type OutreachImage, type RenderResponse } from "@/lib/addons/outreach/types";
 import { useOutreachManage } from "./manageContext";
 import { ErrorNote, Field, nativeControlClass } from "./ui";
+import { ImageInsertDialog, imageTag } from "./ImageInsertDialog";
 
 const LIVE_PREVIEW_DELAY_MS = 300;
 
@@ -22,46 +23,74 @@ export function SandboxedHtml({ html, title }: { html: string; title: string }) 
   );
 }
 
-/** HTML source with an insert-placeholder menu that inserts at the cursor. */
+/**
+ * HTML source with an insert-placeholder menu and „Bild einfügen“; both insert at the cursor
+ * (at the end when the field never had one).
+ */
 export function HtmlSourceEditor({ label, value, onChange, readOnly }: { label: string; value: string; onChange: (value: string) => void; readOnly?: boolean }) {
   const t = useTranslations("outreach");
   const ref = useRef<HTMLTextAreaElement>(null);
   const caret = useRef<{ start: number; end: number } | null>(null);
+  const [pickingImage, setPickingImage] = useState(false);
+  // Where the cursor goes once the image dialog has closed: into the new tag's empty alt text.
+  const afterImage = useRef<number | null>(null);
   const remember = () => { const area = ref.current; if (area) caret.current = { start: area.selectionStart, end: area.selectionEnd }; };
-  const insert = (placeholder: string) => {
-    const token = `{{ ${placeholder} }}`;
+  const focusAt = (position: number) => { const area = ref.current; if (area) { area.focus(); area.setSelectionRange(position, position); } };
+  /** Replaces the selection with `text`; returns where the inserted text starts. */
+  const insertText = (text: string, cursorOffset = text.length) => {
     const { start, end } = caret.current ?? { start: value.length, end: value.length };
-    onChange(value.slice(0, start) + token + value.slice(end));
-    const next = start + token.length;
+    onChange(value.slice(0, start) + text + value.slice(end));
+    const next = start + cursorOffset;
     caret.current = { start: next, end: next };
-    requestAnimationFrame(() => { const area = ref.current; if (area) { area.focus(); area.setSelectionRange(next, next); } });
+    return next;
+  };
+  const insert = (placeholder: string) => {
+    const next = insertText(`{{ ${placeholder} }}`);
+    requestAnimationFrame(() => focusAt(next));
+  };
+  const insertImage = (image: OutreachImage) => {
+    const { tag, altAt } = imageTag(image);
+    afterImage.current = insertText(tag, altAt);
+    setPickingImage(false);
   };
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span className="flex-1 text-sm font-medium">{label}</span>
         {!readOnly ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm"><Braces />{t("content.insertPlaceholder")}</Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-auto min-w-56">
-              {TEMPLATE_PLACEHOLDERS.map(placeholder => (
-                <DropdownMenuItem key={placeholder} onSelect={() => insert(placeholder)} className="max-md:min-h-11">
-                  <span className="flex flex-col">
-                    <span>{t(`placeholders.${placeholder.replace(".", "_") as "first_name"}`)}</span>
-                    <code className="text-xs text-muted-foreground">{`{{ ${placeholder} }}`}</code>
-                  </span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <>
+            <Button variant="outline" size="sm" onClick={() => setPickingImage(true)}><ImagePlus />{t("images.insert")}</Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm"><Braces />{t("content.insertPlaceholder")}</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-auto min-w-56">
+                {TEMPLATE_PLACEHOLDERS.map(placeholder => (
+                  <DropdownMenuItem key={placeholder} onSelect={() => insert(placeholder)} className="max-md:min-h-11">
+                    <span className="flex flex-col">
+                      <span>{t(`placeholders.${placeholder.replace(".", "_") as "first_name"}`)}</span>
+                      <code className="text-xs text-muted-foreground">{`{{ ${placeholder} }}`}</code>
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         ) : null}
       </div>
       <textarea ref={ref} aria-label={label} value={value} readOnly={readOnly} spellCheck={false}
         onChange={event => { onChange(event.target.value); caret.current = { start: event.target.selectionStart, end: event.target.selectionEnd }; }}
         onSelect={remember} onKeyUp={remember} onClick={remember}
         className={`${nativeControlClass} h-[28rem] resize-y font-mono text-xs leading-relaxed max-md:h-72`} />
+      {pickingImage && !readOnly ? (
+        <ImageInsertDialog onCancel={() => setPickingImage(false)} onChoose={insertImage}
+          onCloseAutoFocus={event => {
+            const position = afterImage.current;
+            afterImage.current = null;
+            // After an insert the user lands in the alt text to describe the image; a cancel returns to the button.
+            if (position !== null) { event.preventDefault(); focusAt(position); }
+          }} />
+      ) : null}
     </div>
   );
 }

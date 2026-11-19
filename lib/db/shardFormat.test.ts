@@ -119,7 +119,7 @@ test("production shard-opening inventory routes every writable shard connection 
     "lib/addons/outreach/db.ts", "lib/addons/outreach/tracking/compose.ts",
     "lib/db/connection.ts", "lib/db/messages/senderKeyBackfill.ts", "lib/mail/spam/evalData.ts", "lib/membershipCleanup.ts",
     "scripts/checkShardMessageCollisions.ts", "scripts/dev-fixture/store.ts",
-    "scripts/outreach-import-klaviyo-contacts.ts", "scripts/outreach-import-klaviyo-content.ts", "scripts/spam-apply.ts", "scripts/verifyAdmissionCleanup.ts"
+    "scripts/outreach-import-klaviyo-contacts.ts", "scripts/outreach-import-klaviyo-content.ts", "scripts/outreach-rehost-images.ts", "scripts/spam-apply.ts", "scripts/verifyAdmissionCleanup.ts"
   ]);
   const markerCallers = files.filter(file => /configureAccountDb\(/.test(source(file))).sort();
   expect(markerCallers).toEqual(["lib/db/connection.ts", "lib/db/messages/senderKeyBackfill.ts", "lib/membershipCleanup.ts"]);
@@ -149,6 +149,8 @@ test("production shard-opening inventory routes every writable shard connection 
     for (const opener of source(file).match(/new Database\([^)]*\)/g) ?? []) expect(opener).toMatch(/^new Database\((?:":memory:"|\w+, \{ readonly: true \})\)$/);
     expect(source(file)).not.toMatch(/getMainDbPath|getAccountDb|getDefaultAccountDbPath/);
   }
+  expect(source("scripts/outreach-rehost-images.ts")).toContain("new Database(getOutreachDbPath(), { readonly: true })");
+  expect(source("scripts/outreach-rehost-images.ts")).not.toMatch(/getMainDbPath|getAccountDb|getDefaultAccountDbPath/);
   // Remaining raw constructors open a synthetic UID store or the master DB.
   expect(source("scripts/dev-fixture/store.ts")).toContain("new Database(this.uidValidityPath)");
   expect(source("scripts/verifyAdmissionCleanup.ts")).toContain("new Database(getMainDbPath())");
