@@ -4,6 +4,10 @@
  * The addon is off unless `NOCTUA_ADDON_OUTREACH=1`. Off means: its routes answer 404,
  * no scheduler starts, no MCP tool is registered, no UI entry shows and outgoing mail is
  * byte-identical to a build without the addon. See doc/ADDON-OUTREACH.md.
+ *
+ * One exception keeps a promise to recipients: mail that was already sent stays usable. While
+ * the addon's database file exists, `/t/c` still redirects to the stored target and `/t/u` still
+ * unsubscribes — without recording any tracking event (lib/addons/outreach/tracking/public.ts).
  */
 export function outreachAddonEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return env.NOCTUA_ADDON_OUTREACH === "1";

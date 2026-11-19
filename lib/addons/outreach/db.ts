@@ -1,5 +1,5 @@
 import path from "path";
-import { mkdirSync } from "fs";
+import { existsSync, mkdirSync } from "fs";
 import type { Database } from "bun:sqlite";
 import { getDataDir } from "@/lib/runtimePaths";
 import { onShutdown } from "@/lib/server/shutdown";
@@ -11,6 +11,11 @@ import { onShutdown } from "@/lib/server/shutdown";
  */
 export function getOutreachDbPath() {
   return path.join(getDataDir(), "db", "addons", "outreach.db");
+}
+
+/** The addon was used on this installation: its database file is there (also while the flag is off). */
+export function outreachDbExists() {
+  return existsSync(getOutreachDbPath());
 }
 
 /** Bump with every schema change and add the step to `migrate`. */
