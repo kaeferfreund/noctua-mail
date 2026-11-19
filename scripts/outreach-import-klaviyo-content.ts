@@ -9,8 +9,11 @@ import { itemId, sequenceInput, templateInput, validated } from "@/lib/addons/ou
 import { assertDraft, getSequence, saveSequence, saveTemplate } from "@/lib/addons/outreach/sending/store";
 import type { SequenceStepInput } from "@/lib/addons/outreach/types";
 
+// A real export carries `null` for parts a template does not have (`text`, `amp`); null means absent.
+const withoutNulls = (value: unknown) => value && typeof value === "object" && !Array.isArray(value)
+  ? Object.fromEntries(Object.entries(value).filter(([, field]) => field !== null)) : value;
 const templateExport = z.object({
-  data: z.array(z.object({ id: itemId, attributes: templateInput.pick({ name: true, html: true, text: true }) }))
+  data: z.array(z.object({ id: itemId, attributes: z.preprocess(withoutNulls, templateInput.pick({ name: true, html: true, text: true })) }))
 });
 const flowDefinition = z.object({
   entry_action_id: itemId,
@@ -25,7 +28,7 @@ const flowExport = z.object({
   })
 });
 const sendEmail = z.object({
-  message: z.object({ name: z.string().optional(), subject_line: z.string(), preview_text: z.string().nullish(), template_id: itemId })
+  message: z.object({ name: z.string().nullish(), subject_line: z.string(), preview_text: z.string().nullish(), template_id: itemId })
 });
 const timeDelay = z.object({ value: z.number().nonnegative(), unit: z.string() });
 const units = new Map([["second", 1 / 60], ["minute", 1], ["hour", 60], ["day", 1440], ["week", 10080]]);
