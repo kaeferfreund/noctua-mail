@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { createRateLimiter, getRequestIp } from "@/lib/rateLimit";
 import { outreachAddonEnabled } from "../config";
-import { getOutreachDb } from "../db";
+import { getOutreachDb, outreachDbExists } from "../db";
 import { recordTrackingEvent } from "./events";
 import { normalizeTrackingIp } from "./ip";
 import { httpTarget } from "./rewrite";
@@ -57,14 +57,26 @@ async function observe(request: Request, link: Link, kind: "open" | "click", tok
   }
 }
 
+/**
+ * Mail that was already sent stays usable when the addon is switched off later: as long as its
+ * database is there, links redirect and the pixel answers, and nothing is recorded. An
+ * installation that never used the addon has no database and answers 404 as before.
+ */
+export function servesDeliveredMail() {
+  return outreachAddonEnabled() || outreachDbExists();
+}
+
 export async function trackingOpenResponse(request: Request, filename: string) {
-  if (!outreachAddonEnabled() || !filename.endsWith(".gif")) return notFound(request);
-  try {
-    const token = filename.slice(0, -4);
-    const link = await lookupLink(token, "open");
-    if (link) await observe(request, link, "open", token);
-  } catch {
-    console.warn("[outreach] Could not resolve tracking pixel");
+  if (!servesDeliveredMail() || !filename.endsWith(".gif")) return notFound(request);
+  // Switched off: the same image, no lookup, no event.
+  if (outreachAddonEnabled()) {
+    try {
+      const token = filename.slice(0, -4);
+      const link = await lookupLink(token, "open");
+      if (link) await observe(request, link, "open", token);
+    } catch {
+      console.warn("[outreach] Could not resolve tracking pixel");
+    }
   }
   return new Response(request.method === "HEAD" ? null : pixel, {
     headers: { ...privateHeaders, "Content-Type": "image/gif", "Content-Length": String(pixel.length) }
@@ -72,12 +84,13 @@ export async function trackingOpenResponse(request: Request, filename: string) {
 }
 
 export async function trackingClickResponse(request: Request, token: string) {
-  if (!outreachAddonEnabled()) return notFound(request);
+  if (!servesDeliveredMail()) return notFound(request);
   try {
     const link = await lookupLink(token, "click");
     const target = link?.url && httpTarget(link.url);
     if (!link || !target) return notFound(request);
-    await observe(request, link, "click", token);
+    // Switched off: the stored target still works, the click is not recorded.
+    if (outreachAddonEnabled()) await observe(request, link, "click", token);
     return new Response(null, { status: 302, headers: { ...privateHeaders, Location: target.href } });
   } catch {
     console.warn("[outreach] Could not resolve tracking link");
