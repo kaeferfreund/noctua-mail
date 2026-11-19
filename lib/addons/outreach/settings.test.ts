@@ -38,7 +38,7 @@ test("the addon database is its own file with its own schema version", async () 
   expect(getOutreachDbPath()).toBe(path.join(dir, "db", "addons", "outreach.db"));
   expect((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(OUTREACH_SCHEMA_VERSION);
   const tables = (db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as { name: string }[]).map(row => row.name);
-  expect(tables).toEqual(["account_settings", "api_tokens", "campaigns", "contacts", "list_members", "lists", "sends",
+  expect(tables).toEqual(["account_settings", "api_tokens", "campaigns", "contacts", "erased_addresses", "list_members", "lists", "sends",
     "sequence_enrollments", "sequence_steps", "sequences", "templates", "tracking_events", "tracking_links"]);
 });
 

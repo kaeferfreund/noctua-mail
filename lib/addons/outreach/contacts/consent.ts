@@ -1,0 +1,167 @@
+import type { Database } from "bun:sqlite";
+import { getOutreachDb } from "../db";
+import { onContactUnmailable, onListSubscribed } from "../sending";
+import type { ListMemberStatus, SubscriptionChange, SuppressionReason } from "../types";
+import { ContactError, emailSchema, parseContactInput } from "./input";
+import { findContact, findContactByEmail, getContactDetail, insertContact, rememberErasedAddress, requireContact, requireList, type ContactRow } from "./records";
+
+type Member = { status: ListMemberStatus; subscribedAt: number | null; unsubscribedAt: number | null };
+type ConsentState = Pick<ContactRow, "emailConsent" | "consentAt" | "suppressedReason" | "unsubscribedAt">;
+
+export function subscriptionDecision(contact: ConsentState, membership: Member | null, at: number, freshConsent: boolean) {
+  if (contact.suppressedReason) return "contact_suppressed";
+  // The newest global unsubscribe counts for every list, also after a re-subscription to one of them.
+  const unsubscribedAt = Math.max(
+    contact.unsubscribedAt ?? -1,
+    contact.emailConsent === "unsubscribed" ? contact.consentAt ?? 0 : -1,
+    membership?.unsubscribedAt ?? -1
+  );
+  if (unsubscribedAt >= 0 && (!freshConsent || at <= unsubscribedAt)) return "new_consent_required";
+  return "subscribe";
+}
+
+export function getMembership(db: Database, accountId: string, contactId: string, listId: string): Member | null {
+  return db.query(`
+    SELECT status, subscribedAt, unsubscribedAt FROM list_members WHERE accountId = ? AND contactId = ? AND listId = ?
+  `).get(accountId, contactId, listId) as Member | null;
+}
+
+export function writeMembership(db: Database, accountId: string, contactId: string, listId: string, member: Member, source: string) {
+  db.query(`INSERT INTO list_members (accountId, contactId, listId, status, subscribedAt, unsubscribedAt, source)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(listId, contactId) DO UPDATE SET status = excluded.status, subscribedAt = excluded.subscribedAt,
+      unsubscribedAt = excluded.unsubscribedAt, source = excluded.source
+    WHERE list_members.accountId = excluded.accountId`)
+    .run(accountId, contactId, listId, member.status, member.subscribedAt, member.unsubscribedAt, source);
+}
+
+/** Call inside the caller's write transaction, then notify sending only after commit. */
+export function subscribeToList(db: Database, contact: ContactRow, listId: string,
+  consent: { at: number; source: string; explicit: boolean }, now: number) {
+  const { accountId, id: contactId } = contact;
+  const member = getMembership(db, accountId, contactId, listId);
+  // An already active membership is a retry. Preserve the original consent and enrollment.
+  if (!contact.suppressedReason && contact.emailConsent === "subscribed" && member?.status === "subscribed") return false;
+  const decision = subscriptionDecision(contact, member, consent.at, consent.explicit);
+  if (decision === "contact_suppressed") throw new ContactError("Contact is suppressed", 409, decision);
+  if (decision === "new_consent_required") throw new ContactError("New consent after the unsubscribe is required", 409, decision);
+  if (contact.emailConsent !== "subscribed" || contact.consentAt === null || consent.at > contact.consentAt) {
+    db.query(`UPDATE contacts SET emailConsent = 'subscribed', consentAt = ?, consentSource = ?, updatedAt = ?
+      WHERE accountId = ? AND id = ?`).run(consent.at, consent.source, now, accountId, contactId);
+  }
+  if (member?.status === "subscribed") return false;
+  writeMembership(db, accountId, contactId, listId, {
+    status: "subscribed", subscribedAt: consent.at, unsubscribedAt: null
+  }, consent.source);
+  return true;
+}
+
+export async function notifyListSubscribed(accountId: string, contactId: string, listId: string, at: number) {
+  try {
+    await onListSubscribed(accountId, { contactId, listId, at });
+  } catch {
+    console.warn("Outreach failed to notify sending of a list subscription");
+  }
+}
+
+export async function notifyContactUnmailable(accountId: string, contactId: string) {
+  try {
+    await onContactUnmailable(accountId, contactId);
+  } catch {
+    console.warn("Outreach failed to notify sending of an unmailable contact");
+  }
+}
+
+export async function changeContactSubscription(accountId: string, contactId: string, change: SubscriptionChange, now = Date.now()) {
+  const db = await getOutreachDb();
+  const subscribed = db.transaction(() => {
+    const contact = requireContact(db, accountId, contactId);
+    const list = requireList(db, accountId, change.listId);
+    const source = change.consentSource ?? "manual";
+    if (change.action === "subscribe") {
+      if (list.optIn === "double") throw new ContactError("Double opt-in is not supported", 409, "double_opt_in_unsupported");
+      return subscribeToList(db, contact, list.id, { at: now, source, explicit: true }, now);
+    }
+    const member = getMembership(db, accountId, contactId, list.id);
+    if (member?.status !== "unsubscribed") {
+      writeMembership(db, accountId, contactId, list.id, {
+        status: "unsubscribed", subscribedAt: member?.subscribedAt ?? null, unsubscribedAt: now
+      }, source);
+    }
+    // The contact can still receive mail for other lists. The per-list send check enforces this opt-out.
+    return false;
+  }).immediate();
+  if (subscribed) await notifyListSubscribed(accountId, contactId, change.listId, now);
+  return getContactDetail(accountId, contactId);
+}
+
+export function unsubscribeGlobally(db: Database, contact: ContactRow, at: number, source = "unsubscribe_link"): boolean {
+  const { accountId, id } = contact;
+  const members = db.query(`UPDATE list_members SET status = 'unsubscribed', unsubscribedAt = max(coalesce(unsubscribedAt, 0), ?), source = ?
+    WHERE accountId = ? AND contactId = ? AND (status != 'unsubscribed' OR ? = 1)`).run(at, source, accountId, id,
+    contact.emailConsent === "unsubscribed" ? 0 : 1);
+  if (contact.emailConsent === "unsubscribed") return members.changes > 0;
+  db.query(`UPDATE contacts SET emailConsent = 'unsubscribed', consentAt = ?, consentSource = ?,
+      unsubscribedAt = max(coalesce(unsubscribedAt, 0), ?), updatedAt = max(updatedAt, ?)
+    WHERE accountId = ? AND id = ?`).run(at, source, at, at, accountId, id);
+  return true;
+}
+
+const suppressionPriority: Record<SuppressionReason, number> = { manual: 1, hard_bounce: 2, complaint: 3 };
+
+export function shouldApplySuppression(contact: ConsentState, reason: SuppressionReason) {
+  return !contact.suppressedReason || suppressionPriority[reason] > suppressionPriority[contact.suppressedReason];
+}
+
+function setSuppression(db: Database, contact: ContactRow, reason: SuppressionReason, at: number, now: number) {
+  if (!shouldApplySuppression(contact, reason)) return false;
+  db.query("UPDATE contacts SET suppressedReason = ?, suppressedAt = ?, updatedAt = ? WHERE accountId = ? AND id = ?")
+    .run(reason, at, now, contact.accountId, contact.id);
+  return true;
+}
+
+export async function suppressContact(accountId: string, target: { contactId?: string; email?: string; reason: SuppressionReason; at?: number }): Promise<void> {
+  const email = target.contactId || target.email === undefined ? undefined : parseContactInput(emailSchema, target.email);
+  const now = Date.now();
+  const db = await getOutreachDb();
+  const changed = db.transaction(() => {
+    const contact = target.contactId ? findContact(db, accountId, target.contactId)
+      : email === undefined ? null : findContactByEmail(db, accountId, email) ?? insertContact(db, accountId, { email }, target.reason, now);
+    return contact && setSuppression(db, contact, target.reason, target.at ?? now, now) ? contact.id : null;
+  }).immediate();
+  if (changed) await notifyContactUnmailable(accountId, changed);
+}
+
+export async function changeManualSuppression(accountId: string, contactId: string, suppressed: boolean, now = Date.now()) {
+  const db = await getOutreachDb();
+  const changed = db.transaction(() => {
+    const contact = requireContact(db, accountId, contactId);
+    if (suppressed) return setSuppression(db, contact, "manual", now, now);
+    if (contact.suppressedReason === null) return false;
+    if (contact.suppressedReason !== "manual") throw new ContactError("Only manual suppression can be lifted", 409, "suppression_locked");
+    db.query("UPDATE contacts SET suppressedReason = NULL, suppressedAt = NULL, updatedAt = ? WHERE accountId = ? AND id = ?")
+      .run(now, accountId, contactId);
+    return false;
+  }).immediate();
+  if (changed) await notifyContactUnmailable(accountId, contactId);
+  return getContactDetail(accountId, contactId);
+}
+
+export async function eraseContact(accountId: string, contactId: string, now = Date.now()): Promise<void> {
+  const db = await getOutreachDb();
+  db.transaction(() => {
+    rememberErasedAddress(db, requireContact(db, accountId, contactId), now);
+    const related = `WHERE accountId = ?1 AND (contactId = ?2 OR sendId IN (
+      SELECT id FROM sends WHERE accountId = ?1 AND contactId = ?2
+    ))`;
+    db.query(`DELETE FROM tracking_events ${related}`).run(accountId, contactId);
+    db.query(`DELETE FROM tracking_links ${related}`).run(accountId, contactId);
+    db.query("DELETE FROM sequence_enrollments WHERE accountId = ? AND contactId = ?").run(accountId, contactId);
+    db.query("DELETE FROM list_members WHERE accountId = ? AND contactId = ?").run(accountId, contactId);
+    db.query(`UPDATE sends SET contactId = NULL, recipients = '', subject = '', error = NULL,
+      status = CASE WHEN status = 'queued' THEN 'skipped' ELSE status END
+      WHERE accountId = ? AND contactId = ?`).run(accountId, contactId);
+    db.query("DELETE FROM contacts WHERE accountId = ? AND id = ?").run(accountId, contactId);
+  }).immediate();
+  await notifyContactUnmailable(accountId, contactId);
+}
