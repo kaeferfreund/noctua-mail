@@ -1,9 +1,10 @@
+import { randomBytes, randomUUID } from "node:crypto";
 import { stripBccHeader } from "./stripBccHeader";
 import { configuredReplyTo, type ResolvedSender } from "../sendIdentity";
 import addressParser from "nodemailer/lib/addressparser/index.js";
 import type { Account } from "@/lib/data";
 import nodemailer from "nodemailer";
-import MailComposer from "nodemailer/lib/mail-composer/index.js";
+import MailComposer, { type MailComposerOptions } from "nodemailer/lib/mail-composer/index.js";
 import { markSmtpUpstreamFailure } from "./smtpError";
 import { getSmtpTimeoutOptions } from "./smtpTimeouts";
 
@@ -84,11 +85,14 @@ function createSmtpTransport(account: Account) {
 }
 
 export async function buildRawMessage(account: Account, mail: MailPayload, sender: ResolvedSender) {
-  const mailOptions = buildMailOptions(mail, sender);
-  const raw = await new Promise<Buffer>((resolve, reject) => {
+  return composeRawMessage(buildMailOptions(mail, sender), mail.keepBcc);
+}
+
+function composeRawMessage(mailOptions: MailComposerOptions, keepBcc?: boolean) {
+  return new Promise<Buffer>((resolve, reject) => {
     const composer = new MailComposer(mailOptions);
     const compiled = composer.compile();
-    if (mail.keepBcc) {
+    if (keepBcc) {
       (compiled as { keepBcc?: boolean }).keepBcc = true;
     }
     compiled.build((error: Error | null, message: Buffer) => {
@@ -99,16 +103,35 @@ export async function buildRawMessage(account: Account, mail: MailPayload, sende
       resolve(message);
     });
   });
-
-  return raw;
 }
 
-export async function sendSmtpMessage(account: Account, mail: MailPayload, sender: ResolvedSender, beforeSend?: () => void) {
+type SmtpWireHtml = { html: string; onPrepareFailure: () => void };
+
+async function prepareSmtpCopies(mailOptions: ReturnType<typeof buildMailOptions>, keepBcc?: boolean, wireHtml?: SmtpWireHtml) {
+  if (wireHtml && mailOptions.html) {
+    try {
+      // Match all MIME headers, including generated boundaries and the HTML
+      // part's transfer encoding, across the wire and Sent versions.
+      const shared = { ...mailOptions, date: new Date(), baseBoundary: randomBytes(8).toString("hex"),
+        messageId: mailOptions.messageId ?? `<${randomUUID()}@noctua.local>` };
+      const htmlPart = (content: string) => ({ content, contentTransferEncoding: "quoted-printable" });
+      const raw = await composeRawMessage({ ...shared, html: htmlPart(mailOptions.html) }, keepBcc);
+      const wireRaw = await composeRawMessage({ ...shared, html: htmlPart(wireHtml.html) }, keepBcc);
+      return { raw, wireRaw };
+    } catch {
+      wireHtml.onPrepareFailure();
+    }
+  }
+  const raw = await composeRawMessage(mailOptions, keepBcc);
+  return { raw, wireRaw: raw };
+}
+
+export async function sendSmtpMessage(account: Account, mail: MailPayload, sender: ResolvedSender, beforeSend?: () => void, wireHtml?: SmtpWireHtml) {
   const mailOptions = buildMailOptions(mail, sender);
-  const raw = await buildRawMessage(account, mail, sender);
+  const { raw, wireRaw } = await prepareSmtpCopies(mailOptions, mail.keepBcc, wireHtml);
 
   const transporter = createSmtpTransport(account);
-  const wire = { envelope: mailOptions.envelope, raw: stripBccHeader(raw) };
+  const wire = { envelope: mailOptions.envelope, raw: stripBccHeader(wireRaw) };
   // No await between the live synchronous assertion and sendMail initiation.
   // MIME preparation/module loading must finish before consuming authorization.
   beforeSend?.();
