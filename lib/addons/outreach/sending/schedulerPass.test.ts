@@ -182,9 +182,12 @@ test("a throwing recipient lookup of one campaign does not stop the next campaig
     f.campaign(accountId, "Läuft");
     db.query("UPDATE campaigns SET sendAt = ? WHERE accountId = ? AND id = ?").run(start - 1, accountId, broken.id);
     const recipients = f.deps.recipients;
-    f.deps.recipients = async (account, campaign) => {
-      if (campaign.id === broken.id) throw new Error("lookup failed");
-      return recipients(account, campaign);
+    let lookups = 0;
+    // The broken campaign comes first by sendAt.
+    f.deps.recipients = async (account, selection) => {
+      lookups += 1;
+      if (lookups === 1) throw new Error("lookup failed");
+      return recipients(account, selection);
     };
     const warn = console.warn;
     console.warn = () => {};
