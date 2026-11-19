@@ -28,7 +28,8 @@ export async function readBoundedBody(request: Request, limit: number,
     void request.body?.cancel().catch(() => {});
     return null;
   }
-  const bytes = new Uint8Array(limit);
+  // Collect chunks instead of reserving `limit` up front: a large limit must not cost every small request that much memory.
+  const chunks: Uint8Array[] = [];
   let length = 0;
   const reader = request.body?.getReader();
   if (reader) {
@@ -46,7 +47,7 @@ export async function readBoundedBody(request: Request, limit: number,
           void reader.cancel().catch(() => {});
           return null;
         }
-        bytes.set(value, length);
+        chunks.push(value);
         length += value.byteLength;
       }
     } catch (error) {
@@ -57,7 +58,14 @@ export async function readBoundedBody(request: Request, limit: number,
       reader.releaseLock();
     }
   }
-  return bytes.subarray(0, length);
+  if (chunks.length === 1) return chunks[0]!;
+  const bytes = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return bytes;
 }
 
 /** Preserve JSON parse and body-timeout errors for each caller's existing error handling. */
