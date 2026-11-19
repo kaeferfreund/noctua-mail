@@ -128,7 +128,7 @@ Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 | GET | `{base}/contacts?q=&listId=&consent=&suppressed=&page=&pageSize=` | → `ContactListResponse` |
 | POST | `{base}/contacts` | `ContactInput` (upsert by address) → `{ok, contact, created}` |
 | GET, PATCH, DELETE | `{base}/contacts/{contactId}` | `Partial<ContactInput>` → `{ok, contact: ContactDetail}`; DELETE erases the contact and its events |
-| POST | `{base}/contacts/{contactId}/subscriptions` | `SubscriptionChange` → `{ok, contact: ContactDetail}` |
+| POST | `{base}/contacts/{contactId}/subscriptions` | `SubscriptionChange` → `{ok, contact: ContactDetail}`; 409 `resubscribe_confirmation_required` (with `unsubscribedAt`) until `confirmResubscribe: true` is sent for a person with an unsubscribe on record |
 | POST | `{base}/contacts/{contactId}/suppression` | `{suppressed: boolean}` (manager) → `{ok, contact: ContactDetail}` |
 | GET, POST | `{base}/lists` | `ContactListInput` → `{ok, lists}` / `{ok, list}` |
 | PATCH, DELETE | `{base}/lists/{listId}` | `Partial<ContactListInput>` → `{ok, list}`; DELETE archives |
