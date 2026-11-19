@@ -179,7 +179,7 @@ function OutreachSettingsForm({ accountId, canManage, apiFetch = fetch, onClose 
                   <Field label={t("transport")} hint={status.sesConfigured ? undefined : t("sesMissing")}>
                     <Select.Root value={form.transport} disabled={readOnly} onValueChange={value => update({ transport: value as OutreachTransport })}>
                       <Select.Trigger />
-                      <Select.Content>
+                      <Select.Content position="popper">
                         {OUTREACH_TRANSPORTS.map(value => <Select.Item key={value} value={value}>{t(`transports.${value}`)}</Select.Item>)}
                       </Select.Content>
                     </Select.Root>
@@ -190,7 +190,7 @@ function OutreachSettingsForm({ accountId, canManage, apiFetch = fetch, onClose 
                   <Field label={t("sender")} hint={t("senderHint")}>
                     <Select.Root value={senderValue} disabled={readOnly} onValueChange={value => update({ senderIdentityId: value === MAILBOX_SENDER ? null : value })}>
                       <Select.Trigger />
-                      <Select.Content>
+                      <Select.Content position="popper">
                         <Select.Item value={MAILBOX_SENDER}>{t("senderMailbox")}</Select.Item>
                         {identityList.filter(identity => identity.enabled || identity.id === form.senderIdentityId).map(identity => (
                           <Select.Item key={identity.id} value={identity.id}>
