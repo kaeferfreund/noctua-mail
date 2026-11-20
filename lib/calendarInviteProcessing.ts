@@ -1,7 +1,8 @@
 import { parseIcsInvite, type CalendarEventPreview } from "./calendar";
+import { normalizeIdentityEmail } from "./ownAddresses";
 
 export type CalendarInviteActionType = "invitation" | "update" | "cancellation";
-export type CalendarInviteUnprocessedReason = "event_series_not_found";
+export type CalendarInviteUnprocessedReason = "event_series_not_found" | "organizer_mismatch";
 
 export type CalendarInviteMutationGroup = {
   eventUid: string;
@@ -13,7 +14,15 @@ export type CalendarInviteMutationGroup = {
   instanceOccurrences: Array<{ startAtMs: number; endAtMs?: number; recurrenceIdAtMs: number }>;
   hasInstanceChanges: boolean;
   sequence: number;
+  /** Distinct ORGANIZER addresses over all VEVENTs of the group. */
+  organizerEmails: string[];
 };
+
+/** A calendar address (ORGANIZER/ATTENDEE value) as a normalized email, or null. */
+export function normalizeCalendarInviteAddress(value?: string | null) {
+  const trimmed = value?.trim().replace(/^mailto:/i, "").trim();
+  return trimmed ? normalizeIdentityEmail(trimmed) : null;
+}
 
 function normalizeDateList(values: number[]) {
   if (values.length === 0) return undefined;
@@ -71,7 +80,8 @@ export function collectCalendarInviteMutationGroups(icsSource: string): Calendar
       addedExcludedDates: [],
       instanceOccurrences: [],
       hasInstanceChanges: false,
-      sequence: 0
+      sequence: 0,
+      organizerEmails: []
     };
     groupsByUid.set(eventUid, group);
     return group;
@@ -81,6 +91,10 @@ export function collectCalendarInviteMutationGroups(icsSource: string): Calendar
     const eventUid = event.uid?.trim();
     if (!eventUid) return;
     const group = getGroup(eventUid);
+    // A VEVENT without a usable ORGANIZER counts as an unknown organizer, so
+    // the group can never match a stored organizer exactly.
+    const organizerEmail = normalizeCalendarInviteAddress(event.organizerEmail) ?? "";
+    if (!group.organizerEmails.includes(organizerEmail)) group.organizerEmails.push(organizerEmail);
     const status = event.status?.trim().toUpperCase() || "";
     const cancelled = method === "CANCEL" || status === "CANCELLED";
     const recurrenceIdAtMs = asTimestampMs(event.recurrenceId);

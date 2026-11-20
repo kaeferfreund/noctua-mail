@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, Text } from "@radix-ui/themes";
+import { useTranslations } from "next-intl";
 import type {
   CalendarInviteActionType,
   CalendarInviteUnprocessedReason
@@ -42,18 +43,33 @@ function getInviteProcessButtonPendingLabel(processed?: boolean) {
   return processed ? "Reprocessing…" : "Processing…";
 }
 
-function getInviteUnprocessedReasonLabel(reason?: CalendarInviteUnprocessedReason) {
+export type InviteUnprocessedReasonLabels = {
+  /** Translated text for an invite that was not applied because its sender is not the organizer. */
+  organizerMismatch?: string;
+};
+
+function getInviteUnprocessedReasonLabel(
+  reason: CalendarInviteUnprocessedReason | undefined,
+  labels?: InviteUnprocessedReasonLabels
+) {
   if (reason === "event_series_not_found") return "event series not found";
+  if (reason === "organizer_mismatch") {
+    return labels?.organizerMismatch ?? "sender is not the event organizer";
+  }
   return "";
 }
 
 export function buildInviteStatusText(
   inviteProcessing: InviteProcessingState,
-  dateFormat?: AccountDateFormat
+  dateFormat?: AccountDateFormat,
+  reasonLabels?: InviteUnprocessedReasonLabels
 ) {
   const actionLabel = getInviteActionLabel(inviteProcessing.actionType);
   if (!inviteProcessing.processed) {
-    const reasonLabel = getInviteUnprocessedReasonLabel(inviteProcessing.unprocessedReason);
+    const reasonLabel = getInviteUnprocessedReasonLabel(
+      inviteProcessing.unprocessedReason,
+      reasonLabels
+    );
     return `${actionLabel} not processed${reasonLabel ? ` (${reasonLabel})` : ""}`;
   }
   const processedModeLabel =
@@ -77,7 +93,10 @@ export default function EventInviteStatusRow({
   dateFormat,
   hasOccurrenceCancellationAction
 }: EventInviteStatusRowProps) {
-  const statusText = buildInviteStatusText(inviteProcessing, dateFormat);
+  const t = useTranslations("Calendar.inviteStatus");
+  const statusText = buildInviteStatusText(inviteProcessing, dateFormat, {
+    organizerMismatch: t("organizerMismatch")
+  });
   return (
     <div className={styles.inviteStatusRow}>
       <Text size="1" color={inviteProcessing.processed ? "green" : "gray"}>

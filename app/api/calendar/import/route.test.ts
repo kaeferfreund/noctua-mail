@@ -168,7 +168,7 @@ describe("POST /api/calendar/import", () => {
     // globally mock `@/lib/db` via `mock.module()` (which Bun keeps active for
     // the lifetime of the worker, even across `mock.restore()`), so the
     // calendar db functions may not actually persist the event when this
-    // test runs in the same worker — see lib/caldav/emailEventImporter.test.ts.
+    // test runs in the same worker (e.g. lib/calendarInviteProcessor.test.ts).
     expect(body.imports?.length).toBe(1);
     expect(body.imports?.[0]?.action).toBe("upsert");
   });

@@ -285,6 +285,7 @@ describe("processCalendarInviteForMessage", () => {
       allDay: false,
       recurrenceRule: "FREQ=WEEKLY",
       sourceType: "email",
+      organizer: "alice@example.test",
       messageId: "msg-series-invite",
       createdAtMs: 1,
       updatedAtMs: 1
@@ -333,6 +334,7 @@ describe("processCalendarInviteForMessage", () => {
       "METHOD:REQUEST",
       "BEGIN:VEVENT",
       "UID:series-uid@example.test",
+      "ORGANIZER;CN=Alice:mailto:alice@example.test",
       "RECURRENCE-ID:20260608T100000Z",
       "DTSTART:20260608T160000Z",
       "DTEND:20260608T163000Z",
@@ -347,6 +349,7 @@ describe("processCalendarInviteForMessage", () => {
       icsSource: rescheduleIcs,
       process: true,
       accountEmail: "paul@example.test",
+      senderAddress: "Alice <alice@example.test>",
       reminderUserId: "user-1",
       processedByUserId: "user-1",
       processedAutomatically: true
@@ -397,6 +400,7 @@ describe("processCalendarInviteForMessage", () => {
       allDay: false,
       recurrenceRule: "FREQ=WEEKLY;INTERVAL=2;BYDAY=FR",
       sourceType: "email",
+      organizer: "alice@example.test",
       messageId: "msg-prior-anchor-invite",
       createdAtMs: 1,
       updatedAtMs: 1
@@ -410,6 +414,7 @@ describe("processCalendarInviteForMessage", () => {
       "METHOD:REQUEST",
       "BEGIN:VEVENT",
       "UID:base_R20260403T084500@google.com",
+      "ORGANIZER;CN=Alice:mailto:alice@example.test",
       "SUMMARY:Stand-Up Unified-API",
       "DTSTART:20260403T084500Z",
       "DTEND:20260403T090000Z",
@@ -422,7 +427,8 @@ describe("processCalendarInviteForMessage", () => {
       messageId: "msg-new-anchor",
       icsSource: newAnchorIcs,
       process: true,
-      accountEmail: "paul@example.test"
+      accountEmail: "paul@example.test",
+      senderAddress: "Alice <alice@example.test>"
     });
 
     // First upsert = the new anchor. Second upsert = the sibling cap.
@@ -501,6 +507,7 @@ describe("processCalendarInviteForMessage", () => {
       allDay: false,
       recurrenceRule: "FREQ=WEEKLY;INTERVAL=2;BYDAY=FR",
       sourceType: "email",
+      organizer: "alice@example.test",
       messageId: "msg-newer-anchor-invite",
       createdAtMs: 1,
       updatedAtMs: 1
@@ -514,6 +521,7 @@ describe("processCalendarInviteForMessage", () => {
       "METHOD:REQUEST",
       "BEGIN:VEVENT",
       "UID:base_R20260320T094500@google.com",
+      "ORGANIZER;CN=Alice:mailto:alice@example.test",
       "SUMMARY:Stand-Up Unified-API",
       "DTSTART:20260320T094500Z",
       "DTEND:20260320T100000Z",
@@ -526,7 +534,8 @@ describe("processCalendarInviteForMessage", () => {
       messageId: "msg-older-anchor",
       icsSource: olderAnchorIcs,
       process: true,
-      accountEmail: "paul@example.test"
+      accountEmail: "paul@example.test",
+      senderAddress: "Alice <alice@example.test>"
     });
 
     // First upsert = the new (older) anchor. Second upsert = that same
@@ -586,6 +595,7 @@ describe("processCalendarInviteForMessage", () => {
       allDay: false,
       recurrenceRule: "FREQ=WEEKLY;INTERVAL=2;BYDAY=FR",
       sourceType: "email",
+      organizer: "alice@example.test",
       messageId: "msg-oldest-invite",
       createdAtMs: 1,
       updatedAtMs: 1
@@ -607,6 +617,7 @@ describe("processCalendarInviteForMessage", () => {
       "METHOD:REQUEST",
       "BEGIN:VEVENT",
       "UID:base_R20260403T084500@google.com",
+      "ORGANIZER;CN=Alice:mailto:alice@example.test",
       "SUMMARY:Stand-Up Unified-API",
       "DTSTART:20260403T084500Z",
       "DTEND:20260403T090000Z",
@@ -619,7 +630,8 @@ describe("processCalendarInviteForMessage", () => {
       messageId: "msg-new-anchor-multi",
       icsSource: newAnchorIcs,
       process: true,
-      accountEmail: "paul@example.test"
+      accountEmail: "paul@example.test",
+      senderAddress: "Alice <alice@example.test>"
     });
 
     // 1 upsert for the new anchor + 1 cap per prior sibling.
@@ -684,6 +696,7 @@ describe("processCalendarInviteForMessage", () => {
       recurrenceDates: [firstRescheduleStartMs],
       excludedDates: [recurrenceIdMs],
       sourceType: "email",
+      organizer: "alice@example.test",
       messageId: "msg-series-invite",
       occurrenceMessageIds: { [String(firstRescheduleStartMs)]: "msg-first-reschedule" },
       occurrenceRecurrenceIds: { [String(firstRescheduleStartMs)]: recurrenceIdMs },
@@ -702,6 +715,7 @@ describe("processCalendarInviteForMessage", () => {
       "METHOD:REQUEST",
       "BEGIN:VEVENT",
       "UID:series-uid@example.test",
+      "ORGANIZER;CN=Alice:mailto:alice@example.test",
       "RECURRENCE-ID:20260608T100000Z",
       "DTSTART:20260608T144500Z",
       "DTEND:20260608T153500Z",
@@ -715,7 +729,8 @@ describe("processCalendarInviteForMessage", () => {
       messageId: "msg-second-reschedule",
       icsSource: secondRescheduleIcs,
       process: true,
-      accountEmail: "paul@example.test"
+      accountEmail: "paul@example.test",
+      senderAddress: "Alice <alice@example.test>"
     });
 
     expect(upsertCalendarEventByUid).toHaveBeenCalledTimes(1);
@@ -839,6 +854,7 @@ describe("processCalendarInviteForMessage", () => {
       "METHOD:REQUEST",
       "BEGIN:VEVENT",
       "UID:series-qp@example.test",
+      "ORGANIZER;CN=Alice:mailto:alice@example.test",
       "SUMMARY:Weekly QP meeting=20",
       "DTSTART;TZID=3DEurope/Berlin:20260601T160000",
       "DTEND;TZID=3DEurope/Berlin:20260601T165000",
@@ -858,6 +874,7 @@ describe("processCalendarInviteForMessage", () => {
           "METHOD:REQUEST",
           "BEGIN:VEVENT",
           "UID:series-qp@example.test",
+          "ORGANIZER;CN=Alice:mailto:alice@example.test",
           "SUMMARY:Weekly QP meeting ",
           "DTSTART;TZID=Europe/Berlin:20260601T160000",
           "DTEND;TZID=Europe/Berlin:20260601T165000",
@@ -874,6 +891,7 @@ describe("processCalendarInviteForMessage", () => {
       "METHOD:CANCEL",
       "BEGIN:VEVENT",
       "UID:series-qp@example.test",
+      "ORGANIZER;CN=Alice:mailto:alice@example.test",
       "RECURRENCE-ID:20260608T140000Z",
       "DTSTART:20260608T140000Z",
       "STATUS:CANCELLED",
@@ -890,7 +908,8 @@ describe("processCalendarInviteForMessage", () => {
       messageId: "msg-qp-cancel",
       icsSource: cancelInstanceIcs,
       process: true,
-      accountEmail: "test@example.test"
+      accountEmail: "test@example.test",
+      senderAddress: "Alice <alice@example.test>"
     });
 
     expect(result.states[0]?.processed).toBe(true);
@@ -1390,6 +1409,7 @@ describe("processCalendarInviteForMessage suppression guard", () => {
       endAtMs: Date.UTC(2026, 5, 10, 9, 0, 0),
       allDay: false,
       sourceType: "email",
+      organizer: "alice@example.test",
       createdAtMs: 1,
       updatedAtMs: 1
     } as CalendarEvent);
@@ -1400,10 +1420,187 @@ describe("processCalendarInviteForMessage suppression guard", () => {
       icsSource: inviteIcs,
       process: true,
       accountEmail: "paul@example.test",
+      senderAddress: "Alice <alice@example.test>",
       processedAutomatically: true
     });
 
     expect(isCalendarEventSuppressed).not.toHaveBeenCalled();
     expect(upsertCalendarEventByUid).toHaveBeenCalled();
+  });
+});
+
+describe("processCalendarInviteForMessage organizer authority", () => {
+  const storedIcs = makeIcs([
+    "METHOD:REQUEST",
+    "BEGIN:VEVENT",
+    "UID:meeting-uid@example.test",
+    "SUMMARY:Planning",
+    "DTSTART:20261201T090000Z",
+    "DTEND:20261201T100000Z",
+    "ORGANIZER;CN=Alice:mailto:alice@example.test",
+    "ATTENDEE;CN=Paul;PARTSTAT=ACCEPTED:mailto:paul@example.test",
+    "ATTENDEE;CN=Mallory;PARTSTAT=ACCEPTED:mailto:mallory@example.test",
+    "END:VEVENT"
+  ]);
+  // Stored organizer is the CN label; the address comes from the stored ICS.
+  const emailEvent: CalendarEvent = {
+    id: "cal-meeting",
+    accountId: "acc-1",
+    eventUid: "meeting-uid@example.test",
+    summary: "Planning",
+    startAtMs: Date.UTC(2026, 11, 1, 9, 0, 0),
+    endAtMs: Date.UTC(2026, 11, 1, 10, 0, 0),
+    allDay: false,
+    organizer: "Alice",
+    rawIcs: storedIcs,
+    sourceType: "email",
+    createdAtMs: 1,
+    updatedAtMs: 1
+  };
+  const updateIcs = (organizer: string) =>
+    makeIcs([
+      "METHOD:REQUEST",
+      "BEGIN:VEVENT",
+      "UID:meeting-uid@example.test",
+      "SUMMARY:Planning (moved)",
+      "LOCATION:https://phishing.example.test/",
+      "DTSTART:20261202T090000Z",
+      "DTEND:20261202T100000Z",
+      "SEQUENCE:2",
+      `ORGANIZER:mailto:${organizer}`,
+      "END:VEVENT"
+    ]);
+  const cancelIcs = (organizer: string) =>
+    makeIcs([
+      "METHOD:CANCEL",
+      "BEGIN:VEVENT",
+      "UID:meeting-uid@example.test",
+      "DTSTART:20261201T090000Z",
+      "STATUS:CANCELLED",
+      `ORGANIZER:mailto:${organizer}`,
+      "END:VEVENT"
+    ]);
+  const auto = (icsSource: string, senderAddress: string) =>
+    processCalendarInviteForMessage({
+      accountId: "acc-1",
+      messageId: "msg-incoming",
+      icsSource,
+      process: true,
+      accountEmail: "paul@example.test",
+      senderAddress,
+      reminderUserId: "user-1",
+      processedByUserId: "user-1",
+      processedAutomatically: true
+    });
+
+  test("an attendee cannot overwrite the event with an update", async () => {
+    getCalendarEventByUid.mockResolvedValue(emailEvent);
+    const result = await auto(updateIcs("mallory@example.test"), "mallory@example.test");
+    expect(upsertCalendarEventByUid).not.toHaveBeenCalled();
+    expect(ensureCalendarReminder).not.toHaveBeenCalled();
+    expect(result.states[0]).toMatchObject({ processed: false, unprocessedReason: "organizer_mismatch" });
+    expect(markMessageCalendarInviteStatesUnprocessed).toHaveBeenCalledWith(
+      "acc-1",
+      "msg-incoming",
+      ["meeting-uid@example.test"],
+      "organizer_mismatch"
+    );
+    expect(markMessageCalendarInviteStatesProcessed).not.toHaveBeenCalled();
+  });
+
+  test("an attendee cannot cancel the event", async () => {
+    getCalendarEventByUid.mockResolvedValue(emailEvent);
+    const result = await auto(cancelIcs("mallory@example.test"), "Mallory <mallory@example.test>");
+    expect(cancelCalendarEventByUid).not.toHaveBeenCalled();
+    expect(cancelCalendarRemindersByEventUid).not.toHaveBeenCalled();
+    expect(result.states[0]).toMatchObject({ processed: false, unprocessedReason: "organizer_mismatch" });
+  });
+
+  test("a forged ORGANIZER does not help when the mail comes from someone else", async () => {
+    getCalendarEventByUid.mockResolvedValue(emailEvent);
+    await auto(cancelIcs("alice@example.test"), "mallory@example.test");
+    await auto(updateIcs("alice@example.test"), "mallory@example.test");
+    expect(cancelCalendarEventByUid).not.toHaveBeenCalled();
+    expect(upsertCalendarEventByUid).not.toHaveBeenCalled();
+  });
+
+  test("the organizer can still update and cancel", async () => {
+    getCalendarEventByUid.mockResolvedValue(emailEvent);
+    await auto(updateIcs("alice@example.test"), "Alice <ALICE@example.test>");
+    expect(upsertCalendarEventByUid).toHaveBeenCalledTimes(1);
+    expect(upsertCalendarEventByUid.mock.calls[0][1].summary).toBe("Planning (moved)");
+    await auto(cancelIcs("alice@example.test"), "alice@example.test");
+    expect(cancelCalendarEventByUid).toHaveBeenCalledWith("acc-1", "meeting-uid@example.test");
+  });
+
+  test("local events and events the mailbox organizes are never changed by incoming mail", async () => {
+    getCalendarEventByUid.mockResolvedValue({
+      ...emailEvent,
+      organizer: undefined,
+      rawIcs: undefined,
+      sourceType: "local"
+    });
+    await auto(cancelIcs("alice@example.test"), "alice@example.test");
+    getCalendarEventByUid.mockResolvedValue({
+      ...emailEvent,
+      organizer: "Paul <paul@example.test>",
+      rawIcs: undefined,
+      sourceType: "sent-invite"
+    });
+    await auto(cancelIcs("paul@example.test"), "paul@example.test");
+    await auto(updateIcs("paul@example.test"), "paul@example.test");
+    expect(cancelCalendarEventByUid).not.toHaveBeenCalled();
+    expect(upsertCalendarEventByUid).not.toHaveBeenCalled();
+  });
+
+  test("a cancellation for an unknown event leaves reminders alone", async () => {
+    getCalendarEventByUid.mockResolvedValue(null);
+    const result = await auto(cancelIcs("mallory@example.test"), "mallory@example.test");
+    expect(cancelCalendarRemindersByEventUid).not.toHaveBeenCalled();
+    expect(result.states[0]?.processed).toBe(true);
+  });
+
+  test("a manual Process by the user applies the change", async () => {
+    getCalendarEventByUid.mockResolvedValue(emailEvent);
+    await processCalendarInviteForMessage({
+      accountId: "acc-1",
+      messageId: "msg-incoming",
+      icsSource: cancelIcs("mallory@example.test"),
+      process: true,
+      accountEmail: "paul@example.test",
+      senderAddress: "mallory@example.test",
+      processedAutomatically: false
+    });
+    expect(cancelCalendarEventByUid).toHaveBeenCalledTimes(1);
+  });
+
+  test("a new series anchor only re-anchors siblings of the same organizer", async () => {
+    const victim: CalendarEvent = {
+      ...emailEvent,
+      id: "cal-victim",
+      eventUid: "base_R20260320T094500@google.com",
+      eventUidKey: "base@google.com",
+      startAtMs: Date.UTC(2026, 2, 20, 9, 45, 0),
+      recurrenceRule: "FREQ=WEEKLY",
+      rawIcs: undefined,
+      organizer: "bob@example.test"
+    };
+    listSiblingCalendarEventsByUidKey.mockResolvedValue([victim]);
+    await auto(
+      makeIcs([
+        "METHOD:REQUEST",
+        "BEGIN:VEVENT",
+        "UID:base_R20260403T084500@google.com",
+        "SUMMARY:Anchor",
+        "DTSTART:20260403T084500Z",
+        "RRULE:FREQ=WEEKLY",
+        "ORGANIZER:mailto:mallory@example.test",
+        "END:VEVENT"
+      ]),
+      "mallory@example.test"
+    );
+    // Only the new anchor is written; the sibling of another organizer is not capped.
+    expect(upsertCalendarEventByUid).toHaveBeenCalledTimes(1);
+    expect(upsertCalendarEventByUid.mock.calls[0][1].eventUid).toBe("base_R20260403T084500@google.com");
   });
 });

@@ -298,12 +298,23 @@ async function capEventAtUtcMs(
  */
 export async function reconcileSeriesAnchorSiblings(
   accountId: string,
-  savedEvent: CalendarEvent
+  savedEvent: CalendarEvent,
+  options?: {
+    /**
+     * Siblings this change may cap. Automatic invite processing only lets the
+     * organizer of a sibling series re-anchor it; other siblings are left
+     * out of the timeline entirely.
+     */
+    canModifySibling?: (sibling: CalendarEvent) => boolean;
+  }
 ): Promise<ReconciledSibling[]> {
   if (typeof savedEvent.startAtMs !== "number" || !Number.isFinite(savedEvent.startAtMs)) {
     return [];
   }
-  const siblings = await listSiblingCalendarEventsByUidKey(accountId, savedEvent.eventUid);
+  const canModifySibling = options?.canModifySibling;
+  const siblings = (await listSiblingCalendarEventsByUidKey(accountId, savedEvent.eventUid)).filter(
+    (sibling) => !canModifySibling || canModifySibling(sibling)
+  );
   if (siblings.length === 0) return [];
 
   type Anchor = { event: CalendarEvent; isSaved: boolean };
