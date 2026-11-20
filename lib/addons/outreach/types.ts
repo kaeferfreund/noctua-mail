@@ -375,6 +375,13 @@ export type Sequence = {
 export type SequenceSummary = Omit<Sequence, "steps"> & { stepCount: number; activeEnrollments: number; stats: SendStats };
 /** `steps` replaces the whole step list in the given order. Steps of a `live` sequence can be edited; enrollments keep their position. */
 export type SequenceInput = Partial<Pick<Sequence, "name" | "triggerListId" | "senderIdentityId" | "trackOpens" | "trackClicks">> & { steps?: SequenceStepInput[] };
+/**
+ * A content change of one step (MCP `update_sequence_step`): whole fields first, then `replacements` in order.
+ * `find` must occur exactly once in the field, or at least once with `replaceAll`. Order, waits and `enabled` stay as they are.
+ */
+export type SequenceStepEdit = Partial<Pick<SequenceStep, "name" | "subject" | "previewText" | "html" | "text">> & {
+  replacements?: Array<{ field: "subject" | "previewText" | "html" | "text"; find: string; replace: string; replaceAll?: boolean }>;
+};
 /** `GET {base}/sequences/{id}/report` */
 export type SequenceReport = { ok: true; sequence: SequenceSummary; steps: Array<{ stepId: string; position: number; name: string; stats: SendStats }>; enrollments: { active: number; completed: number; cancelled: number } };
 

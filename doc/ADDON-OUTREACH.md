@@ -258,16 +258,34 @@ An area imports another area only through its `index.ts`.
 ## MCP tools
 
 Scopes are listed in `lib/addons/outreach/mcpScopes.ts`. A token without `send` can prepare
-contacts, templates and campaign drafts; scheduling a campaign or switching a sequence live
-needs `send`, consent changes need `manage`. Tools: `get_message_tracking`,
+contacts, templates, campaign drafts and draft sequences; scheduling a campaign, switching a
+sequence live and editing a sequence that is live or paused need `send`, consent changes need
+`manage`. Tools: `get_message_tracking`,
 `list_tracking_events`, `list_contact_lists`, `search_contacts`, `get_contact`,
 `upsert_contact`, `save_contact_list`, `subscribe_contact`, `unsubscribe_contact`,
 `list_email_templates`, `get_email_template`, `save_email_template`, `list_email_images`,
 `upload_email_image` (base64 `data` and `filename`), `list_campaigns`,
 `get_campaign`, `get_campaign_report`, `save_campaign`, `schedule_campaign`,
-`cancel_campaign`, `list_sequences`, `get_sequence`, `save_sequence`, `set_sequence_status`.
+`cancel_campaign`, `list_sequences`, `get_sequence`, `get_sequence_step`, `save_sequence`,
+`update_sequence_step`, `set_sequence_status`.
 `list_campaigns`, `get_campaign`, `list_sequences` and `get_sequence` return the trace fields of
 the REST shapes; `schedule_campaign` and `set_sequence_status` record the calling token.
+
+Sequences over MCP:
+
+- The sequence tools answer the steps without `html` and `text` and with `htmlLength` and
+  `textLength` instead. `get_sequence_step` answers one step in full; `get_sequence` with
+  `includeBodies` answers all of them.
+- `update_sequence_step` changes the content of one step (`name`, `subject`, `previewText`,
+  `html`, `text`) and leaves order, waits, `enabled` and the other steps alone. Whole fields
+  apply first, then `replacements` in order: `find` is exact text that must occur once in the
+  field, or at least once with `replaceAll`. It requires `expectedUpdatedAt`. `dryRun` runs the
+  checks and answers `changed`, `replacements` and the renderer's `warnings` without saving.
+- `save_sequence` replaces the whole step list when `steps` is given (see `SequenceInput`).
+- An edit of a sequence that is live or paused goes out with the next mail and is not approved
+  again. For such a sequence both edit tools require the token's `send` scope, checked with the
+  live token inside the write, and `expectedUpdatedAt` equal to the sequence's `updatedAt`
+  (`409 sequence_changed` otherwise). Every save and status change raises `updatedAt`.
 
 Authenticated `/api/mcp` requests have a 36 MiB body limit, including the entire body of a
 JSON-RPC batch. It is sized for a draft with about 25 MiB of attachments; the image upload checks

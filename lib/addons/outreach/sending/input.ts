@@ -33,8 +33,19 @@ export const sequenceInput = z.object({
   name, triggerListId: itemId.nullable().optional(), senderIdentityId: itemId.nullable().optional(),
   trackOpens: z.boolean().optional(), trackClicks: z.boolean().optional(), steps: z.array(stepInput).max(200).optional()
 }).partial();
+const version = z.number().int().nonnegative();
+/** `expectedUpdatedAt` is the sequence's `updatedAt` the caller read; a token needs it for a sequence that is not a draft. */
+export const sequenceEditInput = sequenceInput.extend({ expectedUpdatedAt: version.optional() });
+const replacement = z.object({
+  field: z.enum(["subject", "previewText", "html", "text"]), find: z.string().min(1).max(100_000), replace: z.string().max(100_000),
+  replaceAll: z.boolean().optional()
+});
+export const stepEditInput = z.object({
+  name: z.string().trim().max(250).optional(), ...content, replacements: z.array(replacement).min(1).max(50).optional(),
+  expectedUpdatedAt: version, dryRun: z.boolean().optional()
+});
 export const renderInput = z.object({ subject, html: body, text: body.optional(), contactId: itemId.optional() });
-export const scheduleInput = z.object({ sendAt: z.number().int().nullable(), dryRun: z.boolean().optional(), expectedUpdatedAt: z.number().int().nonnegative().optional(),
+export const scheduleInput = z.object({ sendAt: z.number().int().nullable(), dryRun: z.boolean().optional(), expectedUpdatedAt: version.optional(),
   expectedContentVersion: z.string().max(128).optional() });
-export const statusInput = z.object({ status: z.enum(["live", "paused"]), expectedUpdatedAt: z.number().int().nonnegative().optional() });
+export const statusInput = z.object({ status: z.enum(["live", "paused"]), expectedUpdatedAt: version.optional() });
 export const testInput = z.object({ to: z.email().max(254), contactId: itemId.optional() });

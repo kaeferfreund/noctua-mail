@@ -243,7 +243,9 @@ export function saveSequence(db: Database, accountId: string, input: SequenceInp
       throw new SendingError(409, "Die Auslöserliste kann nur im Entwurf geändert werden.");
     }
 
-    const args = [next.name, next.triggerListId, next.senderIdentityId, +next.trackOpens, +next.trackClicks, now, accountId, id] as const;
+    // `updatedAt` is the version a caller's `expectedUpdatedAt` names: two saves in one millisecond still differ.
+    const updatedAt = Math.max(now, (current?.updatedAt ?? 0) + 1);
+    const args = [next.name, next.triggerListId, next.senderIdentityId, +next.trackOpens, +next.trackClicks, updatedAt, accountId, id] as const;
     if (current) {
       db.query(`UPDATE sequences SET name = ?, triggerListId = ?, senderIdentityId = ?, trackOpens = ?, trackClicks = ?, updatedAt = ?
         WHERE accountId = ? AND id = ?`).run(...args);

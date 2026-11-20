@@ -10,7 +10,7 @@ import { outreachPublicOrigin } from "../config";
 import { listSendableRecipients } from "../contacts";
 import { newOutreachId } from "../ids";
 import { getOutreachSettings } from "../settings";
-import type { CampaignScheduleRequest, CampaignScheduleResponse, SequenceInput, SequenceStatus, TestSendRequest } from "../types";
+import type { CampaignScheduleRequest, CampaignScheduleResponse, Sequence, SequenceInput, SequenceStatus, SequenceStepEdit, TestSendRequest } from "../types";
 import { SendingError } from "./input";
 import { renderContent, sampleContact } from "./render";
 import { hasSmtp, isSesConfigured, sendOutreachMail, SendStopped } from "./send";
@@ -120,17 +120,77 @@ export async function cancelCampaign(db: Database, actor: SendingActor, id: stri
   }).immediate();
 }
 
-export async function editSequence(db: Database, accountId: string, id: string, input: SequenceInput) {
-  const sequence = getSequence(db, accountId, id);
-  if (sequence.status === "draft" || input.senderIdentityId === undefined) {
-    return saveSequence(db, accountId, input, { id });
+function sequenceChanged() {
+  return new SendingError(409, "Die Sequenz wurde inzwischen geändert. Prüfe sie erneut.", "sequence_changed");
+}
+
+/**
+ * `expectedUpdatedAt` binds an edit to the version the caller read. `authorization` is the caller's credential when the
+ * scope that let the request in does not cover mail that goes out (an MCP token): an edit of a sequence that is not a
+ * draft reaches subscribers without another approval, so it needs the right to send and a named version.
+ */
+export type SequenceEditGuard = { expectedUpdatedAt?: number; authorization?: OutboundAuthorization };
+
+/** Saves an edit of the sequence as the caller read it (`sequence`). `checkOnly` stops after the checks that precede the write. */
+async function saveSequenceEdit(db: Database, sequence: Sequence, input: SequenceInput, guard: SequenceEditGuard, checkOnly = false) {
+  const { accountId, id } = sequence;
+  if (guard.expectedUpdatedAt !== undefined && sequence.updatedAt !== guard.expectedUpdatedAt) throw sequenceChanged();
+  let assertAuthorized: (() => void) | undefined;
+  if (sequence.status !== "draft") {
+    if (guard.authorization) {
+      if (guard.expectedUpdatedAt === undefined) {
+        throw new SendingError(400, "Für eine Sequenz, die live oder pausiert ist, ist expectedUpdatedAt erforderlich.", "expected_updated_at_required");
+      }
+      assertAuthorized = await prepareOutboundAssertion(await authorizeOutbound(guard.authorization, { accountId, minRole: "editor" }));
+    }
+    if (input.senderIdentityId !== undefined) {
+      await resolveOutreachIdentity(accountId, input.senderIdentityId ?? (await getOutreachSettings(accountId)).senderIdentityId);
+    }
   }
-  const identityId = input.senderIdentityId ?? (await getOutreachSettings(accountId)).senderIdentityId;
-  await resolveOutreachIdentity(accountId, identityId);
+  if (checkOnly) return sequence;
   return db.transaction(() => {
-    assertUnchanged(sequence, getSequence(db, accountId, id));
+    assertAuthorized?.();
+    // Also the status: a draft must not go live between the caller's read and this write.
+    if (JSON.stringify(sequence) !== JSON.stringify(getSequence(db, accountId, id))) throw sequenceChanged();
     return saveSequence(db, accountId, input, { id });
   }).immediate();
+}
+
+export async function editSequence(db: Database, accountId: string, id: string, input: SequenceInput, guard: SequenceEditGuard = {}) {
+  return saveSequenceEdit(db, getSequence(db, accountId, id), input, guard);
+}
+
+/**
+ * Changes the content of one step and leaves the step list alone. `dryRun` answers what a save would do.
+ * `warnings` are the renderer's (an unknown placeholder, for example) for the content as it would be sent.
+ */
+export async function editSequenceStep(db: Database, accountId: string, id: string, stepId: string, edit: SequenceStepEdit,
+  guard: SequenceEditGuard & { dryRun?: boolean }) {
+  const sequence = getSequence(db, accountId, id);
+  const step = required(sequence.steps.find(item => item.id === stepId));
+  const next = { name: edit.name ?? step.name, subject: edit.subject ?? step.subject, previewText: edit.previewText ?? step.previewText,
+    html: edit.html ?? step.html, text: edit.text ?? step.text };
+  const replacements = (edit.replacements ?? []).map(({ field, find, replace, replaceAll }, index) => {
+    const occurrences = next[field].split(find).length - 1;
+    if (!occurrences) {
+      const hint = !step[field] && step.templateId ? " Das Feld ist im Schritt leer, der Inhalt kommt aus der Vorlage." : "";
+      throw new SendingError(409, `Ersetzung ${index + 1}: Der gesuchte Text steht nicht in ${field}.${hint}`, "replacement_not_found");
+    }
+    if (occurrences > 1 && !replaceAll) {
+      throw new SendingError(409, `Ersetzung ${index + 1}: Der gesuchte Text steht ${occurrences}-mal in ${field}. Erweitere ihn oder setze replaceAll.`, "replacement_ambiguous");
+    }
+    next[field] = next[field].replaceAll(find, () => replace);
+    return { field, occurrences };
+  });
+  const changed = (["name", "subject", "previewText", "html", "text"] as const).filter(field => next[field] !== step[field]);
+  const content = resolveContent(db, accountId, { ...next, templateId: step.templateId });
+  if (sequence.status !== "draft" && step.enabled) assertContent(content);
+  const { warnings } = await renderExample(db, accountId, content);
+  const input = { steps: sequence.steps.map(item => item.id === stepId ? { id: stepId, ...next } : { id: item.id }) };
+  const saved = !guard.dryRun && changed.length > 0;
+  const result = await saveSequenceEdit(db, sequence, input, guard, !saved);
+  return { sequence: result, step: saved ? required(result.steps.find(item => item.id === stepId)) : { ...step, ...next },
+    changed, replacements, warnings, saved };
 }
 
 export async function setSequenceStatus(db: Database, actor: SendingActor, id: string, status: Exclude<SequenceStatus, "draft">,
@@ -138,9 +198,7 @@ export async function setSequenceStatus(db: Database, actor: SendingActor, id: s
   const { accountId } = actor;
   const sequence = getSequence(db, accountId, id);
   // Going live approves the steps the caller reviewed, not a later edit by a collaborator.
-  if (expectedUpdatedAt !== undefined && sequence.updatedAt !== expectedUpdatedAt) {
-    throw new SendingError(409, "Die Sequenz wurde inzwischen geändert. Prüfe sie erneut.", "sequence_changed");
-  }
+  if (expectedUpdatedAt !== undefined && sequence.updatedAt !== expectedUpdatedAt) throw sequenceChanged();
   const authorized = status === "live" ? await checkTransportAndSender(actor, sequence.senderIdentityId)
     : await (async () => {
       const authorized = await authorizeOutbound(actor.authorization, { accountId, minRole: "editor" });
@@ -156,7 +214,7 @@ export async function setSequenceStatus(db: Database, actor: SendingActor, id: s
       snapshotSequenceTemplates(db, sequence);
     }
     db.query(`UPDATE sequences SET status = ?, statusChangedByUserId = ?, statusChangedVia = ?, updatedAt = ?
-      WHERE accountId = ? AND id = ?`).run(status, authorized.userId, actor.via, Date.now(), accountId, id);
+      WHERE accountId = ? AND id = ?`).run(status, authorized.userId, actor.via, Math.max(Date.now(), sequence.updatedAt + 1), accountId, id);
     return getSequence(db, accountId, id);
   }).immediate();
 }

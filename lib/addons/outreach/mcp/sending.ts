@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { getOutreachDb } from "../db";
-import { cancelCampaign, editSequence, scheduleCampaign, setSequenceStatus } from "../sending/actions";
-import { campaignInput, itemId, scheduleInput, sequenceInput, statusInput, templateInput } from "../sending/input";
+import { cancelCampaign, editSequence, editSequenceStep, scheduleCampaign, setSequenceStatus } from "../sending/actions";
+import { campaignInput, itemId, scheduleInput, sequenceEditInput, statusInput, stepEditInput, templateInput } from "../sending/input";
 import {
-  campaignReport, getCampaign, getSequence, getTemplate, listCampaigns, listSequences, listTemplates, saveCampaign,
+  campaignReport, getCampaign, getSequence, getTemplate, listCampaigns, listSequences, listTemplates, required, saveCampaign,
   saveSequence, saveTemplate
 } from "../sending/store";
+import type { Sequence, SequenceStep } from "../types";
 import { outreachViaMcp } from "../via";
 import type { OutreachMcpAccount, OutreachMcpHost } from "./index";
 
@@ -17,6 +18,10 @@ const edit = { readOnlyHint: false, openWorldHint: false };
 const send = { readOnlyHint: false, openWorldHint: true };
 const actor = (account: OutreachMcpAccount) => ({ accountId: account.accountId, authorization: { tokenId: account.tokenId },
   via: outreachViaMcp(account.tokenLabel, account.tokenSuffix) });
+/** A step body is a whole HTML mail. A sequence is answered with the bodies' lengths; `get_sequence_step` answers one step in full. */
+const stepOutline = ({ html, text, ...step }: SequenceStep) => ({ ...step, htmlLength: html.length, textLength: text.length });
+const sequenceOutline = (sequence: Sequence) => ({ ...sequence, steps: sequence.steps.map(stepOutline) });
+const liveEdit = "A sequence that is live or paused needs the token's send permission: the change goes out with the next mail, without another approval.";
 
 export function registerOutreachSendingTools(host: OutreachMcpHost) {
   const { server, outreachAccount, result } = host;
@@ -77,24 +82,48 @@ export function registerOutreachSendingTools(host: OutreachMcpHost) {
     const { accountId } = await outreachAccount(args.accountId, "viewer");
     return result("Sequences", { ok: true, sequences: await listSequences(await getOutreachDb(), accountId) });
   });
-  server.registerTool("get_sequence", { description: "Read an email sequence and its steps.", inputSchema: mailbox.extend(sequenceId), annotations: readOnly }, async args => {
+  server.registerTool("get_sequence", {
+    description: "Read an email sequence and its steps. The steps come without html and text, with their lengths: read one step with get_sequence_step, or set includeBodies for all of them (large).",
+    inputSchema: mailbox.extend({ ...sequenceId, includeBodies: z.boolean().optional() }), annotations: readOnly
+  }, async args => {
     const { accountId } = await outreachAccount(args.accountId, "viewer");
-    return result("Sequence", { ok: true, sequence: getSequence(await getOutreachDb(), accountId, args.sequenceId) });
+    const sequence = getSequence(await getOutreachDb(), accountId, args.sequenceId);
+    return result("Sequence", { ok: true, sequence: args.includeBodies ? sequence : sequenceOutline(sequence) });
+  });
+  server.registerTool("get_sequence_step", {
+    description: "Read one step of an email sequence with its HTML and text. Answers the sequence's status and updatedAt for update_sequence_step.",
+    inputSchema: mailbox.extend({ ...sequenceId, stepId: itemId }), annotations: readOnly
+  }, async args => {
+    const { accountId } = await outreachAccount(args.accountId, "viewer");
+    const { id, name, status, updatedAt, steps } = getSequence(await getOutreachDb(), accountId, args.sequenceId);
+    return result("Sequence step", { ok: true, sequence: { id, name, status, updatedAt }, step: required(steps.find(step => step.id === args.stepId)) });
   });
   server.registerTool("save_sequence", {
-    description: "Create or edit an email sequence. A steps array replaces the whole list, in order. Include existing step ids to retain them.",
-    inputSchema: sequenceInput.extend({ ...mailbox.shape, sequenceId: itemId.optional() }), annotations: edit
-  }, async ({ accountId: requested, sequenceId, ...input }) => {
-    const { accountId } = await outreachAccount(requested, "editor");
+    description: `Create or edit an email sequence. A steps array replaces the whole list, in order: include every step to keep with its id; a step without id is new, a step left out is deleted. To change one step's content use update_sequence_step. ${liveEdit} It also needs the sequence's updatedAt as expectedUpdatedAt.`,
+    inputSchema: sequenceEditInput.extend({ ...mailbox.shape, sequenceId: itemId.optional() }), annotations: edit
+  }, async ({ accountId: requested, sequenceId, expectedUpdatedAt, ...input }) => {
+    const ctx = await outreachAccount(requested, "editor");
     const db = await getOutreachDb();
-    const sequence = sequenceId ? await editSequence(db, accountId, sequenceId, input) : saveSequence(db, accountId, input);
-    return result("Sequence saved", { ok: true, sequence });
+    const sequence = sequenceId ? await editSequence(db, ctx.accountId, sequenceId, input, { expectedUpdatedAt, authorization: actor(ctx).authorization })
+      : saveSequence(db, ctx.accountId, input);
+    return result("Sequence saved", { ok: true, sequence: sequenceOutline(sequence) });
+  });
+  server.registerTool("update_sequence_step", {
+    description: `Change the content of one step of an email sequence and nothing else: name, subject, previewText, html and text as whole fields, then replacements of exact text inside a field (find must occur exactly once, or set replaceAll). Pass the sequence's updatedAt as expectedUpdatedAt. dryRun checks and answers without saving. warnings come from rendering the new content. ${liveEdit}`,
+    inputSchema: stepEditInput.extend({ ...mailbox.shape, ...sequenceId, stepId: itemId }), annotations: edit
+  }, async ({ accountId: requested, sequenceId, stepId, expectedUpdatedAt, dryRun, ...change }) => {
+    const ctx = await outreachAccount(requested, "editor");
+    const { sequence, step, ...outcome } = await editSequenceStep(await getOutreachDb(), ctx.accountId, sequenceId, stepId, change,
+      { expectedUpdatedAt, dryRun, authorization: actor(ctx).authorization });
+    return result(outcome.saved ? "Sequence step saved" : "Sequence step not saved", { ok: true, ...outcome,
+      sequence: { id: sequence.id, name: sequence.name, status: sequence.status, updatedAt: sequence.updatedAt }, step: stepOutline(step) });
   });
   server.registerTool("set_sequence_status", {
     description: "Set a sequence live or pause it. Going live enables automatic sends to new subscribers on the trigger list and resumes overdue sends.",
     inputSchema: statusInput.extend({ ...mailbox.shape, ...sequenceId }), annotations: send
   }, async args => {
     const ctx = await outreachAccount(args.accountId, "editor");
-    return result("Sequence status saved", { ok: true, sequence: await setSequenceStatus(await getOutreachDb(), actor(ctx), args.sequenceId, args.status, args.expectedUpdatedAt) });
+    const sequence = await setSequenceStatus(await getOutreachDb(), actor(ctx), args.sequenceId, args.status, args.expectedUpdatedAt);
+    return result("Sequence status saved", { ok: true, sequence: sequenceOutline(sequence) });
   });
 }
