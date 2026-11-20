@@ -114,6 +114,27 @@ describe("a save refused because the sequence changed elsewhere", () => {
     expect(button(page, "Save").disabled).toBe(true);
   });
 
+  it("keeps the form's version when pausing answers content changed elsewhere", async () => {
+    const paused: Sequence = { ...THEIRS, status: "paused" };
+    const { page, calls } = mount(paused, [
+      call => call.method === "POST" && call.path === `${PATH}/status` ? json({ ok: true, sequence: paused }) : undefined
+    ]);
+    const dialog = () => document.querySelector<HTMLElement>("[role=dialog]");
+    fireEvent.change(await page.findByLabelText("Name"), { target: { value: "Willkommen neu" } });
+    fireEvent.click(page.getByRole("button", { name: "Pause" }));
+    await waitFor(() => expect(dialog()).not.toBeNull());
+    fireEvent.click(within(dialog()!).getByRole("button", { name: "Pause" }));
+    // Paused, and the choice is offered right away: the answer carried someone else's step texts.
+    await page.findByText("The sequence is paused.");
+    const alert = await page.findByRole("alert");
+    expect(within(alert).getByRole("button", { name: "Load the newest version and keep my changes" })).toBeTruthy();
+    // A save still names the version the form was loaded from, so it cannot overwrite the other change.
+    fireEvent.click(button(page, "Save"));
+    await waitFor(() => expect(patches(calls)).toHaveLength(1));
+    expect(patches(calls)[0].expectedUpdatedAt).toBe(SEQUENCE.updatedAt);
+    expect((page.getByLabelText("Name") as HTMLInputElement).value).toBe("Willkommen neu");
+  });
+
   it("shows the same choice when going live is refused, outside the dialog", async () => {
     const draft: Sequence = { ...SEQUENCE, status: "draft" };
     const { page } = mount({ ...THEIRS, status: "draft" }, [

@@ -134,9 +134,13 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
     // Going live approves the version shown here; pausing never needs to wait for a review.
     const result = await api.send<{ sequence: Sequence }>("POST", `sequences/${encodeURIComponent(stored.id)}/status`,
       status === "live" ? { status, expectedUpdatedAt: stored.updatedAt } : { status });
-    setCurrent(result.sequence);
+    // Pausing names no version, so its answer can carry content changed elsewhere since the form was loaded. The editor
+    // then keeps the version of its form: a save or go-live stays refused until one of the conflict actions resolves it.
+    const changedElsewhere = status === "paused" && current !== null && comparable(formOf(result.sequence)) !== comparable(saved);
+    setCurrent(changedElsewhere ? { ...result.sequence, updatedAt: current.updatedAt } : result.sequence);
     setReportVersion(version => version + 1);
     setDialog(null);
+    if (changedElsewhere) setConflict("changed");
     setNotice(status === "live" ? t("sequences.nowLive") : t("sequences.nowPaused"));
     if (!current) { markClean(); navigate({ section: "sequences", id: stored.id }); }
   });
