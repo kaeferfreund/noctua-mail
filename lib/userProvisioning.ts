@@ -22,8 +22,9 @@ export async function provisionUser(auth:NoctuaAuth, db:Database, body:unknown,
   if (!parsed.success) throw new AuthPolicyError("invalid_request",400);
   const input=parsed.data;
   const account=input.account?{...input.account,id:accountIdFromEmail(input.account.email)}:undefined;
-  assertNewIdentity(db,input.email,account);
+  // Invite first: without a valid invite nobody learns which users or mailboxes exist.
   validateSignupInvite(db,input.inviteCode,input.email);
+  assertNewIdentity(db,input.email,account);
   if (account && (!await verification.imap(account,account.imap.password) || !await verification.smtp(account))) throw new AuthPolicyError("mailbox_credentials_invalid",400);
   const op=await reserveProvisioning(db,input.email,input.inviteCode,account);
   try {

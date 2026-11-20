@@ -69,6 +69,18 @@ describe("slice 5 provisioning",()=>{
     for(const [body,code] of [[input(invite(f),user.email,mailbox()),"user_exists"],[input(invite(f),legacy,mailbox()),"user_exists"],[input(invite(f),email(),box),"mailbox_exists"],[input(invite(f),shared.email),"mailbox_exists"]] as const)await expect(provisionUser(f.auth,f.master,body,verify)).rejects.toMatchObject({status:409,code});
     expect(calls).toBe(0);expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning`).get().n).toBe(0);
   });
+  test("without a valid invite, existing users and mailboxes answer exactly like unknown addresses",async()=>{
+    const f=await setup(),user=await f.createUser(email()),box=mailbox();
+    persistAccountRow(f.master,{...box,id:"synthetic-existing-probe"});
+    const bound=invite(f,{email:email()}),expired=invite(f,{expiresAt:0});
+    for(const code of ["invalid",bound,expired]){
+      const answers=[];
+      for(const body of [input(code,user.email),input(code,email(),box),input(code,email(),mailbox())])
+        answers.push(await provisionUser(f.auth,f.master,body,verified).then(()=>null,(error:{status:number;code:string})=>({status:error.status,code:error.code})));
+      expect(answers).toEqual(Array(3).fill({status:403,code:"invalid_invite"}));
+    }
+    expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning`).get().n).toBe(0);
+  });
   test("first-admin and last invite use each have one winner across awaits",async()=>{
     const f=await setup();
     const first=await Promise.allSettled([provisionUser(f.auth,f.master,input(invite(f,{role:"admin"})),verified),provisionUser(f.auth,f.master,input(invite(f,{role:"admin"})),verified)]);
