@@ -7,7 +7,7 @@ import { admin, twoFactor } from "better-auth/plugins";
 import { defaultAc, userAc } from "better-auth/plugins/admin/access";
 import { passkey } from "@better-auth/passkey";
 import { getAuthDb, getDb, getDbConnectionGeneration } from "./db/connection";
-import { installAuthControlPlane, reconcileSecurityOperations, readGeneration } from "./db/authPolicy";
+import { installAuthControlPlane, reconcileSecurityOperations, readGeneration, maybeSweepExpiredAuthState } from "./db/authPolicy";
 import { authPolicyPlugin, authPolicyDatabaseHooks, RAW_DISABLED_PATHS, recordVerifiedPasskey, wrapAuthPolicyHandler } from "./authPolicyHandler";
 import { imapSignIn } from "./betterAuthImapSignIn";
 import { verifyEligibleImap } from "./imapLoginPolicy";
@@ -308,6 +308,7 @@ export function getAuth(initialization: {operatorLock?:AuthLifetimeLock} = {}): 
       await reconcileLifecycle(auth,db,cutoff);
       const interrupted = await reconcileSecurityOperations(db, cutoff);
       for (const userId of interrupted) revokeAuthStreams({userId});
+      await maybeSweepExpiredAuthState(db);
       return auth;
     })();
     authPromise = pending;

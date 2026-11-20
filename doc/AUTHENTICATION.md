@@ -283,6 +283,10 @@ session-only resume. Factor/password finalizers publish `revokeAuthStreams` afte
 
 Known-user challenges bind generation and first-factor time. Anonymous passkey options snapshot
 `auth_login_epoch` before the library call; credential/reset/revoke generation advances cancel them.
+An ordinary logout only ends its own session and the user's pending logins; it does not advance the
+epoch, so other people's passkey sign-ins in progress stay valid.
+Expired challenge registry rows, their library verification rows, expired reauth grants and finished
+security operations are swept periodically (`sweepExpiredAuthState`).
 Missing, expired, mismatched or removed registry entries fail before verification and again atomically
 at finalization. The registry uses `two_factor_imap` as a distinct two-factor kind to preserve the
 first factor's `imap_totp` method without storing a mailbox password. IMAP write-back captures its

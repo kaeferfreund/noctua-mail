@@ -493,3 +493,19 @@ test("account repair returns final 404 for an absent mailbox without credential 
   expect(await response.json()).toEqual({ok:false,code:"account_not_found"});
   expect(verified).toBe(false);
 });
+
+test("account repair answers an existing mailbox outside the caller's membership like an absent one", async () => {
+  const f = await fixture();
+  const foreignId = `s3-foreign-${crypto.randomUUID()}`;
+  await f.db.upsertAccount({ ...f.account, id: foreignId, email: "foreign@example.test" });
+  let verified = false;
+  const verification = { imap: async () => { verified = true; return true; }, smtp: async () => { verified = true; return true; } };
+  const answers = [];
+  for (const target of [{ id: foreignId, email: "foreign@example.test" }, { id: "synthetic-absent", email: "absent@example.test" }]) {
+    const response = await handleMailboxCredentialMutation(jsonRequest(f, { ...target, imap: { password: "synthetic-password" } }), "post-existing", undefined, verification);
+    answers.push({ status: response.status, body: await response.json() });
+  }
+  expect(answers[0]).toEqual(answers[1]);
+  expect(answers[0]).toEqual({ status: 404, body: { ok: false, code: "account_not_found" } });
+  expect(verified).toBe(false);
+});

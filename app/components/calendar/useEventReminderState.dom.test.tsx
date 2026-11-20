@@ -4,6 +4,7 @@ import { renderToString } from "react-dom/server";
 import { hydrateRoot } from "react-dom/client";
 import { act, cleanup, render, renderHook } from "@testing-library/react";
 import { useEventReminderState, type UseEventReminderStateInput } from "./useEventReminderState";
+import { setCalendarReminderStoragePrincipal } from "@/app/components/mailclient/utils/calendarReminders";
 
 const start = Date.UTC(2030, 0, 1, 12);
 const input: UseEventReminderStateInput = { accountId: "", title: "Synthetic event", canonicalStartMs: start, onNotice() {} };
@@ -96,6 +97,8 @@ test("SSR and initial hydration agree across the clock boundary; StrictMode clea
 });
 
 test("scheduling resolves the occurrence from the click time between clock ticks", async () => {
+  // The reminder cache is persisted only for a known signed-in user.
+  setCalendarReminderStoragePrincipal("synthetic-user");
   const time = clock(start - 1000);
   let scheduled: { nextEventStartAtMs: number; triggerAtMs: number }[] = [];
   spyOn(globalThis, "fetch").mockImplementation(Object.assign(async (_url: RequestInfo | URL, init?: RequestInit) => {

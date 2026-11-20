@@ -4,6 +4,8 @@ import { normalizeReminderDateList } from "@/lib/reminderDates";
 import { resolveCalendarTimeZoneId } from "@/lib/calendarTimezones";
 
 export const CALENDAR_REMINDERS_UPDATED_EVENT = "noctua:calendar-reminders-updated";
+/** Window event after the signed-in user of this browser's reminder storage changed. */
+export const CALENDAR_REMINDER_PRINCIPAL_CHANGED_EVENT = "noctua:calendar-reminder-principal-changed";
 const CALENDAR_REMINDER_DELIVERED_PREFIX = "noctua:calendar-reminder-delivered";
 const CALENDAR_REMINDER_CACHE_PREFIX = "noctua:calendar-reminder-cache";
 const CALENDAR_REMINDER_QUEUE_PREFIX = "noctua:calendar-reminder-queue";
@@ -117,6 +119,137 @@ function getReminderRemoteFetchState(accountId: string): ReminderRemoteFetchStat
   return created;
 }
 
+const REMINDER_STORAGE_PREFIXES = [
+  CALENDAR_REMINDER_CACHE_PREFIX,
+  CALENDAR_REMINDER_QUEUE_PREFIX,
+  CALENDAR_REMINDER_DELIVERED_PREFIX
+];
+/** The signed-in user the persisted reminder entries belong to (shared by this browser's windows). */
+const CALENDAR_REMINDER_PRINCIPAL_KEY = "noctua:calendar-reminder-principal";
+
+// The server keeps reminders per user and mailbox, so the browser cache, the
+// offline queue and the delivered marks are keyed by both. While no user is
+// known they live in memory only and are never persisted.
+const volatileReminderStorage = new Map<string, string>();
+let lastReminderPrincipal: string | null | undefined;
+
+function readReminderPrincipal(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(CALENDAR_REMINDER_PRINCIPAL_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+function resetReminderFetchState() {
+  // Requests that started for the previous user must neither stamp freshness nor
+  // write the cache when they complete (see the inFlight checks below).
+  reminderRemoteFetchState.forEach((state) => {
+    state.lastSuccessAtMs = 0;
+    state.inFlight = undefined;
+  });
+  reminderRemoteFetchState.clear();
+  volatileReminderStorage.clear();
+}
+
+/** The current reminder user; a change (e.g. made by another window) drops in-memory state. */
+function currentReminderPrincipal(): string | null {
+  const principal = readReminderPrincipal();
+  if (principal !== lastReminderPrincipal) {
+    const announce = lastReminderPrincipal !== undefined;
+    lastReminderPrincipal = principal;
+    resetReminderFetchState();
+    if (announce && typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+      window.dispatchEvent(new Event(CALENDAR_REMINDER_PRINCIPAL_CHANGED_EVENT));
+    }
+  }
+  return principal;
+}
+
+function reminderStoragePrefix(prefix: string, principal: string | null) {
+  return `${prefix}:${principal ? encodeURIComponent(principal) : "-"}:`;
+}
+
+function readReminderStorage(key: string, principal: string | null) {
+  if (!principal) return volatileReminderStorage.get(key) ?? null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeReminderStorage(key: string, value: string, principal: string | null) {
+  // A result for a user who has meanwhile signed out (or been replaced) is dropped.
+  if (principal !== currentReminderPrincipal()) return;
+  if (!principal) {
+    volatileReminderStorage.set(key, value);
+    return;
+  }
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Storage full or unavailable: the server stays the source of truth.
+  }
+}
+
+function removeReminderStorage(keep: string | null) {
+  if (typeof window === "undefined") return;
+  try {
+    const storage = window.localStorage;
+    const stale: string[] = [];
+    for (let index = 0; index < storage.length; index++) {
+      const key = storage.key(index);
+      if (!key) continue;
+      const prefix = REMINDER_STORAGE_PREFIXES.find((candidate) => key.startsWith(`${candidate}:`));
+      if (!prefix) continue;
+      if (keep && key.startsWith(reminderStoragePrefix(prefix, keep))) continue;
+      stale.push(key);
+    }
+    stale.forEach((key) => storage.removeItem(key));
+  } catch {
+    // Storage unavailable (private mode): nothing persisted to drop.
+  }
+}
+
+/**
+ * Binds the reminder storage of this browser to the signed-in user. Entries of
+ * any other user, and entries from before the binding, are removed, so a later
+ * user of a shared browser never sees or replays them.
+ */
+export function setCalendarReminderStoragePrincipal(userId: string) {
+  const next = userId.trim();
+  if (!next || typeof window === "undefined") return;
+  if (readReminderPrincipal() !== next) {
+    try {
+      window.localStorage.setItem(CALENDAR_REMINDER_PRINCIPAL_KEY, next);
+    } catch {
+      // Without storage everything stays in memory.
+    }
+  }
+  currentReminderPrincipal();
+  removeReminderStorage(next);
+}
+
+/** The user this browser's reminder storage is bound to, null when none is known. */
+export function getCalendarReminderStoragePrincipal() {
+  return currentReminderPrincipal();
+}
+
+/** Sign-out: forgets the user and removes every reminder entry of this browser. */
+export function clearCalendarReminderStorage() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(CALENDAR_REMINDER_PRINCIPAL_KEY);
+  } catch {
+    // ignore
+  }
+  removeReminderStorage(null);
+  resetReminderFetchState();
+  currentReminderPrincipal();
+}
+
 export function getCalendarReminderStartAtMs(reminder: CalendarReminder) {
   const startAtMs =
     typeof reminder.nextEventStartAtMs === "number" && Number.isFinite(reminder.nextEventStartAtMs)
@@ -161,12 +294,12 @@ function normalizeEventTitle(value?: string) {
   return value?.trim().toLowerCase() || "";
 }
 
-function reminderCacheStorageKey(accountId: string) {
-  return `${CALENDAR_REMINDER_CACHE_PREFIX}:${accountId}`;
+function reminderCacheStorageKey(accountId: string, principal: string | null) {
+  return `${reminderStoragePrefix(CALENDAR_REMINDER_CACHE_PREFIX, principal)}${accountId}`;
 }
 
-function reminderQueueStorageKey(accountId: string) {
-  return `${CALENDAR_REMINDER_QUEUE_PREFIX}:${accountId}`;
+function reminderQueueStorageKey(accountId: string, principal: string | null) {
+  return `${reminderStoragePrefix(CALENDAR_REMINDER_QUEUE_PREFIX, principal)}${accountId}`;
 }
 
 function generateId(prefix: string) {
@@ -252,8 +385,8 @@ function sanitizeReminder(input: unknown): CalendarReminder | null {
   };
 }
 
-function deliveredStorageKey(accountId: string, clientId: string) {
-  return `${CALENDAR_REMINDER_DELIVERED_PREFIX}:${accountId}:${clientId}`;
+function deliveredStorageKey(accountId: string, clientId: string, principal: string | null) {
+  return `${reminderStoragePrefix(CALENDAR_REMINDER_DELIVERED_PREFIX, principal)}${accountId}:${clientId}`;
 }
 
 function readJsonObject(value: string | null): Record<string, unknown> {
@@ -365,9 +498,9 @@ function sanitizeMutation(input: unknown): QueuedReminderMutation | null {
   return null;
 }
 
-function readReminderCache(accountId: string): CalendarReminder[] {
+function readReminderCache(accountId: string, principal = currentReminderPrincipal()): CalendarReminder[] {
   if (typeof window === "undefined" || !accountId) return [];
-  const raw = window.localStorage.getItem(reminderCacheStorageKey(accountId));
+  const raw = readReminderStorage(reminderCacheStorageKey(accountId, principal), principal);
   try {
     const parsed = raw ? (JSON.parse(raw) as unknown) : [];
     return remindersFromUnknown(parsed);
@@ -376,14 +509,14 @@ function readReminderCache(accountId: string): CalendarReminder[] {
   }
 }
 
-function writeReminderCache(accountId: string, reminders: CalendarReminder[]) {
+function writeReminderCache(accountId: string, reminders: CalendarReminder[], principal = currentReminderPrincipal()) {
   if (typeof window === "undefined" || !accountId) return;
-  window.localStorage.setItem(reminderCacheStorageKey(accountId), JSON.stringify(reminders));
+  writeReminderStorage(reminderCacheStorageKey(accountId, principal), JSON.stringify(reminders), principal);
 }
 
-function readReminderQueue(accountId: string): QueuedReminderMutation[] {
+function readReminderQueue(accountId: string, principal = currentReminderPrincipal()): QueuedReminderMutation[] {
   if (typeof window === "undefined" || !accountId) return [];
-  const raw = window.localStorage.getItem(reminderQueueStorageKey(accountId));
+  const raw = readReminderStorage(reminderQueueStorageKey(accountId, principal), principal);
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw) as unknown;
@@ -397,9 +530,9 @@ function readReminderQueue(accountId: string): QueuedReminderMutation[] {
   }
 }
 
-function writeReminderQueue(accountId: string, queue: QueuedReminderMutation[]) {
+function writeReminderQueue(accountId: string, queue: QueuedReminderMutation[], principal = currentReminderPrincipal()) {
   if (typeof window === "undefined" || !accountId) return;
-  window.localStorage.setItem(reminderQueueStorageKey(accountId), JSON.stringify(queue));
+  writeReminderStorage(reminderQueueStorageKey(accountId, principal), JSON.stringify(queue), principal);
 }
 
 function normalizeEventForMatch(event: ReminderEventKey) {
@@ -614,8 +747,10 @@ async function loadRemindersFromServer(accountId: string) {
 }
 
 async function fetchRemindersFromServer(accountId: string) {
+  const principal = currentReminderPrincipal();
   const reminders = await loadRemindersFromServer(accountId);
-  writeReminderCache(accountId, reminders);
+  if (principal !== currentReminderPrincipal()) throw new Error("Reminder user changed");
+  writeReminderCache(accountId, reminders, principal);
   // A successful server fetch that populates the cache is authoritative, so
   // refresh the TTL — mutation flows fetch through here after invalidation
   // zeroed it, and would otherwise leave fresh data marked expired.
@@ -631,12 +766,19 @@ function canAttemptOnlineSync() {
 async function syncQueuedReminderMutations(accountId: string) {
   if (!accountId.trim()) return;
   if (!canAttemptOnlineSync()) return;
-  const queue = readReminderQueue(accountId);
+  // Queued edits are replayed only for the user who made them: the request
+  // carries whatever session the browser has now.
+  const principal = currentReminderPrincipal();
+  const queue = readReminderQueue(accountId, principal);
   if (queue.length === 0) return;
   const pending = [...queue];
   let failed = false;
   while (pending.length > 0) {
     const mutation = pending[0];
+    if (principal !== currentReminderPrincipal()) {
+      failed = true;
+      break;
+    }
     try {
       if (mutation.kind === "upsert") {
         const res = await fetch(buildAccountRemindersPath(accountId), {
@@ -682,7 +824,7 @@ async function syncQueuedReminderMutations(accountId: string) {
         if (!res.ok) throw new Error(`delete by event failed (${res.status})`);
       }
       pending.shift();
-      writeReminderQueue(accountId, pending);
+      writeReminderQueue(accountId, pending, principal);
     } catch {
       failed = true;
       break;
@@ -713,7 +855,8 @@ export function findActiveCalendarReminderForEvent(
 
 export async function fetchCalendarReminders(accountId: string): Promise<CalendarReminder[]> {
   if (!accountId.trim()) return [];
-  const cache = readReminderCache(accountId);
+  const principal = currentReminderPrincipal();
+  const cache = readReminderCache(accountId, principal);
   if (!canAttemptOnlineSync()) {
     return cache;
   }
@@ -738,13 +881,14 @@ export async function fetchCalendarReminders(accountId: string): Promise<Calenda
       // A reminders-updated dispatch mid-flight deregisters this request;
       // its data predates the change, so it must not refresh the TTL or
       // clobber the cache a newer request may have written.
+      if (principal !== currentReminderPrincipal()) return [];
       if (state.inFlight === request) {
-        writeReminderCache(accountId, reminders);
+        writeReminderCache(accountId, reminders, principal);
         state.lastSuccessAtMs = Date.now();
       }
       return reminders;
     } catch {
-      return cache;
+      return principal === currentReminderPrincipal() ? cache : [];
     } finally {
       if (state.inFlight === request) {
         state.inFlight = undefined;
@@ -848,7 +992,8 @@ export async function deleteCalendarReminderForEvent(
 
 export function readDeliveredReminderMap(accountId: string, clientId: string): DeliveredReminderMap {
   if (typeof window === "undefined" || !accountId || !clientId) return {};
-  const raw = window.localStorage.getItem(deliveredStorageKey(accountId, clientId));
+  const principal = currentReminderPrincipal();
+  const raw = readReminderStorage(deliveredStorageKey(accountId, clientId, principal), principal);
   const parsed = readJsonObject(raw);
   const out: DeliveredReminderMap = {};
   Object.entries(parsed).forEach(([key, value]) => {
@@ -872,7 +1017,8 @@ export function writeDeliveredReminderMap(
   map: DeliveredReminderMap
 ) {
   if (typeof window === "undefined" || !accountId || !clientId) return;
-  window.localStorage.setItem(deliveredStorageKey(accountId, clientId), JSON.stringify(map));
+  const principal = currentReminderPrincipal();
+  writeReminderStorage(deliveredStorageKey(accountId, clientId, principal), JSON.stringify(map), principal);
 }
 
 export function pruneDeliveredReminderMap(
