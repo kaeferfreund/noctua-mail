@@ -527,14 +527,14 @@ describe("shell header", () => {
   const noop = () => {};
   const search: ShellHeaderProps["search"] = {
     state: {
-      query: "", searchScope: "folder", activeFolderId: "inbox", lastFolderId: "inbox",
+      searchInput: "", searchScope: "folder", activeFolderId: "inbox", lastFolderId: "inbox",
       searchFields: DEFAULT_SEARCH_FIELDS, searchBadges: DEFAULT_SEARCH_BADGES,
       includeSentInEverywhere: false, sentFolderName: "Sent", isRelatedSearch: false,
       searchFieldsLabel: "All fields", searchBadgesLabel: "All messages",
       accountFolders: [{ id: "inbox", name: "INBOX", accountId: "synthetic", count: 0, unreadCount: 0 }]
     },
     actions: {
-      setQuery: noop, setSearchScope: noop, setActiveFolderId: noop, setLastFolderId: noop,
+      setSearchInput: noop, submitSearchInput: noop, setSearchScope: noop, setActiveFolderId: noop, setLastFolderId: noop,
       setSearchFields: noop, setSearchBadges: noop, setIncludeSentInEverywhere: noop, clearSearch: noop
     }
   };

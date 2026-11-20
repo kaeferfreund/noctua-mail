@@ -10,7 +10,7 @@ afterEach(cleanup);
 const noop = () => {};
 function placeholderFor(locale: UiLocale, activeFolderId: string) {
   const state: ShellSearchProps["state"] = {
-    query: "", searchScope: "folder", activeFolderId, lastFolderId: activeFolderId,
+    searchInput: "", searchScope: "folder", activeFolderId, lastFolderId: activeFolderId,
     searchFields: DEFAULT_SEARCH_FIELDS, searchBadges: DEFAULT_SEARCH_BADGES,
     includeSentInEverywhere: false, sentFolderName: "Sent", isRelatedSearch: false,
     searchFieldsLabel: "", searchBadgesLabel: "",
@@ -20,7 +20,7 @@ function placeholderFor(locale: UiLocale, activeFolderId: string) {
       { id: "custom", name: "Projekte 2026", accountId: "synthetic", count: 0, unreadCount: 0 }
     ]
   };
-  const view = render(<I18nTestProvider locale={locale}><ShellSearch state={state} actions={{ setQuery: noop, setSearchScope: noop,
+  const view = render(<I18nTestProvider locale={locale}><ShellSearch state={state} actions={{ setSearchInput: noop, submitSearchInput: noop, setSearchScope: noop,
     setActiveFolderId: noop, setLastFolderId: noop, setSearchFields: noop, setSearchBadges: noop,
     setIncludeSentInEverywhere: noop, clearSearch: noop }} /></I18nTestProvider>);
   const placeholder = view.container.querySelector<HTMLInputElement>("#top-search-input")!.placeholder;

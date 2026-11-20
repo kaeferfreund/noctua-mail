@@ -1,15 +1,18 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { useState } from "react";
-import { cleanup, fireEvent, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { render, I18nTestProvider } from "@/lib/i18n/testRender";
 import ShellSearch, { type ShellSearchProps } from "./ShellSearch";
 import { DEFAULT_SEARCH_BADGES, DEFAULT_SEARCH_FIELDS } from "@/app/components/mailclient/useSearchState";
+import { useSearchInput } from "@/app/components/mailclient/useSearchInput";
+import { SEARCH_INPUT_DEBOUNCE_MS } from "@/app/components/mailclient/searchInputPolicy";
 import { expectFocused } from "@/lib/testDomAssertions";
 
 afterEach(cleanup);
 
 function SearchHarness({ scope = "folder", folder = "archive" }: { scope?: "folder" | "all"; folder?: string }) {
   const [query, setQuery] = useState("");
+  const { searchInput, setSearchInput, submitSearchInput } = useSearchInput({ query, setQuery });
   const [searchScope, setSearchScope] = useState(scope);
   const [activeFolderId, setActiveFolderId] = useState(scope === "folder" ? folder : "");
   const [lastFolderId, setLastFolderId] = useState(scope === "folder" ? "inbox" : "archive");
@@ -17,7 +20,7 @@ function SearchHarness({ scope = "folder", folder = "archive" }: { scope?: "fold
   const [searchBadges, setSearchBadges] = useState(DEFAULT_SEARCH_BADGES);
   const [includeSentInEverywhere, setIncludeSentInEverywhere] = useState(false);
   const state: ShellSearchProps["state"] = {
-    query, searchScope, activeFolderId, lastFolderId, searchFields, searchBadges,
+    searchInput, searchScope, activeFolderId, lastFolderId, searchFields, searchBadges,
     includeSentInEverywhere, sentFolderName: "Sent", isRelatedSearch: false,
     searchFieldsLabel: "All fields", searchBadgesLabel: "All messages",
     accountFolders: [
@@ -26,9 +29,10 @@ function SearchHarness({ scope = "folder", folder = "archive" }: { scope?: "fold
     ]
   };
   return <>
-    <ShellSearch state={state} actions={{ setQuery, setSearchScope, setActiveFolderId,
+    <ShellSearch state={state} actions={{ setSearchInput, submitSearchInput, setSearchScope, setActiveFolderId,
       setLastFolderId, setSearchFields, setSearchBadges, setIncludeSentInEverywhere,
       clearSearch: () => setQuery("") }} />
+    <output data-testid="query">{query}</output>
     <output data-testid="folders">{JSON.stringify({ activeFolderId, lastFolderId })}</output>
   </>;
 }
@@ -102,5 +106,27 @@ describe("shell search filters", () => {
     expectFocused(ai);
     fireEvent.click(ai);
     expect(ai.checked).toBe(true);
+  });
+
+  it("searches after a typing pause, at once on Enter, and clears at once", async () => {
+    const view = render(<SearchHarness />);
+    const box = view.container.querySelector<HTMLInputElement>("#top-search-input")!;
+    const applied = () => view.getByTestId("query").textContent;
+    fireEvent.change(box, { target: { value: "rech" } });
+    fireEvent.change(box, { target: { value: "rechnung" } });
+    expect(box.value).toBe("rechnung");
+    expect(applied()).toBe("");
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, SEARCH_INPUT_DEBOUNCE_MS + 50)); });
+    expect(applied()).toBe("rechnung");
+
+    fireEvent.change(box, { target: { value: "kv" } });
+    fireEvent.keyDown(box, { key: "Enter", isComposing: true });
+    expect(applied()).toBe("rechnung");
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(applied()).toBe("kv");
+
+    fireEvent.click(view.getByRole("button", { name: "Clear search" }));
+    expect(box.value).toBe("");
+    expect(applied()).toBe("");
   });
 });
