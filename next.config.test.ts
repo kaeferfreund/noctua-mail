@@ -41,9 +41,9 @@ describe("next.config headers", () => {
       "/((?!api/).*)",
       "/:path*",
       "/api/:path*",
-      "/fonts/:path*",
       "/api/ba/reset-password",
       "/api/ba/reset-password/:path*",
+      "/fonts/:path*",
       "/icons/:file(icon-\\d+\\.png|base\\.svg)",
       "/reset-password"
     ]);
