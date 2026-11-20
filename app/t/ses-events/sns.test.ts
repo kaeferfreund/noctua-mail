@@ -21,7 +21,7 @@ function fixture() {
   const applied: unknown[] = [];
   let checks = 0;
   const deps: NonNullable<Parameters<typeof createSnsHandler>[0]> = {
-    enabled: () => true, topic: () => topic, isLimited: () => false,
+    enabled: () => true, topic: () => topic, isLimited: () => false, unverifiedLimited: () => false,
     fetch: async (url, init) => {
       expect(init.redirect).toBe("error");
       calls.push(url);
@@ -65,6 +65,30 @@ test("SNS verifies an actual RSA SHA-256 signature, uses the cached certificate 
   expect((await handler(request({ ...notification, Message: '{"test":false}' }))).status).toBe(403);
   expect(f.calls).toHaveLength(1);
   expect(f.applied).toEqual([[notification.MessageId, { test: true }]]);
+});
+
+test("unsigned traffic that spends the shared budget cannot delay callbacks signed with a verified certificate", async () => {
+  const f = fixture();
+  const cert = new X509Certificate(signed.cert);
+  f.deps.verify = createSnsVerifier(() => Date.parse(cert.validFrom) + 1000);
+  f.deps.fetch = async url => { f.calls.push(url); return new Response(signed.cert); };
+  let unverifiedBudget = 1;
+  let unverifiedCharges = 0;
+  f.deps.unverifiedLimited = () => { unverifiedCharges++; return unverifiedBudget-- <= 0; };
+  const handler = createSnsHandler(f.deps);
+  // The first genuine callback spends one unit of the shared budget to establish its certificate.
+  expect((await handler(request(notification))).status).toBe(200);
+  // Forged requests with a fresh certificate URL exhaust it and are refused before any fetch ...
+  const forged = { ...notification, SigningCertURL: `https://${host}/SimpleNotificationService-ffff0000.pem` };
+  expect((await handler(request(forged))).status).toBe(429);
+  expect(f.calls).toHaveLength(1);
+  // ... while callbacks signed with the verified certificate still get through without spending it.
+  const charged = unverifiedCharges;
+  expect((await handler(request(notification))).status).toBe(200);
+  expect(unverifiedCharges).toBe(charged);
+  // A forged signature on the known certificate URL is still verified and refused.
+  expect((await handler(request({ ...notification, Message: '{"test":false}' }))).status).toBe(403);
+  expect(f.applied).toEqual([[notification.MessageId, { test: true }], [notification.MessageId, { test: true }]]);
 });
 
 test("SNS confirms only the verified topic and allowed HTTPS host, coalescing a replay", async () => {
