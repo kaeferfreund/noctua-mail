@@ -138,29 +138,103 @@ function receivedByHost(value: string) {
   return value.replace(/\([^()]*\)/g, " ").match(/(?:^|\s)by\s+([a-z0-9.-]+)/i)?.[1].toLowerCase().replace(/\.$/, "") ?? null;
 }
 
+const LOOPBACK_NAMES = new Set(["localhost", "localhost.localdomain"]);
+const isLoopbackIp = (ip: string) => /^(?:ipv6:)?(?:127\.|::1$|::ffff:127\.)/i.test(ip);
+
+/** The `from` clause of a Received value with its comments (`from helo (rdns [192.0.2.1])`); null without one. */
+function receivedFromClause(value: string) {
+  // Blank out comments (same length) so "from userid 1001" or a keyword in a comment is not a clause.
+  let depth = 0;
+  let blank = "";
+  for (const char of value) {
+    if (char === "(") depth++;
+    blank += depth ? " ".repeat(char.length) : char;
+    if (char === ")" && depth) depth--;
+  }
+  const from = /(?:^|\s)from\s/i.exec(blank);
+  if (!from) return null;
+  const start = from.index + from[0].length;
+  const end = blank.slice(start).search(/\s(?:by|via|with|id|for)\s|;/i);
+  return value.slice(start, end < 0 ? value.length : start + end);
+}
+
+/**
+ * Whether a Received line of the receiving server records an internal hop: no
+ * `from` clause (local pickup, `by mx1 (Postfix, from userid 1001)`), a
+ * loopback client, or a client that is one of the receiving server's own
+ * by-hosts (`isHost`). The client's address literal decides first, since the
+ * server writes it: a non-loopback address makes the hop internal only when
+ * every name of the client, the HELO it chose as well as the server's
+ * reverse-DNS name (`unknown` when unverified), is such a host. A client that
+ * says HELO localhost, HELO [127.0.0.1] or HELO <receiver> from an outside
+ * address therefore stays external.
+ */
+function isInternalHop(value: string, isHost: (name: string) => boolean) {
+  const clause = receivedFromClause(value);
+  if (clause === null) return true;
+  const addresses = [...clause.matchAll(/\[([^\]]*)\]/g)].map((match) => match[1].trim());
+  const loopbackOnly = addresses.every(isLoopbackIp);
+  if (addresses.length && loopbackOnly) return true;
+  // The client's names: the HELO and every comment holding an address literal, among them the server's
+  // `(rdns [address])` that no HELO can hide. Comments without one (TLS cipher, authenticated sender) are dropped.
+  let named = clause;
+  for (let previous = ""; previous !== named;) [previous, named] = [named, named.replace(/\([^()[\]]*\)/g, " ")];
+  const names = named.replace(/\[[^\]]*\]/g, " ").split(/[\s()]+/)
+    .map((token) => token.replace(/^helo=/i, "").toLowerCase().replace(/\.$/, "")).filter(Boolean);
+  return names.length > 0 && names.every((name) => isHost(name) || (loopbackOnly && LOOPBACK_NAMES.has(name)));
+}
+
+/**
+ * Index of the first header line that no longer belongs to the receiving
+ * server: walking down from the top-most Received line, the server's own
+ * internal hops (isInternalHop) are skipped; the first line whose client is
+ * external is the hand-off, and the next Received line after it (or the end)
+ * is the limit. A line further down stamped by another host ends the walk.
+ */
+function receiverHeaderLimit(lines: HeaderLine[], receivedIndexes: number[], isReceiver: (host: string) => boolean) {
+  const hosts: string[] = [];
+  const isHost = (name: string) => hosts.some((host) => host === name || host.split(".")[0] === name);
+  for (const [position, index] of receivedIndexes.entries()) {
+    const by = receivedByHost(lines[index].value);
+    // The top-most line is the receiver's by definition (nothing can be written above it).
+    if (position > 0 && (by === null || !isReceiver(by))) return index;
+    if (by) hosts.push(by);
+    if (!isInternalHop(lines[index].value, isHost)) return receivedIndexes[position + 1] ?? lines.length;
+  }
+  return lines.length;
+}
+
 /**
  * The receiving server's Authentication-Results (RFC 8601 §5), shared by the
- * allowlist and the trusted-sender profiles: only blocks above the second
- * Received line whose authserv-id belongs to the receiving server count; of
- * those, the top-most id's block. The receiving server is the configured
- * `NOCTUA_SPAM_AUTHSERV_ID` list (exact ids) or else the host that stamped
- * the top-most Received line, which no sender can write: an id matches when it
- * is that host, its first label (some providers write `by mx1.mail.example.com` and
- * `Authentication-Results: mx1;`) or in its registrable domain. A block the sender inserted under another id (no A-R of our server)
- * is ignored. A mail without any Received line never passed an MX (local
- * append); there the top-most block counts as before.
+ * allowlist, the trusted-sender profiles, the remote-image gate and the
+ * reader's sender badge. The server prepends its own lines: Received lines of
+ * internal hops at the top (a provider that re-injects after its spam check
+ * stamps `Received: by mx1 (Postfix, from userid …)` above the hand-off), then
+ * the hand-off line (`Received: from <client> … by mx1`), its
+ * Authentication-Results and whatever the sender wrote. Only blocks above the
+ * next Received line after the hand-off count (receiverHeaderLimit); a sender
+ * can only write below the hand-off, so a forged Received line there — even
+ * one claiming `by mx1` from localhost — ends the range, and blocks below it
+ * never count. Internal hops are told apart by what the server wrote
+ * (isInternalHop), never by the client's HELO. With one Received line the limit
+ * is the end of the header block.
+ *
+ * Of the blocks in range only those whose authserv-id belongs to the receiving
+ * server count, and of those the top-most id's blocks. The receiving server is
+ * the configured `NOCTUA_SPAM_AUTHSERV_ID` list (exact ids) or else the host
+ * that stamped the top-most Received line, which no sender can write: an id
+ * matches when it is that host, its first label (`by mx1.mail.example.com` and
+ * `Authentication-Results: mx1;`) or in its registrable domain. A block the
+ * sender inserted under another id is ignored. A mail without any Received
+ * line never passed an MX (local append); there the top-most block counts.
  */
 export function receivingAuthenticationResults(lines: HeaderLine[], configured: readonly string[] = configuredAuthservIds()) {
-  // Our receiving server writes its Received line and its Authentication-Results
-  // next to each other at the top. Anything below the second Received line was
-  // written by an earlier hop or by the sender, so a forged block that copies the
-  // authserv-id of our server is ignored there (verify-r2 R1).
   const receivedIndexes = lines.flatMap((line, index) => (line.key === "received" ? [index] : []));
-  const limit = receivedIndexes.length >= 2 ? receivedIndexes[1] : lines.length;
   const byHost = receivedIndexes.length ? receivedByHost(lines[receivedIndexes[0]].value) : null;
   const receiver = byHost ? getRootDomain(byHost) ?? byHost : null;
   const isReceiver = (id: string) => byHost !== null
     && (id === byHost || id === byHost.split(".")[0] || (getRootDomain(id) ?? id) === receiver);
+  const limit = receiverHeaderLimit(lines, receivedIndexes, isReceiver);
   const pinned = (id: string) => (configured.length ? configured.includes(id)
     : byHost === null ? receivedIndexes.length === 0 : isReceiver(id));
   const results = lines.filter((line, index) => line.key === "authentication-results" && index < limit && pinned(authservId(line.value)));

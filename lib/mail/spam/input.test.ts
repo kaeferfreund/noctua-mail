@@ -153,6 +153,107 @@ describe("buildSpamInput", () => {
     expect(receivingAuthenticationResults(lines.slice(1), [])).toEqual(["relay.example.net; dkim=pass header.d=victim.example.test"]);
   });
 
+  describe("a provider that re-injects after its spam check (Received lines of its own above the hand-off)", () => {
+    const at = "Sat, 24 Oct 2026 10:00:00 +0000";
+    const reinject = (host = "mx1.mail.example.net") => [
+      "Return-Path: <bounce@sender.example.test>",
+      "X-Original-To: me@example.org",
+      "Delivered-To: me@example.org",
+      `Received: by ${host} (Postfix, from userid 1001) id 1; ${at}`,
+      `X-Spam-Checker-Version: SpamAssassin 4.0.1 on ${host}`,
+      "X-Spam-Level:",
+      "X-Spam-Status: No, score=-0.1",
+      "X-Original-To: me@example.org",
+      "Delivered-To: me@example.org"
+    ];
+    const handOff = (client = "out-1.smtp.sender.example.test (out-1.smtp.sender.example.test [192.0.2.1])", host = "mx1.mail.example.net") =>
+      `Received: from ${client} by ${host} (Postfix) with ESMTPS id 2; ${at}`;
+    const pass = "mx1; dkim=pass header.d=sender.example.test; spf=pass smtp.mailfrom=sender.example.test";
+    const failed = "mx1; dkim=none; spf=fail smtp.mailfrom=attacker.example.com";
+    const forgedPass = "mx1; dkim=pass header.d=victim.example.com; spf=pass smtp.mailfrom=victim.example.com";
+    const senderHeaders = ["DKIM-Signature: v=1; a=rsa-sha256; d=sender.example.test; s=s1; b=AAAA", "From: Shop <news@sender.example.test>",
+      "To: me@example.org", "Subject: Bestellung"];
+    const results = (...header: string[]) => receivingAuthenticationResults(parseHeaderBlock(header.join("\r\n")), []);
+
+    test("the block after the hand-off Received line counts (it sits below the second Received line)", async () => {
+      const header = [...reinject(), handOff(), `Authentication-Results: ${pass}`, ...senderHeaders];
+      expect(results(...header)).toEqual([pass]);
+      expect(buildSpamInput(await simpleParser([...header, "", "Text"].join("\r\n"))).authenticationResults).toEqual([pass]);
+      // The same with the configured authserv-id list.
+      expect(receivingAuthenticationResults(parseHeaderBlock(header.join("\r\n")), ["mx1"])).toEqual([pass]);
+    });
+
+    test("internal hops between the re-injection and the hand-off: loopback (IPv4, IPv6, localhost) or the receiver itself", () => {
+      for (const hop of [
+        "Received: from localhost (localhost [127.0.0.1]) by mx1.mail.example.net (Postfix) with ESMTP id 3; Sat, 24 Oct 2026 10:00:03 +0000",
+        "Received: from mx1.mail.example.net ([IPv6:::1]) by mx1.mail.example.net (amavisd-new, port 10024) with ESMTP id 3; Sat, 24 Oct 2026 10:00:03 +0000",
+        "Received: from localhost by mx1.mail.example.net (Postfix) id 3; Sat, 24 Oct 2026 10:00:03 +0000",
+        "Received: from mx1.mail.example.net (mx1.mail.example.net [203.0.113.11]) by mx1.mail.example.net (Postfix) id 3; Sat, 24 Oct 2026 10:00:03 +0000",
+        "Received: from mx1.mail.example.net (mx1.mail.example.net [203.0.113.11])\r\n\t(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits))\r\n"
+          + "\t(No client certificate requested)\r\n\tby mx1.mail.example.net (Postfix) with ESMTPS id 3; Sat, 24 Oct 2026 10:00:03 +0000"
+      ]) {
+        expect(results(...reinject(), hop, handOff(), `Authentication-Results: ${pass}`, ...senderHeaders)).toEqual([pass]);
+      }
+    });
+
+    test("two hosts of the provider: both blocks are in range, the pinned ids decide", () => {
+      const mx2 = "mx2; dkim=pass header.d=sender.example.test";
+      // mx1 re-injects a mail that mx2 accepted. The bare label "mx2" is not the top-most
+      // host's (pinning unchanged), the "mx1" block is.
+      expect(results(...reinject("mx1.mail.example.net"), handOff(undefined, "mx2.mail.example.net"), `Authentication-Results: ${mx2}`,
+        `Authentication-Results: ${pass}`, ...senderHeaders)).toEqual([pass]);
+      const fullId = "mx2.mail.example.net; dkim=pass header.d=sender.example.test";
+      expect(results(...reinject("mx1.mail.example.net"), handOff(undefined, "mx2.mail.example.net"), `Authentication-Results: ${fullId}`,
+        `Authentication-Results: ${pass}`, ...senderHeaders)).toEqual([fullId]);
+      // mx2 re-injects what mx1 relayed to it: mx1 is no by-host above the relay line, so that
+      // line is the hand-off and the mx2 block below it counts; mx1's block is out of range.
+      const relay = handOff("mx1.mail.example.net (mx1.mail.example.net [203.0.113.11])", "mx2.mail.example.net");
+      expect(results(...reinject("mx2.mail.example.net"), relay, `Authentication-Results: ${mx2}`, handOff(), `Authentication-Results: ${pass}`,
+        ...senderHeaders)).toEqual([mx2]);
+    });
+
+    test("forged: a Received line claiming the receiver right after the hand-off ends the range, its A-R never counts", () => {
+      for (const forgedHop of [
+        "Received: from localhost (localhost [127.0.0.1]) by mx1.mail.example.net (Postfix) id 9; Sat, 24 Oct 2026 09:59:00 +0000",
+        "Received: by mx1.mail.example.net (Postfix, from userid 0) id 9; Sat, 24 Oct 2026 09:59:00 +0000",
+        "Received: from out-1.smtp.sender.example.test (out-1.smtp.sender.example.test [192.0.2.1]) by mx1.mail.example.net id 9; Sat, 24 Oct 2026 09:59:00 +0000"
+      ]) {
+        expect(results(...reinject(), handOff(), `Authentication-Results: ${failed}`, forgedHop, `Authentication-Results: ${forgedPass}`, ...senderHeaders))
+          .toEqual([failed]);
+        expect(results(...reinject(), handOff(), forgedHop, `Authentication-Results: ${forgedPass}`, ...senderHeaders)).toEqual([]);
+      }
+    });
+
+    test("forged: a client posing as local or as the receiver in its HELO stays external (the server-written address decides)", () => {
+      for (const client of [
+        "localhost (unknown [198.51.100.7])",
+        "[127.0.0.1] (unknown [198.51.100.7])",
+        "mx1.mail.example.net (unknown [198.51.100.7])",
+        "mx1 (unknown [198.51.100.7])",
+        // A HELO with its own comment cannot hide the server's (unknown [address]).
+        "mx1.mail.example.net(mx1.mail.example.net) (unknown [198.51.100.7])",
+        "mx1.mail.example.net(mx1.mail.example.net [127.0.0.1]) (unknown [198.51.100.7])",
+        // Same registrable domain as the receiver, but not one of its by-hosts.
+        "vps-7.example.net (vps-7.example.net [198.51.100.8])"
+      ]) {
+        const forgedHop = "Received: from localhost (localhost [127.0.0.1]) by mx1.mail.example.net (Postfix) id 9; Sat, 24 Oct 2026 09:59:00 +0000";
+        expect(results(...reinject(), handOff(client), forgedHop, `Authentication-Results: ${forgedPass}`, ...senderHeaders)).toEqual([]);
+      }
+    });
+
+    test("forged: a block under a foreign id after the hand-off, or above any Received line of the sender, never counts", () => {
+      const foreign = "mx.google.example; dkim=pass header.d=victim.example.com; spf=pass smtp.mailfrom=victim.example.com";
+      expect(results(...reinject(), handOff(), `Authentication-Results: ${foreign}`, ...senderHeaders)).toEqual([]);
+      expect(results(...reinject(), handOff(), `Authentication-Results: ${failed}`, `Authentication-Results: ${foreign}`, ...senderHeaders,
+        "Received: from laptop (unknown [192.0.2.50]) by out-1.smtp.sender.example.test id 0; Sat, 24 Oct 2026 09:58:00 +0000")).toEqual([failed]);
+    });
+
+    test("a single Received line without a from clause keeps the whole header block in range", () => {
+      expect(results("Received: by mx1.mail.example.net (Postfix, from userid 1001) id 1; Sat, 24 Oct 2026 10:00:00 +0000",
+        `Authentication-Results: ${pass}`, ...senderHeaders)).toEqual([pass]);
+    });
+  });
+
   test("the row fallback takes the server verdicts from a raw header block", () => {
     const headers = source.slice(0, source.indexOf("\r\n\r\n")) + "\r\nAuto-Submitted: auto-generated";
     const input = buildSpamInputFromMessage({ from: "News@Shop.Example.test", to: "anna@example.test", cc: "bob@example.test", subject: "S",
