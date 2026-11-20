@@ -376,6 +376,33 @@ test("a template edit after the review changes the version of the sequences that
   expect(getSequence(box.db, box.accountId, sequence.id).status).toBe("draft");
 }));
 
+test("a template content edit raises the version of every sequence with a step that references it, own content or not", () => withOutreachFlag(async () => {
+  const box = await outreachMailbox();
+  const { db, accountId, listId } = box;
+  const full = await mcpToken(box, "full", "Voll");
+  const template = saveTemplate(db, accountId, { name: "Vorlage", subject: "Betreff A", html: "<p>Vorlagentext A</p>" });
+  // The step references the template but has its own subject and body: as stored it takes nothing from the template.
+  const own = saveSequence(db, accountId, { name: "Eigener Inhalt", triggerListId: listId,
+    steps: [{ templateId: template.id, subject: "Eigener Betreff", html: "<p>Eigener Text</p>" }] });
+  await full.call("set_sequence_status", { sequenceId: own.id, status: "live" });
+  const live = getSequence(db, accountId, own.id);
+  const unrelated = getSequence(db, accountId, box.sequence.id);
+  const edit = { sequenceId: live.id, stepId: live.steps[0].id, expectedUpdatedAt: live.updatedAt, subject: "" };
+
+  // The dry run shows the template's subject A for the emptied field.
+  expect(await full.call("update_sequence_step", { ...edit, dryRun: true })).toMatchObject({ saved: false, changed: ["subject"], step: { subject: "Betreff A" } });
+  saveTemplate(db, accountId, { subject: "Betreff B" }, { id: template.id });
+  const bumped = getSequence(db, accountId, live.id);
+  expect(bumped.updatedAt).toBeGreaterThan(live.updatedAt);
+  expect({ ...bumped, updatedAt: 0 }).toEqual({ ...live, updatedAt: 0 });
+  expect(getSequence(db, accountId, unrelated.id)).toEqual(unrelated);
+  // The real call with the version of the dry run would store B, which nobody reviewed: it is refused.
+  expect(await full.refusal("update_sequence_step", edit)).toStartWith("sequence_changed: ");
+  expect(await full.refusal("save_sequence", { sequenceId: live.id, expectedUpdatedAt: live.updatedAt, steps: [{ id: live.steps[0].id, subject: "" }] }))
+    .toStartWith("sequence_changed: ");
+  expect(getSequence(db, accountId, live.id)).toEqual(bumped);
+}));
+
 test("a value longer than its limit once the placeholders are written out is refused", () => withOutreachFlag(async () => {
   const box = await outreachMailbox();
   const drafts = await mcpToken(box, "drafts");

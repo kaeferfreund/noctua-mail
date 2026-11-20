@@ -208,8 +208,8 @@ Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 | POST | `{base}/campaigns/{campaignId}/cancel` | → `{ok, campaign}` |
 | GET | `{base}/campaigns/{campaignId}/report?cursor=` | → `CampaignReport` |
 | GET, POST | `{base}/sequences` | `SequenceInput` → `{ok, sequences: SequenceSummary[]}` / `{ok, sequence}` |
-| GET, PATCH, DELETE | `{base}/sequences/{sequenceId}` | `SequenceInput` → `{ok, sequence: Sequence}`; only drafts delete. `Sequence` and `SequenceSummary` carry `statusChangedByUserId` and `statusChangedVia` |
-| POST | `{base}/sequences/{sequenceId}/status` | `SequenceStatusRequest` (`{status: "live" \| "paused", expectedUpdatedAt?}`) → `{ok, sequence}`; a reviewed `expectedUpdatedAt` that no longer matches answers 409 `sequence_changed`. Saving a template raises `updatedAt` of every sequence with a step that takes content from it, so a template edit after the review also answers 409 |
+| GET, PATCH, DELETE | `{base}/sequences/{sequenceId}` | `SequenceInput` (PATCH also `expectedUpdatedAt?`) → `{ok, sequence: Sequence}`; a PATCH whose `expectedUpdatedAt` no longer matches the sequence's `updatedAt` answers 409 `sequence_changed` and writes nothing (the app always sends the version it loaded; without it the PATCH saves as before); only drafts delete. `Sequence` and `SequenceSummary` carry `statusChangedByUserId` and `statusChangedVia` |
+| POST | `{base}/sequences/{sequenceId}/status` | `SequenceStatusRequest` (`{status: "live" \| "paused", expectedUpdatedAt?}`) → `{ok, sequence}`; a reviewed `expectedUpdatedAt` that no longer matches answers 409 `sequence_changed`. A content change of a template (subject, preview text, HTML or text; a rename does not count) raises `updatedAt` of every sequence of the mailbox with a step that references the template, also when the step has own content, so a template edit after the review also answers 409 |
 | GET | `{base}/sequences/{sequenceId}/report` | → `SequenceReport` |
 
 Errors: `{ok:false, message, code?}`; 404 flag off or unknown id, 409 `outreach_disabled`

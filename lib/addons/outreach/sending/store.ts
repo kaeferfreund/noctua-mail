@@ -143,17 +143,15 @@ export function resolveContent(db: Database, accountId: string, item: Required<C
 }
 
 /**
- * A template edit changes what a sequence whose steps take content from the template would approve when it goes live:
- * its version (`updatedAt`) rises in the same transaction, so a go-live or edit with the version read before answers
- * `sequence_changed`.
+ * A content edit of a template can change what a sequence with a step that references the template would store or
+ * approve: a step's empty field is filled from the template, and an edit pending against the version read can empty a
+ * field the step has today. So the version (`updatedAt`) of every sequence of the mailbox with a step that references
+ * the template rises in the same transaction, whatever the step's own content, and a go-live or edit with the version
+ * read before answers `sequence_changed`.
  */
 function touchTemplateSequences(db: Database, accountId: string, templateId: string, now: number) {
-  const steps = rows<Required<Content> & { sequenceId: string; templateId: string }>(db, `SELECT sequenceId, templateId, subject, previewText,
-    html, text FROM sequence_steps WHERE accountId = ? AND templateId = ?`).all(accountId, templateId);
-  const touch = db.query("UPDATE sequences SET updatedAt = MAX(?, updatedAt + 1) WHERE accountId = ? AND id = ?");
-  for (const sequenceId of new Set(steps.filter(step => templateBackedFields(step).length).map(step => step.sequenceId))) {
-    touch.run(now, accountId, sequenceId);
-  }
+  db.query(`UPDATE sequences SET updatedAt = MAX(?1, updatedAt + 1) WHERE accountId = ?2
+    AND id IN (SELECT sequenceId FROM sequence_steps WHERE accountId = ?2 AND templateId = ?3)`).run(now, accountId, templateId);
 }
 
 type CampaignRow = Omit<Campaign, "listIds" | "excludedListIds" | "trackOpens" | "trackClicks"> & {
