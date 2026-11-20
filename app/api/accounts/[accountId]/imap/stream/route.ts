@@ -26,6 +26,7 @@ import {
   streamTimers
 } from "@/lib/mail/imapStreamRuntime";
 import { isStreamKey, registerStream } from "@/lib/mail/imapStreamRegistry";
+import { resolveImapStreamBudget } from "@/lib/mail/imapStreamBudget";
 import { normalizeImapFlags } from "@/lib/messageFlags";
 import { mailboxPathFromFolderId } from "@/lib/mailboxPaths";
 import { findInboxFolder } from "@/lib/specialFolders";
@@ -35,8 +36,6 @@ import {
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
 
-const DEFAULT_MAX_IDLE = 3;
-const DEFAULT_BACKGROUND_POLL_INTERVAL = 900_000; // 15 minutes
 // Bound orphaned streams even when the runtime reports neither abort nor cancel.
 const MAX_STREAM_LIFETIME_MS = 60 * 60 * 1000;
 
@@ -58,16 +57,8 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     if (folderError) return folderError;
     const logContext = { accountId, clientId };
 
-    const maxIdleSessions =
-      Number(searchParams.get("maxIdleSessions")) ||
-      account?.settings?.sync?.maxIdleSessions ||
-      DEFAULT_MAX_IDLE;
-    const pollIntervalMs =
-      Number(searchParams.get("backgroundPollIntervalMs")) ||
-      Number(searchParams.get("pollIntervalMs")) ||
-      account?.settings?.sync?.backgroundPollIntervalMs ||
-      account?.settings?.sync?.pollIntervalMs ||
-      DEFAULT_BACKGROUND_POLL_INTERVAL;
+    // Upstream connection and polling budget: never taken from the request URL.
+    const { maxIdleSessions, pollIntervalMs } = resolveImapStreamBudget(account?.settings?.sync);
 
     if (streamKey !== null && !isStreamKey(streamKey)) {
       return NextResponse.json({ ok: false, message: "Invalid streamKey" }, { status: 400 });
