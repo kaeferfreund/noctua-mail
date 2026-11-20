@@ -34,6 +34,7 @@ import MessageViewPane from "@/app/components/mailclient/message/MessageViewPane
 import ThreadView from "@/app/components/mailclient/message/ThreadView";
 import type { MessageTab } from "@/app/components/mailclient/message/types";
 import styles from "./page.module.css";
+import { senderIconsEnabled } from "@/lib/accountPrefs";
 
 type DeleteResponse = {
   action: "deleted" | "moved";
@@ -412,6 +413,9 @@ export default function MessageWindowPage() {
                 ensureMessageContent: async () => null,
                 messageContentLoading: {},
                 includeThreadAcrossFolders: false,
+                // Same mailbox setting as the main reader; the icon route also
+                // applies the user's own opt-out (SD46).
+                senderIconsEnabled: senderIconsEnabled(account?.settings),
                 activeFolderId: safeMessage.folderId,
                 threadPathById: (folderId: string) =>
                   getFolderDisplayPath(folderId, id => folderById.get(id), locale, safeMessage.accountId),
