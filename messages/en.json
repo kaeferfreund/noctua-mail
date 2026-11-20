@@ -2390,6 +2390,7 @@
       "generic": "That did not work. Try again.",
       "tooLarge": "The file is too large for the server.",
       "imageQuota": "This mailbox's image storage is full. Use an image that was already uploaded.",
+      "imageStorageFull": "The server's image storage is full. Use an image that was already uploaded.",
       "unsupportedType": "This file type is not accepted.",
       "detail": "(Server: {detail})"
     },

@@ -153,7 +153,11 @@ local database. Event listings and the latest event in a send summary truncate e
 as soon as the retention window ends. Each physical cleanup run processes up to 20 batches
 of 500 rows per mailbox and yields between transactions.
 
-One send can store up to 2,000 open and click events combined. A click stores a reference
+One send can store up to 2,000 open events and, separately, up to 2,000 click events. One
+client address and one click link can each fill at most 200 of them, so a single link holder
+cannot use up the history of the whole send. Opens and clicks are stored only while the
+mailbox has the addon switched on; links of mail sent earlier keep redirecting and the pixel
+keeps answering after it is switched off, but no activity is recorded. A click stores a reference
 to its link, which holds the target URL. Links longer than 2,048 characters keep their
 original href. The open pixel is omitted if the rewritten HTML cannot render it as an
 image.

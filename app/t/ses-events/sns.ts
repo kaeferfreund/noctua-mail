@@ -66,9 +66,17 @@ export function createSnsVerifier(now: () => number = Date.now) {
 
 const limiter = createRateLimiter({ max: 600 });
 const globalLimiter = createRateLimiter({ max: 3600 });
+const trustedCertTtlMs = 60 * 60_000;
+const maxTrustedCerts = 16;
 const defaults = {
   enabled: outreachAddonEnabled, topic: () => process.env.NOCTUA_OUTREACH_SES_EVENTS_TOPIC_ARN,
-  isLimited: (request: Request) => limiter.isLimited(getRequestIp(request)) || globalLimiter.isLimited("sns"),
+  /** Per client, for every request. */
+  isLimited: (request: Request) => limiter.isLimited(getRequestIp(request)),
+  /**
+   * Process-wide budget, spent only by requests whose signing certificate has not yet verified
+   * a message: unsigned traffic cannot use up the capacity of genuine provider callbacks.
+   */
+  unverifiedLimited: () => globalLimiter.isLimited("sns"),
   fetch: globalThis.fetch as SnsFetch, verify: createSnsVerifier(),
   apply: (messageId: string, event: unknown, publishedAt: number) => applySesEvent(messageId, event, undefined, publishedAt)
 };
@@ -77,6 +85,13 @@ export function createSnsHandler(deps = defaults) {
   // SNS confirmation itself is idempotent upstream. Coalesce replays locally,
   // including requests that arrive while the confirmation fetch is in flight.
   const confirmations = new Map<string, Promise<void>>();
+  // Certificate URLs that verified a message of the configured topic, with their expiry.
+  const trustedCerts = new Map<string, number>();
+  const isTrustedCert = (href: string) => {
+    const expires = trustedCerts.get(href);
+    if (expires !== undefined && expires <= Date.now()) trustedCerts.delete(href);
+    return expires !== undefined && expires > Date.now();
+  };
   return async (request: Request) => {
     const topic = deps.topic();
     if (!deps.enabled() || !topic) return new Response(null, { status: 404 });
@@ -97,8 +112,13 @@ export function createSnsHandler(deps = defaults) {
       return new Response(null, { status: 403 });
     }
     if (message.Type !== "Notification" && (!message.Token || !message.SubscribeURL)) return new Response(null, { status: 400 });
+    if (!isTrustedCert(cert.href) && deps.unverifiedLimited()) {
+      return new Response(null, { status: 429, headers: { "Retry-After": "60" } });
+    }
     try {
       if (!(await deps.verify(message, cert, deps.fetch))) return new Response(null, { status: 403 });
+      if (!trustedCerts.has(cert.href) && trustedCerts.size >= maxTrustedCerts) trustedCerts.delete(trustedCerts.keys().next().value!);
+      trustedCerts.set(cert.href, Date.now() + trustedCertTtlMs);
       if (message.Type === "SubscriptionConfirmation") {
         const target = snsUrl(message.SubscribeURL, host);
         if (!target || target.pathname !== "/" || target.searchParams.get("TopicArn") !== topic

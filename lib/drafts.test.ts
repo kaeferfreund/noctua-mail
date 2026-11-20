@@ -380,6 +380,32 @@ describe("saveDraftForAccount", () => {
     }
   });
 
+  test("saving a draft over received or sent mail is refused and leaves that message intact", async () => {
+    const accountId = `draft-received-${crypto.randomUUID()}`;
+    const account = buildAccount(accountId);
+    const inbox = buildInboxFolder(accountId);
+    await upsertAccount(account);
+    await saveFoldersForAccount(accountId, [inbox, buildDraftsFolder(accountId)]);
+    const received = buildMessage({ id: "received-row", accountId, folderId: inbox.id, threadId: "<received@example.test>",
+      messageId: "<received@example.test>", subject: "Received", from: "peer@example.test", to: account.email,
+      dateValue: Date.UTC(2026, 2, 26, 13, 0, 0), imapUid: 7 });
+    await upsertMessages(accountId, inbox.id, [received], true);
+    await expect(saveDraftForAccount({ account, accountId, clientId: "synthetic", payload: {
+      draftId: received.id, to: "peer@example.test", subject: "Replace", text: "Replaced"
+    } })).rejects.toMatchObject({ status: 404 });
+    expect(appendImapMessage).not.toHaveBeenCalled();
+    expect(deleteImapMessage).not.toHaveBeenCalled();
+    expect((await getMessageById(accountId, received.id))?.subject).toBe("Received");
+
+    // The write boundary rechecks the invariant: a replacement naming a non-draft writes nothing.
+    const replacement = { ...received, id: "replacement-row", folderId: `${accountId}:Drafts`, messageId: "<replacement@example.test>",
+      threadId: "<replacement@example.test>", flags: ["\\Draft"], draft: true, mailboxPath: "Drafts", imapUid: 8 };
+    await expect(upsertMessages(accountId, null, [replacement], false, { replaceDraftId: received.id }))
+      .rejects.toThrow("precondition");
+    expect((await getMessageById(accountId, received.id))?.subject).toBe("Received");
+    expect(await getMessageById(accountId, replacement.id)).toBeNull();
+  });
+
   test("stale expectedUpdatedAt refuses the save before APPEND", async () => {
     const accountId = `draft-version-${crypto.randomUUID()}`;
     const account = buildAccount(accountId);

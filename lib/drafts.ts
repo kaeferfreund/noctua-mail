@@ -448,7 +448,9 @@ export async function saveDraftForAccount(params: {
   authorization?: OutboundAuthorization;
 }): Promise<SaveDraftResult> {
   const { account, accountId, clientId, payload } = params;
-  const existingDraft = payload.draftId ? await getMessageById(accountId, payload.draftId) : null;
+  // Saving replaces (deletes) the named message without a trash step: only a draft qualifies,
+  // never received or sent mail named by its id.
+  const existingDraft = payload.draftId ? await findComposeDraft(accountId, payload.draftId) : null;
   if (payload.draftId && !existingDraft) throw new DraftSaveError(404, "Draft not found");
   const assertDraftVersion = (draft: Message | null) => {
     if (payload.expectedUpdatedAt !== undefined && draft?.dateValue !== payload.expectedUpdatedAt) {

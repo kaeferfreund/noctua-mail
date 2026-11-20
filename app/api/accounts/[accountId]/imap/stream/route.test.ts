@@ -242,6 +242,26 @@ describe("production IMAP stream acceptance", () => {
     expect(clients.filter(client => !client.closed)).toHaveLength(3);
   });
 
+  test("live streams of one user and mailbox are capped before any IMAP connection and freed on close", async () => {
+    const f = await fixture();
+    const streams = [];
+    for (let i = 0; i < 3; i++) {
+      const stream = await open(f);
+      await initial(stream);
+      streams.push(stream);
+    }
+    const connections = clients.length;
+    const request = () => GET(new Request(`http://localhost:3000/api/accounts/${f.id}/imap/stream`, { headers: f.jar.headers() }),
+      { params: Promise.resolve({ accountId: f.id }) });
+    const refused = await request();
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get("retry-after")).toBe("30");
+    expect(clients).toHaveLength(connections);
+    streams[0].abort.abort();
+    await until(() => clients.filter(client => !client.closed).length < connections);
+    await initial(await open(f));
+  });
+
   test("folder switch is bound to the stream key, session and account", async () => {
     const f = await fixture(), other = await createAuthenticatedTestSession(f.id);
     const streamKey = "synthetic-stream-key-0002";

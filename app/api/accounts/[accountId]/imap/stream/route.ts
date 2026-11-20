@@ -25,7 +25,7 @@ import {
   loadImapFlow,
   streamTimers
 } from "@/lib/mail/imapStreamRuntime";
-import { isStreamKey, registerStream } from "@/lib/mail/imapStreamRegistry";
+import { isStreamKey, registerStream, reserveStreamSlot } from "@/lib/mail/imapStreamRegistry";
 import { resolveImapStreamBudget } from "@/lib/mail/imapStreamBudget";
 import { normalizeImapFlags } from "@/lib/messageFlags";
 import { mailboxPathFromFolderId } from "@/lib/mailboxPaths";
@@ -76,6 +76,13 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
         { ok: false, message: "IMAP library is missing. Run `bun install`." },
         { status: 500 }
       );
+    }
+
+    // Admission before any upstream connection; released when the stream stops.
+    const releaseSlot = reserveStreamSlot(accountId, accountContext.session.userId);
+    if (!releaseSlot) {
+      return NextResponse.json({ ok: false, message: "Too many live mail streams" },
+        { status: 429, headers: { "Retry-After": "30" } });
     }
 
     let cancelStream: () => void = () => {};
@@ -129,6 +136,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
           streamTimers.clearTimeout(lifetimeTimer);
           request.signal.removeEventListener("abort", onAbort);
           unregister();
+          releaseSlot();
           try { controller.close(); } catch { /* Already closed. */ }
           sessions.clear();
           await Promise.allSettled([...ownedClients].map(disposeClient));
