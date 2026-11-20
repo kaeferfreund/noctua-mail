@@ -240,6 +240,10 @@ export type OutreachImageType = (typeof OUTREACH_IMAGE_TYPES)[number];
 export const OUTREACH_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 /** Stored image bytes per mailbox. Images cannot be removed (sent mail keeps pointing to them), so this caps the data volume a mailbox's editors can fill. */
 export const OUTREACH_IMAGE_QUOTA_BYTES = 200 * 1024 * 1024;
+/** Stored image bytes of all mailboxes together (each distinct file counted once). */
+export const OUTREACH_IMAGE_TOTAL_QUOTA_BYTES = 2 * 1024 * 1024 * 1024;
+/** Free space the data volume keeps after a new image file: mail and databases share that volume. */
+export const OUTREACH_IMAGE_FREE_SPACE_RESERVE_BYTES = 1024 * 1024 * 1024;
 
 export type OutreachImage = {
   id: string;
