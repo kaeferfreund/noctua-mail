@@ -1,7 +1,8 @@
+import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { getOutreachDb } from "../db";
 import { cancelCampaign, editSequence, editSequenceStep, scheduleCampaign, setSequenceStatus } from "../sending/actions";
-import { campaignInput, itemId, scheduleInput, sequenceEditInput, statusInput, stepEditInput, templateInput } from "../sending/input";
+import { campaignInput, itemId, scheduleInput, SendingError, sequenceEditInput, statusInput, stepEditInput, templateInput } from "../sending/input";
 import {
   campaignReport, getCampaign, getSequence, getTemplate, listCampaigns, listSequences, listTemplates, required, saveCampaign,
   saveSequence, saveTemplate
@@ -21,10 +22,24 @@ const actor = (account: OutreachMcpAccount) => ({ accountId: account.accountId, 
 /** A step body is a whole HTML mail. A sequence is answered with the bodies' lengths; `get_sequence_step` answers one step in full. */
 const stepOutline = ({ html, text, ...step }: SequenceStep) => ({ ...step, htmlLength: html.length, textLength: text.length });
 const sequenceOutline = (sequence: Sequence) => ({ ...sequence, steps: sequence.steps.map(stepOutline) });
-const liveEdit = "Editing a sequence that is live or paused approves the new content for sending like going live: it needs the token's send permission, the change goes out with the next mail, and the token's creator becomes the sequence's approver.";
+const liveEdit = "Editing a sequence that is live or paused approves the new content for sending like going live: it needs the token's send permission, the change goes out with the next mail, and the token's creator becomes the sequence's approver. A version conflict answers an error that starts with \"sequence_changed:\": read the sequence again.";
+
+/** A refusal with a code reaches the client as "<code>: <message>", so a client tells a conflict (`sequence_changed`) from other refusals. */
+function refusalCodes<T extends (...args: never[]) => unknown>(handler: T): T {
+  return (async (...args: Parameters<T>) => {
+    try {
+      return await handler(...args);
+    } catch (error) {
+      throw error instanceof SendingError && error.code ? new Error(`${error.code}: ${error.message}`) : error;
+    }
+  }) as T;
+}
 
 export function registerOutreachSendingTools(host: OutreachMcpHost) {
-  const { server, outreachAccount, result } = host;
+  const { outreachAccount, result } = host;
+  const server: Pick<McpServer, "registerTool"> = {
+    registerTool: (name, config, handler) => host.server.registerTool(name, config, refusalCodes(handler))
+  };
   server.registerTool("list_email_templates", { description: "List email template summaries.", inputSchema: mailbox, annotations: readOnly }, async args => {
     const { accountId } = await outreachAccount(args.accountId, "viewer");
     return result("Email templates", { ok: true, templates: listTemplates(await getOutreachDb(), accountId) });
@@ -109,7 +124,7 @@ export function registerOutreachSendingTools(host: OutreachMcpHost) {
     return result("Sequence saved", { ok: true, sequence: sequenceOutline(sequence) });
   });
   server.registerTool("update_sequence_step", {
-    description: `Change the content of one step of an email sequence and nothing else: name, subject, previewText, html and text as whole fields, then replacements of exact text inside a field (find must occur exactly once, or set replaceAll). Pass the sequence's updatedAt as expectedUpdatedAt. dryRun checks and answers without saving. warnings come from rendering the new content. ${liveEdit}`,
+    description: `Change the content of one step of an email sequence and nothing else: name, subject, previewText, html and text as whole fields, then replacements of exact text inside a field (find must occur exactly once, counting non-overlapping matches, or set replaceAll). Placeholders are stored as {{ name }} (with spaces) and find matches the text as stored, as get_sequence_step shows it. Pass the sequence's updatedAt as expectedUpdatedAt. dryRun runs every check and answers without saving. changed and step describe the content as it would be stored; warnings come from rendering it. ${liveEdit}`,
     inputSchema: stepEditInput.extend({ ...mailbox.shape, ...sequenceId, stepId: itemId }), annotations: edit
   }, async ({ accountId: requested, sequenceId, stepId, expectedUpdatedAt, dryRun, ...change }) => {
     const ctx = await outreachAccount(requested, "editor");

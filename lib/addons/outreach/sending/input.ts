@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CONTENT_FIELDS, type ContentField } from "../types";
 
 export class SendingError extends Error {
   constructor(readonly status: number, message: string, readonly code?: string) { super(message); }
@@ -15,8 +16,11 @@ export function validated<T>(schema: z.ZodType<T>, input: unknown): T {
 
 export const itemId = z.string().trim().min(1).max(256);
 const name = z.string().trim().min(1).max(250);
-/** Longest stored value of each content field, in characters. */
-export const contentLimits = { subject: 998, previewText: 998, html: 2_000_000, text: 2_000_000 } as const;
+/**
+ * Longest value of each content field, in characters: checked on input and again on the value as stored, after the
+ * placeholders are normalized (`normalizedContent` in `store.ts`), since normalizing can make a value longer.
+ */
+export const contentLimits: Readonly<Record<ContentField, number>> = { subject: 998, previewText: 998, html: 2_000_000, text: 2_000_000 };
 const subject = z.string().max(contentLimits.subject);
 const body = z.string().max(contentLimits.html);
 const content = { subject: subject.optional(), previewText: subject.optional(), html: body.optional(), text: body.optional() };
@@ -39,7 +43,7 @@ const version = z.number().int().nonnegative();
 /** `expectedUpdatedAt` is the sequence's `updatedAt` the caller read; a token needs it for a sequence that is not a draft. */
 export const sequenceEditInput = sequenceInput.extend({ expectedUpdatedAt: version.optional() });
 const replacement = z.object({
-  field: z.enum(["subject", "previewText", "html", "text"]), find: z.string().min(1).max(100_000), replace: z.string().max(100_000),
+  field: z.enum(CONTENT_FIELDS), find: z.string().min(1).max(100_000), replace: z.string().max(100_000),
   replaceAll: z.boolean().optional()
 });
 export const stepEditInput = z.object({

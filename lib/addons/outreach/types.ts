@@ -209,6 +209,10 @@ export type SubscribeResponse = { ok: true; contactId: string; status: ListMembe
  */
 export const TEMPLATE_PLACEHOLDERS = ["first_name", "last_name", "email", "organization.name", "organization.full_address", "current_year", "unsubscribe_url"] as const;
 
+/** The content fields of a template, a campaign and a sequence step, in one list for the input schemas and the edit code. */
+export const CONTENT_FIELDS = ["subject", "previewText", "html", "text"] as const;
+export type ContentField = (typeof CONTENT_FIELDS)[number];
+
 export type EmailTemplate = {
   id: string;
   accountId: string;
@@ -377,10 +381,11 @@ export type SequenceSummary = Omit<Sequence, "steps"> & { stepCount: number; act
 export type SequenceInput = Partial<Pick<Sequence, "name" | "triggerListId" | "senderIdentityId" | "trackOpens" | "trackClicks">> & { steps?: SequenceStepInput[] };
 /**
  * A content change of one step (MCP `update_sequence_step`): whole fields first, then `replacements` in order.
- * `find` must occur exactly once in the field, or at least once with `replaceAll`. Order, waits and `enabled` stay as they are.
+ * `find` is matched against the text as stored (placeholders as `{{ name }}`) and must occur exactly once in the field
+ * (non-overlapping matches), or at least once with `replaceAll`. Order, waits and `enabled` stay as they are.
  */
-export type SequenceStepEdit = Partial<Pick<SequenceStep, "name" | "subject" | "previewText" | "html" | "text">> & {
-  replacements?: Array<{ field: "subject" | "previewText" | "html" | "text"; find: string; replace: string; replaceAll?: boolean }>;
+export type SequenceStepEdit = Partial<Pick<SequenceStep, "name" | ContentField>> & {
+  replacements?: Array<{ field: ContentField; find: string; replace: string; replaceAll?: boolean }>;
 };
 /** `GET {base}/sequences/{id}/report` */
 export type SequenceReport = { ok: true; sequence: SequenceSummary; steps: Array<{ stepId: string; position: number; name: string; stats: SendStats }>; enrollments: { active: number; completed: number; cancelled: number } };

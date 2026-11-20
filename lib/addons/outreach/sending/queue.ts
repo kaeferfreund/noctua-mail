@@ -6,7 +6,7 @@ import { newOutreachId } from "../ids";
 import type { SendableRecipient } from "../contacts";
 import type { Campaign, OutreachAccountSettings, SendStatus, SequenceStep } from "../types";
 import { SendStopped, type SendOutcome } from "./send";
-import { renderContent } from "./render";
+import { renderContent, type Content, type RenderOptions } from "./render";
 
 export type QueueRow = {
   id: string; accountId: string; kind: "campaign" | "sequence"; campaignId: string | null; sequenceId: string | null;
@@ -60,16 +60,35 @@ export function cancelContact(db: Database, accountId: string, contactId: string
   }).immediate();
 }
 
+/** Renders content for a contact with the mailbox's organization as stored in this database (synchronous, for use inside a write). */
+export function renderForContact(db: Database, accountId: string, content: Content,
+  options: Pick<RenderOptions, "contact" | "unsubscribeUrl" | "now">) {
+  const organization = rows<{ organizationName: string; organizationAddress: string }>(db, `SELECT organizationName, organizationAddress
+    FROM account_settings WHERE accountId = ?`).get(accountId);
+  return renderContent(content, { ...options, organizationName: organization?.organizationName ?? "",
+    organizationAddress: organization?.organizationAddress ?? "" });
+}
+
 /** A row shows the subject as its recipient will see it until the send stores the subject it used. */
 function recipientSubject(db: Database, accountId: string, contactId: string, subject: string, now: number) {
   if (!/{[{%]/.test(subject)) return subject;
   const contact = rows<{ firstName: string; lastName: string; email: string }>(db, `SELECT firstName, lastName, email FROM contacts
     WHERE accountId = ? AND id = ?`).get(accountId, contactId);
   if (!contact) return subject;
-  const organization = rows<{ organizationName: string; organizationAddress: string }>(db, `SELECT organizationName, organizationAddress
-    FROM account_settings WHERE accountId = ?`).get(accountId);
-  return renderContent({ subject, html: "", text: "" }, { contact, organizationName: organization?.organizationName ?? "",
-    organizationAddress: organization?.organizationAddress ?? "", unsubscribeUrl: "", now }).subject;
+  return renderForContact(db, accountId, { subject, html: "", text: "" }, { contact, unsubscribeUrl: "", now }).subject;
+}
+
+/** After a step's subject changed: its queued sends that were not attempted yet show the new subject. */
+export function refreshQueuedSubjects(db: Database, accountId: string, sequenceId: string, steps: ReadonlyArray<Pick<SequenceStep, "id" | "subject">>,
+  now: number) {
+  const queued = db.query(`SELECT id, contactId FROM sends WHERE accountId = ? AND sequenceId = ? AND sequenceStepId = ?
+    AND kind = 'sequence' AND status = 'queued' AND attempts = 0`);
+  const update = db.query("UPDATE sends SET subject = ? WHERE accountId = ? AND id = ? AND status = 'queued' AND attempts = 0");
+  for (const step of steps) {
+    for (const row of queued.all(accountId, sequenceId, step.id) as Array<{ id: string; contactId: string }>) {
+      update.run(recipientSubject(db, accountId, row.contactId, step.subject, now), accountId, row.id);
+    }
+  }
 }
 
 export function expandCampaign(db: Database, campaign: Campaign, recipients: SendableRecipient[], now: number) {

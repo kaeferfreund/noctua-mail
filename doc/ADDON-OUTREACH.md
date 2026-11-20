@@ -209,7 +209,7 @@ Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 | GET | `{base}/campaigns/{campaignId}/report?cursor=` | → `CampaignReport` |
 | GET, POST | `{base}/sequences` | `SequenceInput` → `{ok, sequences: SequenceSummary[]}` / `{ok, sequence}` |
 | GET, PATCH, DELETE | `{base}/sequences/{sequenceId}` | `SequenceInput` → `{ok, sequence: Sequence}`; only drafts delete. `Sequence` and `SequenceSummary` carry `statusChangedByUserId` and `statusChangedVia` |
-| POST | `{base}/sequences/{sequenceId}/status` | `SequenceStatusRequest` (`{status: "live" \| "paused", expectedUpdatedAt?}`) → `{ok, sequence}`; a reviewed `expectedUpdatedAt` that no longer matches answers 409 `sequence_changed` |
+| POST | `{base}/sequences/{sequenceId}/status` | `SequenceStatusRequest` (`{status: "live" \| "paused", expectedUpdatedAt?}`) → `{ok, sequence}`; a reviewed `expectedUpdatedAt` that no longer matches answers 409 `sequence_changed`. Saving a template raises `updatedAt` of every sequence with a step that takes content from it, so a template edit after the review also answers 409 |
 | GET | `{base}/sequences/{sequenceId}/report` | → `SequenceReport` |
 
 Errors: `{ok:false, message, code?}`; 404 flag off or unknown id, 409 `outreach_disabled`
@@ -279,13 +279,26 @@ Sequences over MCP:
 - `update_sequence_step` changes the content of one step (`name`, `subject`, `previewText`,
   `html`, `text`) and leaves order, waits, `enabled` and the other steps alone. Whole fields
   apply first, then `replacements` in order: `find` is exact text that must occur once in the
-  field, or at least once with `replaceAll`. It requires `expectedUpdatedAt`. `dryRun` runs the
-  checks and answers `changed`, `replacements` and the renderer's `warnings` without saving.
+  field (non-overlapping matches are counted), or at least once with `replaceAll`. Placeholders
+  are stored as `{{ name }}` and `find` matches the text as stored. It requires
+  `expectedUpdatedAt`. `dryRun` runs every check up to the write and answers `changed`,
+  `replacements`, the step and the renderer's `warnings` (preview text included) without saving.
+  `changed` and the step describe the content as it would be stored: normalized and, for an
+  enabled step of a sequence that is not a draft, filled from the step's template. A field equal
+  to the stored value is no change, and an edit without a change saves nothing.
 - `save_sequence` replaces the whole step list when `steps` is given (see `SequenceInput`).
-- An edit of a sequence that is live or paused goes out with the next mail and is not approved
-  again. For such a sequence both edit tools require the token's `send` scope, checked with the
-  live token inside the write, and `expectedUpdatedAt` equal to the sequence's `updatedAt`
-  (`409 sequence_changed` otherwise). Every save and status change raises `updatedAt`.
+- Both tools write through the one edit path of the REST `PATCH` (`editSequence` in
+  `sending/actions.ts`). Editing a sequence that is live or paused approves the new content like
+  going live: it goes out with the next mail, the token's creator becomes the recorded approver
+  (`statusChangedByUserId`, `statusChangedVia`) and the scheduler sends under that user. For such
+  a sequence both tools require the token's `send` scope, the editor role, an enabled sender
+  identity and a configured transport, checked again with the live token inside the write, and
+  `expectedUpdatedAt` equal to the sequence's `updatedAt`. Every enabled step must keep a subject
+  and a body that are not empty once the placeholders are filled in for the sample contact.
+  Every save and status change raises `updatedAt`.
+- A refusal with a code reaches MCP clients as a tool error whose text starts with the code, for
+  example `sequence_changed: …` when the sequence changed after it was read
+  (REST answers the same as 409 `sequence_changed`).
 
 Authenticated `/api/mcp` requests have a 36 MiB body limit, including the entire body of a
 JSON-RPC batch. It is sized for a draft with about 25 MiB of attachments; the image upload checks

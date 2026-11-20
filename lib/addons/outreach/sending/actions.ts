@@ -10,12 +10,18 @@ import { outreachPublicOrigin } from "../config";
 import { listSendableRecipients } from "../contacts";
 import { newOutreachId } from "../ids";
 import { getOutreachSettings } from "../settings";
-import type { CampaignScheduleRequest, CampaignScheduleResponse, Sequence, SequenceInput, SequenceStatus, SequenceStepEdit, TestSendRequest } from "../types";
+import {
+  CONTENT_FIELDS, type CampaignScheduleRequest, type CampaignScheduleResponse, type Sequence, type SequenceInput, type SequenceStatus,
+  type ContentField, type SequenceStepEdit, type TestSendRequest
+} from "../types";
 import { contentLimits, SendingError } from "./input";
-import { renderContent, sampleContact } from "./render";
+import { previewUnsubscribeUrl, renderContent, renderPreviewText, sampleContact } from "./render";
 import { hasSmtp, isSesConfigured, sendOutreachMail, SendStopped } from "./send";
 import { sendOwner } from "./lease";
-import { assertContent, assertDraft, campaignSummary, getCampaign, getSequence, required, resolveContent, saveSequence, snapshotSequenceTemplates } from "./store";
+import {
+  assertContent, assertDraft, campaignSummary, getCampaign, getSequence, required, resolveContent, saveSequence, snapshotSequenceTemplates,
+  storedStepContent, templateBackedFields
+} from "./store";
 
 /** `via`: where the request came from, recorded with a scheduled campaign or a status change (`../via.ts`). */
 export type SendingActor = { accountId: string; authorization: OutboundAuthorization; via: string };
@@ -181,8 +187,10 @@ export async function editSequence(db: Database, actor: SendingActor, id: string
 
 /**
  * Changes the content of one step and leaves the step list alone, through the write path of `editSequence`.
- * `dryRun` answers what a save would do. `warnings` are the renderer's (an unknown placeholder, for example) for the
- * content as it would be sent.
+ * The version and the authorization are checked before anything about the step. `changed`, `saved` and the answered
+ * step describe the content as it would be stored (`storedStepContent`, the rule of a save of the step list), also in
+ * a dry run; a field equal to the stored value once normalized is no change. `warnings` are the renderer's (an unknown
+ * placeholder, for example) for the content as it would be sent, preview text included.
  */
 export async function editSequenceStep(db: Database, actor: SendingActor, id: string, stepId: string, edit: SequenceStepEdit,
   options: { expectedUpdatedAt?: number; dryRun?: boolean }) {
@@ -190,12 +198,12 @@ export async function editSequenceStep(db: Database, actor: SendingActor, id: st
   const sequence = getSequence(db, accountId, id);
   const authorized = await authorizeSequenceEdit(actor, sequence, options);
   const step = required(sequence.steps.find(item => item.id === stepId));
-  const next = { name: edit.name ?? step.name, subject: edit.subject ?? step.subject, previewText: edit.previewText ?? step.previewText,
-    html: edit.html ?? step.html, text: edit.text ?? step.text };
+  const next = Object.fromEntries(CONTENT_FIELDS.map(field => [field, edit[field] ?? step[field]])) as Record<ContentField, string>;
   const replacements = (edit.replacements ?? []).map(({ field, find, replace, replaceAll }, index) => {
     const occurrences = next[field].split(find).length - 1;
     if (!occurrences) {
-      const hint = !step[field] && step.templateId ? " Das Feld ist im Schritt leer, der Inhalt kommt aus der Vorlage." : "";
+      const hint = templateBackedFields({ ...next, templateId: step.templateId }).includes(field)
+        ? " Das Feld ist im Schritt leer, der Inhalt kommt aus der Vorlage." : "";
       throw new SendingError(409, `Ersetzung ${index + 1}: Der gesuchte Text steht nicht in ${field}.${hint}`, "replacement_not_found");
     }
     if (occurrences > 1 && !replaceAll) {
@@ -208,16 +216,16 @@ export async function editSequenceStep(db: Database, actor: SendingActor, id: st
     next[field] = next[field].replaceAll(find, () => replace);
     return { field, occurrences };
   });
-  const changed = (["name", "subject", "previewText", "html", "text"] as const).filter(field => next[field] !== step[field]);
-  const content = resolveContent(db, accountId, { ...next, templateId: step.templateId });
-  if (sequence.status !== "draft" && step.enabled) assertContent(content);
-  const { warnings } = await renderExample(db, accountId, content);
+  const name = edit.name ?? step.name;
+  const stored = { name, ...storedStepContent(db, accountId, sequence.status !== "draft", { ...step, name }, next) };
+  const changed = (["name", ...CONTENT_FIELDS] as const).filter(field => stored[field] !== step[field]);
+  const { warnings } = await renderExample(db, accountId, resolveContent(db, accountId, { ...stored, templateId: step.templateId }));
   const saved = !options.dryRun && changed.length > 0;
   if (!saved) {
     authorized?.assertAuthorized();
-    return { sequence, step: { ...step, ...next }, changed, replacements, warnings, saved };
+    return { sequence, step: { ...step, ...stored }, changed, replacements, warnings, saved };
   }
-  const input = { steps: sequence.steps.map(item => item.id === stepId ? { id: stepId, ...next } : { id: item.id }) };
+  const input = { steps: sequence.steps.map(item => item.id === stepId ? { id: stepId, ...stored } : { id: item.id }) };
   const result = writeSequenceEdit(db, actor, sequence, input, authorized);
   return { sequence: result, step: required(result.steps.find(item => item.id === stepId)), changed, replacements, warnings, saved };
 }
@@ -254,11 +262,16 @@ export function renderContact(db: Database, accountId: string, contactId: string
     WHERE accountId = ? AND id = ?`).get(accountId, contactId));
 }
 
-export async function renderExample(db: Database, accountId: string, input: { subject: string; html: string; text?: string; contactId?: string }) {
+/** `warnings` cover the preview text too when it is given (rendered like the send path does). */
+export async function renderExample(db: Database, accountId: string,
+  input: { subject: string; html: string; text?: string; previewText?: string; contactId?: string }) {
   const contact = renderContact(db, accountId, input.contactId);
   const settings = await getOutreachSettings(accountId);
-  return renderContent({ ...input, text: input.text ?? "" }, { contact, organizationName: settings.organizationName,
-    organizationAddress: settings.organizationAddress, unsubscribeUrl: `${outreachPublicOrigin() ?? "https://example.test"}/t/u/preview`, now: Date.now() });
+  const options = { contact, organizationName: settings.organizationName, organizationAddress: settings.organizationAddress,
+    unsubscribeUrl: previewUnsubscribeUrl(), now: Date.now() };
+  const rendered = renderContent({ ...input, text: input.text ?? "" }, options);
+  if (!input.previewText) return rendered;
+  return { ...rendered, warnings: [...new Set([...rendered.warnings, ...renderPreviewText(input.previewText, options).warnings])] };
 }
 
 export async function testCampaign(db: Database, actor: SendingActor, id: string, input: TestSendRequest) {

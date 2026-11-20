@@ -10,10 +10,11 @@ import { PATCH as editSequenceRoute } from "@/app/api/addons/outreach/accounts/[
 import { POST as setSequenceStatus } from "@/app/api/addons/outreach/accounts/[accountId]/sequences/[sequenceId]/status/route";
 import { getOutreachDb, initOutreachSchema } from "../db";
 import { getOutreachSettings, saveOutreachSettings } from "../settings";
-import { editSequence, setSequenceStatus as setSequenceStatusAction } from "./actions";
+import { editSequence, editSequenceStep, setSequenceStatus as setSequenceStatusAction, type SendingActor } from "./actions";
 import { enroll } from "./queue";
 import { OutreachScheduler } from "./scheduler";
 import { getSequence, saveSequence } from "./store";
+import type { Sequence } from "../types";
 
 /** Editing a live sequence is an approval of what it sends (synthetic data only). */
 
@@ -90,7 +91,13 @@ test("an MCP token without the send scope cannot edit a live sequence but can st
   expect(getSequence(db, accountId, sequence.id)).toMatchObject({ statusChangedByUserId: editor.user.id, statusChangedVia: actor.via });
 }));
 
-test("sends of an edited live sequence run under the editor and stop once the editor loses the role", () => withFlag(async () => {
+/** Both edit paths (the whole sequence, one step) approve what they change. */
+const edits: Array<[string, (db: Database, actor: SendingActor, sequence: Sequence) => Promise<unknown>]> = [
+  ["the whole sequence", (db, actor, sequence) => editSequence(db, actor, sequence.id, changedSteps(sequence))],
+  ["one step", (db, actor, sequence) => editSequenceStep(db, actor, sequence.id, sequence.steps[0].id, { subject: "Geändert", text: "Neuer Inhalt" }, {})]
+];
+
+test.each(edits)("sends of a live sequence edited through %s run under the editor and stop once the editor loses the role", (_path, edit) => withFlag(async () => {
   const { accountId, approver, editor } = await liveSequence();
   // A separate outreach database keeps the scheduler pass to this mailbox.
   const db = new Database(":memory:");
@@ -135,7 +142,7 @@ test("sends of an edited live sequence run under the editor and stop once the ed
     // Queued under the earlier approver (send rate 0 holds it back), then edited by a collaborator.
     await scheduler.tick();
     expect(sends()).toEqual([{ userId: approver.user.id, status: "queued" }]);
-    await editSequence(db, actorOf(editor), sequence.id, changedSteps(sequence));
+    await edit(db, actorOf(editor), sequence);
     expect(getSequence(db, accountId, sequence.id).statusChangedByUserId).toBe(editor.user.id);
 
     editor.master.prepare("DELETE FROM user_accounts WHERE userId = ? AND accountId = ?").run(editor.user.id, accountId);
