@@ -5,7 +5,7 @@ import { requireActiveUserSession } from "./auth";
 import { revokeAuthStreams } from "./authStreams";
 import { publishMailboxEvent } from "./mailboxWatcherEvents";
 import { publishThreadCollabEvent, subscribeThreadCollabEvents } from "./threadCollabEvents";
-import { createUserEventStream } from "./userEvents";
+import { MAX_UNREAD_USER_EVENTS, MAX_USER_EVENT_STREAMS_PER_SESSION, createUserEventStream } from "./userEvents";
 import { getUserMailboxSummary } from "./mailboxSummary";
 import { changeAccountMember } from "./accountMembers";
 import { recordMailboxSync, setMailboxWatcherState } from "./db/mailboxSummary";
@@ -260,4 +260,38 @@ test("watcher-only transitions publish current watcher metadata and Open events 
     if (previous === undefined) delete process.env.NOCTUA_MAILBOX_WATCHER;
     else process.env.NOCTUA_MAILBOX_WATCHER = previous;
   }
+});
+
+test("a reader that stops consuming ends the stream instead of growing its queue", async () => {
+  const f = await fixture();
+  const reader = createUserEventStream(f.request, f.identity, { heartbeatMs: 1 }).getReader();
+  try {
+    expect(await read(reader)).toBe(": heartbeat\n\n");
+    await pause(MAX_UNREAD_USER_EVENTS * 4);
+    let chunks = 0;
+    while (await read(reader) !== null) {
+      chunks++;
+      if (chunks > MAX_UNREAD_USER_EVENTS + 2) throw new Error("Unread queue was not bounded");
+    }
+    expect(chunks).toBeGreaterThan(0);
+  } finally { await reader.cancel(); }
+});
+
+test("one login session holds a bounded number of event streams; a closed stream frees its slot", async () => {
+  const f = await fixture();
+  const responses: Response[] = [];
+  try {
+    for (let i = 0; i < MAX_USER_EVENT_STREAMS_PER_SESSION; i++) {
+      const response = await GET(f.request);
+      expect(response.status).toBe(200);
+      responses.push(response);
+    }
+    const refused = await GET(f.request);
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get("retry-after")).toBe("30");
+    await responses.shift()!.body!.cancel();
+    const reopened = await GET(f.request);
+    expect(reopened.status).toBe(200);
+    responses.push(reopened);
+  } finally { await Promise.all(responses.map(response => response.body!.cancel())); }
 });
