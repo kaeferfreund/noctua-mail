@@ -64,7 +64,8 @@ export async function sanitizeSyncedMessage(message: Message, accountId: string)
   );
   if (htmlBody) {
     dataUrlReplacements.forEach((url, dataUrl) => {
-      htmlBody = htmlBody?.replaceAll(dataUrl, url);
+      // Function replacer: keep $ sequences in the URL literal.
+      htmlBody = htmlBody?.replaceAll(dataUrl, () => url);
     });
     htmlBody = stripRedundantInlineImageFallbacks(htmlBody, attachments);
     htmlBody = appendUnreferencedInlineImages(htmlBody, attachments);

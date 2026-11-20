@@ -622,11 +622,11 @@ export async function upsertMessages(
         const rowMessagePathSegment = `/messages/${encodeURIComponent(rowId)}/`;
         const rewriteAttachmentUrl = (url?: string) => {
           if (!url || rowId === message.id) return url ?? null;
-          return url.replaceAll(baseMessagePathSegment, rowMessagePathSegment);
+          return url.replaceAll(baseMessagePathSegment, () => rowMessagePathSegment);
         };
         const rewrittenHtmlBody =
           rowId !== message.id && message.htmlBody
-            ? message.htmlBody.replaceAll(baseMessagePathSegment, rowMessagePathSegment)
+            ? message.htmlBody.replaceAll(baseMessagePathSegment, () => rowMessagePathSegment)
             : message.htmlBody;
         // Replacement snapshots retain metadata after their old rows/maps were
         // deleted. Only a surviving message must already own an identity.
