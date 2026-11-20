@@ -1766,6 +1766,7 @@
     "alwaysLoadSenderShort": "Always load",
     "unknownSender": "Sender unknown",
     "unverifiedSender": "Sender not verified",
+    "checkingSender": "Checking sender…",
     "remoteImage": "Remote image: {label}",
     "blockedImage": "Image not loaded: {label}",
     "flags": {
