@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import { betterAuth } from "better-auth";
 import { withResetDelivery } from "../authRecoveryContext";
-import { importLegacyProfileFields, installAuthControlPlane } from "./authPolicy";
+import { FINISHED_SECURITY_OPERATION_RETENTION_MS, importLegacyProfileFields, installAuthControlPlane, sweepExpiredAuthState } from "./authPolicy";
 import { migrateAuthSchema, noctuaAuthOptions } from "../betterAuth";
 import { caught, createTestAuthHarness, openMasterDb, TEST_BASE_URL, TEST_SECRET, type TestAuthHarness } from "../testAuthHarness";
 
@@ -611,5 +611,43 @@ describe("historical profile import",()=>{
     installAuthControlPlane(f.master);
     expect(f.master.prepare("SELECT name,banned FROM auth_user WHERE id=?").get(user.id)).toEqual({name:"Authoritative Name",banned:0});
     expect(state(f,user.id)).toBe(generation+1);
+  });
+});
+
+describe("expired authentication state sweep", () => {
+  test("abandoned anonymous passkey options and other expired state are swept, live state stays", async () => {
+    const f = await setup();
+    const user = await f.createUser("sweep@example.test");
+    const { session } = await f.signIn(user.email);
+    // A public, never finished passkey ceremony: a library row plus the registry sidecar.
+    const options = await f.auth.handler(new Request(`${TEST_BASE_URL}/api/ba/passkey/generate-authenticate-options`, { headers: { origin: TEST_BASE_URL } }));
+    expect(options.status).toBe(200);
+    const abandoned = f.master.prepare(`SELECT identifier,expiresAt FROM auth_pending_challenges WHERE kind='passkey_login'`).all() as { identifier: string; expiresAt: number }[];
+    expect(abandoned).toHaveLength(1);
+    expect(f.master.prepare(`SELECT 1 FROM auth_verification WHERE identifier=?`).get(abandoned[0].identifier)).not.toBeNull();
+    const now = Date.now();
+    const insertChallenge = f.master.prepare(`INSERT INTO auth_pending_challenges(identifier,userId,generation,authenticatedAt,kind,expiresAt) VALUES(?,?,?,?,'two_factor',?)`);
+    insertChallenge.run("2fa-live", user.id, state(f, user.id), now, now + 600_000);
+    const insertVerification = f.master.prepare(`INSERT INTO auth_verification(id,identifier,value,expiresAt,createdAt,updatedAt) VALUES(?,?,?,?,?,?)`);
+    insertVerification.run("v-live", "2fa-live", user.id, new Date(now + 600_000).toISOString(), new Date(now).toISOString(), new Date(now).toISOString());
+    insertVerification.run("v-old", "reset-password:old", user.id, new Date(now - 1000).toISOString(), new Date(now).toISOString(), new Date(now).toISOString());
+    const insertGrant = f.master.prepare(`INSERT INTO auth_reauth_grants(tokenHash,userId,sessionId,purpose,generation,expiresAt) VALUES(?,?,?,?,?,?)`);
+    insertGrant.run("grant-old", user.id, session!.session.id, "test", 1, now - 1);
+    insertGrant.run("grant-live", user.id, session!.session.id, "test", 1, now + 600_000);
+    const insertOperation = f.master.prepare(`INSERT INTO admin_lifecycle_operations(id,slot,actorUserId,targetUserId,action,state,createdAt,updatedAt) VALUES(?,?,?,?,?,?,?,?)`);
+    const old = now - FINISHED_SECURITY_OPERATION_RETENTION_MS - 1;
+    insertOperation.run("op-old", null, user.id, user.id, "security.login", "complete", old, old);
+    insertOperation.run("op-recent", null, user.id, user.id, "security.login", "complete", now, now);
+    insertOperation.run("op-member", null, user.id, user.id, "member.revoke", "complete", old, old);
+
+    // After the passkey options expired: the abandoned ceremony goes, everything live stays.
+    const later = Math.max(...abandoned.map(row => row.expiresAt)) + 1;
+    sweepExpiredAuthState(f.master, Math.min(later, now + 500_000));
+    expect(f.master.prepare(`SELECT 1 FROM auth_pending_challenges WHERE identifier=?`).get(abandoned[0].identifier)).toBeNull();
+    expect(f.master.prepare(`SELECT 1 FROM auth_verification WHERE identifier=?`).get(abandoned[0].identifier)).toBeNull();
+    expect(f.master.prepare(`SELECT identifier FROM auth_pending_challenges`).all()).toEqual([{ identifier: "2fa-live" }]);
+    expect(f.master.prepare(`SELECT id FROM auth_verification WHERE id IN ('v-live','v-old') ORDER BY id`).all()).toEqual([{ id: "v-live" }]);
+    expect(f.master.prepare(`SELECT tokenHash FROM auth_reauth_grants ORDER BY tokenHash`).all()).toEqual([{ tokenHash: "grant-live" }]);
+    expect(f.master.prepare(`SELECT id FROM admin_lifecycle_operations WHERE id LIKE 'op-%' ORDER BY id`).all()).toEqual([{ id: "op-member" }, { id: "op-recent" }]);
   });
 });

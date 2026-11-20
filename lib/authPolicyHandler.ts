@@ -3,7 +3,7 @@ import type { BetterAuthOptions, BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { currentAuthProof, withAuthProof, type AuthProofContext, type PendingChallenge } from "./authPolicyContext";
 import { AuthPolicyError, advanceSecurityGeneration, assertSecurityOperation, enrollmentState, finalizeAuthentication,
-  finishSecurityOperation, deleteSessionProofState, readGeneration, readSessionSecurity, reserveSecurityOperation } from "./db/authPolicy";
+  finishSecurityOperation, deleteSessionProofState, readGeneration, readSessionSecurity, reserveSecurityOperation, maybeSweepExpiredAuthState } from "./db/authPolicy";
 import { assertProofSession, hashProof, issueReauthGrant, readReauthGrant, type ReauthPurpose } from "./authPolicy";
 import { withDbWriteRetry } from "./dbWriteRetry";
 import { revokeAuthStreams } from "./authStreams";
@@ -191,6 +191,8 @@ async function preparePolicy(ctx: MiddlewareContext, proof: AuthProofContext) {
       const epoch = db.prepare(`SELECT generation FROM auth_login_epoch WHERE id=1`).get();
       if (!epoch) failure("invalid_challenge");
       proof.loginEpoch = epoch.generation;
+      // Anyone can start this ceremony; abandoned ones must not pile up.
+      await maybeSweepExpiredAuthState(db);
     }
     return;
   }
