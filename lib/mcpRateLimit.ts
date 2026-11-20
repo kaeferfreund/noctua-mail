@@ -12,3 +12,15 @@ export function createMcpRateLimiter() {
 }
 
 export const isMcpToolRateLimited = createMcpRateLimiter();
+
+/** Most JSON-RPC messages one MCP HTTP request (a batch) may carry. */
+export const MCP_MAX_BATCH_ITEMS = 32;
+/** Every JSON-RPC message counts here (including protocol messages and invalid ones), before any work. */
+export const MCP_MESSAGES_PER_MINUTE = 300;
+
+export function createMcpMessageRateLimiter() {
+  const messages = createRateLimiter({ max: MCP_MESSAGES_PER_MINUTE });
+  return (tokenId: string) => messages.isLimited(tokenId);
+}
+
+export const isMcpMessageRateLimited = createMcpMessageRateLimiter();

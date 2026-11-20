@@ -13,7 +13,7 @@ import { listAccountMembersForRole } from "@/lib/accountAccess";
 import { getOwnAddresses } from "@/lib/ownAddresses";
 import { assertMcpToolPermission, listMcpTokenAccounts, mcpTokenScopes, resolveMcpToolContext } from "@/lib/mcpAuth";
 import { mcpToolScope, type McpScope } from "@/lib/mcpPermissions";
-import { isMcpToolRateLimited } from "@/lib/mcpRateLimit";
+import { MCP_MAX_BATCH_ITEMS, isMcpMessageRateLimited, isMcpToolRateLimited } from "@/lib/mcpRateLimit";
 import {
   MCP_ATTACHMENT_DEFAULT_TEXT_CHARS,
   MCP_ATTACHMENT_MAX_BYTES,
@@ -675,6 +675,9 @@ function formatFolderListContent(folders: (Folder & { url: string })[]) {
   return [`Returned ${folders.length} folders:`, ...lines].join("\n");
 }
 
+/** Server-defined JSON-RPC error code for an exhausted per-token message budget. */
+const MCP_RATE_LIMITED_CODE = -32029;
+
 function makeJsonRpcError(id: RequestId | null, code: number, message: string) {
   return {
     jsonrpc: "2.0" as const,
@@ -1197,16 +1200,27 @@ class StatelessJsonResponseTransport implements Transport {
     }
 
     const rawMessages = Array.isArray(body) ? body : [body];
+    if (rawMessages.length > MCP_MAX_BATCH_ITEMS) {
+      return {
+        ok: false as const,
+        responses: [makeJsonRpcError(null, ErrorCode.InvalidRequest, `Invalid request: a batch holds at most ${MCP_MAX_BATCH_ITEMS} messages`)]
+      };
+    }
     const parsedMessages: JSONRPCMessage[] = [];
     const parseErrors: ReturnType<typeof makeJsonRpcError>[] = [];
     for (const rawMessage of rawMessages) {
+      const rawId = typeof rawMessage === "object" && rawMessage && "id" in rawMessage
+        ? ((rawMessage as { id?: RequestId | null }).id ?? null)
+        : null;
+      // Each batch item counts against the token's message budget before any work for it.
+      if (isMcpMessageRateLimited(this.tokenId)) {
+        parseErrors.push(makeJsonRpcError(rawId, MCP_RATE_LIMITED_CODE,
+          "MCP rate limit exceeded (messages per minute per token). Retry after 60 seconds."));
+        continue;
+      }
       const parsed = JSONRPCMessageSchema.safeParse(rawMessage);
       if (!parsed.success || isJSONRPCResponse(parsed.data) || isJSONRPCError(parsed.data)) {
-        const id =
-          typeof rawMessage === "object" && rawMessage && "id" in rawMessage
-            ? ((rawMessage as { id?: RequestId | null }).id ?? null)
-            : null;
-        parseErrors.push(makeJsonRpcError(id, ErrorCode.InvalidRequest, "Invalid request"));
+        parseErrors.push(makeJsonRpcError(rawId, ErrorCode.InvalidRequest, "Invalid request"));
       } else {
         parsedMessages.push(parsed.data);
       }
