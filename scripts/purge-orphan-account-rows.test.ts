@@ -113,4 +113,22 @@ describe("purge-orphan-account-rows", () => {
     expect(cli.exitCode).toBe(0);
     expect(cli.stdout.toString()).toContain("nothing to remove");
   });
+
+  test("refuses --apply when a mailbox's shard path lies outside the data dir (copied data dir)", async () => {
+    const master = await getDb();
+    const outside = path.join(path.dirname(getDataDir()), "original-data-dir", "db", "accounts", "synthetic.db");
+    const id = "synthetic-outside-shard";
+    master.prepare(`INSERT INTO accounts (id, name, email, avatar, dbPath, imapHost, imapPort, imapSecure, imapUser, imapPassword,
+      smtpHost, smtpPort, smtpSecure, smtpUser, smtpPassword)
+      VALUES (?, 'Outside', 'outside@example.test', '', ?, 'imap.example.test', 993, 1, 'u', 'p', 'smtp.example.test', 465, 1, 'u', 'p')`).run(id, outside);
+    try {
+      const scan = scanOrphanAccountRows();
+      expect(scan.shardsOutsideDataDir).toEqual([id]);
+      expect(scan.shards.some(shard => shard.path === outside)).toBe(false);
+      expect(formatOrphanScan(scan)).toContain("--apply refused");
+      await expect(applyOrphanPurge(scan)).rejects.toThrow("Refusing to apply");
+    } finally {
+      master.prepare("DELETE FROM accounts WHERE id = ?").run(id);
+    }
+  });
 });

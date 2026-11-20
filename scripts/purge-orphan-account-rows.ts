@@ -43,6 +43,11 @@ export type OrphanScan = {
   master: OrphanRows;
   shards: ShardScan[];
   outreach: OrphanRows | null;
+  /**
+   * Mailboxes whose shard path lies outside the data dir. main.db stores absolute shard
+   * paths, so on a copied data dir these point at the original files; --apply refuses.
+   */
+  shardsOutsideDataDir: string[];
 };
 
 const SHARD_TABLES = [...ACCOUNT_SHARD_TABLES, ...ACCOUNT_SHARD_RUNTIME_TABLES];
@@ -150,7 +155,17 @@ export function scanOrphanAccountRows(): OrphanScan {
     if (key && !files.has(key)) files.set(key, { path: file, role });
   };
   add(mainPath, "main");
-  for (const account of accounts) add(resolveAccountDbPathForPersist(account.id, account.dbPath), "referenced");
+  const dataDir = path.resolve(getDataDir());
+  const shardsOutsideDataDir: string[] = [];
+  for (const account of accounts) {
+    const file = path.resolve(dataDir, resolveAccountDbPathForPersist(account.id, account.dbPath));
+    if (!file.startsWith(dataDir + path.sep)) {
+      // Never read or write it: on a copy it is the original (possibly live) shard.
+      shardsOutsideDataDir.push(account.id);
+      continue;
+    }
+    add(file, "referenced");
+  }
   const accountsDir = path.join(getDataDir(), "db", "accounts");
   if (existsSync(accountsDir)) {
     for (const name of readdirSync(accountsDir).filter(entry => entry.endsWith(".db")).sort()) {
@@ -158,7 +173,7 @@ export function scanOrphanAccountRows(): OrphanScan {
     }
   }
   const shards = [...files.values()].map(file => scanShard(file.path, file.role, live));
-  return { dataDir: getDataDir(), liveAccounts: live.size, master, shards, outreach: scanOutreach(live) };
+  return { dataDir: getDataDir(), liveAccounts: live.size, master, shards, outreach: scanOutreach(live), shardsOutsideDataDir };
 }
 
 const hasRows = (rows: OrphanRows | null) => Boolean(rows && Object.keys(rows).length);
@@ -186,6 +201,9 @@ async function inTransaction(db: Database, run: () => Promise<void>) {
  * database is reported and the others still run. Returns the failures.
  */
 export async function applyOrphanPurge(scan: OrphanScan) {
+  if (scan.shardsOutsideDataDir.length) {
+    throw new Error(`Refusing to apply: shard paths outside ${scan.dataDir} for ${scan.shardsOutsideDataDir.join(", ")}`);
+  }
   const failures: Array<{ target: string; error: unknown }> = [];
   const attempt = async (target: string, run: () => Promise<void>) => {
     try { await run(); } catch (error) { failures.push({ target, error }); }
@@ -256,6 +274,9 @@ function formatRows(rows: OrphanRows) {
 /** The dry-run report: ids, tables and counts only. */
 export function formatOrphanScan(scan: OrphanScan) {
   const lines = [`data dir: ${scan.dataDir} (${scan.liveAccounts} mailboxes)`];
+  if (scan.shardsOutsideDataDir.length) {
+    lines.push(`shard paths outside the data dir (copied data dir?), not scanned, --apply refused: ${scan.shardsOutsideDataDir.join(", ")}`);
+  }
   if (hasRows(scan.master)) lines.push("master db/main.db:", ...formatRows(scan.master));
   for (const shard of scan.shards) {
     const name = display(shard.path, scan.dataDir);
@@ -287,6 +308,14 @@ async function main() {
   const { dataDir, apply } = parseArgs(process.argv.slice(2));
   if (dataDir) process.env.NOCTUA_DATA_DIR = path.resolve(dataDir);
   console.info("Stop the Noctua service and back up the data directory before --apply.");
+  // Even a read-only open of a WAL database can leave -wal/-shm files owned by the caller;
+  // owned by root, the service could no longer write its databases after the restart.
+  const mainPath = getMainDbPath();
+  const uid = process.getuid?.();
+  if (uid !== undefined && existsSync(mainPath) && statSync(mainPath).uid !== uid) {
+    console.error(`Run this as the owner of ${mainPath} (the service user), not as uid ${uid}.`);
+    return 1;
+  }
   const scan = scanOrphanAccountRows();
   console.info(formatOrphanScan(scan));
   if (!apply) {

@@ -483,6 +483,12 @@ mailbox (or the master DB) kept using, in the master tables `scheduled_sends`, `
 and others, and in the newsletter add-on database. Mailbox ids are derived from the address, so a
 mailbox recreated for the same address would inherit them. Remove them once after upgrading:
 
+Run it as the service user (the owner of `db/main.db`; the script refuses otherwise, because even a
+read-only open can leave `-wal`/`-shm` files owned by the caller). Run it only on the live data
+directory with the service stopped, never on a copy: `main.db` stores absolute shard paths, so on a
+copy they point at the original files. The script refuses `--apply` when a shard path lies outside
+the data directory.
+
 1. Stop the service (all writers, including workers).
 2. Back up the data directory as in [Full Backup](#full-backup-including-cache).
 3. Dry run from the application directory (reads `NOCTUA_DATA_DIR` like the app, or pass the path):
