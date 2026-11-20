@@ -120,16 +120,31 @@ export async function cancelCampaign(db: Database, actor: SendingActor, id: stri
   }).immediate();
 }
 
-export async function editSequence(db: Database, accountId: string, id: string, input: SequenceInput) {
+/**
+ * A draft is only content. A sequence that is live, or paused and able to resume, sends what is stored: editing it
+ * approves the new content like going live does, so the editor needs the same outbound authorization, becomes the
+ * recorded approver (the scheduler sends under that user, `scheduler.ts`) and the templates are snapshotted again.
+ */
+export async function editSequence(db: Database, actor: SendingActor, id: string, input: SequenceInput) {
+  const { accountId } = actor;
   const sequence = getSequence(db, accountId, id);
-  if (sequence.status === "draft" || input.senderIdentityId === undefined) {
-    return saveSequence(db, accountId, input, { id });
+  if (sequence.status === "draft") {
+    return db.transaction(() => {
+      // Went live meanwhile: the edit would bypass the approval below.
+      if (getSequence(db, accountId, id).status !== "draft") throw new SendingError(409, "Die Sequenz wurde inzwischen geändert. Prüfe sie erneut.", "sequence_changed");
+      return saveSequence(db, accountId, input, { id });
+    }).immediate();
   }
-  const identityId = input.senderIdentityId ?? (await getOutreachSettings(accountId)).senderIdentityId;
-  await resolveOutreachIdentity(accountId, identityId);
+  const identityId = input.senderIdentityId === undefined ? sequence.senderIdentityId : input.senderIdentityId;
+  const authorized = await checkTransportAndSender(actor, identityId);
   return db.transaction(() => {
+    authorized.assertAuthorized();
     assertUnchanged(sequence, getSequence(db, accountId, id));
-    return saveSequence(db, accountId, input, { id });
+    const saved = saveSequence(db, accountId, input, { id });
+    if (saved.status === "live") snapshotSequenceTemplates(db, saved);
+    db.query(`UPDATE sequences SET statusChangedByUserId = ?, statusChangedVia = ? WHERE accountId = ? AND id = ?`)
+      .run(authorized.userId, actor.via, accountId, id);
+    return getSequence(db, accountId, id);
   }).immediate();
 }
 
