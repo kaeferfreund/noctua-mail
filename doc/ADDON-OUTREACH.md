@@ -280,20 +280,24 @@ Sequences over MCP:
   `html`, `text`) and leaves order, waits, `enabled` and the other steps alone. Whole fields
   apply first, then `replacements` in order: `find` is exact text that must occur once in the
   field (non-overlapping matches are counted), or at least once with `replaceAll`. Placeholders
-  are stored as `{{ name }}` and `find` matches the text as stored. It requires
+  are stored as `{{ name }}`. `find` matches the field's text as stored, or as given in the same
+  call when the call supplies the whole field. It requires
   `expectedUpdatedAt`. `dryRun` runs every check up to the write and answers `changed`,
   `replacements`, the step and the renderer's `warnings` (preview text included) without saving.
   `changed` and the step describe the content as it would be stored: normalized and, for an
   enabled step of a sequence that is not a draft, filled from the step's template. A field equal
   to the stored value is no change, and an edit without a change saves nothing.
 - `save_sequence` replaces the whole step list when `steps` is given (see `SequenceInput`).
-- Both tools write through the one edit path of the REST `PATCH` (`editSequence` in
-  `sending/actions.ts`). Editing a sequence that is live or paused approves the new content like
+- Both tools write through the one write path of the REST `PATCH` (`writeSequenceEdit` in
+  `sending/actions.ts`): `save_sequence` through `editSequence`, `update_sequence_step` through
+  `editSequenceStep`. Editing a sequence that is live or paused approves the new content like
   going live: it goes out with the next mail, the token's creator becomes the recorded approver
   (`statusChangedByUserId`, `statusChangedVia`) and the scheduler sends under that user. For such
   a sequence both tools require the token's `send` scope, the editor role, an enabled sender
-  identity and a configured transport, checked again with the live token inside the write, and
-  `expectedUpdatedAt` equal to the sequence's `updatedAt`. Every enabled step must keep a subject
+  identity, a configured transport and the addon enabled for the mailbox, and `expectedUpdatedAt`
+  equal to the sequence's `updatedAt`. Inside the write the token, its scope, the role and the
+  sender identity are checked again; the transport and the enabled flag are checked before the
+  write and again before every send. Every enabled step must keep a subject
   and a body that are not empty once the placeholders are filled in for the sample contact.
   Every save and status change raises `updatedAt`.
 - A refusal with a code reaches MCP clients as a tool error whose text starts with the code, for

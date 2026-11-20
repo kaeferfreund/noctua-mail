@@ -381,8 +381,9 @@ export type SequenceSummary = Omit<Sequence, "steps"> & { stepCount: number; act
 export type SequenceInput = Partial<Pick<Sequence, "name" | "triggerListId" | "senderIdentityId" | "trackOpens" | "trackClicks">> & { steps?: SequenceStepInput[] };
 /**
  * A content change of one step (MCP `update_sequence_step`): whole fields first, then `replacements` in order.
- * `find` is matched against the text as stored (placeholders as `{{ name }}`) and must occur exactly once in the field
- * (non-overlapping matches), or at least once with `replaceAll`. Order, waits and `enabled` stay as they are.
+ * `find` is matched against the field's text as stored (placeholders as `{{ name }}`), or as given in the same edit when
+ * the edit supplies the whole field, and must occur exactly once in the field (non-overlapping matches), or at least once
+ * with `replaceAll`. Order, waits and `enabled` stay as they are.
  */
 export type SequenceStepEdit = Partial<Pick<SequenceStep, "name" | ContentField>> & {
   replacements?: Array<{ field: ContentField; find: string; replace: string; replaceAll?: boolean }>;

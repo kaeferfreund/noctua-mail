@@ -133,9 +133,9 @@ function assertSequenceUnchanged(db: Database, read: Sequence) {
 
 /**
  * `expectedUpdatedAt` binds an edit to the version the caller read. A token caller must name it for a sequence that is
- * not a draft. `checkOnly` runs every check that precedes the write and saves nothing (a dry run).
+ * not a draft.
  */
-export type SequenceEditOptions = { expectedUpdatedAt?: number; checkOnly?: boolean };
+export type SequenceEditOptions = { expectedUpdatedAt?: number };
 
 /**
  * The checks that precede an edit of `sequence` as the caller read it: the version first, then, for a sequence that is
@@ -184,10 +184,6 @@ function writeSequenceEdit(db: Database, actor: SendingActor, sequence: Sequence
 export async function editSequence(db: Database, actor: SendingActor, id: string, input: SequenceInput, options: SequenceEditOptions = {}) {
   const sequence = getSequence(db, actor.accountId, id);
   const authorized = await authorizeSequenceEdit(actor, sequence, options, input.senderIdentityId);
-  if (options.checkOnly) {
-    authorized?.assertAuthorized();
-    return sequence;
-  }
   return writeSequenceEdit(db, actor, sequence, input, authorized);
 }
 
