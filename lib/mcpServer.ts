@@ -51,6 +51,7 @@ import {
 import { z } from "zod";
 import { enrichMessagesWithThreadTopics } from "@/app/api/_helpers/enrichMessagesWithThreadTopics";
 import { runNewMailCheck } from "@/app/api/_helpers/newMailCheck";
+import { presentSyncJobErrorForRole } from "@/lib/syncJobs";
 import type { Account, Attachment, Folder, Message, McpTokenMetadata } from "@/lib/data";
 import {
   getFolders,
@@ -1396,7 +1397,8 @@ export async function executeMcpHttpRequest(params: {
     },
     async ({ accountId: requestedAccountId }) => {
       const ctx = await resolveAccountContext(context, requestedAccountId);
-      const result = await runNewMailCheck(ctx.account, ctx.accountId, `mcp:${ctx.tokenRecord.id}`);
+      const checked = await runNewMailCheck(ctx.account, ctx.accountId, `mcp:${ctx.tokenRecord.id}`);
+      const result = { ...checked, jobs: checked.jobs.map(job => ({ ...job, error: presentSyncJobErrorForRole(job.error, ctx.role) })) };
       const summary =
         result.foldersWithNewMail > 0
           ? `Synced ${result.foldersWithNewMail} folder(s) with new mail (checked ${result.foldersChecked}).${result.timedOut ? " Warning: timed out before all jobs completed." : ""}`

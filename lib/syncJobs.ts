@@ -4,6 +4,8 @@ import { trackBackgroundWork, trackWorker } from "./server/backgroundWork";
 import { UnconfirmedWorkerExitError } from "./db/processLeases";
 import { DurableSyncWorkerSemaphore } from "./durableSyncWorkerSemaphore";
 import { randomUUID } from "crypto";
+import type { AccountRole } from "@/lib/data";
+import { roleAtLeast } from "@/lib/accountRole";
 import { positiveInteger, withSyncWorkerTimeout, drainSyncWorkerOutput } from "./syncWorkerSemaphore";
 import { parseSyncWorkerLine } from "@/lib/workers/syncProtocol";
 import { workerScriptPaths } from "@/lib/workers/entrypoints";
@@ -31,6 +33,26 @@ export type SyncJob = {
 };
 
 export type SyncJobSource = "interactive" | "watcher" | "background";
+
+const SYNC_JOB_FAILED_SUMMARY = "Sync failed.";
+const SYNC_JOB_RETRYING_SUMMARY = "Sync attempt failed, retrying.";
+
+/**
+ * Worker failure text (stderr, upstream server replies, hosts) is diagnostic
+ * detail for mailbox managers; other roles get a fixed summary.
+ */
+export function presentSyncJobErrorForRole(error: string | undefined, role: AccountRole) {
+  return error && !roleAtLeast(role, "manager") ? SYNC_JOB_FAILED_SUMMARY : error;
+}
+
+/** A job as a mailbox member may see it (error and failed/retrying progress text). */
+export function presentSyncJobForRole(job: SyncJob, role: AccountRole): SyncJob {
+  if (roleAtLeast(role, "manager")) return job;
+  const progress = job.progress && (job.progress.phase === "failed" || job.progress.phase === "retrying")
+    ? { ...job.progress, message: job.progress.phase === "failed" ? SYNC_JOB_FAILED_SUMMARY : SYNC_JOB_RETRYING_SUMMARY }
+    : job.progress;
+  return { ...job, error: presentSyncJobErrorForRole(job.error, role), progress };
+}
 
 const admissionBypasses = new WeakMap<SyncJob, number>();
 function jobPriority(job: SyncJob) {

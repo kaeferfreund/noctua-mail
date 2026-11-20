@@ -5,7 +5,7 @@ import { getRequestClientId } from "./clientId";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { requireActiveUserSession } from "@/lib/auth";
-import { getSyncJob, startSyncJob } from "@/lib/syncJobs";
+import { getSyncJob, presentSyncJobForRole, startSyncJob } from "@/lib/syncJobs";
 import type { SyncPayload } from "@/lib/syncOperation";
 
 type SyncHandlerOptions = {
@@ -54,7 +54,7 @@ export async function handleSyncStartRequest(
     }
     if (job.status === "failed") {
       return NextResponse.json(
-        { ok: false, message: job.error || "Failed to start sync job." },
+        { ok: false, message: presentSyncJobForRole(job, access.role).error || "Failed to start sync job." },
         { status: 500 }
       );
     }
@@ -123,6 +123,6 @@ export async function handleSyncStatusRequest(
       progressUpdatedAt: job.progress?.updatedAt,
       progressMessage: job.progress?.message
     });
-    return NextResponse.json({ ok: true, job });
+    return NextResponse.json({ ok: true, job: presentSyncJobForRole(job, access.role) });
   });
 }
