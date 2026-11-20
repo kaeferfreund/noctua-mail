@@ -4,6 +4,10 @@ import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { requireActiveUserSession } from "@/lib/auth";
 import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
+import { presentSyncJobErrorForRole } from "@/lib/syncJobs";
+
+/** Worker stderr stays with mailbox managers, as for sync jobs. */
+const RECOMPUTE_FAILED_SUMMARY = "Recompute failed.";
 
 type RecomputeJob = {
   id: string;
@@ -41,7 +45,7 @@ export async function handleRecomputeStartRequest(
     const job = startJob(accountId);
     if (job.status === "failed") {
       return NextResponse.json(
-        { ok: false, message: job.error || failedDefaultMessage },
+        { ok: false, message: presentSyncJobErrorForRole(job.error, access.role, RECOMPUTE_FAILED_SUMMARY) || failedDefaultMessage },
         { status: 500 }
       );
     }
@@ -77,6 +81,9 @@ export async function handleRecomputeStatusRequest(
     if (job.accountId !== routeAccountId) {
       return NextResponse.json({ ok: false, message: "Job not found" }, { status: 404 });
     }
-    return NextResponse.json({ ok: true, job });
+    return NextResponse.json({
+      ok: true,
+      job: { ...job, error: presentSyncJobErrorForRole(job.error, access.role, RECOMPUTE_FAILED_SUMMARY) }
+    });
   });
 }

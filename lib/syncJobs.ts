@@ -41,8 +41,12 @@ const SYNC_JOB_RETRYING_SUMMARY = "Sync attempt failed, retrying.";
  * Worker failure text (stderr, upstream server replies, hosts) is diagnostic
  * detail for mailbox managers; other roles get a fixed summary.
  */
-export function presentSyncJobErrorForRole(error: string | undefined, role: AccountRole) {
-  return error && !roleAtLeast(role, "manager") ? SYNC_JOB_FAILED_SUMMARY : error;
+export function presentSyncJobErrorForRole(
+  error: string | undefined,
+  role: AccountRole,
+  summary: string = SYNC_JOB_FAILED_SUMMARY
+) {
+  return error && !roleAtLeast(role, "manager") ? summary : error;
 }
 
 /** A job as a mailbox member may see it (error and failed/retrying progress text). */
