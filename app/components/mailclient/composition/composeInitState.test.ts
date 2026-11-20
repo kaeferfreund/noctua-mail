@@ -340,6 +340,41 @@ describe("computeComposeInitState — reply", () => {
 // ---------------------------------------------------------------------------
 
 describe("computeComposeInitState — replyAll", () => {
+  it("never promotes original Bcc recipients into visible reply headers", () => {
+    const sent = computeComposeInitState(
+      "replyAll",
+      makeMessage({
+        from: "me@example.com",
+        to: "Bob <bob@example.test>",
+        cc: "Carol <carol@example.test>",
+        bcc: "Blind <blind@example.test>, \"Hidden, Two\" <hidden@example.test>"
+      }),
+      false,
+      opts,
+      deps
+    );
+    const received = computeComposeInitState(
+      "replyAll",
+      makeMessage({
+        from: "Alice <alice@example.test>",
+        to: "me@example.com, Bob <bob@example.test>",
+        bcc: "Blind <blind@example.test>"
+      }),
+      false,
+      opts,
+      deps
+    );
+    for (const fields of [sent, received]) {
+      const visible = [fields.composeTo, fields.composeCc].join(",");
+      expect(visible).not.toContain("blind@example.test");
+      expect(visible).not.toContain("hidden@example.test");
+      expect(fields.composeBcc).toBe("");
+    }
+    expect(sent.composeTo).toContain("bob@example.test");
+    expect(sent.composeCc).toContain("carol@example.test");
+    expect(received.composeCc).toContain("bob@example.test");
+  });
+
   it("excludes own email from Cc", () => {
     const fields = computeComposeInitState(
       "replyAll",

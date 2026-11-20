@@ -290,7 +290,9 @@ function computeBaseComposeInitState(
     if (isSentByCurrentUser) {
       toList = uniqueRecipients(splitRecipientEntries(message.to)
         .filter(recipient => !isOwnAddress(recipient, ownAddresses)).map(getDisplayRecipient));
-      ccList = uniqueEmails([message.cc, message.bcc].flatMap(value => parseAddressEmails(value))
+      // Original Bcc recipients stay blind: Reply All builds To/Cc from the
+      // visible headers only. The sender can add anyone back deliberately.
+      ccList = uniqueEmails(parseAddressEmails(message.cc)
         .filter(email => !isOwnAddress(email, ownAddresses)));
     } else {
       // When Reply-To is set we deliberately do not add the original From
@@ -310,8 +312,7 @@ function computeBaseComposeInitState(
       );
       const allRecipientParts = [
         ...splitRecipientEntries(message.to),
-        ...splitRecipientEntries(message.cc),
-        ...splitRecipientEntries(message.bcc)
+        ...splitRecipientEntries(message.cc)
       ]
         .map((s) => s.trim())
         .filter(Boolean);
