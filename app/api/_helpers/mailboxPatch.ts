@@ -9,6 +9,7 @@ import { accountIdFromEmail } from "@/lib/accountId";
 import { updateMailboxCredentials, MailboxCredentialError, type MailboxPatch, type CredentialVerification } from "@/lib/mailboxCredentials";
 import { sanitizeAccountForClient } from "@/lib/accountPresentation";
 import { listAccountMembers } from "@/lib/accountAccess";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 export async function applyMailboxPatch(context: AccountContext, patch: MailboxPatch, verification?: CredentialVerification) {
   if (!patch || typeof patch !== "object" || Array.isArray(patch)) return NextResponse.json({ ok: false, message: "Invalid body" }, { status: 400 });
   try {
@@ -32,7 +33,9 @@ export async function handleMailboxCredentialMutation(
   if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
     const origin = requireJsonSameOrigin(request); if (origin) return origin;
-    const payload = await request.json().catch(() => null);
+    const json = await readJsonBody<any>(request);
+    if (!json.ok) return json.response;
+    const payload = json.value;
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) return NextResponse.json({ ok: false, message: "Invalid body" }, { status: 400 });
     let accountId: string;
     if (mode === "post-existing") {

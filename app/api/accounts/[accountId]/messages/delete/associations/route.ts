@@ -7,6 +7,7 @@ import {
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
 import { listDeleteCalendarAssociations } from "@/lib/db";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 type DeleteAssociationPayload = {
   accountId?: string;
@@ -27,7 +28,6 @@ function normalizeStringArray(values: unknown) {
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const payload = (await request.json().catch(() => null)) as DeleteAssociationPayload | null;
   const accountId = await getAccountIdFromParams(params);
   if (!accountId) {
     return NextResponse.json({ ok: false, message: "Missing accountId" }, { status: 400 });
@@ -37,6 +37,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  const body = await readJsonBody<DeleteAssociationPayload>(request);
+  if (!body.ok) return body.response;
+  const payload = body.value;
   return withAuthResponse(accountContext, async () => {
 
     try {

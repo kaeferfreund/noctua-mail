@@ -5,6 +5,7 @@ import { applyCategoryFeedback } from "@/lib/db";
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
 import { requireAccountAndMessageContext } from "@/app/api/_helpers/message/routeHelpers";
 import { getAccountIdFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; messageId?: string }>;
@@ -15,13 +16,6 @@ export async function POST(request: Request, { params }: Params) {
   const accountId = await getAccountIdFromParams(params);
   const { messageId: rawMessageId } = await params;
   const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";
-  const payload = (await request.json().catch(() => null)) as
-    | {
-        accountId?: string;
-        messageId?: string;
-        category?: string | null;
-      }
-    | null;
 
   const context = await requireAccountAndMessageContext(
     request,
@@ -29,6 +23,13 @@ export async function POST(request: Request, { params }: Params) {
     { minRole: "editor", missingFieldsMessage: "Missing accountId or messageId" }
   );
   if (context instanceof NextResponse) return context;
+  const body = await readJsonBody<{
+        accountId?: string;
+        messageId?: string;
+        category?: string | null;
+      }>(request);
+  if (!body.ok) return body.response;
+  const payload = body.value;
   return withAuthResponse(context, async () => {
     const { accountId: resolvedAccountId, messageId: resolvedMessageId } = context;
 

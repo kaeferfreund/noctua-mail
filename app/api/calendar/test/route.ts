@@ -3,6 +3,7 @@ import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { requireActiveUserSession } from "@/lib/auth";
 import { testCaldavConnection } from "@/lib/caldav/client";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 export async function POST(request: Request) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
@@ -10,11 +11,13 @@ export async function POST(request: Request) {
   if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
 
-    const body = (await request.json().catch(() => null)) as {
+    const json = await readJsonBody<{
       url?: string;
       user?: string;
       password?: string;
-    } | null;
+    }>(request);
+    if (!json.ok) return json.response;
+    const body = json.value;
 
     const url = body?.url?.trim() ?? "";
     const user = body?.user?.trim() ?? "";

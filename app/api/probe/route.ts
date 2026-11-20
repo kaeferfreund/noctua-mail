@@ -4,6 +4,7 @@ import { requireActiveUserSession, withAuthResponse } from "@/lib/auth";
 import net from "net";
 import tls from "tls";
 import { createRateLimiter, getRequestIp } from "@/lib/rateLimit";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 /**
  * POST /api/probe — tests whether a user-supplied IMAP/SMTP host:port
@@ -111,11 +112,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const payload = (await request.json()) as {
+    const body = await readJsonBody<{
       protocol: "imap" | "smtp";
       host: string;
       port: number;
-    };
+    }>(request);
+    if (!body.ok) return body.response;
+    const payload = body.value ?? ({} as NonNullable<typeof body.value>);
 
     if (!payload.host || !payload.port) {
       return NextResponse.json({ ok: false, message: "Host and port required" }, { status: 400 });

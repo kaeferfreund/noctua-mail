@@ -10,20 +10,23 @@ import {
   requireAccountContext,
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const payload = (await request.json()) as {
+  const accountId = await getAccountIdFromParams(params);
+  const accountContext = await requireAccountContext(request, accountId, { minRole: "manager" });
+  if (accountContext instanceof NextResponse) return accountContext;
+  const body = await readJsonBody<{
     accountId?: string;
     name: string;
     parentId?: string | null;
-  };
-  const accountId = await getAccountIdFromParams(params);
+  }>(request);
+  if (!body.ok) return body.response;
+  const payload = body.value ?? ({} as NonNullable<typeof body.value>);
   if (!accountId || !payload?.name) {
     return NextResponse.json({ ok: false, message: "Missing accountId or name" }, { status: 400 });
   }
-  const accountContext = await requireAccountContext(request, accountId, { minRole: "manager" });
-  if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
     const { account, clientId } = accountContext;
     const folderError = await validateAccountFolders(accountId, [payload.parentId]);

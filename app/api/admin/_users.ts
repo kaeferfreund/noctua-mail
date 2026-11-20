@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminSessionOr403 } from "./_auth";
 import { requireJsonSameOrigin,requireBodylessSameOrigin } from "../_helpers/requestOrigin";
+import { AUTH_JSON_BODY_LIMIT, BodyReadTimeoutError, readBoundedBody } from "../_helpers/readAuthJson";
 import { forwardAuthHeaders } from "@/lib/auth";
 import { getAuth } from "@/lib/betterAuth";
 import { getDb } from "../../../lib/db/connection";
@@ -36,12 +37,14 @@ export async function handleAdminUser(request:Request,action:"invite"|"generic-i
     const limited=checkAdminMutationRateLimit(request,source.userId);
     if(limited)return forwardAuthHeaders(limited,headers);
     const auth=await getAuth(),db=await getDb();
-    const text=bodyless?"":await request.text();
+    const bytes=bodyless?new Uint8Array():await readBoundedBody(request,AUTH_JSON_BODY_LIMIT);
+    if(!bytes)return forwardAuthHeaders(NextResponse.json({ok:false,code:"payload_too_large"},{status:413}),headers);
+    const text=new TextDecoder().decode(bytes);
     const body:unknown=bodyless || action==="generic-invite" && !text?{}:JSON.parse(text);
     const result=action==="generic-invite"?await issueGenericInvite(db,source,body):action==="invite"?await issueOnboardingInvite(db,source,body):action==="update"?await updateUserLifecycle(auth,db,source,request,userId,body):action==="delete"?await removeUserLifecycle(auth,db,source,request,userId,body):action==="recovery"?await issueRecovery(auth,db,source,request,userId,body):await mutateAdminSecurity(db,source,request,userId,body,action,passkeyId);
     return forwardAuthHeaders(NextResponse.json(result,{status:action==="invite"||action==="generic-invite"?201:200}),headers);
   } catch(error) {
-    const status=error instanceof AuthPolicyError?error.status:error instanceof SyntaxError?400:503;
+    const status=error instanceof AuthPolicyError?error.status:error instanceof SyntaxError?400:error instanceof BodyReadTimeoutError?408:503;
     return forwardAuthHeaders(NextResponse.json({ok:false,code:error instanceof AuthPolicyError?error.code:status===400?"invalid_request":"admin_operation_failed"},{status}),headers);
   }
 }

@@ -31,6 +31,7 @@ import { randomUUID } from "crypto";
 import { normalizeCalendarParticipationStatus } from "@/lib/calendarParticipation";
 import { buildReplyThreadHeaders } from "@/lib/replyThreadHeaders";
 import { toFiniteNumber } from "@/app/api/_helpers/numberParsing";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; eventId?: string }>;
@@ -68,16 +69,6 @@ export function resolveCalendarReplyThreadHeaders(sourceMessage?: {
 
 export async function POST(request: Request, { params }: Params) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const payload = (await request.json().catch(() => null)) as
-    | {
-        accountId?: string;
-        identityId?: string;
-        partstat?: string;
-        scope?: string;
-        sendReply?: boolean;
-        occurrenceStartAtMs?: number;
-      }
-    | null;
   const accountId = await getAccountIdFromParams(params);
   const { eventId: rawEventId } = await params;
   const eventId = typeof rawEventId === "string" ? rawEventId.trim() : "";
@@ -89,6 +80,16 @@ export async function POST(request: Request, { params }: Params) {
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  const body = await readJsonBody<{
+        accountId?: string;
+        identityId?: string;
+        partstat?: string;
+        scope?: string;
+        sendReply?: boolean;
+        occurrenceStartAtMs?: number;
+      }>(request);
+  if (!body.ok) return body.response;
+  const payload = body.value;
   return withAuthResponse(accountContext, async () => {
     const originError = requireJsonSameOrigin(request);
     if (originError) return originError;

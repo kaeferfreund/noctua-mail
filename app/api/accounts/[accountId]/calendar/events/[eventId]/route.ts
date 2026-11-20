@@ -14,6 +14,7 @@ import {
 import type { CalendarEvent } from "@/lib/data";
 import { toFiniteNumber, toPositiveNumberArray } from "@/app/api/_helpers/numberParsing";
 import { deleteCalendarEventAndRelatedData } from "@/lib/calendarEventDeletion";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 /**
  * Compute the write-back dirty flag after a local edit: stamp the change time
@@ -61,9 +62,6 @@ export async function GET(request: Request, { params }: Params) {
 
 export async function PUT(request: Request, { params }: Params) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const body = (await request.json().catch(() => null)) as Partial<CalendarEvent> & {
-    accountId?: string;
-  } | null;
   const accountId = await getAccountIdFromParams(params);
   const { eventId: rawEventId } = await params;
   const eventId = typeof rawEventId === "string" ? rawEventId.trim() : "";
@@ -75,6 +73,11 @@ export async function PUT(request: Request, { params }: Params) {
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  const json = await readJsonBody<Partial<CalendarEvent> & {
+    accountId?: string;
+  }>(request);
+  if (!json.ok) return json.response;
+  const body = json.value;
   return withAuthResponse(accountContext, async () => {
 
     const existing = await getCalendarEventById(accountId, eventId);
