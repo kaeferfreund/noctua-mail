@@ -15,7 +15,7 @@ const body = "Hallo Alex,\r\n\r\nanbei die Unterlagen für Donnerstag.\r\n\r\nVi
 const generated = "Hallo Toni,\n\nvielen Dank, das passt so!\n\nViele Grüße\nAlex";
 
 test.beforeAll(async () => {
-  const source = ["From: Toni Muster <toni.muster@example.test>", "To: demo@monkeydent.test", "Message-ID: <qa-ai-reply@example.test>",
+  const source = ["From: Toni Muster <toni.muster@example.test>", "To: demo@demo-praxis.test", "Message-ID: <qa-ai-reply@example.test>",
     `Date: ${new Date(Date.now() + 3_600_000).toUTCString()}`, `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
     "MIME-Version: 1.0", "Content-Type: text/plain; charset=utf-8", "Content-Transfer-Encoding: 8bit", "", body].join("\r\n");
   const response = await fetch(`${process.env.QA_SHELL_CONTROL_URL}/inject`, { method: "POST", body: JSON.stringify({ source, flags: ["\\Seen"] }) });
@@ -63,7 +63,7 @@ async function stubSpeechRecognition(page: Page) {
 type AiReplyBody = { locale?: string; instruction?: string };
 const draftResponse = () => ({ ok: true, draftId: "qa-ai-draft", url: null, message: {
   id: "qa-ai-draft", accountId: "qa-shared", folderId: "qa-shared:Drafts", threadId: "<qa-ai-reply@example.test>", subject: `Re: ${subject}`,
-  from: "Demo <demo@monkeydent.test>", to: "Toni Muster <toni.muster@example.test>", preview: "", date: new Date().toISOString(),
+  from: "Demo <demo@demo-praxis.test>", to: "Toni Muster <toni.muster@example.test>", preview: "", date: new Date().toISOString(),
   dateValue: Date.now(), body: `${generated}\n\nAm 27.10.2026 schrieb Toni Muster:\n> anbei die Unterlagen für Donnerstag.`,
   inReplyTo: "<qa-ai-reply@example.test>", draft: true, flags: ["\\Draft", "\\Seen", "$NoctuaAI"]
 } });

@@ -211,9 +211,9 @@ test('sender identities: personal From, signature replacement, saved draft reope
   const dialogs:string[]=[];
   page.on('dialog',async dialog=>{dialogs.push(dialog.message());await dialog.dismiss();});
   await from.click();
-  await page.getByRole('option',{name:/demo@monkeydent.test/}).click();
-  await expect(from).toContainText('demo@monkeydent.test');
-  await expect(editor).toContainText('demo@monkeydent.test');
+  await page.getByRole('option',{name:/demo@demo-praxis.test/}).click();
+  await expect(from).toContainText('demo@demo-praxis.test');
+  await expect(editor).toContainText('demo@demo-praxis.test');
   await expect(editor).not.toContainText(aliasEmail);
   // Programmatic From changes remain authoritative across editor formats.
   for (const format of ['Text', 'Markdown']) {
@@ -222,10 +222,10 @@ test('sender identities: personal From, signature replacement, saved draft reope
     await page.getByRole('option',{name:new RegExp(escapeRegExp(aliasEmail))}).click();
     await page.getByRole('tab',{name:'HTML',exact:true}).click();
     await expect(editor).toContainText(aliasEmail);
-    await expect(editor).not.toContainText('demo@monkeydent.test');
+    await expect(editor).not.toContainText('demo@demo-praxis.test');
     expect((await editor.innerText()).match(/Synthetic Alex/g)).toHaveLength(1);
     await from.click();
-    await page.getByRole('option',{name:/demo@monkeydent.test/}).click();
+    await page.getByRole('option',{name:/demo@demo-praxis.test/}).click();
     await expect(editor).not.toContainText(aliasEmail);
   }
   expect(dialogs).toEqual([]);
@@ -243,7 +243,7 @@ test('sender identities: personal From, signature replacement, saved draft reope
   const handoffId='synthetic-sender-reopen';
   await page.evaluate(({handoffId,seed,draftId})=>localStorage.setItem(`noctua:detached-compose-handoff:${handoffId}`,JSON.stringify({version:1,status:'ready',accountId:seed.accountId,ownerUserId:seed.id,mode:'new',draftId,sourceMessageId:null,createdAtMs:Date.now(),updatedAtMs:Date.now()})),{handoffId,seed,draftId});
   await page.goto(`/compose/window?handoff=${handoffId}`);
-  await expect(page.getByLabel('From:',{exact:true})).toContainText('demo@monkeydent.test');
+  await expect(page.getByLabel('From:',{exact:true})).toContainText('demo@demo-praxis.test');
   const restoredEditor=page.locator('[data-lexical-editor="true"]');
   await expect(restoredEditor).toContainText('Synthetic Alex');
   expect((await restoredEditor.innerText()).match(/Synthetic Alex/g)).toHaveLength(1);
@@ -271,7 +271,7 @@ test('sender identities: personal From, signature replacement, saved draft reope
   await expect.poll(()=>readdirSync(process.env.COMPOSE_QA_OUTBOX!).filter(file=>file.endsWith('.eml')&&!beforeSent.has(file)).length).toBe(1);
   const receipts=readdirSync(process.env.COMPOSE_QA_OUTBOX!).filter(file=>file.endsWith('.eml')&&!beforeSent.has(file)).map(file=>readFileSync(path.join(process.env.COMPOSE_QA_OUTBOX!,file),'utf8'));
   const receipt=receipts.find(source=>source.includes('Subject: Synthetic identity and signature browser proof'))!;
-  expect(receipt).toBeTruthy(); expect(receipt).toContain('demo@monkeydent.test');
+  expect(receipt).toBeTruthy(); expect(receipt).toContain('demo@demo-praxis.test');
   // A separate enrolled editor inherits the shared template and uses their own
   // profile, even though the alias was created by the manager above.
   const otherContext=await browser.newContext({baseURL:process.env.COMPOSE_QA_BASE_URL??'http://localhost:3880',viewport:{width:390,height:844},extraHTTPHeaders:{'x-forwarded-for':'192.0.2.62'}});
@@ -282,7 +282,7 @@ test('sender identities: personal From, signature replacement, saved draft reope
     await openCompose(otherPage);
     const otherFrom=otherPage.getByLabel('From:',{exact:true});
     await expect(otherFrom).toBeVisible();
-    await expect(otherFrom).toContainText('demo@monkeydent.test');
+    await expect(otherFrom).toContainText('demo@demo-praxis.test');
     const otherEditor=otherPage.locator('[data-lexical-editor="true"]');
     await expect(otherEditor).toContainText('Synthetic Jo');
     await expect(otherEditor).toContainText('Team regards,');

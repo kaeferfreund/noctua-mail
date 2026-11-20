@@ -76,7 +76,7 @@ test("QA-004/009: pointer-operated members and confirmations stack above Admin; 
   const manage = page.locator("div.rounded-md.border").filter({ has: page.getByText("QA Shared", { exact: true }) })
     .getByRole("button", { name: "Manage members", exact: true });
   await manage.click();
-  const members = page.getByRole("dialog", { name: "Members of demo@monkeydent.test", exact: true });
+  const members = page.getByRole("dialog", { name: "Members of demo@demo-praxis.test", exact: true });
   await members.getByLabel("Add existing enabled user").selectOption(seeds[1].id);
   await members.getByLabel("New member role").selectOption("editor");
   const hit = await members.getByRole("button", { name: "Add member", exact: true }).evaluate(button => {

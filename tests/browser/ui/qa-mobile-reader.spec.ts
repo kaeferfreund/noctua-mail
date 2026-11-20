@@ -24,7 +24,7 @@ ${Array.from({ length: 12 }, (_, n) => `<p>Synthetischer Absatz ${n + 1} für di
 const senderEmail = "kundenservice.benachrichtigungen@mail.example.test";
 const source = [
   `From: Synthetic Broker <${senderEmail}>`,
-  "To: demo@monkeydent.test",
+  "To: demo@demo-praxis.test",
   "Message-ID: <qa-mobile-reader@example.test>",
   `Date: ${new Date(Date.now() + 3_600_000).toUTCString()}`,
   `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
@@ -39,7 +39,7 @@ const source = [
 const whiteSubject = "Ihre Bestellbestätigung mit weißem Hintergrund";
 const whiteSource = [
   "From: Synthetic Shop <shop@mail.example.test>",
-  "To: demo@monkeydent.test",
+  "To: demo@demo-praxis.test",
   "Message-ID: <qa-mobile-reader-white@example.test>",
   `Date: ${new Date(Date.now() + 3_500_000).toUTCString()}`,
   `Subject: =?UTF-8?B?${Buffer.from(whiteSubject).toString("base64")}?=`,

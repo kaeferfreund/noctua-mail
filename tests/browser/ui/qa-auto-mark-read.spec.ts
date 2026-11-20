@@ -22,7 +22,7 @@ test.beforeAll(async () => {
   for (const [n, subject] of Object.values(subjects).entries()) {
     const source = [
       "From: Synthetic Sender <sender@example.test>",
-      "To: demo@monkeydent.test",
+      "To: demo@demo-praxis.test",
       `Message-ID: <qa-auto-read-${n}@example.test>`,
       `Date: ${new Date(Date.now() + 3_600_000 - n * 60_000).toUTCString()}`,
       `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,

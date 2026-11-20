@@ -81,5 +81,5 @@ for (const type of ["application/pdf", "image/png", "text/calendar"]) assert(att
 const newsletter = inbox.find(m => m.subject === "Praxispost im Oktober");
 assert(newsletter?.hasInlineAttachments);
 const details = await (await request(`${api}/messages/${newsletter.id}`)).json() as { message: Message };
-assert(details.message.htmlBody?.includes("MonkeyDent Praxispost"));
+assert(details.message.htmlBody?.includes("Demo-Praxis Praxispost"));
 console.log(`attachment downloads verified: ${[...attachmentTypes].sort().join(", ")}; newsletter HTML + inline image verified`);

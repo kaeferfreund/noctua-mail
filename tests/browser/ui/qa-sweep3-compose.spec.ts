@@ -79,7 +79,7 @@ test("QA-201 forwards and Text replies get the signature back at the start witho
   await signInQa(page);
   const textSubject = /^QA long subject checks wrapping/, htmlSubject = /^QA sweep 3 HTML forward/;
   await expect(page.getByText(textSubject).first()).toBeVisible({ timeout: 60000 });
-  const html = `From: Synthetic Html <html@example.test>\r\nTo: demo@monkeydent.test\r\nMessage-ID: <qa-sweep3-html-forward@example.test>\r\nDate: ${new Date().toUTCString()}\r\nSubject: QA sweep 3 HTML forward\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><body><p>Synthetic <b>HTML</b> body to forward.</p></body></html>\r\n`;
+  const html = `From: Synthetic Html <html@example.test>\r\nTo: demo@demo-praxis.test\r\nMessage-ID: <qa-sweep3-html-forward@example.test>\r\nDate: ${new Date().toUTCString()}\r\nSubject: QA sweep 3 HTML forward\r\nMIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\n\r\n<html><body><p>Synthetic <b>HTML</b> body to forward.</p></body></html>\r\n`;
   expect((await request.post(new URL("/inject", process.env.QA_SHELL_CONTROL_URL!).toString(), { data: { source: html } })).ok()).toBe(true);
   const { team, unsigned } = await seedSenders(page);
   const dialogs: string[] = [];

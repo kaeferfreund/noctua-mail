@@ -17,7 +17,7 @@ const spamSubject = "Sie haben einen Gutschein über 500 € gewonnen";
 
 function source(id: string, from: string, subject: string, text: string, offsetMs: number) {
   return [
-    `From: ${from}`, "To: demo@monkeydent.test", `Message-ID: <${id}@example.test>`,
+    `From: ${from}`, "To: demo@demo-praxis.test", `Message-ID: <${id}@example.test>`,
     `Date: ${new Date(Date.now() + offsetMs).toUTCString()}`,
     `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
     "X-Spam-Flag: YES", "X-Spam-Status: Yes, score=8.2", "MIME-Version: 1.0",
