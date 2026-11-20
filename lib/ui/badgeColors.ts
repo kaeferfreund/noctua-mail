@@ -17,6 +17,7 @@ export const badgeColors = {
   priorityLow: "gray" as BadgeColor,
   priorityDefault: "amber" as BadgeColor,
   suspicious: "red" as BadgeColor,
+  unverifiedSender: "amber" as BadgeColor,
   mailbox: "cyan" as BadgeColor
 };
 
