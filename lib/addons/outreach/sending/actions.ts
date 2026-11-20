@@ -19,7 +19,7 @@ import { previewUnsubscribeUrl, renderContent, renderPreviewText, sampleContact 
 import { hasSmtp, isSesConfigured, sendOutreachMail, SendStopped } from "./send";
 import { sendOwner } from "./lease";
 import {
-  assertContent, assertDraft, campaignSummary, getCampaign, getSequence, required, resolveContent, saveSequence, snapshotSequenceTemplates,
+  assertContent, assertDraft, assertEnabledStep, campaignSummary, getCampaign, getSequence, required, resolveContent, saveSequence, snapshotSequenceTemplates,
   storedStepContent, templateBackedFields
 } from "./store";
 
@@ -167,7 +167,13 @@ function writeSequenceEdit(db: Database, actor: SendingActor, sequence: Sequence
     assertSequenceUnchanged(db, sequence);
     const saved = saveSequence(db, accountId, input, { id });
     if (!authorized) return saved;
-    if (saved.status === "live") snapshotSequenceTemplates(db, saved);
+    if (saved.status === "live") {
+      // A step list was stored by `saveSequence` through `storedStepContent` (resolved and checked like going live), every
+      // step of it: only the rule that a live sequence keeps an enabled step is left. Without one, the stored steps are
+      // snapshotted as going live does.
+      if (input.steps) assertEnabledStep(saved);
+      else snapshotSequenceTemplates(db, saved);
+    }
     db.query("UPDATE sequences SET statusChangedByUserId = ?, statusChangedVia = ? WHERE accountId = ? AND id = ?")
       .run(authorized.userId, actor.via, accountId, id);
     return getSequence(db, accountId, id);

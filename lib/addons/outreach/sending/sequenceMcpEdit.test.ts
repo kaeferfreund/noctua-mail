@@ -248,6 +248,39 @@ test("checks run in order: the version, then the permission, then the step and i
   expect(read()).toEqual(before);
 }));
 
+test("a live edit with a step list keeps an enabled step and renders each enabled step once", () => withOutreachFlag(async () => {
+  const { box, full, sequenceId, read } = await liveSequence({ templated: true });
+  const { db, accountId } = box;
+  const actor = tokenActor(accountId, full);
+  const before = read();
+  const guard = { expectedUpdatedAt: before.updatedAt };
+
+  // Every step disabled, or no step left: refused, nothing written.
+  for (const steps of [before.steps.map(step => ({ id: step.id, enabled: false })), []]) {
+    await expect(editSequence(db, actor, sequenceId, { steps }, guard)).rejects.toMatchObject({ message: "Aktiviere mindestens einen Schritt." });
+    expect(read()).toEqual(before);
+  }
+  // The content checks of going live run on the stored step list.
+  const emptied = before.steps.map((step, index) => index === 1 ? { id: step.id, subject: " " } : { id: step.id });
+  await expect(editSequence(db, actor, sequenceId, { steps: emptied }, guard)).rejects.toMatchObject({ message: "Schritt 2 „Tipps“: Betreff und Nachricht sind erforderlich." });
+  const unfilled = before.steps.map((step, index) => index === 1 ? { id: step.id, subject: "{{ typo }}" } : { id: step.id });
+  await expect(editSequence(db, actor, sequenceId, { steps: unfilled }, guard)).rejects.toMatchObject({ code: "content_empty" });
+  expect(read()).toEqual(before);
+
+  // Each render of a step's content reads the organization once (`renderForContact`): one per enabled step.
+  let renders = 0;
+  const counting = new Proxy(db, {
+    get(target, key) {
+      if (key === "query") return (sql: string) => { if (sql.includes("FROM account_settings")) renders++; return target.query(sql); };
+      const value = Reflect.get(target, key, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    }
+  });
+  const saved = await editSequence(counting, actor, sequenceId, { name: "Serie neu", steps: before.steps.map(step => ({ id: step.id })) }, guard);
+  expect(renders).toBe(before.steps.filter(step => step.enabled).length);
+  expect(saved).toMatchObject({ name: "Serie neu", status: "live", steps: before.steps });
+}));
+
 test("a step edit leaves queued sends, template steps and the waiting contact alone; a queued send shows its step's new subject", () => withOutreachFlag(async () => {
   const { box, full, sequenceId, templateId, read, enrollment } = await liveSequence({ templated: true });
   const { db, accountId } = box;

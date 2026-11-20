@@ -114,9 +114,15 @@ export function storedStepContent(db: Database, accountId: string, sends: boolea
   return content;
 }
 
+/** A live sequence keeps at least one enabled step. */
+export function assertEnabledStep(sequence: Pick<Sequence, "steps">) {
+  if (!sequence.steps.some(step => step.enabled)) throw new SendingError(400, "Aktiviere mindestens einen Schritt.");
+}
+
+/** Going live and an edit without a step list: every enabled step stored as `storedStepContent` resolves and checks it. */
 export function snapshotSequenceTemplates(db: Database, sequence: Sequence) {
+  assertEnabledStep(sequence);
   const steps = sequence.steps.filter(step => step.enabled);
-  if (!steps.length) throw new SendingError(400, "Aktiviere mindestens einen Schritt.");
   const update = db.query(`UPDATE sequence_steps SET subject = ?, previewText = ?, html = ?, text = ?
     WHERE accountId = ? AND sequenceId = ? AND id = ?`);
   for (const step of steps) {
