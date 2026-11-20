@@ -154,7 +154,8 @@ export function buildImapIdentityKey(account: Account) {
     account.id,
     account.imap.host,
     account.imap.port,
-    account.imap.secure
+    account.imap.secure,
+    Boolean(account.imap.requireTls)
   ]);
 }
 
@@ -531,6 +532,9 @@ export function buildImapFlowOptions(
     host: account.imap.host,
     port: account.imap.port,
     secure: account.imap.secure,
+    // STARTTLS chosen as mandatory: fail instead of authenticating in cleartext
+    // when the server does not offer (or an attacker strips) the upgrade.
+    ...(!account.imap.secure && account.imap.requireTls ? { doSTARTTLS: true } : {}),
     logger: getImapLogger(),
     ...getImapTimeoutOptions(),
     ...overrides,

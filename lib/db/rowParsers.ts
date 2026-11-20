@@ -183,14 +183,14 @@ export function mapAccountRow(row: any): Account {
     imap: {
       host: row.imapHost,
       port: row.imapPort,
-      secure: Boolean(row.imapSecure),
+      ...transportSecurityFromColumn(row.imapSecure),
       user: row.imapUser,
       password: decodeSecret(row.imapPassword)
     },
     smtp: {
       host: row.smtpHost,
       port: row.smtpPort,
-      secure: Boolean(row.smtpSecure),
+      ...transportSecurityFromColumn(row.smtpSecure),
       user: row.smtpUser,
       password: decodeSecret(row.smtpPassword)
     },
@@ -228,6 +228,7 @@ function mergeMailServerForPatch(
   if (patch.host !== undefined) next.host = patch.host;
   if (patch.port !== undefined) next.port = patch.port;
   if (patch.secure !== undefined) next.secure = patch.secure;
+  if (patch.requireTls !== undefined) next.requireTls = patch.requireTls;
   if (patch.user !== undefined) next.user = patch.user;
   // A blank password means "leave the stored one unchanged": clients only
   // ever hold blanked secrets (sanitizeAccountForClient), so saving unrelated
@@ -271,6 +272,23 @@ export function resolveAccountDbPathForPersist(accountId: string, dbPath?: strin
   return getDefaultAccountDbPath(accountId);
 }
 
+/**
+ * `imapSecure`/`smtpSecure` column values: 0 = no TLS requirement
+ * (opportunistic STARTTLS), 1 = implicit TLS, 2 = STARTTLS required.
+ */
+const TRANSPORT_STARTTLS_REQUIRED = 2;
+
+export function transportSecurityFromColumn(value: unknown): { secure: boolean; requireTls: boolean } {
+  const numeric = Number(value);
+  if (numeric === TRANSPORT_STARTTLS_REQUIRED) return { secure: false, requireTls: true };
+  return { secure: Boolean(numeric), requireTls: false };
+}
+
+export function transportSecurityColumn(server: { secure: boolean; requireTls?: boolean }): number {
+  if (server.secure) return 1;
+  return server.requireTls ? TRANSPORT_STARTTLS_REQUIRED : 0;
+}
+
 export function persistAccountRow(db: any, account: Account, dbPath?: string | null, insertOnly = false, createdBy?: string) {
   const settings = normalizeAccountSettings(account.settings);
   const insert = db.prepare(`
@@ -293,12 +311,12 @@ export function persistAccountRow(db: any, account: Account, dbPath?: string | n
     settings ? JSON.stringify(settings) : null,
     account.imap.host,
     account.imap.port,
-    account.imap.secure ? 1 : 0,
+    transportSecurityColumn(account.imap),
     account.imap.user,
     encodeSecret(account.imap.password),
     account.smtp.host,
     account.smtp.port,
-    account.smtp.secure ? 1 : 0,
+    transportSecurityColumn(account.smtp),
     account.smtp.user,
     encodeSecret(account.smtp.password),
     account.caldav?.url ?? null,

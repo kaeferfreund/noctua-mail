@@ -25,7 +25,7 @@ export type MailboxPatch = Omit<Partial<Account>, "imap" | "smtp"> & {
 export type CredentialActor = { userId: string; clientId?: string };
 export type CredentialVerification = { imap: typeof verifyImapCredentials; smtp: typeof verifySmtpCredentials; authorize?: () => void };
 const defaultVerification: CredentialVerification = { imap: verifyImapCredentials, smtp: verifySmtpCredentials };
-const endpointKeys = ["host", "port", "secure", "user"] as const;
+const endpointKeys = ["host", "port", "secure", "requireTls", "user"] as const;
 const normalized = (value: string) => value.trim().toLowerCase();
 
 /**
@@ -55,6 +55,7 @@ export async function updateMailboxCredentials(accountId: string, patchInput: Ma
     for (const key of ["host", "user"] as const) if (key in server && (typeof server[key] !== "string" || !server[key]!.trim())) throw new MailboxCredentialError(`Invalid ${protocol}.${key}`);
     if ("port" in server && (!Number.isInteger(server.port) || server.port! < 1 || server.port! > 65535)) throw new MailboxCredentialError("Invalid port");
     if ("secure" in server && typeof server.secure !== "boolean") throw new MailboxCredentialError("Invalid secure flag");
+    if ("requireTls" in server && typeof server.requireTls !== "boolean") throw new MailboxCredentialError("Invalid requireTls flag");
     if (endpointKeys.some(k => k in server && server[k] !== original[protocol][k]) && !server.password?.trim()) throw new MailboxCredentialError(`Changing ${protocol} endpoint requires its password`);
   }
   if (patch.settings?.signatures !== undefined) {

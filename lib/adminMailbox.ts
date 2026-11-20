@@ -9,7 +9,7 @@ import { verifySmtpCredentials } from "./mail/smtp";
 import { accountIdFromEmail } from "./accountId";
 import { teamFeaturesSupported } from "./teamFeatures";
 import { MailboxCredentialError, type CredentialVerification } from "./mailboxCredentials";
-const server = z.object({ host: z.string().trim().min(1).max(253), port: z.number().int().min(1).max(65535), secure: z.boolean(), user: z.string().trim().min(1).max(320), password: z.string().min(1).max(4096) }).strict();
+const server = z.object({ host: z.string().trim().min(1).max(253), port: z.number().int().min(1).max(65535), secure: z.boolean(), requireTls: z.boolean().optional(), user: z.string().trim().min(1).max(320), password: z.string().min(1).max(4096) }).strict();
 export const newMailboxSchema = z.object({ name: z.string().trim().min(1).max(256), email: z.string().trim().toLowerCase().pipe(z.email()), avatar: z.string().max(2048).default(""), imap: server, smtp: server }).strict();
 /**
  * The creating admin becomes the owner, so a new mailbox is always visible to its creator
