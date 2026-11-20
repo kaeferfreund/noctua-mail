@@ -18,6 +18,16 @@ const SOURCES: Record<string, string[]> = {
   "spf-pass-subdomain": [received, "Authentication-Results: mx.example.test; spf=pass smtp.mailfrom=bounce.example.test", `From: <${SENDER}>`],
   "forged": [received, "Authentication-Results: mx.example.test; dkim=fail header.d=example.test; spf=softfail smtp.mailfrom=attacker.test", `From: <${SENDER}>`],
   "other-domain-pass": [received, "Authentication-Results: mx.example.test; dkim=pass header.d=attacker.test", `From: <${SENDER}>`],
+  // A provider that re-injects after its spam check: its A-R sits below the second Received line.
+  "reinjected": [
+    "Received: by mx1.mail.example.net (Postfix, from userid 1001) id 1; Mon, 2 Nov 2026 10:00:05 +0000",
+    "X-Spam-Status: No, score=-0.1",
+    "Received: from out-1.relay.example.net (out-1.relay.example.net [192.0.2.1]) by mx1.mail.example.net (Postfix) with ESMTPS id 2; Mon, 2 Nov 2026 10:00:00 +0000",
+    "Authentication-Results: mx1; dkim=pass header.d=example.test; spf=pass smtp.mailfrom=example.test",
+    `From: <${SENDER}>`
+  ],
+  // Stored by a mail client via IMAP APPEND: never passed a mail server.
+  "appended": [`From: <${SENDER}>`, "To: <owner@example.test>"],
   "sender-inserted": [
     received,
     "Authentication-Results: mx.example.test; dkim=fail header.d=example.test; spf=fail smtp.mailfrom=attacker.test",
@@ -48,6 +58,7 @@ describe("remote-content sender verification", () => {
   it("applies the permission when the receiving server authenticated the sender's domain", async () => {
     expect(await remoteContentSenderDecision(prefs, ACCOUNT, message("dkim-pass"), sourcesDir)).toEqual({ senderVerified: true, allowed: true });
     expect(await isRemoteContentSenderVerified(ACCOUNT, message("spf-pass-subdomain"), sourcesDir)).toBe(true);
+    expect(await isRemoteContentSenderVerified(ACCOUNT, message("reinjected"), sourcesDir)).toBe(true);
   });
 
   it("does not apply it when SPF and DKIM did not pass for the From domain", async () => {
@@ -66,6 +77,8 @@ describe("remote-content sender verification", () => {
     expect(await remoteContentSenderDecision(prefs, ACCOUNT, message("no-results"), sourcesDir)).toEqual({ senderVerified: false, allowed: false });
     expect(await isRemoteContentSenderVerified(ACCOUNT, message("no-source", { hasSource: false }), sourcesDir)).toBe(false);
     expect(await isRemoteContentSenderVerified(ACCOUNT, message("missing-file"), sourcesDir)).toBe(false);
+    // A source without any Received line: no badge (see below), but no remote images either.
+    expect(await isRemoteContentSenderVerified(ACCOUNT, message("appended"), sourcesDir)).toBe(false);
   });
 
   it("never applies without a sender key or a matching permission", async () => {
@@ -102,6 +115,7 @@ describe("reader sender badge signal (messageSenderVerified)", () => {
 
   it("is true or false from the strict check for received mail", async () => {
     expect(await messageSenderVerified(ACCOUNT, opened("dkim-pass"), mailbox, sourcesDir)).toBe(true);
+    expect(await messageSenderVerified(ACCOUNT, opened("reinjected"), mailbox, sourcesDir)).toBe(true);
     expect(await messageSenderVerified(ACCOUNT, opened("no-results"), mailbox, sourcesDir)).toBe(false);
     expect(await messageSenderVerified(ACCOUNT, opened("forged"), mailbox, sourcesDir)).toBe(false);
   });
@@ -111,5 +125,9 @@ describe("reader sender badge signal (messageSenderVerified)", () => {
     expect(await messageSenderVerified(ACCOUNT, opened("no-results", { folderId: "sent" }), mailbox, sourcesDir)).toBeNull();
     expect(await messageSenderVerified(ACCOUNT, opened("no-results", { folderId: "drafts" }), mailbox, sourcesDir)).toBeNull();
     expect(await messageSenderVerified(ACCOUNT, opened("no-source", { hasSource: false }), mailbox, sourcesDir)).toBeNull();
+  });
+
+  it("is null for a source without any Received line (stored by a mail client, never passed a mail server)", async () => {
+    expect(await messageSenderVerified(ACCOUNT, opened("appended"), mailbox, sourcesDir)).toBeNull();
   });
 });
