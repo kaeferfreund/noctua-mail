@@ -27,6 +27,7 @@ import { getAttachmentContentBuffer, sanitizeSyncedMessage } from "@/lib/mail/sy
 import { hasMessageFlag, isCalendarAttachment, CALENDAR_INVITE_FLAG } from "@/lib/messageFlags";
 import type { SyncMode } from "@/lib/syncPolicy";
 import { deleteMessageFiles } from "@/lib/storage";
+import { buildFolderId } from "@/lib/mail/imap/_shared";
 import {
   deleteImapMessage,
   listImapMailboxUidsAndFlags,
@@ -216,14 +217,22 @@ export function sortCalendarInviteImportsForProcessing(invites: CalendarInviteIm
   });
 }
 
+/**
+ * The local folder a sync enumerates remotely. Without an explicit folder the
+ * IMAP fetch opens INBOX, so reconciliation must be bound to INBOX as well and
+ * never to the whole mailbox.
+ */
+export function resolveSyncedFolderId(accountId: string, folderId: string | null | undefined, mailboxPath: string) {
+  return folderId ?? buildFolderId(accountId, mailboxPath);
+}
+
 export function resolveOrphanedMessageFileRefs(params: {
   removed: Array<{ messageId: string; attachmentIds: string[] }>;
   existingFolderIds: Map<string, string>;
-  currentFolderId?: string | null;
+  currentFolderId: string;
 }) {
-  const { removed, existingFolderIds, currentFolderId = null } = params;
+  const { removed, existingFolderIds, currentFolderId } = params;
   if (removed.length === 0) return [];
-  if (!currentFolderId) return removed;
   return removed.filter((item) => {
     const existingFolderId = existingFolderIds.get(item.messageId);
     if (!existingFolderId) return true;
@@ -628,8 +637,9 @@ export async function runSyncOperationBatched(
   // can reconcile orphans (messages deleted from the server) at the end.
   // Resumed syncs skip reconciliation because we only re-fetch a subset of UIDs.
   const isFreshFullSync = syncMode === "full" && !payload.resumeFromUid;
+  const syncedFolderId = resolveSyncedFolderId(account.id, payload.folderId, resolvedMailboxPath);
   const existingFileRefs = isFreshFullSync
-    ? await listMessageFileRefs(account.id, payload.folderId ?? null)
+    ? await listMessageFileRefs(account.id, syncedFolderId)
     : [];
 
   // Process each batch as it arrives from IMAP
@@ -908,7 +918,7 @@ export async function runSyncOperationBatched(
       const orphaned = resolveOrphanedMessageFileRefs({
         removed,
         existingFolderIds,
-        currentFolderId: payload.folderId ?? null
+        currentFolderId: syncedFolderId
       });
       if (orphaned.length > 0) {
         emitFinalizing(

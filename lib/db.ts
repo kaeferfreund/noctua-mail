@@ -184,6 +184,7 @@ export {
 export {
   deleteMcpToken,
   deleteMcpTokensForUser,
+  removeMcpTokenAccount,
   getMcpTokenByHash,
   insertMcpToken,
   listMcpTokens,

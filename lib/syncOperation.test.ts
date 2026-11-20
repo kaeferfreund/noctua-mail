@@ -6,6 +6,7 @@ import {
   planTwoPhaseNewBackfill,
   partitionMissingRemoteUids,
   resolveOrphanedMessageFileRefs,
+  resolveSyncedFolderId,
   shouldAutoProcessCalendarInvitesForSyncMode,
   sortCalendarInviteImportsForProcessing
 } from "./syncOperation";
@@ -31,14 +32,20 @@ describe("resolveOrphanedMessageFileRefs", () => {
     expect(orphaned).toEqual([]);
   });
 
-  test("treats account-wide full sync removals as orphaned", () => {
+  test("a sync without an explicit folder reconciles only INBOX, never other folders", () => {
+    const currentFolderId = resolveSyncedFolderId("acc", undefined, "INBOX");
+    expect(currentFolderId).toBe("acc:INBOX");
     const orphaned = resolveOrphanedMessageFileRefs({
-      removed: [{ messageId: "row-1", attachmentIds: [] }],
-      existingFolderIds: new Map([["row-1", "acc:Archive"]]),
-      currentFolderId: null
+      removed: [
+        { messageId: "archived", attachmentIds: ["att-1"] },
+        { messageId: "inbox-gone", attachmentIds: [] }
+      ],
+      existingFolderIds: new Map([["archived", "acc:Archive"], ["inbox-gone", "acc:INBOX"]]),
+      currentFolderId
     });
 
-    expect(orphaned).toEqual([{ messageId: "row-1", attachmentIds: [] }]);
+    expect(orphaned).toEqual([{ messageId: "inbox-gone", attachmentIds: [] }]);
+    expect(resolveSyncedFolderId("acc", "acc:Archive", "Archive")).toBe("acc:Archive");
   });
 });
 

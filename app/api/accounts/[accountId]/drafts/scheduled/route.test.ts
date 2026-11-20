@@ -92,4 +92,16 @@ describe("scheduled send routes", () => {
     expect((await POST(f.request("POST", { draftId: busy, sendAt: sendAt + 60_000 }), f.params())).status).toBe(409);
     expect(await f.db.getMessageById(f.accountId, busy)).not.toBeNull();
   });
+
+  test("discard deletes only drafts, never received or sent mail", async () => {
+    const f = await fixture();
+    for (const overrides of [{ flags: [], folderId: `${f.accountId}:INBOX` }, { flags: ["\\Seen"], folderId: `${f.accountId}:Sent` }]) {
+      const messageId = await f.seedDraft(overrides);
+      expect((await discard(f.request("POST", {}), f.params({ draftId: messageId }))).status).toBe(404);
+      expect(await f.db.getMessageById(f.accountId, messageId)).not.toBeNull();
+    }
+    const unflaggedDraft = await f.seedDraft({ flags: [] });
+    expect((await discard(f.request("POST", {}), f.params({ draftId: unflaggedDraft }))).status).toBe(200);
+    expect(await f.db.getMessageById(f.accountId, unflaggedDraft)).toBeNull();
+  });
 });

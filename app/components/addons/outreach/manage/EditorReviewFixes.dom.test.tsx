@@ -49,7 +49,7 @@ describe("content from a referenced template (M)", () => {
 
     fireEvent.click(goLive);
     fireEvent.click(within(await page.findByRole("dialog")).getByRole("button", { name: "Switch live" }));
-    await waitFor(() => expect(bodies(calls, "POST", `sequences/${IMPORTED.id}/status`)).toEqual([{ status: "live" }]));
+    await waitFor(() => expect(bodies(calls, "POST", `sequences/${IMPORTED.id}/status`)).toEqual([{ status: "live", expectedUpdatedAt: IMPORTED.updatedAt }]));
     // Showing the template is not an edit: nothing is saved before going live.
     expect(calls.some(call => call.method === "PATCH")).toBe(false);
   });

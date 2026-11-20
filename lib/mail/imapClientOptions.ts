@@ -1,4 +1,5 @@
 import type { ImapFlow, ImapFlowOptions } from "imapflow";
+import { createHash } from "crypto";
 import tls from "tls";
 
 import type { Account } from "@/lib/data";
@@ -143,18 +144,22 @@ function getImapConnectRetryOptions() {
 }
 
 /**
- * Stable identity key for an account's IMAP endpoint. Used by the connection
- * circuit breaker and the connection pool (`lib/mail/imap/connectionPool.ts`)
- * so both treat "the same account, host, port, TLS mode" as the same bucket.
- * If any of these fields change (e.g. user re-configures IMAP host), the key
- * differs and stale entries age out on their own timers.
+ * Stable identity key for an account's upstream IMAP identity. Used by the
+ * connection circuit breaker and the connection pool
+ * (`lib/mail/imap/connectionPool.ts`) so both treat "the same account, host,
+ * port, TLS mode, login and credential" as the same bucket. A pooled session
+ * is authenticated as one upstream login: after the username or password
+ * changes, the key differs, the old session is never handed out again and it
+ * ages out on its own timers. The password enters only as a one-way digest.
  */
 export function buildImapIdentityKey(account: Account) {
   return JSON.stringify([
     account.id,
     account.imap.host,
     account.imap.port,
-    account.imap.secure
+    account.imap.secure,
+    account.imap.user,
+    createHash("sha256").update(account.imap.password ?? "").digest("base64url")
   ]);
 }
 

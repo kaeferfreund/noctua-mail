@@ -167,7 +167,7 @@ describe("newsletter campaigns", () => {
     const { page, calls } = mount({
       initial: { section: "campaigns", id: DRAFT.id },
       handlers: [call => call.path === `campaigns/${DRAFT.id}/schedule`
-        ? json({ ok: true, recipients: 398, campaign: { ...DRAFT, status: "sending", startedAt: Date.now(), stats: { recipients: 398, queued: 398, sent: 0, failed: 0, skipped: 0, opened: 0, clicked: 0, bounced: 0, unsubscribed: 0, complained: 0, machineOpens: 0 } } })
+        ? json({ ok: true, recipients: 398, contentVersion: "synthetic-content-v1", campaign: { ...DRAFT, status: "sending", startedAt: Date.now(), stats: { recipients: 398, queued: 398, sent: 0, failed: 0, skipped: 0, opened: 0, clicked: 0, bounced: 0, unsubscribed: 0, complained: 0, machineOpens: 0 } } })
         : call.path === `campaigns/${DRAFT.id}/report` ? json({ ok: true, campaign: { ...DRAFT, status: "sending" }, stats: { recipients: 398, queued: 398, sent: 0, failed: 0, skipped: 0, opened: 0, clicked: 0, bounced: 0, unsubscribed: 0, complained: 0, machineOpens: 0 }, links: [], recipients: [], nextCursor: null })
         : undefined]
     });
@@ -176,10 +176,12 @@ describe("newsletter campaigns", () => {
     // The count comes from the server's dry run (consent, suppression, excluded lists), not from list sizes.
     expect(dialog.textContent).toContain("The campaign goes to 398 recipients from the lists Newsletter.");
     const scheduleCalls = () => calls.filter(call => call.path.endsWith("/schedule")).map(call => call.body);
-    expect(scheduleCalls()).toEqual([{ sendAt: null, dryRun: true }]);
+    // The count is bound to the version on screen, the confirmation to what that count resolved.
+    expect(scheduleCalls()).toEqual([{ sendAt: null, dryRun: true, expectedUpdatedAt: DRAFT.updatedAt }]);
     fireEvent.click(within(dialog).getByRole("button", { name: "Send now" }));
     // The confirmed call names the draft version the count was made for.
-    await waitFor(() => expect(scheduleCalls()).toEqual([{ sendAt: null, dryRun: true }, { sendAt: null, expectedUpdatedAt: DRAFT.updatedAt }]));
+    await waitFor(() => expect(scheduleCalls()).toEqual([{ sendAt: null, dryRun: true, expectedUpdatedAt: DRAFT.updatedAt },
+      { sendAt: null, expectedUpdatedAt: DRAFT.updatedAt, expectedContentVersion: "synthetic-content-v1" }]));
     expect(await page.findByText("Sending to 398 recipients has started.")).toBeTruthy();
     expect(page.getByRole("button", { name: "Cancel sending" })).toBeTruthy();
   });

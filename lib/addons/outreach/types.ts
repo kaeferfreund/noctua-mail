@@ -196,7 +196,8 @@ export type OutreachApiToken = { id: string; name: string; listIds: string[]; cr
  * sequences triggered by that list). Idempotent per (email, listId).
  */
 export type SubscribeRequest = ContactInput & { listId: string; consentAt?: number; consentSource?: string };
-export type SubscribeResponse = { ok: true; contactId: string; status: ListMemberStatus; created: boolean };
+/** Uniform for new and known addresses: a token must not reveal whether a contact existed. */
+export type SubscribeResponse = { ok: true; contactId: string; status: ListMemberStatus };
 
 // ---------------------------------------------------------------- templates
 
@@ -237,6 +238,8 @@ export type RenderResponse = { ok: true; subject: string; html: string; text: st
 export const OUTREACH_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"] as const;
 export type OutreachImageType = (typeof OUTREACH_IMAGE_TYPES)[number];
 export const OUTREACH_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+/** Stored image bytes per mailbox. Images cannot be removed (sent mail keeps pointing to them), so this caps the data volume a mailbox's editors can fill. */
+export const OUTREACH_IMAGE_QUOTA_BYTES = 200 * 1024 * 1024;
 
 export type OutreachImage = {
   id: string;
@@ -297,8 +300,14 @@ export type CampaignInput = Partial<Pick<Campaign, "name" | "subject" | "preview
  * `POST {base}/campaigns/{id}/schedule` — `sendAt: null` sends now. Answers the number of recipients it will reach.
  * `dryRun: true` runs every check and answers the count without scheduling anything.
  */
-export type CampaignScheduleRequest = { sendAt: number | null; dryRun?: boolean; expectedUpdatedAt?: number };
-export type CampaignScheduleResponse = { ok: true; campaign: CampaignSummary; recipients: number };
+/**
+ * `expectedUpdatedAt` binds the request to the campaign version the caller reviewed (also on the dry run);
+ * `expectedContentVersion` binds the confirmation to the dry run's resolved content, sender and audience.
+ */
+export type CampaignScheduleRequest = { sendAt: number | null; dryRun?: boolean; expectedUpdatedAt?: number; expectedContentVersion?: string };
+export type CampaignScheduleResponse = { ok: true; campaign: CampaignSummary; recipients: number; contentVersion: string };
+/** `POST {base}/sequences/{id}/status`; `expectedUpdatedAt` binds going live to the sequence version the caller reviewed. */
+export type SequenceStatusRequest = { status: Exclude<SequenceStatus, "draft">; expectedUpdatedAt?: number };
 /** `POST {base}/campaigns/{id}/test` — one rendered copy to an address, never counted in the report. */
 export type TestSendRequest = { to: string; contactId?: string };
 /** `GET {base}/campaigns/{id}/report` */

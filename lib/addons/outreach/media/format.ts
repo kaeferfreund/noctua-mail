@@ -14,7 +14,7 @@ export const imageFilenameLimit = 255;
 export const base64ImageLimit = 4 * Math.ceil(OUTREACH_IMAGE_MAX_BYTES / 3);
 
 export class OutreachImageError extends Error {
-  constructor(readonly status: 400 | 413 | 415, message: string) { super(message); }
+  constructor(readonly status: 400 | 413 | 415, message: string, readonly code?: string) { super(message); }
 }
 
 type Dimensions = [width: number, height: number];
