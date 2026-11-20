@@ -17,8 +17,8 @@ export const JSON_BODY_LIMITS = {
 /** Total time a JSON body may take to arrive (not a stall timeout). */
 export const JSON_BODY_TIMEOUT_MS = {
   default: 60_000,
-  /** The largest compose body needs about 2.5 Mbit/s sustained. */
-  compose: 120_000
+  /** The largest compose body (36 MiB) needs about 0.5 Mbit/s sustained: a slow mobile uplink must still send. */
+  compose: 600_000
 } as const;
 
 export type JsonBodyResult<T> = { ok: true; value: T | null } | { ok: false; response: NextResponse };

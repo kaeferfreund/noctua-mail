@@ -1005,6 +1005,7 @@ export default function MailClient({
     setDomainView(null);
     setRecipientAliasDialogState(null);
     setMoveToDialogState(null);
+    setHtmlPreview(null);
     resetRelogin();
     setReloginDescription("");
   });
