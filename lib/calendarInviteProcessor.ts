@@ -38,7 +38,7 @@ import {
 import { getMessageSource } from "@/lib/storage";
 import { extractIcsSourceFromEmailSource } from "@/lib/mail/attachmentFromSource";
 import { reconcileSeriesAnchorSiblings } from "@/lib/calendarSeriesReanchor";
-import { isCalendarInviteFromEventOrganizer } from "@/lib/calendarInviteAuthority";
+import { calendarInviteAuthorityFailure } from "@/lib/calendarInviteAuthority";
 
 const DEFAULT_AUTOMATIC_REMINDER = {
   leadMinutes: 15,
@@ -230,6 +230,12 @@ export type ProcessCalendarInviteForMessageParams = {
   accountEmail?: OwnAddressInput;
   /** The message's From header. Automatic processing only lets the organizer change existing events. */
   senderAddress?: string | null;
+  /**
+   * The receiving server's Authentication-Results of the message
+   * (inviteSenderAuthenticationResults). Automatic processing needs SPF or
+   * DKIM passing for the organizer's domain.
+   */
+  senderAuthenticationResults?: readonly string[] | null;
   reminderUserId?: string | null;
   processedByUserId?: string | null;
   processedAutomatically?: boolean | null;
@@ -255,6 +261,7 @@ export async function processCalendarInviteForMessage({
   process,
   accountEmail,
   senderAddress,
+  senderAuthenticationResults,
   reminderUserId,
   processedByUserId,
   processedAutomatically
@@ -310,17 +317,19 @@ export async function processCalendarInviteForMessage({
   for (const group of groups) {
     let existingEvent = existingEventsByUid.get(group.eventUid) ?? null;
     const actionType = resolveInviteActionType(group, existingEvent);
-    const isFromOrganizer = (event: CalendarEvent) =>
-      isCalendarInviteFromEventOrganizer({
+    const authorityFailure = (event: CalendarEvent) =>
+      calendarInviteAuthorityFailure({
         existingEvent: event,
         group,
         senderAddress,
+        senderAuthenticationResults,
         ownAddresses: accountEmail
       });
+    const isFromOrganizer = (event: CalendarEvent) => authorityFailure(event) === null;
     const canModifySibling = requireOrganizerAuthority ? isFromOrganizer : undefined;
-    const keepUnprocessed = () => {
+    const keepUnprocessed = (reason: CalendarInviteUnprocessedReason) => {
       processedStateByUid.set(group.eventUid, false);
-      unprocessedReasonByUid.set(group.eventUid, "organizer_mismatch");
+      unprocessedReasonByUid.set(group.eventUid, reason);
     };
 
     try {
@@ -332,8 +341,9 @@ export async function processCalendarInviteForMessage({
             processedStateByUid.set(group.eventUid, true);
             continue;
           }
-          if (!isFromOrganizer(existingEvent)) {
-            keepUnprocessed();
+          const failure = authorityFailure(existingEvent);
+          if (failure) {
+            keepUnprocessed(failure);
             continue;
           }
         }
@@ -373,8 +383,9 @@ export async function processCalendarInviteForMessage({
         );
         existingEventsByUid.set(group.eventUid, existingEvent);
       }
-      if (existingEvent && requireOrganizerAuthority && !isFromOrganizer(existingEvent)) {
-        keepUnprocessed();
+      const failure = existingEvent && requireOrganizerAuthority ? authorityFailure(existingEvent) : null;
+      if (failure) {
+        keepUnprocessed(failure);
         continue;
       }
       const missingSeriesForOccurrenceChange =

@@ -139,6 +139,9 @@ beforeEach(async () => {
   messagesByIdForSnapshot.clear();
 });
 
+// The receiving server confirmed DKIM for the organizer's domain (alice@example.test).
+const ORGANIZER_DKIM_PASS = ["mx.example.test; dkim=pass header.d=example.test; spf=pass smtp.mailfrom=example.test"];
+
 function makeIcs(lines: string[]) {
   return ["BEGIN:VCALENDAR", ...lines, "END:VCALENDAR"].join("\r\n");
 }
@@ -350,6 +353,7 @@ describe("processCalendarInviteForMessage", () => {
       process: true,
       accountEmail: "paul@example.test",
       senderAddress: "Alice <alice@example.test>",
+      senderAuthenticationResults: ORGANIZER_DKIM_PASS,
       reminderUserId: "user-1",
       processedByUserId: "user-1",
       processedAutomatically: true
@@ -428,7 +432,8 @@ describe("processCalendarInviteForMessage", () => {
       icsSource: newAnchorIcs,
       process: true,
       accountEmail: "paul@example.test",
-      senderAddress: "Alice <alice@example.test>"
+      senderAddress: "Alice <alice@example.test>",
+      senderAuthenticationResults: ORGANIZER_DKIM_PASS
     });
 
     // First upsert = the new anchor. Second upsert = the sibling cap.
@@ -535,7 +540,8 @@ describe("processCalendarInviteForMessage", () => {
       icsSource: olderAnchorIcs,
       process: true,
       accountEmail: "paul@example.test",
-      senderAddress: "Alice <alice@example.test>"
+      senderAddress: "Alice <alice@example.test>",
+      senderAuthenticationResults: ORGANIZER_DKIM_PASS
     });
 
     // First upsert = the new (older) anchor. Second upsert = that same
@@ -631,7 +637,8 @@ describe("processCalendarInviteForMessage", () => {
       icsSource: newAnchorIcs,
       process: true,
       accountEmail: "paul@example.test",
-      senderAddress: "Alice <alice@example.test>"
+      senderAddress: "Alice <alice@example.test>",
+      senderAuthenticationResults: ORGANIZER_DKIM_PASS
     });
 
     // 1 upsert for the new anchor + 1 cap per prior sibling.
@@ -730,7 +737,8 @@ describe("processCalendarInviteForMessage", () => {
       icsSource: secondRescheduleIcs,
       process: true,
       accountEmail: "paul@example.test",
-      senderAddress: "Alice <alice@example.test>"
+      senderAddress: "Alice <alice@example.test>",
+      senderAuthenticationResults: ORGANIZER_DKIM_PASS
     });
 
     expect(upsertCalendarEventByUid).toHaveBeenCalledTimes(1);
@@ -909,7 +917,8 @@ describe("processCalendarInviteForMessage", () => {
       icsSource: cancelInstanceIcs,
       process: true,
       accountEmail: "test@example.test",
-      senderAddress: "Alice <alice@example.test>"
+      senderAddress: "Alice <alice@example.test>",
+      senderAuthenticationResults: ORGANIZER_DKIM_PASS
     });
 
     expect(result.states[0]?.processed).toBe(true);
@@ -1421,6 +1430,7 @@ describe("processCalendarInviteForMessage suppression guard", () => {
       process: true,
       accountEmail: "paul@example.test",
       senderAddress: "Alice <alice@example.test>",
+      senderAuthenticationResults: ORGANIZER_DKIM_PASS,
       processedAutomatically: true
     });
 
@@ -1480,7 +1490,11 @@ describe("processCalendarInviteForMessage organizer authority", () => {
       `ORGANIZER:mailto:${organizer}`,
       "END:VEVENT"
     ]);
-  const auto = (icsSource: string, senderAddress: string) =>
+  const auto = (
+    icsSource: string,
+    senderAddress: string,
+    senderAuthenticationResults: string[] = ORGANIZER_DKIM_PASS
+  ) =>
     processCalendarInviteForMessage({
       accountId: "acc-1",
       messageId: "msg-incoming",
@@ -1488,6 +1502,7 @@ describe("processCalendarInviteForMessage organizer authority", () => {
       process: true,
       accountEmail: "paul@example.test",
       senderAddress,
+      senderAuthenticationResults,
       reminderUserId: "user-1",
       processedByUserId: "user-1",
       processedAutomatically: true
@@ -1531,6 +1546,51 @@ describe("processCalendarInviteForMessage organizer authority", () => {
     expect(upsertCalendarEventByUid.mock.calls[0][1].summary).toBe("Planning (moved)");
     await auto(cancelIcs("alice@example.test"), "alice@example.test");
     expect(cancelCalendarEventByUid).toHaveBeenCalledWith("acc-1", "meeting-uid@example.test");
+  });
+
+  test("a forged From of the organizer without SPF/DKIM for its domain stays unprocessed", async () => {
+    getCalendarEventByUid.mockResolvedValue(emailEvent);
+    const noResults = await auto(cancelIcs("alice@example.test"), "alice@example.test", []);
+    const failed = await auto(cancelIcs("alice@example.test"), "alice@example.test", [
+      "mx.example.test; spf=fail smtp.mailfrom=example.test; dkim=fail header.d=example.test"
+    ]);
+    const otherDomain = await auto(updateIcs("alice@example.test"), "alice@example.test", [
+      "mx.example.test; spf=pass smtp.mailfrom=attacker.example; dkim=pass header.d=attacker.example"
+    ]);
+    expect(cancelCalendarEventByUid).not.toHaveBeenCalled();
+    expect(cancelCalendarRemindersByEventUid).not.toHaveBeenCalled();
+    expect(upsertCalendarEventByUid).not.toHaveBeenCalled();
+    for (const result of [noResults, failed, otherDomain]) {
+      expect(result.states[0]).toMatchObject({ processed: false, unprocessedReason: "sender_unverified" });
+    }
+    expect(markMessageCalendarInviteStatesUnprocessed).toHaveBeenCalledWith(
+      "acc-1",
+      "msg-incoming",
+      ["meeting-uid@example.test"],
+      "sender_unverified"
+    );
+  });
+
+  test("SPF for the organizer's domain is enough", async () => {
+    getCalendarEventByUid.mockResolvedValue(emailEvent);
+    await auto(cancelIcs("alice@example.test"), "alice@example.test", [
+      "mx.example.test; spf=pass smtp.mailfrom=bounces.example.test; dkim=none"
+    ]);
+    expect(cancelCalendarEventByUid).toHaveBeenCalledWith("acc-1", "meeting-uid@example.test");
+  });
+
+  test("a manual Process applies an unconfirmed organizer update", async () => {
+    getCalendarEventByUid.mockResolvedValue(emailEvent);
+    await processCalendarInviteForMessage({
+      accountId: "acc-1",
+      messageId: "msg-incoming",
+      icsSource: cancelIcs("alice@example.test"),
+      process: true,
+      accountEmail: "paul@example.test",
+      senderAddress: "alice@example.test",
+      processedAutomatically: false
+    });
+    expect(cancelCalendarEventByUid).toHaveBeenCalledTimes(1);
   });
 
   test("local events and events the mailbox organizes are never changed by incoming mail", async () => {

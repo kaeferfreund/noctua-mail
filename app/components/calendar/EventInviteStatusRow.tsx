@@ -46,6 +46,8 @@ function getInviteProcessButtonPendingLabel(processed?: boolean) {
 export type InviteUnprocessedReasonLabels = {
   /** Translated text for an invite that was not applied because its sender is not the organizer. */
   organizerMismatch?: string;
+  /** Translated text for an organizer update whose sender the receiving server did not confirm (SPF/DKIM). */
+  senderUnverified?: string;
 };
 
 function getInviteUnprocessedReasonLabel(
@@ -55,6 +57,9 @@ function getInviteUnprocessedReasonLabel(
   if (reason === "event_series_not_found") return "event series not found";
   if (reason === "organizer_mismatch") {
     return labels?.organizerMismatch ?? "sender is not the event organizer";
+  }
+  if (reason === "sender_unverified") {
+    return labels?.senderUnverified ?? "sender not confirmed by SPF/DKIM, apply manually";
   }
   return "";
 }
@@ -95,7 +100,8 @@ export default function EventInviteStatusRow({
 }: EventInviteStatusRowProps) {
   const t = useTranslations("Calendar.inviteStatus");
   const statusText = buildInviteStatusText(inviteProcessing, dateFormat, {
-    organizerMismatch: t("organizerMismatch")
+    organizerMismatch: t("organizerMismatch"),
+    senderUnverified: t("senderUnverified")
   });
   return (
     <div className={styles.inviteStatusRow}>

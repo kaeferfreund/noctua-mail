@@ -779,7 +779,8 @@
       "submitWithoutSending": "{status, select, ACCEPTED {Zusagen, ohne Antwort zu senden} DECLINED {Absagen, ohne Antwort zu senden} TENTATIVE {Mit Vorbehalt zusagen, ohne Antwort zu senden} other {Speichern, ohne Antwort zu senden}}"
     },
     "inviteStatus": {
-      "organizerMismatch": "Absender ist nicht der Organisator des Termins"
+      "organizerMismatch": "Absender ist nicht der Organisator des Termins",
+      "senderUnverified": "Absender nicht per SPF/DKIM bestätigt, bitte manuell übernehmen"
     }
   },
   "Search": {

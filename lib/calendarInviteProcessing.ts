@@ -2,7 +2,10 @@ import { parseIcsInvite, type CalendarEventPreview } from "./calendar";
 import { normalizeIdentityEmail } from "./ownAddresses";
 
 export type CalendarInviteActionType = "invitation" | "update" | "cancellation";
-export type CalendarInviteUnprocessedReason = "event_series_not_found" | "organizer_mismatch";
+export type CalendarInviteUnprocessedReason =
+  | "event_series_not_found"
+  | "organizer_mismatch"
+  | "sender_unverified";
 
 export type CalendarInviteMutationGroup = {
   eventUid: string;

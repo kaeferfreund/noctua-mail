@@ -779,7 +779,8 @@
       "submitWithoutSending": "{status, select, ACCEPTED {Accept and save without sending response} DECLINED {Decline and save without sending response} TENTATIVE {Mark tentative and save without sending response} other {Respond and save without sending response}}"
     },
     "inviteStatus": {
-      "organizerMismatch": "sender is not the event organizer"
+      "organizerMismatch": "sender is not the event organizer",
+      "senderUnverified": "sender not confirmed by SPF/DKIM, apply manually"
     }
   },
   "Search": {

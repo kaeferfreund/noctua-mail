@@ -23,6 +23,7 @@ import {
   upsertMessages
 } from "@/lib/db";
 import { processCalendarInviteForMessage } from "@/lib/calendarInviteProcessor";
+import { inviteSenderAuthenticationResults } from "@/lib/calendarInviteAuthority";
 import { getAttachmentContentBuffer, sanitizeSyncedMessage } from "@/lib/mail/syncMessageSanitizer";
 import { hasMessageFlag, isCalendarAttachment, CALENDAR_INVITE_FLAG } from "@/lib/messageFlags";
 import type { SyncMode } from "@/lib/syncPolicy";
@@ -189,6 +190,8 @@ type CalendarInviteImport = {
   messageId: string;
   icsSource: string;
   senderAddress?: string;
+  /** Receiving server's Authentication-Results; automatic updates need SPF/DKIM for the organizer. */
+  senderAuthenticationResults?: string[];
   dateValue: number;
   imapUid?: number;
   process: boolean;
@@ -820,6 +823,7 @@ export async function runSyncOperationBatched(
             messageId: message.id,
             icsSource,
             senderAddress: message.from,
+            senderAuthenticationResults: inviteSenderAuthenticationResults(message.source),
             dateValue: message.dateValue,
             imapUid: typeof message.imapUid === "number" ? message.imapUid : undefined,
             process: shouldProcessInvite,
@@ -892,6 +896,7 @@ export async function runSyncOperationBatched(
       process: invite.process && !fullyProcessedInviteMessageIds.has(invite.messageId),
       accountEmail: getOwnAddresses(account),
       senderAddress: invite.senderAddress,
+      senderAuthenticationResults: invite.senderAuthenticationResults,
       reminderUserId: autoProcessCalendarInvites ? account.ownerUserId : undefined,
       processedByUserId: autoProcessCalendarInvites ? account.ownerUserId : undefined,
       processedAutomatically: autoProcessCalendarInvites ? true : undefined
