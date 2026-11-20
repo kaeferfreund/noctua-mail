@@ -200,12 +200,12 @@ Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 | GET, POST | `{base}/campaigns` | `CampaignInput` → `{ok, campaigns: CampaignSummary[]}` / `{ok, campaign}` |
 | GET, PATCH, DELETE | `{base}/campaigns/{campaignId}` | `CampaignInput` → `{ok, campaign: Campaign}`; only drafts change or delete. `Campaign` and `CampaignSummary` carry `scheduledByUserId` and `scheduledVia` |
 | POST | `{base}/campaigns/{campaignId}/test` | `TestSendRequest` → `{ok}` |
-| POST | `{base}/campaigns/{campaignId}/schedule` | `CampaignScheduleRequest` → `CampaignScheduleResponse`; `dryRun: true` checks and counts without scheduling. Pass its `campaign.updatedAt` as `expectedUpdatedAt` to reject a changed draft with 409 `campaign_changed`. Scheduling a campaign that would reach nobody answers 409 `no_recipients`. |
+| POST | `{base}/campaigns/{campaignId}/schedule` | `CampaignScheduleRequest` → `CampaignScheduleResponse`; `dryRun: true` checks and counts without scheduling. Pass the reviewed `campaign.updatedAt` as `expectedUpdatedAt` (also on the dry run) and the dry run's `contentVersion` (resolved content incl. a referenced template, sender, lists, tracking) as `expectedContentVersion` to reject a changed draft with 409 `campaign_changed`; the app always sends both. Scheduling a campaign that would reach nobody answers 409 `no_recipients`. |
 | POST | `{base}/campaigns/{campaignId}/cancel` | → `{ok, campaign}` |
 | GET | `{base}/campaigns/{campaignId}/report?cursor=` | → `CampaignReport` |
 | GET, POST | `{base}/sequences` | `SequenceInput` → `{ok, sequences: SequenceSummary[]}` / `{ok, sequence}` |
 | GET, PATCH, DELETE | `{base}/sequences/{sequenceId}` | `SequenceInput` → `{ok, sequence: Sequence}`; only drafts delete. `Sequence` and `SequenceSummary` carry `statusChangedByUserId` and `statusChangedVia` |
-| POST | `{base}/sequences/{sequenceId}/status` | `{status: "live" \| "paused"}` → `{ok, sequence}` |
+| POST | `{base}/sequences/{sequenceId}/status` | `SequenceStatusRequest` (`{status: "live" \| "paused", expectedUpdatedAt?}`) → `{ok, sequence}`; a reviewed `expectedUpdatedAt` that no longer matches answers 409 `sequence_changed` |
 | GET | `{base}/sequences/{sequenceId}/report` | → `SequenceReport` |
 
 Errors: `{ok:false, message, code?}`; 404 flag off or unknown id, 409 `outreach_disabled`

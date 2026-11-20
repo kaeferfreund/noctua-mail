@@ -298,8 +298,14 @@ export type CampaignInput = Partial<Pick<Campaign, "name" | "subject" | "preview
  * `POST {base}/campaigns/{id}/schedule` — `sendAt: null` sends now. Answers the number of recipients it will reach.
  * `dryRun: true` runs every check and answers the count without scheduling anything.
  */
-export type CampaignScheduleRequest = { sendAt: number | null; dryRun?: boolean; expectedUpdatedAt?: number };
-export type CampaignScheduleResponse = { ok: true; campaign: CampaignSummary; recipients: number };
+/**
+ * `expectedUpdatedAt` binds the request to the campaign version the caller reviewed (also on the dry run);
+ * `expectedContentVersion` binds the confirmation to the dry run's resolved content, sender and audience.
+ */
+export type CampaignScheduleRequest = { sendAt: number | null; dryRun?: boolean; expectedUpdatedAt?: number; expectedContentVersion?: string };
+export type CampaignScheduleResponse = { ok: true; campaign: CampaignSummary; recipients: number; contentVersion: string };
+/** `POST {base}/sequences/{id}/status`; `expectedUpdatedAt` binds going live to the sequence version the caller reviewed. */
+export type SequenceStatusRequest = { status: Exclude<SequenceStatus, "draft">; expectedUpdatedAt?: number };
 /** `POST {base}/campaigns/{id}/test` — one rendered copy to an address, never counted in the report. */
 export type TestSendRequest = { to: string; contactId?: string };
 /** `GET {base}/campaigns/{id}/report` */
