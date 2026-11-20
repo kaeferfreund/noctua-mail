@@ -3,12 +3,11 @@ import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import {
   getAttachmentIds,
-  getMessageById,
   deleteMessageById,
   recordDraftTombstone
 } from "@/lib/db";
 import { deleteImapMessage } from "@/lib/mail/imap";
-import { holdScheduleForDraftChange, type DraftScheduleHold } from "@/lib/drafts";
+import { findComposeDraft, holdScheduleForDraftChange, type DraftScheduleHold } from "@/lib/drafts";
 import { scheduledSendConflictResponse } from "@/app/api/_helpers/scheduledSendConflict";
 import { deleteMessageFiles } from "@/lib/storage";
 import {
@@ -36,7 +35,9 @@ export async function POST(request: Request, { params }: Params) {
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
     const { account, clientId } = accountContext;
-    const message = await getMessageById(accountId, draftId);
+    // Only drafts can be discarded: this permanently deletes the IMAP copy
+    // without a trash step, so received or sent mail must never qualify.
+    const message = await findComposeDraft(accountId, draftId);
     if (!message) {
       return NextResponse.json({ ok: false, message: "Draft not found" }, { status: 404 });
     }

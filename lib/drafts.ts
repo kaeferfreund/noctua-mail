@@ -649,13 +649,18 @@ export async function loadSendableDraft(accountId: string, draftId: string) {
  * not set the flag). Anything else, e.g. received mail named by a crafted id, is never
  * returned, so a send can't delete it. Best-effort like the cleanup it feeds: null on error.
  */
+/** A message of this mailbox that is a draft (`\\Draft` flag or in the Drafts folder), else null. */
+export async function findComposeDraft(accountId: string, draftId: string): Promise<Message | null> {
+  const draft = await getMessageById(accountId, draftId);
+  if (!draft) return null;
+  if (hasMessageFlag(draft.flags, "\\Draft")) return draft;
+  const draftsFolder = findDraftsFolder(await getFolders(accountId), accountId);
+  return draftsFolder && draft.folderId === draftsFolder.id ? draft : null;
+}
+
 export async function findSentComposeDraft(accountId: string, draftId: string): Promise<Message | null> {
   try {
-    const draft = await getMessageById(accountId, draftId);
-    if (!draft) return null;
-    if (hasMessageFlag(draft.flags, "\\Draft")) return draft;
-    const draftsFolder = findDraftsFolder(await getFolders(accountId), accountId);
-    return draftsFolder && draft.folderId === draftsFolder.id ? draft : null;
+    return await findComposeDraft(accountId, draftId);
   } catch (error) {
     console.warn("[draft-send] could not look up the sent draft", { accountId, draftId, error });
     return null;
