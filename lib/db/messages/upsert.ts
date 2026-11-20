@@ -42,7 +42,7 @@ import { stageMessageFiles } from "../../storage";
 import { getAttachmentContentBuffer } from "../../mail/syncMessageSanitizer";
 import { remapThreadCollab, type ThreadRemapPair } from "../threadCollab";
 import { createHash } from "crypto";
-import { normalizeImapFlags, preserveLocalOnlyMessageFlags } from "../../messageFlags";
+import { hasMessageFlag, normalizeImapFlags, preserveLocalOnlyMessageFlags } from "../../messageFlags";
 import {
   normalizeCalendarEventUid,
   normalizeCalendarEventUidKey,
@@ -100,6 +100,12 @@ export class UpsertPreconditionError extends Error {
     super("upsertMessages precondition no longer holds; nothing was written");
     this.name = "UpsertPreconditionError";
   }
+}
+
+function isReplaceableDraftRow(row: { folderId: string | null; flags: string | null }, nextMessages: Message[]) {
+  const flags = safeParseJson<string[]>(row.flags);
+  if (Array.isArray(flags) && hasMessageFlag(flags.filter(flag => typeof flag === "string"), "\\Draft")) return true;
+  return Boolean(row.folderId) && nextMessages.some(message => message.folderId === row.folderId);
 }
 
 export async function upsertMessages(
@@ -755,7 +761,11 @@ export async function upsertMessages(
           if (options.precondition && !options.precondition(db)) throw new UpsertPreconditionError();
           captureIdentitySnapshots();
           if (options.replaceDraftId) {
-            const previous = findMessageById.get(accountId, options.replaceDraftId) as ReplacedRow | undefined;
+            const previous = findMessageById.get(accountId, options.replaceDraftId) as
+              (ReplacedRow & { folderId: string | null; flags: string | null }) | undefined;
+            // Only a draft may be replaced (no trash step): \Draft-flagged, or in the folder the
+            // replacement draft is written to. Rechecked here against the row being deleted.
+            if (previous && !isReplaceableDraftRow(previous, nextMessages)) throw new UpsertPreconditionError();
             if (previous) {
               replacedById.set(previous.id, previous);
               if (previous.messageId) replacedByHeader.set(previous.messageId, previous);
