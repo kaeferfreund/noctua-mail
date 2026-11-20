@@ -20,6 +20,12 @@ export type SearchInputState = {
   setSearchInput: (value: string) => void;
   /** Enter: apply the box content now. */
   submitSearchInput: () => void;
+  /**
+   * Drop a pending (debounced) search and show the applied query again. Call it
+   * when the mailbox or folder changes, so text typed just before the switch
+   * does not start a search in the new scope.
+   */
+  resetSearchInput: () => void;
 };
 
 /**
@@ -94,5 +100,10 @@ export function useSearchInput({
     applyQuery(resolveSubmittedSearchQuery(searchInput));
   }, [applyQuery, searchInput]);
 
-  return { searchInput, setSearchInput, submitSearchInput };
+  const resetSearchInput = useCallback(() => {
+    cancelPending();
+    setBox({ input: appliedQueryRef.current, seenQuery: appliedQueryRef.current });
+  }, [cancelPending]);
+
+  return { searchInput, setSearchInput, submitSearchInput, resetSearchInput };
 }

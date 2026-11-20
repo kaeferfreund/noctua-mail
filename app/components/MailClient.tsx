@@ -510,7 +510,7 @@ export default function MailClient({
   const viewMessageId = viewMessage?.id;
   const clearMobileMessage = useCallback(() => setViewMessage(null), []);
   const [query, setQuery] = useState("");
-  const { searchInput, setSearchInput, submitSearchInput } = useSearchInput({ query, setQuery });
+  const { searchInput, setSearchInput, submitSearchInput, resetSearchInput } = useSearchInput({ query, setQuery });
   // next-themes owns the theme (class and color-scheme on <html>, persisted
   // under "noctua:theme"); the kept renderers read the resulting html class,
   // which is correct on their first render, so the HtmlMessage iframe is
@@ -977,6 +977,11 @@ export default function MailClient({
     suspiciousUnreadCount,
     activeVirtualFolder
   } = searchState;
+  // Text typed just before a mailbox / folder switch must not start a search in
+  // the new scope once its debounce fires.
+  useEffect(() => {
+    resetSearchInput();
+  }, [activeAccountId, activeFolderId, activeVirtualFolderId, resetSearchInput]);
   const {
     setSearchScope,
     setSearchFields,

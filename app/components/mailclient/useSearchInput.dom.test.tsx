@@ -82,3 +82,15 @@ describe("useSearchInput", () => {
     expect(result.current.searchInput).toBe("");
   });
 });
+
+describe("useSearchInput scope change", () => {
+  it("drops a pending search when resetSearchInput runs before the debounce fires", async () => {
+    const { result } = renderHook(useHarness);
+    act(() => result.current.setSearchInput("re"));
+    act(() => result.current.resetSearchInput());
+    expect(result.current.searchInput).toBe("");
+    await settle();
+    expect(result.current.query).toBe("");
+    expect(result.current.applied).toEqual([]);
+  });
+});
