@@ -539,6 +539,7 @@
       "evictCache": "Thread-Cache leeren"
     },
     "logout": "Abmelden",
+    "detachedSignedOut": "Du wurdest abgemeldet. Dieses Fenster zeigt keine Mails mehr an und kann geschlossen werden.",
     "calendar": "Kalender",
     "compose": {
       "label": "Schreiben",

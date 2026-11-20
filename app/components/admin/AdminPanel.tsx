@@ -26,6 +26,13 @@ import type { AdminUser } from "./types";
 
 type Action = { user: AdminUser; type: "role" | "status" | "delete" | "recovery" | "mfa-reset" | "sessions" | "passkey"; role?: "admin" | "user" };
 function isOwner(user: AdminUser) { return user.accounts?.some(account => account.isOwner === true) ?? false; }
+/** Fresh proof the server requires: recovery-style actions, or anything that makes someone an enabled admin. */
+function actionPurpose(action: Action): "admin.recovery" | "admin.grant" | null {
+  if (["recovery", "mfa-reset", "sessions", "passkey"].includes(action.type)) return "admin.recovery";
+  if (action.type === "role" && action.role === "admin" && action.user.role !== "admin") return "admin.grant";
+  if (action.type === "status" && action.user.disabled && action.user.role === "admin") return "admin.grant";
+  return null;
+}
 
 export type AdminSection = (typeof ADMIN_SECTIONS)[number];
 type NavigationProps = { section?: AdminSection; onSectionChange?: (section: AdminSection) => void };
@@ -56,6 +63,7 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
   const [name, setName] = useState("");
   const [inviteRevision, setInviteRevision] = useState(0);
   const [inviteRole, setInviteRole] = useState<"admin" | "user">("user");
+  const [inviteReauth, setInviteReauth] = useState(false);
   const auth = useMemo(() => client ?? createAuthClient(apiFetch), [client, apiFetch]);
   const load = useCallback(() => {
     return adminRequest<{ users: AdminUser[] }>(apiFetch, "/api/admin/users")
@@ -71,16 +79,16 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
   useEffect(() => { void load(); }, [load]);
   const begin = (action: Action) => { setActionError(null); setPending(action); setOwner(""); setReauthOpen(false); setVerified(false); setPasskeyId(""); };
   const cancel = () => { setPending(null); setActionError(null); setReauthOpen(false); setVerified(false); setPasskeyId(""); setOwner(""); };
-  const sensitive = pending && ["recovery", "mfa-reset", "sessions", "passkey"].includes(pending.type);
+  const purpose = pending ? actionPurpose(pending) : null;
   const submit = async (proof?: Proof) => {
     if (!pending || busy) return;
-    if (sensitive && !proof) { setReauthOpen(true); return; }
+    if (purpose && !proof) { setReauthOpen(true); return; }
     setBusy(true); setActionError(null);
     try {
       const grant = proof?.grant;
       const base = `/api/admin/users/${encodeURIComponent(pending.user.id)}`;
-      if (pending.type === "role") await adminRequest(apiFetch, base, jsonMutation("PATCH", { role: pending.role }));
-      if (pending.type === "status") await adminRequest(apiFetch, base, jsonMutation("PATCH", { disabled: !pending.user.disabled }));
+      if (pending.type === "role") await adminRequest(apiFetch, base, jsonMutation("PATCH", { role: pending.role }, grant));
+      if (pending.type === "status") await adminRequest(apiFetch, base, jsonMutation("PATCH", { disabled: !pending.user.disabled }, grant));
       if (pending.type === "delete") await adminRequest(apiFetch, base, jsonMutation("DELETE", owner ? { reassignOwnerTo: owner } : {}));
       if (pending.type === "recovery") {
         const result = await adminRequest<{ url: string }>(apiFetch, `${base}/recovery`, jsonMutation("POST", { confirmedTarget: true }, grant));
@@ -93,14 +101,17 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
     } catch (error) { setReauthOpen(false); setActionError(error); }
     finally { setBusy(false); }
   };
-  const invite = async (event: React.FormEvent) => {
-    event.preventDefault(); setBusy(true); setError(null);
+  const issueInvite = async (proof?: Proof) => {
+    if (busy) return;
+    if (inviteRole === "admin" && !proof) { setInviteReauth(true); return; }
+    setInviteReauth(false); setBusy(true); setError(null);
     try {
-      const data = await adminRequest<{ invite: { code: string } }>(apiFetch, "/api/admin/users", jsonMutation("POST", { email, name, role: inviteRole }));
+      const data = await adminRequest<{ invite: { code: string } }>(apiFetch, "/api/admin/users", jsonMutation("POST", { email, name, role: inviteRole }, proof?.grant));
       setSecret({ kind: "invite", value: data.invite.code }); setEmail(""); setName(""); setInviteRevision(value => value + 1);
     } catch (error) { setError(error); }
     finally { setBusy(false); }
   };
+  const invite = (event: React.FormEvent) => { event.preventDefault(); void issueInvite(); };
   return <SettingsFrame open onClose={() => { if (!busy) onClose(); }}><div className="flex h-full min-h-0 flex-col gap-4">
     <SettingsHeader title={t("title")} closeLabel={t("close")} closeDisabled={busy} onClose={onClose} />
     <nav aria-label={t("sections")} className={`${adminActionRow} ${settingsNavClass.buttons}`}>{ADMIN_SECTIONS.map(value => <Button key={value} variant="ghost" aria-pressed={tab === value} onClick={() => setTab(value)}>{t(`tabs.${value}`)}</Button>)}</nav>
@@ -111,7 +122,7 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
         <AdminUsersTable users={users} busy={busy} onAction={(user, type, role) => begin({ user, type, role })} />
       </section>}
       {tab === "invites" && <section className="space-y-4" aria-label={t("tabs.invites")}><div className="space-y-1"><h3 className={adminSectionTitle}>{t("invites.heading")}</h3><p className="text-sm text-muted-foreground">{t("invites.help")}</p></div>
-        <form onSubmit={event => void invite(event)} className="grid max-w-lg gap-3 text-sm"><label className="grid gap-1">{t("name")}<Input required value={name} onChange={event => setName(event.target.value)} /></label><label className="grid gap-1">{t("email")}<Input required type="email" value={email} onChange={event => setEmail(event.target.value)} /></label>
+        <form onSubmit={invite} className="grid max-w-lg gap-3 text-sm"><label className="grid gap-1">{t("name")}<Input required value={name} onChange={event => setName(event.target.value)} /></label><label className="grid gap-1">{t("email")}<Input required type="email" value={email} onChange={event => setEmail(event.target.value)} /></label>
           <label className="grid gap-1">{t("invites.role")}<select className={nativeControlClass} value={inviteRole} onChange={event => setInviteRole(event.target.value as "user" | "admin")}><option value="user">{t("roles.user")}</option><option value="admin">{t("roles.admin")}</option></select></label><Button className="justify-self-start" disabled={busy}>{t("invites.issue")}</Button></form>
         <AdminInviteHistory apiFetch={apiFetch} revision={inviteRevision} />
       </section>}
@@ -128,7 +139,8 @@ function AdminPanelContent({ section, onSectionChange, apiFetch, client, onClose
       {pending.type === "passkey" && <label className="grid gap-1">{t("users.passkey")}<select className={nativeControlClass} aria-label={t("users.passkey")} value={passkeyId} onChange={event => setPasskeyId(event.target.value)}><option value="">{t("users.choosePasskey")}</option>{pending.user.passkeys?.map(key => <option key={key.id} value={key.id}>{key.name || t("users.unnamedPasskey")}{key.createdAt == null ? "" : ` · ${dateTime(key.createdAt)}`}</option>)}</select></label>}
 
     </AdminConfirmDialog>}
-    {reauthOpen && pending && <ReauthDialog purpose="admin.recovery" client={auth} onCancel={cancel} onVerified={proof => submit(proof)} />}
+    {reauthOpen && pending && purpose && <ReauthDialog purpose={purpose} client={auth} onCancel={cancel} onVerified={proof => submit(proof)} />}
+    {inviteReauth && <ReauthDialog purpose="admin.grant" client={auth} onCancel={() => setInviteReauth(false)} onVerified={proof => issueInvite(proof)} />}
     {secret && <AdminSecretDialog key={secret.value} secret={secret} onClose={() => setSecret(null)} />}
   </div></SettingsFrame>;
 }

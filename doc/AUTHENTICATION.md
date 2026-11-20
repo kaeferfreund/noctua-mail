@@ -285,6 +285,15 @@ Known-user challenges bind generation and first-factor time. Anonymous passkey o
 `auth_login_epoch` before the library call; credential/reset/revoke generation advances cancel them.
 An ordinary logout only ends its own session and the user's pending logins; it does not advance the
 epoch, so other people's passkey sign-ins in progress stay valid.
+An admin lifecycle change on a user (session revocation, disable, MFA reset, recovery, ...) takes the
+user's security slot over from a pending sign-in (`security.login`, often still verifying its first
+factor): the sign-in loses the slot and can no longer register a challenge or session. Other pending
+security operations still make the admin change wait (`security_operation_pending`).
+On a shared browser, sign-out also removes the recent move destinations and closes the detached
+windows the main window opened; detached reader, composer and calendar windows drop their content
+when the browser's signed-in user changes or their session is gone (`useDetachedSessionGuard`). The
+mounted mail client resets search text, its place in the address bar and per-person dialogs when
+another person signs in (`usePrincipalBoundary`).
 Expired challenge registry rows, their library verification rows, expired reauth grants and finished
 security operations are swept periodically (`sweepExpiredAuthState`).
 Missing, expired, mismatched or removed registry entries fail before verification and again atomically
@@ -314,6 +323,7 @@ session's original factor. A backup code is accepted only for `totp.replace`.
 | `passkey.rename` | Password + TOTP, or same-user UV passkey (same policy as enrollment) |
 | `sessions.revoke` | Current credential + TOTP/UV |
 | `admin.recovery` | Admin app password + TOTP/UV; administration additionally verifies the target out of band |
+| `admin.grant` | Admin app password + TOTP/UV; required for an admin invite, promoting a user to admin and re-enabling a disabled admin |
 | `mcp.create` | Current credential + TOTP/UV |
 
 Password+UV uses `proofMode:"passkey"` with `currentPassword` for purposes that require password.
@@ -574,6 +584,10 @@ The 201 response is `{ok:true,invite}`; generic redemption still uses ordinary s
   without installing future collaboration tables. Only then does plugin `removeUser` run. A failed
   cleanup leaves the identity banned and the durable slot held. Startup retries idempotently using
   local adapter authority after shard cleanup; it does not fabricate an admin session.
+- Durable admin authority needs a fresh, single-use `admin.grant` in `x-noctua-reauth`: `POST /api/admin/users`
+  with `role:"admin"`, and `PATCH /api/admin/users/[userId]` when it promotes a user to admin or re-enables a
+  disabled admin. A live admin session alone (e.g. a stolen cookie) cannot create an identity that outlives its
+  revocation. User invites, renames, demotions and disabling need no grant.
 - `POST /api/admin/users/[userId]/recovery` JSON `{confirmedTarget:true}` additionally requires a
   fresh `admin.recovery` grant in `x-noctua-reauth` (admin app password + freshly verified TOTP/UV).
   `confirmedTarget` is the admin's explicit assertion of personal out-of-band identity verification.

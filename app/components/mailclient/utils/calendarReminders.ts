@@ -125,7 +125,7 @@ const REMINDER_STORAGE_PREFIXES = [
   CALENDAR_REMINDER_DELIVERED_PREFIX
 ];
 /** The signed-in user the persisted reminder entries belong to (shared by this browser's windows). */
-const CALENDAR_REMINDER_PRINCIPAL_KEY = "noctua:calendar-reminder-principal";
+export const CALENDAR_REMINDER_PRINCIPAL_KEY = "noctua:calendar-reminder-principal";
 
 // The server keeps reminders per user and mailbox, so the browser cache, the
 // offline queue and the delivered marks are keyed by both. While no user is

@@ -76,7 +76,9 @@ import { Button as AuthButton } from "./ui/button";
 import { Dialog as AuthDialog, DialogContent as AuthDialogContent, DialogTitle as AuthDialogTitle, DialogDescription as AuthDialogDescription } from "./ui/dialog";
 import LazyDialogLoading from "./LazyDialogLoading";
 import type { Proof, AuthUser, AuthMe } from "@/lib/authClient";
-import MoveToDialog, { recordRecentMoveFolder, getRecentMoveFolderIds } from "./mailclient/message/MoveToDialog";
+import MoveToDialog from "./mailclient/message/MoveToDialog";
+import { recordRecentMoveFolder, getRecentMoveFolderIds } from "./mailclient/utils/recentMoveFolders";
+import { usePrincipalBoundary } from "./mailclient/usePrincipalBoundary";
 import CopyToAccountDialog from "./mailclient/message/CopyToAccountDialog";
 import InAppNoticeStack, { type InAppNotice } from "./mailclient/InAppNoticeStack";
 import DialogsHost from "./mailclient/dialogs/DialogsHost";
@@ -421,6 +423,8 @@ type CopyToAccountDialogState = {
 };
 
 type RecipientAliasDialogState = {
+  /** The mailbox whose message the recipients come from; the dialog shows only while it is active. */
+  accountId: string;
   fieldLabel: "To" | "Cc";
   recipients: string;
   aliasId?: string | null;
@@ -977,6 +981,19 @@ export default function MailClient({
     clearSearch,
     activateVirtualFolder
   } = searchActions;
+
+  // Search text and its place, and dialogs holding one person's mail, never carry over to the
+  // next person who signs in in this tab (SD26, SD43, SD50).
+  usePrincipalBoundary(authState === "ok" ? currentUser?.id ?? null : null, authState === "unauth", () => {
+    setQuery("");
+    setSearchScope("folder");
+    setSearchFields({ ...DEFAULT_SEARCH_FIELDS });
+    setSearchBadges({ ...DEFAULT_SEARCH_BADGES });
+    setActiveVirtualFolderId(null);
+    setDomainView(null);
+    setRecipientAliasDialogState(null);
+    setMoveToDialogState(null);
+  });
 
   const {
     isSyncing,
@@ -1834,14 +1851,18 @@ export default function MailClient({
   );
   const openRecipientAliasDialog = useCallback(
     (fieldLabel: "To" | "Cc", recipients: string, alias?: RecipientAlias | null) => {
+      if (!activeAccountId) return;
       setRecipientAliasDialogState({
+        accountId: activeAccountId,
         fieldLabel,
         recipients,
         aliasId: alias?.id ?? null
       });
     },
-    []
+    [activeAccountId]
   );
+  const shownRecipientAliasDialog =
+    recipientAliasDialogState?.accountId === activeAccountId ? recipientAliasDialogState : null;
 
   const isDraftMessage = (message: Message) => {
     const folder = folders.find((item) => item.id === message.folderId);
@@ -3768,16 +3789,16 @@ export default function MailClient({
 
   const getRecentFoldersFor = useCallback((accountId: string | null): Folder[] => {
     const byId = new Map(moveFoldersFor(accountId).map((folder) => [folder.id, folder]));
-    return getRecentMoveFolderIds(accountId ?? activeAccountId ?? "")
+    return getRecentMoveFolderIds(currentUser?.id, accountId ?? activeAccountId ?? "")
       .flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
-  }, [activeAccountId, moveFoldersFor]);
+  }, [activeAccountId, currentUser?.id, moveFoldersFor]);
 
   const recordAndMove = useCallback(
     (folderId: string, options: Parameters<typeof moveMessagesToFolder>[1]) => {
-      recordRecentMoveFolder(actionFolderById.get(folderId)?.accountId ?? activeAccountId ?? "", folderId);
+      recordRecentMoveFolder(currentUser?.id, actionFolderById.get(folderId)?.accountId ?? activeAccountId ?? "", folderId);
       void moveMessagesToFolder(folderId, options);
     },
-    [actionFolderById, activeAccountId, moveMessagesToFolder]
+    [actionFolderById, activeAccountId, currentUser?.id, moveMessagesToFolder]
   );
 
   const handleMoveToFolder = useCallback(
@@ -4512,6 +4533,7 @@ export default function MailClient({
     };
   }, [clientId]);
 
+  const currentUserId = currentUser?.id ?? null;
   const refreshVisibleSession = useCallback(async () => {
       try {
         const res = await apiFetch("/api/auth/me", {
@@ -4529,7 +4551,9 @@ export default function MailClient({
         if (typeof data?.ttlSeconds === "number") {
           setSessionTtlSeconds(data.ttlSeconds);
         }
-        if (data && (data.mailboxState !== mailboxState || (data.accountId ?? "") !== activeAccountId ||
+        // Another person signed in elsewhere in this browser: the bootstrap closes the previous
+        // person's views (settings form, error log) before anything of the new one shows.
+        if (data && ((data.user?.id ?? null) !== currentUserId || data.mailboxState !== mailboxState || (data.accountId ?? "") !== activeAccountId ||
           data.security.enrollmentRequired !== authSecurity?.enrollmentRequired || data.security.reauthRequired !== authSecurity?.reauthRequired)) {
           await loadInitialData();
         } else if (data) {
@@ -4538,7 +4562,7 @@ export default function MailClient({
       } catch {
         // ignore refresh errors
       }
-  }, [apiFetch, mailboxState, activeAccountId, authSecurity, loadInitialData]);
+  }, [apiFetch, mailboxState, activeAccountId, authSecurity, currentUserId, loadInitialData]);
   useVisibleInterval(refreshVisibleSession, authState === "ok" && sessionTtlSeconds
     ? Math.max(60_000, Math.min(30 * 60_000, Math.floor((sessionTtlSeconds * 1000) / 3))) : null);
 
@@ -6169,7 +6193,7 @@ export default function MailClient({
       />
 
       <RecipientAliasDialog
-        open={recipientAliasDialogState !== null}
+        open={shownRecipientAliasDialog !== null}
         onOpenChange={(open) => {
           if (!open) {
             setRecipientAliasDialogState(null);
@@ -6177,12 +6201,12 @@ export default function MailClient({
         }}
         aliases={recipientAliases}
         resetKey={
-          recipientAliasDialogState
-            ? `${recipientAliasDialogState.aliasId ?? "new"}:${recipientAliasDialogState.recipients}`
+          shownRecipientAliasDialog
+            ? `${shownRecipientAliasDialog.aliasId ?? "new"}:${shownRecipientAliasDialog.recipients}`
             : "closed"
         }
-        initialAliasId={recipientAliasDialogState?.aliasId ?? null}
-        initialRecipients={recipientAliasDialogState?.recipients ?? ""}
+        initialAliasId={shownRecipientAliasDialog?.aliasId ?? null}
+        initialRecipients={shownRecipientAliasDialog?.recipients ?? ""}
         onCreateAlias={createRecipientAliasForAccount}
         onUpdateAlias={updateRecipientAliasForAccount}
         onDeleteAlias={deleteRecipientAliasForAccount}
@@ -6252,6 +6276,7 @@ export default function MailClient({
       <MoveToDialog
         open={moveToDialogState !== null}
         onOpenChange={(open) => { if (!open) setMoveToDialogState(null); }}
+        userId={currentUser?.id}
         accountId={moveDialogFolders.accountId}
         rootFolders={moveDialogFolders.rootFolders}
         folderTree={moveDialogFolders.folderTree}
