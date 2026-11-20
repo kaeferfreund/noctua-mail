@@ -11,7 +11,7 @@ import { listSendableRecipients } from "../contacts";
 import { newOutreachId } from "../ids";
 import { getOutreachSettings } from "../settings";
 import type { CampaignScheduleRequest, CampaignScheduleResponse, Sequence, SequenceInput, SequenceStatus, SequenceStepEdit, TestSendRequest } from "../types";
-import { SendingError } from "./input";
+import { contentLimits, SendingError } from "./input";
 import { renderContent, sampleContact } from "./render";
 import { hasSmtp, isSesConfigured, sendOutreachMail, SendStopped } from "./send";
 import { sendOwner } from "./lease";
@@ -178,6 +178,10 @@ export async function editSequenceStep(db: Database, accountId: string, id: stri
     }
     if (occurrences > 1 && !replaceAll) {
       throw new SendingError(409, `Ersetzung ${index + 1}: Der gesuchte Text steht ${occurrences}-mal in ${field}. Erweitere ihn oder setze replaceAll.`, "replacement_ambiguous");
+    }
+    // Checked before the text is built: a short request can ask for a very long result.
+    if (next[field].length + occurrences * (replace.length - find.length) > contentLimits[field]) {
+      throw new SendingError(400, `Ersetzung ${index + 1}: ${field} wäre danach länger als ${contentLimits[field]} Zeichen.`, "replacement_too_long");
     }
     next[field] = next[field].replaceAll(find, () => replace);
     return { field, occurrences };

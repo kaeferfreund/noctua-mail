@@ -91,6 +91,10 @@ test("a full token changes one step of a live sequence against the version it re
   const guard = { ...edit, expectedUpdatedAt: before.updatedAt };
   expect(await full.refusal("update_sequence_step", { ...guard, replacements: [{ field: "html", find: "Tipp vier", replace: "x" }] })).toContain("steht nicht in html");
   expect(await full.refusal("update_sequence_step", { ...guard, replacements: [{ field: "html", find: "Tipp", replace: "Hinweis" }] })).toContain("3-mal");
+  // A replacement cannot grow a field past the limit of the field.
+  expect(await full.refusal("update_sequence_step", { ...guard, replacements: [{ field: "subject", find: "Tipps", replace: "x".repeat(995) }] })).toContain("länger als 998");
+  expect(await full.refusal("update_sequence_step", { ...guard, replacements: [{ field: "html", find: "Tipp", replace: "x".repeat(100_000), replaceAll: true },
+    { field: "html", find: "x", replace: "y".repeat(100_000), replaceAll: true }] })).toContain("länger als 2000000");
   // A live step keeps a subject and a body.
   expect(await full.refusal("update_sequence_step", { ...guard, subject: " " })).toContain("Betreff und Nachricht");
   expect(read()).toEqual(before);
@@ -101,14 +105,15 @@ test("a full token changes one step of a live sequence against the version it re
     warnings: ["Unbekannter Platzhalter: vorname"], sequence: { updatedAt: before.updatedAt } });
   expect(read()).toEqual(before);
 
+  // The replacement text is taken literally (`$&` is no pattern).
   const saved = await full.call("update_sequence_step", { ...guard, previewText: "Kurz und knapp",
-    replacements: [{ field: "html", find: "Tipp zwei.", replace: "Tipp zwei, der wichtigste." }] });
+    replacements: [{ field: "html", find: "Tipp zwei.", replace: "Tipp zwei, der wichtigste $& $1." }] });
   expect(saved).toMatchObject({ saved: true, changed: ["previewText", "html"], warnings: [], sequence: { status: "live" },
     step: { id: second.id, position: 1, delayMinutes: 1440, previewText: "Kurz und knapp" } });
   const after = read();
   expect(after.updatedAt).toBeGreaterThan(before.updatedAt);
   expect((saved.sequence as Sequence).updatedAt).toBe(after.updatedAt);
-  expect(after.steps[1]).toEqual({ ...second, previewText: "Kurz und knapp", html: "<p>Tipp eins. Tipp zwei, der wichtigste. Tipp drei.</p>" });
+  expect(after.steps[1]).toEqual({ ...second, previewText: "Kurz und knapp", html: "<p>Tipp eins. Tipp zwei, der wichtigste $& $1. Tipp drei.</p>" });
   expect([after.steps[0], after.steps[2]]).toEqual([first, before.steps[2]]);
   expect({ ...after, steps: [], updatedAt: 0 }).toEqual({ ...before, steps: [], updatedAt: 0 });
   expect(enrollment()).toEqual(waiting);

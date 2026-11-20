@@ -15,8 +15,10 @@ export function validated<T>(schema: z.ZodType<T>, input: unknown): T {
 
 export const itemId = z.string().trim().min(1).max(256);
 const name = z.string().trim().min(1).max(250);
-const subject = z.string().max(998);
-const body = z.string().max(2_000_000);
+/** Longest stored value of each content field, in characters. */
+export const contentLimits = { subject: 998, previewText: 998, html: 2_000_000, text: 2_000_000 } as const;
+const subject = z.string().max(contentLimits.subject);
+const body = z.string().max(contentLimits.html);
 const content = { subject: subject.optional(), previewText: subject.optional(), html: body.optional(), text: body.optional() };
 export const templateInput = z.object({ name, ...content });
 const audience = z.array(itemId).max(500).transform(ids => [...new Set(ids)]);
