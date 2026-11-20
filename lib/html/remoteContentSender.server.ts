@@ -1,6 +1,6 @@
 import type { Folder, Message, UserAccountPrefs } from "@/lib/data";
 import { senderAuthPassed } from "@/lib/mail/spam/allowlist";
-import { parseHeaderBlock, receivingAuthenticationResults } from "@/lib/mail/spam/input";
+import { type HeaderLine, parseHeaderBlock, receivingAuthenticationResults } from "@/lib/mail/spam/input";
 import { readSourceHeads } from "@/lib/mail/spam/profileBuild";
 import { isOwnAddress } from "@/lib/ownAddresses";
 import { getSourcesDir } from "@/lib/runtimePaths";
@@ -24,19 +24,22 @@ type SenderCheckMessage = Pick<Message, "id" | "senderKey" | "hasSource">;
  * means "not verified".
  */
 export function senderVerifiedByHeaders(headers: string, senderEmail: string) {
+  return senderVerifiedByLines(parseHeaderBlock(headers), senderEmail);
+}
+
+function senderVerifiedByLines(lines: HeaderLine[], senderEmail: string) {
   const domain = senderEmail.slice(senderEmail.lastIndexOf("@") + 1);
-  return senderAuthPassed({ authenticationResults: receivingAuthenticationResults(parseHeaderBlock(headers)) }, domain);
+  return senderAuthPassed({ authenticationResults: receivingAuthenticationResults(lines) }, domain);
 }
 
 /**
- * The strict sender check for one stored message: null when it cannot be made
- * (no sender key, source not stored or unreadable), else senderVerifiedByHeaders.
+ * The stored source's header lines for the strict sender check: null when it
+ * cannot be made (no sender key, source not stored or unreadable).
  */
-async function storedSenderVerified(accountId: string, message: SenderCheckMessage, sourcesDir: string) {
-  const senderKey = message.senderKey;
-  if (!senderKey || !message.hasSource) return null;
+async function storedSenderHeaderLines(accountId: string, message: SenderCheckMessage, sourcesDir: string) {
+  if (!message.senderKey || !message.hasSource) return null;
   const head = (await readSourceHeads(sourcesDir, accountId, [message.id])).get(message.id);
-  return head ? senderVerifiedByHeaders(head.headers, senderKey) : null;
+  return head ? parseHeaderBlock(head.headers) : null;
 }
 
 /**
@@ -50,7 +53,8 @@ export async function isRemoteContentSenderVerified(
   message: SenderCheckMessage,
   sourcesDir: string = getSourcesDir()
 ) {
-  return (await storedSenderVerified(accountId, message, sourcesDir)) === true;
+  const lines = await storedSenderHeaderLines(accountId, message, sourcesDir);
+  return lines !== null && senderVerifiedByLines(lines, message.senderKey ?? "");
 }
 
 /**
@@ -71,7 +75,10 @@ export async function remoteContentSenderDecision(
  * The reader's "Nicht bestätigt" signal for one opened message: true or false
  * from the strict sender check, null when it does not apply — the mailbox's
  * own mail (From is one of its addresses or identities, or the message is in
- * Sent or Drafts) and messages whose source is not stored yet.
+ * Sent or Drafts), messages whose source is not stored yet, and sources
+ * without any Received line: a mail client stored them by IMAP APPEND, they
+ * never passed a mail server, so there is nothing to verify. The remote-image
+ * gate (isRemoteContentSenderVerified) stays strict for those.
  */
 export async function messageSenderVerified(
   accountId: string,
@@ -81,5 +88,7 @@ export async function messageSenderVerified(
 ): Promise<boolean | null> {
   if (isSentFolder(message.folderId, mailbox.folders) || isDraftsFolder(message.folderId, mailbox.folders)) return null;
   if (isOwnAddress(message.senderKey ?? message.from, mailbox.ownAddresses)) return null;
-  return storedSenderVerified(accountId, message, sourcesDir);
+  const lines = await storedSenderHeaderLines(accountId, message, sourcesDir);
+  if (!lines || !lines.some((line) => line.key === "received")) return null;
+  return senderVerifiedByLines(lines, message.senderKey ?? "");
 }
