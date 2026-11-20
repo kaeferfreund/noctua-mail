@@ -298,6 +298,11 @@ export const accountRouteRoles: Array<{ method: string; path: string; minRole: A
     "minRole": "manager"
   },
   {
+    "method": "GET",
+    "path": "messages/[messageId]/remote-content",
+    "minRole": "viewer"
+  },
+  {
     "method": "POST",
     "path": "messages/[messageId]/resync",
     "minRole": "viewer"
