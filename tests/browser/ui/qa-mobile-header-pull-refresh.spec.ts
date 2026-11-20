@@ -19,7 +19,7 @@ const shortSubject = "Kurzer Betreff zur Ratenwarnung";
 const lateSubject = "Neu eingegangen nach dem Herunterziehen";
 const source = (subject: string, id: string, offsetMs: number) => [
   "From: Synthetic Console <console@mail.example.test>",
-  "To: demo@monkeydent.test",
+  "To: demo@demo-praxis.test",
   `Message-ID: <${id}@example.test>`,
   `Date: ${new Date(Date.now() + offsetMs).toUTCString()}`,
   `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,

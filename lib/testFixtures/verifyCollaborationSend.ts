@@ -23,7 +23,7 @@ import { updateThreadCollabState, getThreadCollabState } from "../threadCollab";
 const directory = mkdtempSync(join(tmpdir(), "collab-send-fixture-"));
 const a = await createAuthenticatedTestSession();
 const b = await createAuthenticatedTestSession();
-const store = new MailStore("monkeydent", new Date("2026-10-22T10:00:00Z"), join(directory, "uid.sqlite"));
+const store = new MailStore("demo-praxis", new Date("2026-10-22T10:00:00Z"), join(directory, "uid.sqlite"));
 let connections = 0;
 const serverOptions: ImapOptions = { port: 0, controlPort: 0, store, onConnection: () => { connections++; }, appendUid: true };
 const imap = await startImapServer(serverOptions);

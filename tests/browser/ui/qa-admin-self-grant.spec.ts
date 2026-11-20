@@ -13,8 +13,8 @@ test("admin creates a mailbox, becomes its owner without a grant step, and sees 
   const create = page.getByRole("dialog", { name: "Create mailbox", exact: true });
   await expect(create.getByText("Creates a mailbox owned by you. Add further members after creation.", { exact: true })).toBeVisible();
   for (const [label, value] of [["Name", "Synthetic Grant Mailbox"], ["Email", "self-grant@example.test"],
-    ["IMAP host", "127.0.0.1"], ["IMAP user", process.env.QA_SHELL_FIXTURE_USER ?? "demo@monkeydent.test"], ["IMAP password", "demo"],
-    ["SMTP host", "127.0.0.1"], ["SMTP user", process.env.QA_SHELL_FIXTURE_USER ?? "demo@monkeydent.test"], ["SMTP password", "demo"]]) {
+    ["IMAP host", "127.0.0.1"], ["IMAP user", process.env.QA_SHELL_FIXTURE_USER ?? "demo@demo-praxis.test"], ["IMAP password", "demo"],
+    ["SMTP host", "127.0.0.1"], ["SMTP user", process.env.QA_SHELL_FIXTURE_USER ?? "demo@demo-praxis.test"], ["SMTP password", "demo"]]) {
     await create.getByLabel(label, { exact: true }).fill(value);
   }
   // The existing dev fixture speaks plaintext on assigned loopback ports.
@@ -89,7 +89,7 @@ test.describe("admin with partial membership (German UI)", () => {
 
       await page.goto("/?admin=mailboxes");
       const admin = page.getByRole("dialog", { name: "Administration", exact: true });
-      await expect(admin.getByText("demo@monkeydent.test · 2 Mitglieder", { exact: true })).toBeVisible();
+      await expect(admin.getByText("demo@demo-praxis.test · 2 Mitglieder", { exact: true })).toBeVisible();
       await expect(admin.getByText("second@example.test · 1 Mitglied", { exact: true })).toBeVisible();
       await expect(admin.getByText("private@example.test", { exact: false })).toHaveCount(0);
       await shot(page, "admin-scope-mailboxes");

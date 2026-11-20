@@ -18,7 +18,7 @@ const activeSource = () => {
     '<button id="submit" style="width:100%;height:200px">Synthetic</button></form><script>document.title="script-ran"</script>';
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><script>document.title="svg-script-ran"</script><rect width="40" height="40" fill="red"/></svg>';
   return [
-    "From: Synthetic Sender <sender@example.test>", "To: demo@monkeydent.test", "Message-ID: <csp-attachments@example.test>",
+    "From: Synthetic Sender <sender@example.test>", "To: demo@demo-praxis.test", "Message-ID: <csp-attachments@example.test>",
     `Date: ${new Date().toUTCString()}`, `Subject: ${ACTIVE_SUBJECT}`, "MIME-Version: 1.0",
     `Content-Type: multipart/mixed; boundary="${boundary}"`, "",
     `--${boundary}`, "Content-Type: text/html; charset=utf-8", "Content-Transfer-Encoding: base64", "", b64(html),
@@ -113,7 +113,7 @@ test("app pages run under the CSP without violations; attachments stay isolated"
   const newsletter = await findMessage(page, "Praxispost im Oktober");
   await page.goto(`/message/window?accountId=${ACCOUNT}&messageId=${encodeURIComponent(newsletter.id)}`);
   const mailFrame = page.frameLocator("iframe[sandbox='allow-same-origin']");
-  await expect(mailFrame.getByText("MonkeyDent Praxispost")).toBeVisible({ timeout: 30_000 });
+  await expect(mailFrame.getByText("Demo-Praxis Praxispost")).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => mailFrame.locator("img").evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
   await page.screenshot({ path: evidencePath("csp-html-mail.png") });
 

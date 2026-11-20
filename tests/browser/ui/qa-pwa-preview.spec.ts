@@ -86,7 +86,7 @@ const boundary = "qa-pwa-preview-boundary";
 const html = `<html><body><h1>Unterlagen</h1>${Array.from({ length: 6 }, (_, n) => `<p>Synthetischer Absatz ${n + 1}.</p>`).join("")}</body></html>`;
 const source = [
   "From: Synthetic Office <office@example.test>",
-  "To: demo@monkeydent.test",
+  "To: demo@demo-praxis.test",
   "Message-ID: <qa-pwa-preview@example.test>",
   `Date: ${new Date(Date.now() + 7_200_000).toUTCString()}`,
   `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,

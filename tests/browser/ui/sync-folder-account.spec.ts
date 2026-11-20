@@ -14,7 +14,7 @@ test("create, immutable owner and switch never sync the previous account's folde
   const me = await (await page.request.get("/api/auth/me")).json();
   const suffix = Date.now();
   async function createMailbox(label: string) {
-    const endpoint = { host: "127.0.0.1", secure: false, user: "demo@monkeydent.test", password: "demo" };
+    const endpoint = { host: "127.0.0.1", secure: false, user: "demo@demo-praxis.test", password: "demo" };
     const response = await page.request.post("/api/admin/accounts", { headers, data: {
       name: `Synthetic ${label} ${suffix}`, email: `sync-${label.toLowerCase()}-${suffix}@example.test`, avatar: "",
       imap: { ...endpoint, port: Number(process.env.QA_SHELL_IMAP_PORT ?? 3846) }, smtp: { ...endpoint, port: Number(process.env.QA_SHELL_SMTP_PORT ?? 3848) }

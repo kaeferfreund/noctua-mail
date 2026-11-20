@@ -138,7 +138,7 @@ test("admin selects are styled and the admin members table sits on a card in bot
       await admin.getByRole("button", { name: "Postfächer", exact: true }).click();
       await admin.locator("div.rounded-md.border").filter({ has: page.getByText("QA Shared", { exact: true }) })
         .getByRole("button", { name: "Mitglieder verwalten", exact: true }).click();
-      const members = page.getByRole("dialog", { name: "Mitglieder von demo@monkeydent.test", exact: true });
+      const members = page.getByRole("dialog", { name: "Mitglieder von demo@demo-praxis.test", exact: true });
       const table = members.locator("[data-members-table]");
       await expect(table.locator("tbody tr")).not.toHaveCount(0);
       await page.screenshot({ path: evidencePath(`admin-members-${width}-${colorScheme}.png`) });
@@ -173,7 +173,7 @@ test("the MCP tab fits phones and keeps mailbox names whole", async ({ page }) =
     const dialog = await openSettings(page, width);
     await dialog.getByRole("tab", { name: "MCP", exact: true }).click();
     const panel = dialog.locator('[role="tabpanel"][data-state="active"]');
-    const mailbox = panel.getByRole("checkbox", { name: "QA Shared (demo@monkeydent.test)", exact: true });
+    const mailbox = panel.getByRole("checkbox", { name: "QA Shared (demo@demo-praxis.test)", exact: true });
     await expect(mailbox).toBeVisible();
     await page.screenshot({ path: evidencePath(`settings-mcp-${width}.png`) });
     const url = panel.getByText(/\/api\/mcp$/);
@@ -182,8 +182,8 @@ test("the MCP tab fits phones and keeps mailbox names whole", async ({ page }) =
       return { title: element.getAttribute("title"), right: box.right, cardRight: card.right };
     });
     // The mailbox name is user text: not hyphenated or split at an arbitrary letter, and
-    // "(demo@monkeydent.test)" stays on one line where the column fits it.
-    const label = await panel.locator("label").filter({ hasText: "QA Shared (demo@monkeydent.test)" }).evaluate(element => {
+    // "(demo@demo-praxis.test)" stays on one line where the column fits it.
+    const label = await panel.locator("label").filter({ hasText: "QA Shared (demo@demo-praxis.test)" }).evaluate(element => {
       const text = element.textContent!, range = document.createRange();
       const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
       const nodes: Text[] = []; for (let node = walker.nextNode(); node; node = walker.nextNode()) nodes.push(node as Text);

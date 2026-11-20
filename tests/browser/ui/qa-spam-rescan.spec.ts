@@ -19,7 +19,7 @@ const isRescanState = (url: URL) => url.pathname === rescanUrl;
 
 function source(id: string, from: string, subject: string, ageDays: number, flagged: boolean) {
   return [
-    `From: ${from}`, "To: demo@monkeydent.test", `Message-ID: <${id}@example.test>`,
+    `From: ${from}`, "To: demo@demo-praxis.test", `Message-ID: <${id}@example.test>`,
     `Date: ${new Date(Date.now() - ageDays * DAY).toUTCString()}`,
     `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
     ...(flagged ? ["X-Spam-Flag: YES", "X-Spam-Status: Yes, score=8.2"] : []),
@@ -66,8 +66,8 @@ async function waitForSyncedInbox(page: Page) {
 
 async function openPanel(page: Page) {
   await page.goto("/?admin=spam");
-  await page.getByRole("button", { name: "Posteingang von demo@monkeydent.test prüfen" }).click();
-  return page.getByRole("listitem").filter({ has: page.getByText("demo@monkeydent.test", { exact: true }) });
+  await page.getByRole("button", { name: "Posteingang von demo@demo-praxis.test prüfen" }).click();
+  return page.getByRole("listitem").filter({ has: page.getByText("demo@demo-praxis.test", { exact: true }) });
 }
 
 const mixedJob = {

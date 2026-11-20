@@ -40,7 +40,7 @@ const georgiaParagraphs = "<p>Hallo Alex,</p><p>diese synthetische HTML-Mail set
 function message(id: string, subject: string, contentType: string, body: string, minutes: number) {
   return [
     "From: Toni Muster <toni.muster@example.test>",
-    "To: demo@monkeydent.test",
+    "To: demo@demo-praxis.test",
     `Message-ID: <qa-mail-body-font-${id}@example.test>`,
     `Date: ${new Date(Date.now() + 3_600_000 + minutes * 60_000).toUTCString()}`,
     `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
