@@ -766,9 +766,10 @@ a {
   color: var(--link);
 }
 
-/* Remote or unknown image in rendered Markdown that was not loaded
-   (MarkdownContent): mail Markdown view, notes and the compose preview. */
-.markdown-blocked-image {
+/* Remote or unknown image in sender content shown in the app document that
+   was not loaded: rendered Markdown (MarkdownContent) and the rich compose
+   editor (lexical/ImageNode). */
+.remote-image-placeholder {
   display: inline-flex;
   align-items: center;
   gap: 0.35em;
@@ -785,11 +786,11 @@ a {
   vertical-align: middle;
 }
 
-button.markdown-blocked-image {
+button.remote-image-placeholder {
   cursor: pointer;
 }
 
-button.markdown-blocked-image:hover {
+button.remote-image-placeholder:hover {
   background: var(--gray-a3);
 }
 

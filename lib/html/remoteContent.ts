@@ -22,6 +22,22 @@ export function isLocalMailResource(value: string) {
   return /^(?:cid:|data:image\/|blob:)/i.test(url) || LOCAL_ATTACHMENT_PATH.test(url);
 }
 
+/**
+ * How an image source is treated where sender content is shown in the app
+ * document itself (rendered Markdown, the rich compose editor):
+ * - `local`: inline/attachment resources of the message, always shown;
+ * - `remote`: absolute http(s) URLs, shown only with remote-content consent;
+ * - `inert`: anything else (relative app paths, other schemes), never loaded.
+ */
+export type ImageSourceKind = "local" | "remote" | "inert";
+
+export function classifyImageSource(src: string | null | undefined): ImageSourceKind {
+  const value = src?.trim() ?? "";
+  if (!value) return "inert";
+  if (isLocalMailResource(value)) return "local";
+  return /^https?:\/\//i.test(value) ? "remote" : "inert";
+}
+
 export function messageHtmlCsp(mode: RemoteContentMode = "block") {
   const remote = mode === "allow" ? " https: http:" : "";
   // Opt-in permits image resources only; sender CSS/fonts never load remotely.

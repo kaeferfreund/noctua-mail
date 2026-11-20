@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { render } from "@/lib/i18n/testRender";
 import MarkdownPanel from "./MarkdownPanel";
-import { classifyMarkdownImage, hasRemoteMarkdownImages } from "./markdownImages";
+import { classifyImageSource } from "@/lib/html/remoteContent";
+import { hasRemoteMarkdownImages } from "./markdownImages";
 
 const REMOTE = "https://tracker.example.test/pixel.gif";
 const LOCAL = "/api/accounts/acct/messages/m1/attachments/logo";
@@ -28,12 +29,12 @@ const imageSources = (container: HTMLElement) => [...container.querySelectorAll(
 
 describe("markdown image policy (DS-08, A23)", () => {
   it("classifies sources", () => {
-    expect(classifyMarkdownImage(REMOTE)).toBe("remote");
-    expect(classifyMarkdownImage(LOCAL)).toBe("local");
-    expect(classifyMarkdownImage("data:image/png;base64,AAAA")).toBe("local");
-    expect(classifyMarkdownImage("/api/accounts/../prefs")).toBe("inert");
-    expect(classifyMarkdownImage("//tracker.example.test/p")).toBe("inert");
-    expect(classifyMarkdownImage("javascript:alert(1)")).toBe("inert");
+    expect(classifyImageSource(REMOTE)).toBe("remote");
+    expect(classifyImageSource(LOCAL)).toBe("local");
+    expect(classifyImageSource("data:image/png;base64,AAAA")).toBe("local");
+    expect(classifyImageSource("/api/accounts/../prefs")).toBe("inert");
+    expect(classifyImageSource("//tracker.example.test/p")).toBe("inert");
+    expect(classifyImageSource("javascript:alert(1)")).toBe("inert");
   });
 
   it("detects inline and reference remote images, not raw HTML", () => {

@@ -1,11 +1,10 @@
 "use client";
 
-import { ImageOff } from "lucide-react";
-import { useTranslations } from "next-intl";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
-import { classifyMarkdownImage } from "./markdownImages";
+import RemoteImagePlaceholder from "@/app/components/RemoteImagePlaceholder";
+import { classifyImageSource } from "@/lib/html/remoteContent";
 
 export type MarkdownContentProps = {
   source: string;
@@ -15,15 +14,6 @@ export type MarkdownContentProps = {
   onLoadRemoteImages?: () => void;
   onLinkPreview?: (url: string | null) => void;
 };
-
-function imageLabel(src: string, alt: string | undefined) {
-  if (alt?.trim()) return alt.trim();
-  try {
-    return new URL(src).host;
-  } catch {
-    return src;
-  }
-}
 
 type MarkdownImageProps = {
   src: string;
@@ -35,26 +25,12 @@ type MarkdownImageProps = {
 
 /** Local images render; remote ones only with consent; anything else never loads. */
 function MarkdownImage({ src, alt, title, remoteImagesAllowed, onLoadRemoteImages }: MarkdownImageProps) {
-  const t = useTranslations("Reader");
-  const kind = classifyMarkdownImage(src);
+  const kind = classifyImageSource(src);
   if (kind === "local" || (kind === "remote" && remoteImagesAllowed)) {
     // eslint-disable-next-line @next/next/no-img-element -- message content, not an app asset
     return <img src={src} alt={alt ?? ""} title={title} referrerPolicy="no-referrer" loading="lazy" />;
   }
-  const label = t(kind === "remote" ? "remoteImage" : "blockedImage", { label: imageLabel(src, alt) });
-  const content = (
-    <>
-      <ImageOff size={14} aria-hidden="true" />
-      <span>{label}</span>
-    </>
-  );
-  return kind === "remote" && onLoadRemoteImages ? (
-    <button type="button" className="markdown-blocked-image" title={t("loadOnce")} onClick={onLoadRemoteImages}>
-      {content}
-    </button>
-  ) : (
-    <span className="markdown-blocked-image" title={title}>{content}</span>
-  );
+  return <RemoteImagePlaceholder src={src} alt={alt} title={title} kind={kind} onLoad={onLoadRemoteImages} />;
 }
 
 /**
