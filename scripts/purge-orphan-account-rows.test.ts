@@ -54,8 +54,9 @@ describe("purge-orphan-account-rows", () => {
     // Spam settings are keyed by scope: the prefixed and the legacy bare-id row of A are orphans, B's row and "global" are not.
     const spamScopes = [`account:${a.accountId}`, a.accountId, `account:${b.accountId}`, "global"];
     for (const scope of spamScopes) {
-      master.prepare(`INSERT INTO spam_settings (scope, settings, updatedAt, updatedByUserId) VALUES (?, '{"enabled":false}', 0, NULL)
-        ON CONFLICT(scope) DO NOTHING`).run(scope);
+      // "global" stays empty: other test files share this master DB and must keep the default spam detection.
+      master.prepare(`INSERT INTO spam_settings (scope, settings, updatedAt, updatedByUserId) VALUES (?, ?, 0, NULL)
+        ON CONFLICT(scope) DO NOTHING`).run(scope, scope === "global" ? "{}" : '{"enabled":false}');
     }
     const spamRows = () => (master.prepare("SELECT scope FROM spam_settings WHERE scope IN (?, ?, ?, ?) ORDER BY scope")
       .all(...spamScopes) as Array<{ scope: string }>).map(row => row.scope);
