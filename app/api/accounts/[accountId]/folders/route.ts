@@ -3,6 +3,8 @@ import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getFolders, saveFoldersForAccount } from "@/lib/db";
 import type { Folder } from "@/lib/data";
+import { FolderAccountMismatchError, folderIdBelongsToAccount } from "@/lib/folderAccount";
+import { folderAccountMismatchResponse } from "@/app/api/_helpers/folderAccount";
 import {
   getAccountIdFromParams,
   requireAccountContext,
@@ -28,11 +30,21 @@ export async function PUT(request: Request, { params }: AccountRouteParams) {
     if (!Array.isArray(payload)) {
       return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
     }
-    const invalidFolder = payload.find((folder) => folder.accountId !== accountContext.accountId);
+    // The folder id (and parent id) is the shard-wide key, so it must carry this
+    // mailbox's namespace, not just the accountId field next to it.
+    const invalidFolder = payload.find((folder) =>
+      folder?.accountId !== accountContext.accountId ||
+      !folderIdBelongsToAccount(accountContext.accountId, folder.id) ||
+      (folder.parentId != null && !folderIdBelongsToAccount(accountContext.accountId, folder.parentId)));
     if (invalidFolder) {
       return NextResponse.json({ ok: false, message: "Folder account mismatch" }, { status: 400 });
     }
-    await saveFoldersForAccount(accountContext.accountId, payload);
+    try {
+      await saveFoldersForAccount(accountContext.accountId, payload);
+    } catch (error) {
+      if (error instanceof FolderAccountMismatchError) return folderAccountMismatchResponse();
+      throw error;
+    }
     return NextResponse.json({ ok: true });
   });
 }
