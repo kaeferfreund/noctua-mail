@@ -46,7 +46,7 @@ describe("calendar browser across a mailbox switch", () => {
       view.rerender(ui("mailbox-b"));
       expect(view.container.textContent).not.toContain("Private event of mailbox-a");
       await waitFor(() => expect(view.container.textContent).toContain("Private event of mailbox-b"));
-    } finally { network.mockRestore(); }
+    } finally { cleanup(); network.mockRestore(); }
   });
 
   it("closes the open event and replaces the previous mailbox's entries", async () => {
@@ -62,6 +62,6 @@ describe("calendar browser across a mailbox switch", () => {
       expect(view.container.textContent).not.toContain("Private event of mailbox-a");
       await waitFor(() => expect(view.container.textContent).toContain("Private event of mailbox-b"));
       expect(view.container.textContent).not.toContain("Private event of mailbox-a");
-    } finally { network.mockRestore(); }
+    } finally { cleanup(); network.mockRestore(); }
   });
 });
