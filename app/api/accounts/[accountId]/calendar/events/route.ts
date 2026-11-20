@@ -118,8 +118,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       myPartstatUpdatedAtMs: toFiniteNumber(body?.myPartstatUpdatedAtMs) || undefined,
       myAttendeeEmail: body?.myAttendeeEmail?.trim() || undefined,
       replyRequested: body?.replyRequested === undefined ? undefined : Boolean(body.replyRequested),
-      remoteEtag: body?.remoteEtag?.trim() || undefined,
-      remoteHref: body?.remoteHref?.trim() || undefined,
+      // Server-owned CalDAV linkage (set only by sync), never taken from the request.
+      remoteEtag: existing?.remoteEtag,
+      remoteHref: existing?.remoteHref,
       rawIcs: body?.rawIcs ?? undefined,
       sourceType: (body?.sourceType as CalendarEventSourceType) ?? "local",
       messageId: resolvedMessageId,
