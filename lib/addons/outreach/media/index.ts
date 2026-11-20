@@ -3,8 +3,8 @@ import { randomUUID } from "node:crypto";
 import { lstat, mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getDataDir } from "@/lib/runtimePaths";
-import type { OutreachImage, OutreachImageType, OutreachImageUploadResponse } from "../types";
-import { imageExtensions, imageUrl, prepareImage } from "./format";
+import { OUTREACH_IMAGE_QUOTA_BYTES, type OutreachImage, type OutreachImageType, type OutreachImageUploadResponse } from "../types";
+import { imageExtensions, imageUrl, OutreachImageError, prepareImage } from "./format";
 
 export { base64ImageLimit, decodeImageBase64, imageFilename, imageFilenameLimit, imagePathPrefix, imageUrl,
   OutreachImageError, prepareImage } from "./format";
@@ -30,9 +30,20 @@ export function listOutreachImages(db: Database, accountId: string): OutreachIma
     WHERE accountId = ? ORDER BY createdAt DESC, hash`).all(accountId).map(imageFromRow);
 }
 
+/** A new image of this mailbox must fit its quota; one it already has costs nothing. */
+function assertImageQuota(db: Database, accountId: string, hash: string, size: number, quota: number) {
+  if (db.query("SELECT 1 FROM images WHERE accountId = ? AND hash = ?").get(accountId, hash)) return;
+  const { used } = db.query("SELECT COALESCE(SUM(bytes), 0) AS used FROM images WHERE accountId = ?").get(accountId) as { used: number };
+  if (used + size > quota) {
+    throw new OutreachImageError(413, "Der Bildspeicher dieses Postfachs ist voll.", "image_quota_exceeded");
+  }
+}
+
 export async function saveOutreachImage(db: Database, accountId: string, image: ReturnType<typeof prepareImage>,
-  userId: string | null, directory = outreachMediaDir()): Promise<OutreachImageUploadResponse> {
+  userId: string | null, directory = outreachMediaDir(), quota = OUTREACH_IMAGE_QUOTA_BYTES): Promise<OutreachImageUploadResponse> {
   const { bytes, contentType, filename, hash, width, height } = image;
+  // Checked before the file is written and again atomically with the insert (concurrent uploads).
+  assertImageQuota(db, accountId, hash, bytes.byteLength, quota);
   const target = outreachImageFile(directory, hash, contentType);
   const existing = await lstat(target).catch((error: NodeJS.ErrnoException) => {
     if (error.code !== "ENOENT") throw error;
@@ -49,11 +60,14 @@ export async function saveOutreachImage(db: Database, accountId: string, image: 
       await rm(temp, { force: true });
     }
   }
-  const inserted = db.query(
-    `INSERT INTO images (accountId, hash, contentType, bytes, width, height, filename, createdAt, createdByUserId)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (accountId, hash) DO NOTHING RETURNING ${imageFields}`
-  ).get(accountId, hash, contentType, bytes.byteLength, width, height, filename, Date.now(), userId) as ImageRow | null;
+  const inserted = db.transaction(() => {
+    assertImageQuota(db, accountId, hash, bytes.byteLength, quota);
+    return db.query(
+      `INSERT INTO images (accountId, hash, contentType, bytes, width, height, filename, createdAt, createdByUserId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT (accountId, hash) DO NOTHING RETURNING ${imageFields}`
+    ).get(accountId, hash, contentType, bytes.byteLength, width, height, filename, Date.now(), userId) as ImageRow | null;
+  }).immediate();
   const row = inserted ?? db.query(
     `SELECT ${imageFields} FROM images WHERE accountId = ? AND hash = ?`
   ).get(accountId, hash) as ImageRow;

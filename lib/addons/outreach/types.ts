@@ -238,6 +238,8 @@ export type RenderResponse = { ok: true; subject: string; html: string; text: st
 export const OUTREACH_IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"] as const;
 export type OutreachImageType = (typeof OUTREACH_IMAGE_TYPES)[number];
 export const OUTREACH_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+/** Stored image bytes per mailbox. Images cannot be removed (sent mail keeps pointing to them), so this caps the data volume a mailbox's editors can fill. */
+export const OUTREACH_IMAGE_QUOTA_BYTES = 200 * 1024 * 1024;
 
 export type OutreachImage = {
   id: string;

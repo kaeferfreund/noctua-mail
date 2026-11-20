@@ -196,7 +196,7 @@ Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 | GET, PATCH, DELETE | `{base}/templates/{templateId}` | `Partial<EmailTemplateInput>` → `{ok, template}`; DELETE archives |
 | POST | `{base}/render` | `{subject, html, text?, contactId?}` → `RenderResponse` |
 | GET | `{base}/images` | → `OutreachImageListResponse` |
-| POST | `{base}/images?filename=` | file bytes as `application/octet-stream` → `OutreachImageUploadResponse` (PNG, JPEG, GIF, WebP; at most 5 MiB; 413 if oversized, 415 if unsupported or the extension disagrees with the detected type) |
+| POST | `{base}/images?filename=` | file bytes as `application/octet-stream` → `OutreachImageUploadResponse` (PNG, JPEG, GIF, WebP; at most 5 MiB; 413 if oversized, 413 `image_quota_exceeded` when a new image would exceed the mailbox's 200 MiB image storage (an image the mailbox already has is free), 415 if unsupported or the extension disagrees with the detected type) |
 | GET, POST | `{base}/campaigns` | `CampaignInput` → `{ok, campaigns: CampaignSummary[]}` / `{ok, campaign}` |
 | GET, PATCH, DELETE | `{base}/campaigns/{campaignId}` | `CampaignInput` → `{ok, campaign: Campaign}`; only drafts change or delete. `Campaign` and `CampaignSummary` carry `scheduledByUserId` and `scheduledVia` |
 | POST | `{base}/campaigns/{campaignId}/test` | `TestSendRequest` → `{ok}` |

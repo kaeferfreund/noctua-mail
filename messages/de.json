@@ -2379,6 +2379,7 @@
       "offline": "Der Server ist nicht erreichbar. Prüfe die Verbindung und versuch es erneut.",
       "generic": "Das hat nicht geklappt. Versuch es erneut.",
       "tooLarge": "Die Datei ist zu groß für den Server.",
+      "imageQuota": "Der Bildspeicher dieses Postfachs ist voll. Verwende ein bereits hochgeladenes Bild.",
       "unsupportedType": "Dieser Dateityp wird nicht angenommen.",
       "detail": "(Server: {detail})"
     },

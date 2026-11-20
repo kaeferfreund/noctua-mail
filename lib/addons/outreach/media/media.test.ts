@@ -36,6 +36,26 @@ test("storage deduplicates concurrent uploads across mailboxes and retains the f
   }
 });
 
+test("a mailbox's new images must fit its storage quota; known images and other mailboxes are not affected", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "outreach-images-"));
+  try {
+    const variant = (marker: number) => prepareImage(Buffer.concat([gif, Buffer.from([marker])]), `v${marker}.gif`);
+    const quota = (gif.length + 1) * 2;
+    await saveOutreachImage(db, "a", variant(1), "user-a", dir, quota);
+    await saveOutreachImage(db, "a", variant(2), "user-a", dir, quota);
+    const files = readdirSync(dir).length;
+    await expect(saveOutreachImage(db, "a", variant(3), "user-a", dir, quota))
+      .rejects.toMatchObject({ status: 413, code: "image_quota_exceeded" });
+    // Refused before anything is written.
+    expect(readdirSync(dir).length).toBe(files);
+    expect(listOutreachImages(db, "a")).toHaveLength(2);
+    expect(await saveOutreachImage(db, "a", variant(1), "user-a", dir, quota)).toMatchObject({ ok: true, created: false });
+    expect(await saveOutreachImage(db, "b", variant(3), "user-b", dir, quota)).toMatchObject({ ok: true, created: true });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("v4 upgrades add image storage and preserve existing template and send data", () => {
   removeHistorySchema(db);
   db.exec("DROP TABLE images; PRAGMA user_version = 4");
