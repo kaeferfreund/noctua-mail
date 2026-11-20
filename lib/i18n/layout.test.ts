@@ -15,4 +15,6 @@ for (const [input, locale, label, description] of [
   expect(html).toContain(`data-locale="${locale}" data-zone="Europe/Berlin">${label}</p>`);
   expect(metadata.description).toBe(description);
   expect(metadata.manifest).toBe("/manifest.webmanifest");
+  // Inline scripts carry the request's CSP nonce, or the browser blocks them.
+  expect(html).toContain('<script id="ios-standalone" nonce="c3ludGhldGljLW5vbmNl">');
 });

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { headers } from "next/headers";
 import { Theme } from "@radix-ui/themes";
 import { ThemeProvider } from "next-themes";
 import Script from "next/script";
@@ -50,21 +51,23 @@ export default async function RootLayout({
   children: ReactNode;
 }) {
   const settings = await getLocaleSettings();
+  // Script nonce of this request's Content-Security-Policy (proxy.ts).
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     // next-themes sets the theme class and color-scheme on <html> before
     // hydration, so the server markup cannot match it.
     <html lang={settings.locale} suppressHydrationWarning>
       <head>
-        <Script src="/runtime-config.js" strategy="beforeInteractive" />
+        <Script src="/runtime-config.js" strategy="beforeInteractive" nonce={nonce} />
         {/* Marks an iOS 26 home-screen app on <html> before the first paint, so
             the top spacer does not shift the header after load. */}
-        <script id="ios-standalone" dangerouslySetInnerHTML={{ __html: IOS_STANDALONE_SCRIPT }} />
+        <script id="ios-standalone" nonce={nonce} dangerouslySetInnerHTML={{ __html: IOS_STANDALONE_SCRIPT }} />
       </head>
       <body suppressHydrationWarning>
         <ClientErrorReporting />
         <I18nProvider {...settings}>
           <LocaleSessionSync uiLocale={settings.uiLocale} />
-          <ThemeProvider attribute="class" storageKey="noctua:theme" enableSystem>
+          <ThemeProvider attribute="class" storageKey="noctua:theme" enableSystem nonce={nonce}>
             <ThemeColorSync />
             {/* Radix surface tokens are bridged to the shadcn tokens by the
                 .radix-themes rule in globals.css. */}

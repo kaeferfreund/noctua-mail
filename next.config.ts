@@ -2,6 +2,7 @@ import path from "node:path";
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import { workerRuntimeTraceFiles } from "./build-scripts/workerRuntimeTraceFiles";
+import { API_FRAME_HEADERS, GLOBAL_SECURITY_HEADERS, PAGE_FRAME_HEADERS } from "./lib/securityHeaders";
 
 // Next walks parent lockfiles and otherwise picks a parent directory (for
 // example the home directory) as the workspace root, which nests standalone
@@ -29,7 +30,12 @@ const OUTREACH_TOKEN_PATH = /^(?:[a-z][a-z0-9+.-]*:\/\/[^/]*)?\/+(?:t|%74|%54)(?
 const nextConfig: NextConfig = {
   logging: { incomingRequests: { ignore: [RESET_PASSWORD_ANY_SPELLING, OUTREACH_TOKEN_PATH] } },
   async headers() {
-    return [{ source: "/reset-password", headers: [
+    // Later rules override earlier ones for the same key, so the general
+    // security headers come first. The page CSP is set per request in proxy.ts.
+    return [{ source: "/:path*", headers: GLOBAL_SECURITY_HEADERS },
+    { source: "/((?!api/).*)", headers: PAGE_FRAME_HEADERS },
+    { source: "/api/:path*", headers: API_FRAME_HEADERS },
+    { source: "/reset-password", headers: [
       {key:"Cache-Control",value:"no-store"},{key:"Referrer-Policy",value:"no-referrer"}
     ] },
     // Font and icon file names are stable but not content-hashed, so they
