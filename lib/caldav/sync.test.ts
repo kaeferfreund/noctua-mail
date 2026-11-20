@@ -255,6 +255,22 @@ describe("syncCalendarEvents collection boundary", () => {
     expect(result.errors.filter(error => error.startsWith("Skip remote object outside calendar"))).toHaveLength(outside.length);
   });
 
+  test("a listing with objects outside the collection deletes no local events", async () => {
+    const accountId = `acc-sync-boundary-${randomUUID()}`;
+    await upsertAccount(buildAccount(accountId));
+    const kept = buildDirtyEvent(accountId, `evt-${randomUUID()}@example.test`, "etag-1");
+    kept.pendingRemoteSync = undefined;
+    await upsertCalendarEvent(accountId, kept);
+    // A misconfigured server names our object under another collection path.
+    remoteObjects = [{ url: `${outside[0]}${kept.eventUid}.ics`, etag: "etag-1", data: ics(kept.eventUid) }];
+
+    const result = await syncCalendarEvents(accountId, syncDeps);
+
+    expect(result.deleted).toBe(0);
+    expect((await getCalendarEventById(accountId, kept.id))?.deletedAtMs).toBeFalsy();
+    expect(result.errors.join("\n")).toContain("Skip local deletions");
+  });
+
   test("never PUTs or DELETEs a stored href outside the configured calendar collection", async () => {
     for (const base of outside) {
       const accountId = `acc-sync-boundary-${randomUUID()}`;
