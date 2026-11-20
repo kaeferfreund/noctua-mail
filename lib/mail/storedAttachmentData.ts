@@ -1,6 +1,6 @@
 import {
   getAttachmentData,
-  getMessageSource,
+  getMessageSourceBuffer,
   saveAttachmentData,
   statAttachmentData,
   statMessageSource
@@ -53,8 +53,8 @@ export async function readStoredAttachmentData(
     return cached;
   }
   if (limits) assertWithin("source", (await statMessageSource(accountId, messageId))?.size, limits.maxSourceBytes);
-  const source = await getMessageSource(accountId, messageId);
-  if (!source) return null;
+  const source = await getMessageSourceBuffer(accountId, messageId);
+  if (!source?.length) return null;
   let data: Buffer<ArrayBuffer>;
   try {
     const extracted = await extractAttachmentBufferFromSource(source, {

@@ -181,7 +181,12 @@ export type Message = {
   htmlBody?: string;
   /** Whether `body`/`htmlBody` are present in this payload; see MessageContentState. */
   contentState?: import("./messageContentState").MessageContentState;
-  source?: string;
+  /**
+   * Raw RFC 822 source. Server-side ingestion carries the exact wire bytes
+   * (Buffer) so 8bit/binary parts in non-UTF-8 charsets survive storage;
+   * locally generated sources (drafts, sent copies) may be strings.
+   */
+  source?: string | Buffer;
   hasSource?: boolean;
   /** Byte length of the stored raw RFC822 source. */
   sizeBytes?: number;

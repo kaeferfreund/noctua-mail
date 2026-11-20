@@ -22,6 +22,7 @@ import {
   upsertMessages
 } from "./serverDb";
 import { deleteMessageFiles, getMessageSource } from "@/lib/storage";
+import { rawMessageSourceText } from "@/lib/messageSource";
 import {
   normalizeCalendarAttachments,
   parseComposeAttachments,
@@ -631,7 +632,7 @@ export async function loadSendableDraft(accountId: string, draftId: string) {
   if (!draftHasSendableRecipients(draft)) {
     throw new DraftSendError(400, "Please add at least one recipient before sending.");
   }
-  const rawSource = (await getMessageSource(accountId, draft.id)) ?? draft.source ?? null;
+  const rawSource = (await getMessageSource(accountId, draft.id)) ?? (draft.source !== undefined ? rawMessageSourceText(draft.source) : null);
   if (!rawSource) {
     throw new DraftSendError(
       409,

@@ -1,5 +1,5 @@
 import { parseDeliveryMetadata } from "../../mail/imap/parser";
-import { getMessageSource } from "../../storage";
+import { getMessageSourceBuffer } from "../../storage";
 import { withDbWriteRetry } from "../../dbWriteRetry";
 import { hydrateIdentityMetadata } from "./identityMetadata";
 /**
@@ -56,9 +56,9 @@ export async function getMessageById(accountId: string, messageId: string) {
   if (!row) return null;
   // Lazy cached-source enrichment for explicitly reopened legacy messages.
   if (row.hasSource && (row.deliveredTo == null || row.originalTo == null)) {
-    const source = await getMessageSource(accountId, row.id);
-    if (source) {
-      const metadata = parseDeliveryMetadata(Buffer.from(source));
+    const source = await getMessageSourceBuffer(accountId, row.id);
+    if (source?.length) {
+      const metadata = parseDeliveryMetadata(source);
       await withDbWriteRetry("hydrateDeliveryMetadata", () => db.prepare(`UPDATE messages SET
         deliveredTo=COALESCE(deliveredTo,?), originalTo=COALESCE(originalTo,?),
         senderIdentityId=COALESCE(senderIdentityId,?) WHERE accountId=? AND id=?`)

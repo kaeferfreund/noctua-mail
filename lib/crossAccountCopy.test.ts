@@ -48,11 +48,11 @@ type AppendCall = { mailboxPath: string; raw: Buffer; flags: string[] };
 
 function makeCopyDeps(
   overrides: {
-    storedSource?: string | null;
+    storedSource?: string | Buffer<ArrayBuffer> | null;
     appendResult?: number | null;
     readBack?: Message | null;
     readBackThrows?: boolean;
-    sourceFetch?: string | null;
+    sourceFetch?: string | Buffer | null;
   } = {}
 ) {
   const appendCalls: AppendCall[] = [];
@@ -64,7 +64,7 @@ function makeCopyDeps(
     sourceFetch = null
   } = overrides;
   const deps: CopyDeps = {
-    getMessageSource: async () => storedSource,
+    getMessageSourceBuffer: async () => (typeof storedSource === "string" ? Buffer.from(storedSource) : storedSource),
     appendImapMessage: async (_account, mailboxPath, raw, flags) => {
       appendCalls.push({ mailboxPath, raw: raw as Buffer, flags: flags ?? [] });
       return appendResult;
@@ -94,6 +94,20 @@ describe("copyMessageToAccount", () => {
     expect(appendCalls[0]!.raw.toString("utf-8")).toBe("raw-source-bytes");
     expect(result.destinationUid).toBe(4242);
     expect(result.syncedMessage?.id).toBe("dst-msg");
+  });
+
+  test("appends stored 8bit Latin-1 bytes unchanged", async () => {
+    const latin1 = Buffer.from("Subject: synthetic\r\nContent-Type: text/plain; charset=iso-8859-1\r\nContent-Transfer-Encoding: 8bit\r\n\r\nGr\u00fc\u00dfe \u00e4\u00f6\r\n", "latin1");
+    const { deps, appendCalls } = makeCopyDeps({ storedSource: latin1 });
+    await copyMessageToAccount(baseParams(makeMessage()), deps);
+    expect(appendCalls[0]!.raw.equals(latin1)).toBe(true);
+  });
+
+  test("appends fetched IMAP source bytes unchanged when nothing is cached", async () => {
+    const latin1 = Buffer.from("Subject: synthetic\r\n\r\n\u00fc\u00df\r\n", "latin1");
+    const { deps, appendCalls } = makeCopyDeps({ storedSource: null, sourceFetch: latin1 });
+    await copyMessageToAccount(baseParams(makeMessage({ imapUid: 7, mailboxPath: "SOURCE" })), deps);
+    expect(appendCalls[0]!.raw.equals(latin1)).toBe(true);
   });
 
   test("carries over only system flags", async () => {

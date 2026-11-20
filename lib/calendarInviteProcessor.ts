@@ -35,7 +35,7 @@ import {
   CALENDAR_EVENT_SNAPSHOT_VERSION,
   serializeCalendarEventSnapshot
 } from "@/lib/calendarEventSnapshot";
-import { getMessageSource } from "@/lib/storage";
+import { getMessageSourceBuffer } from "@/lib/storage";
 import { extractIcsSourceFromEmailSource } from "@/lib/mail/attachmentFromSource";
 import { reconcileSeriesAnchorSiblings } from "@/lib/calendarSeriesReanchor";
 import { calendarInviteAuthorityFailure } from "@/lib/calendarInviteAuthority";
@@ -188,8 +188,8 @@ async function hydrateExistingEventFromPriorInviteSource(
     excludeMessageId: messageId
   });
   for (const candidate of candidates) {
-    const emailSource = await getMessageSource(accountId, candidate.messageId);
-    if (!emailSource?.trim()) continue;
+    const emailSource = await getMessageSourceBuffer(accountId, candidate.messageId);
+    if (!emailSource?.length) continue;
     const icsSource = await extractIcsSourceFromEmailSource(emailSource);
     if (!icsSource?.trim()) continue;
     const parsed = parseIcsInvite(icsSource);
