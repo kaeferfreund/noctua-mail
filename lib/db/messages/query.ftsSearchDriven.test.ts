@@ -34,7 +34,9 @@ describe("FTS-driven search candidates differential", () => {
 
   beforeAll(async () => {
     fixture = await createSharedShardFixture();
-    for (const f of [fixture.a, fixture.b]) {
+    // Folder ids are shard-wide keys: one mailbox owns these unprefixed ids (B, as before the
+    // write was scoped, when B's save re-owned A's rows). A has no folder rows.
+    for (const f of [fixture.b]) {
       await f.api.saveFoldersForAccount(f.accountId, [
         { id: "inbox", accountId: f.accountId, name: "INBOX", count: 0, specialUse: "\\Inbox" },
         { id: "archive", accountId: f.accountId, name: "Archive", count: 0 },
