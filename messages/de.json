@@ -1819,6 +1819,8 @@
     "fullSyncCancelled": "Vollständige Synchronisierung abgebrochen",
     "syncCancelledSelectionChanged": "Die vollständige Synchronisierung wurde vor dem Start abgebrochen, weil du ein anderes Postfach ausgewählt hast.",
     "folderAccountMismatch": "Der Ordner gehört nicht zu diesem Postfach. Bitte wähle das Postfach neu aus.",
+    "requestBodyTooLarge": "Die Daten sind zu groß für den Server (z. B. Anhänge über 25 MB oder ein sehr großes Bild in der Signatur).",
+    "requestBodyTimeout": "Die Übertragung hat zu lange gedauert. Bitte erneut versuchen.",
     "syncCancelledBeforeStart": "Die vollständige Synchronisierung wurde vor dem Start abgebrochen.",
     "region": "Benachrichtigungen",
     "dismissLabel": "Benachrichtigung schließen",

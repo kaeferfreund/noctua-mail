@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { BodyReadTimeoutError, readBoundedBody } from "./readAuthJson";
+import { REQUEST_BODY_TIMEOUT, REQUEST_BODY_TOO_LARGE } from "@/lib/requestBodyErrors";
 
 const MIB = 1024 * 1024;
 
@@ -38,13 +39,19 @@ export async function readJsonBody<T = unknown>(
     bytes = await readBoundedBody(request, limit, timeoutMs);
   } catch (error) {
     if (error instanceof BodyReadTimeoutError) {
-      return { ok: false, response: NextResponse.json({ ok: false, message: "Request body timed out" }, { status: 408 }) };
+      return { ok: false, response: NextResponse.json(
+        { ok: false, message: "Request body timed out", code: REQUEST_BODY_TIMEOUT },
+        { status: 408 }
+      ) };
     }
     // A body that was aborted or already consumed reads like an empty one.
     return { ok: true, value: null };
   }
   if (!bytes) {
-    return { ok: false, response: NextResponse.json({ ok: false, message: "Request body too large" }, { status: 413 }) };
+    return { ok: false, response: NextResponse.json(
+        { ok: false, message: "Request body too large", code: REQUEST_BODY_TOO_LARGE },
+        { status: 413 }
+      ) };
   }
   try {
     return { ok: true, value: JSON.parse(new TextDecoder().decode(bytes)) as T };
