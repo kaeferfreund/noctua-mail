@@ -233,6 +233,7 @@ import {
   VIRTUAL_FOLDERS,
   getVirtualFolderLabels
 } from "./mailclient/useSearchState";
+import { useSearchInput } from "./mailclient/useSearchInput";
 import { useReminderNotifications } from "./mailclient/useReminderNotifications";
 import { useMessageData } from "./mailclient/useMessageData";
 import { useMailboxViewCache } from "./mailclient/mailboxViewCache";
@@ -508,6 +509,7 @@ export default function MailClient({
   const viewMessageId = viewMessage?.id;
   const clearMobileMessage = useCallback(() => setViewMessage(null), []);
   const [query, setQuery] = useState("");
+  const { searchInput, setSearchInput, submitSearchInput } = useSearchInput({ query, setQuery });
   // next-themes owns the theme (class and color-scheme on <html>, persisted
   // under "noctua:theme"); the kept renderers read the resulting html class,
   // which is correct on their first render, so the HtmlMessage iframe is
@@ -5706,7 +5708,7 @@ export default function MailClient({
             : [currentAccount?.name || currentAccount?.email, activeVirtualFolder?.name || activeFolderName].filter((part): part is string => Boolean(part)),
           search: {
             state: {
-              query,
+              searchInput,
               searchScope,
               includeSentInEverywhere,
               sentFolderName: sentFolderBySpecialUse ? getFolderDisplayName(sentFolderBySpecialUse, locale) : null,
@@ -5720,7 +5722,8 @@ export default function MailClient({
               searchBadgesLabel
             },
             actions: {
-              setQuery,
+              setSearchInput,
+              submitSearchInput,
               setSearchScope,
               setIncludeSentInEverywhere,
               setSearchFields,
