@@ -28,7 +28,8 @@ export async function handleRecomputeStartRequest(
     if (!accountId) {
       return NextResponse.json({ ok: false, message: "Missing accountId" }, { status: 400 });
     }
-    const access = await requireAccountContext(request, accountId, { minRole: "viewer" });
+    // Account-wide rebuilds rewrite shared derived state; viewers only read it.
+    const access = await requireAccountContext(request, accountId, { minRole: "editor" });
     if (access instanceof NextResponse) return access;
     const body = await request.json().catch(() => null) as { folderId?: unknown } | null;
     const folderError = await validateAccountFolders(accountId, [body?.folderId,

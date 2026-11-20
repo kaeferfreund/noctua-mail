@@ -95,7 +95,7 @@ export const accountRouteRoles: Array<{ method: string; path: string; minRole: A
   {
     "method": "POST",
     "path": "categories/recompute",
-    "minRole": "viewer"
+    "minRole": "editor"
   },
   {
     "method": "GET",
@@ -470,7 +470,7 @@ export const accountRouteRoles: Array<{ method: string; path: string; minRole: A
   {
     "method": "POST",
     "path": "threads/recompute",
-    "minRole": "viewer"
+    "minRole": "editor"
   },
   {
     "method": "GET",

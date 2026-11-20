@@ -5649,6 +5649,7 @@ export default function MailClient({
             accountFolderCount: accountFolders.length,
             isRecomputingThreads,
             isRecomputingCategories,
+            canRecompute: !!activeAccountId && canEditMailbox(activeAccountId),
             syncAccount,
             recomputeThreads,
             recomputeCategories,
