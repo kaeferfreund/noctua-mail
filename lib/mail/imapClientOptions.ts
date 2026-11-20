@@ -1,9 +1,10 @@
 import type { ImapFlow, ImapFlowOptions } from "imapflow";
+import { createHash } from "crypto";
 import tls from "tls";
 
 import type { Account } from "@/lib/data";
 import { isImapDeadlineCancelled } from "./imapCancellation";
-import { markImapConnectFailure } from "./imapError";
+import { describeImapError, isTemporaryImapAuthFailure, markImapConnectFailure } from "./imapError";
 import { getImapLogger, logImapOp } from "./imapLogger";
 
 export type ImapClientLogContext = {
@@ -143,18 +144,23 @@ function getImapConnectRetryOptions() {
 }
 
 /**
- * Stable identity key for an account's IMAP endpoint. Used by the connection
- * circuit breaker and the connection pool (`lib/mail/imap/connectionPool.ts`)
- * so both treat "the same account, host, port, TLS mode" as the same bucket.
- * If any of these fields change (e.g. user re-configures IMAP host), the key
- * differs and stale entries age out on their own timers.
+ * Stable identity key for an account's upstream IMAP identity. Used by the
+ * connection circuit breaker and the connection pool
+ * (`lib/mail/imap/connectionPool.ts`) so both treat "the same account, host,
+ * port, TLS mode, login and credential" as the same bucket. A pooled session
+ * is authenticated as one upstream login: after the username or password
+ * changes, the key differs, the old session is never handed out again and it
+ * ages out on its own timers. The password enters only as a one-way digest.
  */
 export function buildImapIdentityKey(account: Account) {
   return JSON.stringify([
     account.id,
     account.imap.host,
     account.imap.port,
-    account.imap.secure
+    account.imap.secure,
+    account.imap.user,
+    createHash("sha256").update(account.imap.password ?? "").digest("base64url"),
+    Boolean(account.imap.requireTls)
   ]);
 }
 
@@ -189,6 +195,10 @@ function isRetryableImapConnectError(error: unknown) {
   const candidate = error as ImapConnectErrorLike | null | undefined;
   const text = collectImapConnectErrorText(error);
   if (!text) return false;
+
+  // The server answered the login with "could not process" (RFC 5530), not a
+  // rejection: an outage like a dropped connection, so retry and count it.
+  if (isTemporaryImapAuthFailure(error)) return true;
 
   if (
     candidate?.authenticationFailed === true ||
@@ -405,10 +415,13 @@ export async function connectImapClientWithRetry(params: {
             host: account.imap.host,
             consecutiveFailures: nextState.consecutiveFailures,
             openedUntil: nextState.openedUntil,
-            error: (error as Error | undefined)?.message ?? String(error ?? "")
+            error: describeImapError(error)
           });
         }
-        throw error;
+        // Retries are used up on a failure of the server or the network:
+        // routes answer "mail server unreachable" (503) right away instead of
+        // a raw 500 until the breaker opens.
+        throw markImapConnectFailure(error);
       }
 
       const delayMs = getImapConnectDelayMs(
@@ -426,7 +439,7 @@ export async function connectImapClientWithRetry(params: {
           attempt,
           maxAttempts,
           delayMs,
-          error: (error as Error | undefined)?.message ?? String(error ?? "")
+          error: describeImapError(error)
         });
       }
       await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
@@ -531,6 +544,9 @@ export function buildImapFlowOptions(
     host: account.imap.host,
     port: account.imap.port,
     secure: account.imap.secure,
+    // STARTTLS chosen as mandatory: fail instead of authenticating in cleartext
+    // when the server does not offer (or an attacker strips) the upgrade.
+    ...(!account.imap.secure && account.imap.requireTls ? { doSTARTTLS: true } : {}),
     logger: getImapLogger(),
     ...getImapTimeoutOptions(),
     ...overrides,

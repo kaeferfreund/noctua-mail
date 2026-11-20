@@ -33,7 +33,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       return NextResponse.json(await saveOutreachImage(await getOutreachDb(), context.accountId, image, context.userId));
     } catch (error) {
       if (error instanceof OutreachImageError) {
-        return NextResponse.json({ ok: false, message: error.message }, { status: error.status });
+        return NextResponse.json({ ok: false, message: error.message, ...(error.code ? { code: error.code } : {}) }, { status: error.status });
       }
       console.warn("[outreach] Image upload failed");
       return NextResponse.json({ ok: false, message: "Das Bild konnte nicht gespeichert werden." }, { status: 500 });

@@ -63,6 +63,9 @@ export function imapSignIn(options: {
             throw APIError.from("UNAUTHORIZED", BASE_ERROR_CODES.INVALID_EMAIL_OR_PASSWORD);
           }
           if (!(await options.verifyImap(email, password))) {
+            // Same work as for unknown users: an ineligible or rate-limited
+            // known user would otherwise answer measurably faster (DS-18).
+            await ctx.context.password.hash(password);
             throw APIError.from("UNAUTHORIZED", BASE_ERROR_CODES.INVALID_EMAIL_OR_PASSWORD);
           }
           const dontRememberMe = ctx.body.rememberMe === false;

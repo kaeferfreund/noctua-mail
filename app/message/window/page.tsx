@@ -3,7 +3,7 @@
 import { SENDER_SETTINGS_STORAGE_KEY } from "@/lib/ui/senderSettings";
 import { retryAutoReadOnce } from "@/lib/autoMarkRead";
 
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { getFolderDisplayPath } from "@/lib/i18n/folderNames";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
 
@@ -16,6 +16,7 @@ import {
   buildAccountMessageActionPath,
   buildAccountMessageHtmlPath,
   buildAccountMessagePath,
+  buildAccountMessageEmlPath,
   buildAccountMessageSourcePath
 } from "@/lib/accountApiPaths";
 import { normalizeAccountDateFormat } from "@/lib/dateFormatting";
@@ -23,6 +24,7 @@ import type { Account, AccountDateFormat, Folder, Message } from "@/lib/data";
 import { formatMessageHtmlPageTitle, formatMessagePageTitle } from "@/lib/appBranding";
 import { useWindowTitle } from "@/lib/ui/windowTitle";
 import { useDarkMode } from "@/app/hooks/useDarkMode";
+import { useDetachedSessionGuard } from "@/app/hooks/useDetachedSessionGuard";
 import { createAutoReadCoordinator, useAutoMarkRead, useAutoMarkReadDelay } from "@/app/hooks/useAutoMarkRead";
 import { notifyDetachedMessageDeleted } from "@/lib/ui/detachedMessageEvents";
 import { getImapFlagBadges, hasHtmlContent } from "@/lib/ui/messageView";
@@ -34,6 +36,7 @@ import MessageViewPane from "@/app/components/mailclient/message/MessageViewPane
 import ThreadView from "@/app/components/mailclient/message/ThreadView";
 import type { MessageTab } from "@/app/components/mailclient/message/types";
 import styles from "./page.module.css";
+import { senderIconsEnabled } from "@/lib/accountPrefs";
 
 type DeleteResponse = {
   action: "deleted" | "moved";
@@ -77,7 +80,14 @@ export default function MessageWindowPage() {
   const sourceFetchRef = useRef<Map<string, Promise<string | null>>>(new Map());
   const missingParams = !accountId || !messageId;
 
-  useWindowTitle(formatMessagePageTitle(message?.subject));
+  const tShell = useTranslations("Shell");
+  // After sign-out (or another person's sign-in) this window drops the previous person's mail.
+  const sessionEnded = useDetachedSessionGuard();
+  if (sessionEnded && (message || account || folders.length)) {
+    setMessage(null); setAccount(null); setFolders([]);
+  }
+
+  useWindowTitle(formatMessagePageTitle(sessionEnded ? null : message?.subject));
 
   useEffect(() => {
     let active = true;
@@ -161,13 +171,13 @@ export default function MessageWindowPage() {
 
   const handleDownloadEml = useCallback(async (target: Message) => {
     try {
-      const res = await fetch(buildAccountMessageSourcePath(target.accountId, target.id), {
+      const res = await fetch(buildAccountMessageEmlPath(target.accountId, target.id), {
         credentials: "include"
       });
       if (!res.ok) return;
-      const data = (await res.json()) as { source?: string };
-      if (!data?.source) return;
-      const blob = new Blob([data.source], { type: "message/rfc822" });
+      // The exact stored bytes: re-encoding text would alter 8bit parts.
+      const blob = new Blob([await res.arrayBuffer()], { type: "message/rfc822" });
+      if (!blob.size) return;
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -383,7 +393,9 @@ export default function MessageWindowPage() {
 
   return (
     <div className={styles.page}>
-      {missingParams ? (
+      {sessionEnded ? (
+        renderState(tShell("detachedSignedOut"))
+      ) : missingParams ? (
         renderState("Missing accountId or messageId.", "red")
       ) : status === "loading" ? (
         renderState("Loading message…")
@@ -412,6 +424,9 @@ export default function MessageWindowPage() {
                 ensureMessageContent: async () => null,
                 messageContentLoading: {},
                 includeThreadAcrossFolders: false,
+                // Same mailbox setting as the main reader; the icon route also
+                // applies the user's own opt-out (SD46).
+                senderIconsEnabled: senderIconsEnabled(account?.settings),
                 activeFolderId: safeMessage.folderId,
                 threadPathById: (folderId: string) =>
                   getFolderDisplayPath(folderId, id => folderById.get(id), locale, safeMessage.accountId),

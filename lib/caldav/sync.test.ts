@@ -13,6 +13,7 @@ const updateRemoteEvent = mock(async () => ({ etag: "etag-new" }));
 const deleteRemoteEvent = mock(async () => {});
 
 import { syncCalendarEvents, type CaldavSyncDeps } from "./sync";
+import { selectConfiguredCalendars } from "./client";
 
 const syncDeps: Partial<CaldavSyncDeps> = {
   createCaldavClient: (async () => ({})) as unknown as CaldavSyncDeps["createCaldavClient"],
@@ -22,7 +23,7 @@ const syncDeps: Partial<CaldavSyncDeps> = {
   deleteRemoteEvent: deleteRemoteEvent as unknown as CaldavSyncDeps["deleteRemoteEvent"]
 };
 
-const { upsertAccount, upsertCalendarEvent, getCalendarEventById, listUnresolvedCalendarEventConflicts } =
+const { upsertAccount, upsertCalendarEvent, getCalendarEventById, listUnresolvedCalendarEventConflicts, listCalendarEventsBySource } =
   await dbModulePromise;
 
 function ics(uid: string): string {
@@ -226,5 +227,51 @@ describe("syncCalendarEvents write-back", () => {
     await syncCalendarEvents(accountId, syncDeps);
 
     expect(deleteRemoteEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("syncCalendarEvents calendar selection", () => {
+  const otherCalendar = "https://caldav.example.test/private/";
+  const fetchCalendarsFor = (calendarPath: string) =>
+    (async (client: { fetchCalendars: () => Promise<Array<{ url: string }>> }) =>
+      selectConfiguredCalendars(await client.fetchCalendars(), calendarPath)) as unknown as CaldavSyncDeps["fetchRemoteCalendars"];
+
+  test("an unmatched configured calendar imports nothing instead of every calendar", async () => {
+    const accountId = `acc-sync-select-${randomUUID()}`;
+    const account = buildAccount(accountId);
+    await upsertAccount({ ...account, caldav: { ...account.caldav!, calendarPath: "/cal/renamed/" } });
+    const uid = `evt-${randomUUID()}@example.test`;
+    remoteObjects = [{ url: `${otherCalendar}${uid}.ics`, etag: "etag-1", data: ics(uid) }];
+    const result = await syncCalendarEvents(accountId, {
+      ...syncDeps,
+      createCaldavClient: (async () => ({
+        fetchCalendars: async () => [{ url: CALENDAR_URL }, { url: otherCalendar }]
+      })) as unknown as CaldavSyncDeps["createCaldavClient"],
+      fetchRemoteCalendars: fetchCalendarsFor("/cal/renamed/")
+    });
+    expect(result.inserted).toBe(0);
+    expect(result.errors.join("\n")).toContain("not found");
+    expect(await listCalendarEventsBySource(accountId, "caldav")).toHaveLength(0);
+  });
+
+  test("a matching configured calendar imports only that collection", async () => {
+    const accountId = `acc-sync-select-${randomUUID()}`;
+    await upsertAccount(buildAccount(accountId));
+    const uid = `evt-${randomUUID()}@example.test`;
+    remoteObjects = [{ url: `${CALENDAR_URL}${uid}.ics`, etag: "etag-1", data: ics(uid) }];
+    const fetched: string[] = [];
+    const result = await syncCalendarEvents(accountId, {
+      ...syncDeps,
+      createCaldavClient: (async () => ({
+        fetchCalendars: async () => [{ url: CALENDAR_URL }, { url: otherCalendar }]
+      })) as unknown as CaldavSyncDeps["createCaldavClient"],
+      fetchRemoteCalendars: fetchCalendarsFor("/cal/"),
+      fetchRemoteEvents: (async (_client: unknown, calendar: { url: string }) => {
+        fetched.push(calendar.url);
+        return remoteObjects;
+      }) as unknown as CaldavSyncDeps["fetchRemoteEvents"]
+    });
+    expect(fetched).toEqual([CALENDAR_URL]);
+    expect(result.inserted).toBe(1);
   });
 });

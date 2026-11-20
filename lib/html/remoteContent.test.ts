@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { sanitizeHtmlForDisplay } from "./sanitize";
-import { messageHtmlCsp, senderAllowsRemoteContent } from "./remoteContent";
+import { isLocalMailResource, messageHtmlCsp, senderAllowsRemoteContent } from "./remoteContent";
 
 const remote = "https://images.example.test/photo.png";
 const local = "/api/accounts/demo/messages/newsletter/attachments/logo";
@@ -120,4 +120,33 @@ describe("message HTML privacy", () => {
     expect(messageHtmlCsp()).not.toContain("https:");
     expect(messageHtmlCsp("allow")).toContain("https: http:");
   });
+});
+
+describe("local attachment URL allowlist (DS-09)", () => {
+  it("accepts the paths buildAccountAttachmentPath generates", async () => {
+    const { buildAccountAttachmentPath } = await import("@/lib/accountApiPaths");
+    for (const [account, message, attachment] of [["demo", "newsletter", "logo"], ["a b", "<id@example.test>", "1.2"], ["acct", "m.1", "part~2"]]) {
+      const path = buildAccountAttachmentPath(account, message, attachment);
+      expect(isLocalMailResource(path)).toBe(true);
+      expect(isLocalMailResource(`${path}?preview=1`)).toBe(true);
+    }
+  });
+
+  for (const value of [
+    "/api/accounts/../messages/../attachments/x",
+    "/api/accounts/demo/messages/./attachments/x",
+    "/api/accounts/demo/messages/newsletter/attachments/..",
+    "/api/accounts/%2e%2e/messages/x/attachments/y",
+    "/api/accounts/demo/messages/.%2E/attachments/y",
+    "/api/accounts/demo/messages/x/attachments/%2e",
+    "/api/accounts/demo/messages/x/attachments/y/../../../../prefs",
+    "/api/accounts/de\tmo/messages/x/attachments/y",
+    "/api/accounts/demo/messages/x/attachments/.\t.",
+    "/api/accounts/demo/messages/x/attachments/y#frag"
+  ]) {
+    it(`rejects ${JSON.stringify(value)}`, () => {
+      expect(isLocalMailResource(value)).toBe(false);
+      expect(sanitizeHtmlForDisplay(`<img src="${value}">`)).toContain('src="data:image/gif');
+    });
+  }
 });

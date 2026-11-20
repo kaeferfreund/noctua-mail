@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+// Next compiles header sources with this parser. Its testing helpers ("next/experimental/testing/server")
+// are not used: loaded after "next/server", they break route tests that run later in the same process.
+import { tryToParsePath } from "next/dist/lib/try-to-parse-path";
 
 const PUBLIC_ASSET_CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=604800";
 
@@ -35,11 +38,54 @@ describe("next.config headers", () => {
     // long-lived cache.
     expect(headers.some((entry) => entry.source.includes("runtime-config"))).toBe(false);
     expect(headers.map((entry) => entry.source).sort()).toEqual([
+      "/((?!api/).*)",
+      "/:path*",
+      "/api/:path*",
+      "/api/ba/reset-password",
+      "/api/ba/reset-password/:path*",
       "/fonts/:path*",
       "/icons/:file(icon-\\d+\\.png|base\\.svg)",
       "/reset-password"
     ]);
     expect(headers.some((entry) => entry.source === "/icons/:path*")).toBe(false);
+  });
+});
+
+describe("next.config security headers", () => {
+  // Every matching rule applies; for the same key the later rule wins.
+  const responseHeaders = async (path: string) => {
+    const rules = await (await import("./next.config")).default.headers!();
+    const result = new Map<string, string>();
+    for (const rule of rules) {
+      if (!new RegExp(tryToParsePath(rule.source).regexStr!).test(path)) continue;
+      for (const { key, value } of rule.headers) result.set(key.toLowerCase(), value);
+    }
+    return result;
+  };
+
+  test("forbids framing of pages and type sniffing everywhere", async () => {
+    for (const path of ["/", "/compose/window", "/reset-password", "/t/u/synthetic-token", "/sw.js"]) {
+      const headers = await responseHeaders(path);
+      expect({ path, frame: headers.get("x-frame-options") }).toEqual({ path, frame: "DENY" });
+      expect({ path, sniff: headers.get("x-content-type-options") }).toEqual({ path, sniff: "nosniff" });
+    }
+  });
+
+  test("lets Noctua frame its own API documents", async () => {
+    for (const path of ["/api/accounts/a/messages/m/attachments/x", "/api/accounts/a/messages/m/html"]) {
+      const headers = await responseHeaders(path);
+      expect({ path, frame: headers.get("x-frame-options") }).toEqual({ path, frame: "SAMEORIGIN" });
+      expect({ path, sniff: headers.get("x-content-type-options") }).toEqual({ path, sniff: "nosniff" });
+    }
+  });
+
+  test("sends no referrer to other sites and none at all from the reset page", async () => {
+    expect((await responseHeaders("/")).get("referrer-policy")).toBe("same-origin");
+    expect((await responseHeaders("/reset-password")).get("referrer-policy")).toBe("no-referrer");
+    // The handover redirect and the reset POST carry the token in the URL.
+    for (const path of ["/api/ba/reset-password/synthetic-token", "/api/ba/reset-password"]) {
+      expect({ path, policy: (await responseHeaders(path)).get("referrer-policy") }).toEqual({ path, policy: "no-referrer" });
+    }
   });
 });
 

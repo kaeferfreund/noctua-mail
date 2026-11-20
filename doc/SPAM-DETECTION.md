@@ -65,7 +65,7 @@ and `lib/db/spamRescan.ts`.
    model as hints. `name` entries never allow; a known display name from an
    unknown address is a weak hint only.
 6. **Trusted sender** (`senderProfile.ts`, `anomaly.ts`, section below):
-   a sender with enough authenticated history in the household skips the
+   a sender with enough authenticated history in this mailbox skips the
    model (`trusted:profile`) unless the mail deviates from its pattern; then
    it goes to the model with the deviations as a hint and threshold 0.9. A
    user's latest "Als Spam" for the sender skips this step.
@@ -138,7 +138,8 @@ read an entry that is not written yet.
 
 Concept: briefs/spam/trusted-sender-concept.md (user decisions of 2026-10-24:
 20 mails / 30 days / 2 % canary, no curated service list, household-wide
-profiles). Trust belongs to one sender address, is earned by history, needs
+profiles; since the 2026-11 security fixes the server uses per-mailbox profiles,
+see "Mailbox view" below). Trust belongs to one sender address, is earned by history, needs
 authentication and holds only while a mail matches the sender's pattern.
 
 **Profile** (`senderProfile.ts`, shard table `spam_sender_profiles`, one row
@@ -184,11 +185,13 @@ backfill and the eval take `dateValue`, which only affects rows without a stored
 source (they have no authentication results either, so they cannot make a
 sender trusted). Arrival times in the future are capped at now.
 
-**Household view**: the profiles of the same address in all mailboxes are
-merged (counts and patterns add up, earliest first mail, latest "Als Spam";
-mailboxes silent for 180 days contribute only their "Als Spam").
+**Mailbox view**: the server decides with the profile of the message's own
+mailbox only (a profile silent for 180 days contributes only its "Als Spam").
+Another mailbox's history never trusts a sender here and never appears in this
+mailbox's stored reasons, which every member can read. The eval
+(`--trust-profiles`) can still merge profiles of several mailboxes.
 
-**Trusted** when the merged profile has at least 20 mails over at least 30
+**Trusted** when the profile has at least 20 mails over at least 30
 days, at least 95 % aligned authentication, no "Als Spam" ever, a mail within
 the last 180 days and at most 5 % of its mail in Junk folders.
 
@@ -224,9 +227,10 @@ to the mailbox's profile (spam and unsure results never do). A profile
 remembers short keys of its latest 256 counted mails, so a mail checked again
 (after a revocation) or already folded by the backfill is not counted twice.
 "Als Spam" by a user (`POST …/messages/:id/spam` or a move into Junk) sets the
-profile's `lastUserSpamAt` (a household-wide revocation through the merge),
+`lastUserSpamAt` in the profile of the marked mailbox and of every other
+mailbox where the acting user is at least editor (no other mailbox is touched),
 counts the mail into the sender's junk share once, and resets the sender's
-INBOX rows in every mailbox that were skipped as trusted and checked in the
+INBOX rows in those mailboxes that were skipped as trusted and checked in the
 last 7 days (sender matched like the profile key: case, display name, IDN);
 they are queued for a new check. The classifier's auto-move to Junk counts the
 mail into the junk share of a sender that already has a profile. Moves by
@@ -249,7 +253,7 @@ the mailboxes the admin is a member of.
 `scripts/spam-profiles-backfill.ts` (one pass per shard, only the first 64 KB of
 each source for the header block and attachment names; about 40 s for 87,000
 rows on the dev data). Stored "Als Spam" decisions (`spam_examples`, label
-spam) become `lastUserSpamAt`, so they revoke trust household-wide like new ones.
+spam) become `lastUserSpamAt` of their mailbox, so they revoke trust there like new ones.
 `--data <dir> [--account <id>] [--out profiles.json]` is the default dry run:
 read-only (`mode=ro`), it prints the plan per account (with `--account`
 only that account is built). `--data <dir> --write` replaces each account's
@@ -434,15 +438,22 @@ result) and a summary. Run it on the server from the app directory (Bun loads
 may run while the service is running. Shards without the spam schema are
 refused (deploy the spam build first, see Deploy above).
 
+The reports name senders, subjects and mailbox paths. Keep them in a private
+directory (`mktemp -d` creates one with mode 700) and remove it afterwards. The
+scripts write reports with mode 600 and refuse an input file that belongs to
+another user or that others may write.
+
 ```sh
+REPORTS=$(mktemp -d)
 # 1. Eval with output file (read-only)
 bun scripts/spam-eval.ts --data /path/to/noctua-data \
   --sample briefs/spam/eval-sample.json --rules briefs/spam/static-rules.json \
-  --out /tmp/spam-eval-result.json
+  --out "$REPORTS/spam-eval-result.json"
 # 2. Preview: databases opened read-only, nothing is moved
-bun scripts/spam-apply.ts --in /tmp/spam-eval-result.json --data /path/to/noctua-data --dry-run
+bun scripts/spam-apply.ts --in "$REPORTS/spam-eval-result.json" --data /path/to/noctua-data --dry-run
 # 3. Move (optionally one mailbox: --account <accountId>)
-bun scripts/spam-apply.ts --in /tmp/spam-eval-result.json --data /path/to/noctua-data
+bun scripts/spam-apply.ts --in "$REPORTS/spam-eval-result.json" --data /path/to/noctua-data
+rm -r "$REPORTS"
 ```
 
 Wrongly moved mail must be moved back in Noctua — with „Kein Spam“ or by moving
@@ -465,11 +476,13 @@ collaboration assignment, status, note or topic; when the classifier already
 judged it or will (last three days); or when the mailbox has no Junk folder.
 
 ```sh
+REPORTS=$(mktemp -d)
 # 1. Dry run on an online .backup copy (refused on a live dir), list with every decision (mode 600)
-bun scripts/spam-apply.ts --server-flagged --data /path/to/copy --dry-run --out /tmp/flagged.json
-# 2. Review /tmp/flagged.json; delete entries that must stay in the INBOX
+bun scripts/spam-apply.ts --server-flagged --data /path/to/copy --dry-run --out "$REPORTS/flagged.json"
+# 2. Review "$REPORTS/flagged.json"; delete entries that must stay in the INBOX
 # 3. Move only reviewed "move" entries the live data still selects (resumable)
-bun scripts/spam-apply.ts --server-flagged --data /path/to/noctua-data --only /tmp/flagged.json --out /tmp/applied.json
+bun scripts/spam-apply.ts --server-flagged --data /path/to/noctua-data --only "$REPORTS/flagged.json" --out "$REPORTS/applied.json"
+rm -r "$REPORTS"
 ```
 
 The spam examples get the source `server-flag-backfill` and the mail's arrival

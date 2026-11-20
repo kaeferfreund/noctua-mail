@@ -7,6 +7,7 @@ import { createAdminMailbox } from "@/lib/adminMailbox";
 import { MailboxCredentialError } from "@/lib/mailboxCredentials";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { getRequestClientId } from "@/app/api/_helpers/clientId";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 /** Only mailboxes the admin is a member of (owner or any role); others stay invisible. */
 export async function GET(request: Request) {
   const session = await requireAdminSessionOr403(request); if (session instanceof NextResponse) return session;
@@ -23,8 +24,10 @@ export async function POST(request: Request) {
   const session = await requireAdminSessionOr403(request); if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
     const origin = requireJsonSameOrigin(request); if (origin) return origin;
+    const json = await readJsonBody<any>(request);
+    if (!json.ok) return json.response;
     try {
-      const account = await createAdminMailbox(session.userId, await request.json().catch(() => null), getRequestClientId(request));
+      const account = await createAdminMailbox(session.userId, json.value, getRequestClientId(request));
       return NextResponse.json({ ok: true, account: sanitizeAccountForClient(account, { role: "manager", viewerUserId: session.userId, memberCount: 1 }) }, { status: 201 });
     } catch (error) { if (error instanceof MailboxCredentialError) return NextResponse.json({ ok: false, message: error.message }, { status: error.status }); throw error; }
   });

@@ -91,7 +91,7 @@ for(const signin of ["success","response-failure","throw"] as const)test(`HTTP m
   const {spyOn}=await import("bun:test"),imap=await import("@/lib/mail/imapAuth"),smtp=await import("@/lib/mail/smtp");
   const actor=await createAuthenticatedTestSession(undefined,"admin"),address=`mail-signup-${crypto.randomUUID()}@example.test`;
   const issued=await POST(request("admin/users",actor.jar.header(),{email:address,name:"Synthetic Mail",role:"user"}));expect(issued.status).toBe(201);const {invite}=await issued.json();
-  const imapSpy=spyOn(imap,"verifyImapCredentials").mockResolvedValue(true),smtpSpy=spyOn(smtp,"verifySmtpCredentials").mockResolvedValue(true);
+  const imapSpy=spyOn(imap,"verifyImapCredentials").mockResolvedValue("ok"),smtpSpy=spyOn(smtp,"verifySmtpCredentials").mockResolvedValue(true);
   const handler=signin==="success"?undefined:spyOn(actor.auth,"handler");
   if(signin==="response-failure")handler!.mockResolvedValue(new Response(null,{status:503}));
   if(signin==="throw")handler!.mockRejectedValue(new Error("synthetic post-commit sign-in failure"));

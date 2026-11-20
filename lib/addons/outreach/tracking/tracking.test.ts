@@ -39,6 +39,7 @@ afterEach(() => {
 async function seedSend(id = "send-a", mailbox = accountId, kind = "campaign", sentAt = Date.now() - 60_000) {
   const db = await getOutreachDb();
   const email = `${id}@example.test`;
+  db.prepare("INSERT OR IGNORE INTO account_settings (accountId, enabled, updatedAt) VALUES (?, 1, 0)").run(mailbox);
   db.prepare("INSERT INTO contacts (id, accountId, email, emailLower, createdAt, updatedAt) VALUES (?, ?, ?, ?, 0, 0)")
     .run(`contact-${id}`, mailbox, email, email);
   db.prepare(`INSERT INTO sends (id, accountId, kind, campaignId, contactId, messageId, recipients, subject, status, queuedAt, sentAt)
@@ -384,20 +385,65 @@ test("v2 event URLs survive migration and new clicks are stored by token", async
   expect(await getMessageTracking(accountId, { sendId: "send-a" })).toMatchObject({ lastEvent: { url: target } });
 });
 
-test("the per-send cap limits opens and clicks together while the public responses still work", async () => {
+test("the per-send cap limits opens and clicks separately while the public responses still work", async () => {
   const db = await seedSend();
   const html = await rewrite(`<a href="${target}">Link</a>`);
   const token = html.match(/\/t\/c\/([\w-]+)/)![1];
   const filename = html.match(/\/t\/o\/([\w-]+\.gif)/)![1];
-  db.prepare(`WITH RECURSIVE ids(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM ids WHERE n < 1999)
+  db.prepare(`WITH RECURSIVE ids(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM ids WHERE n < 2000)
     INSERT INTO tracking_events (accountId, sendId, type, at) SELECT ?, 'send-a', 'click', 0 FROM ids`).run(accountId);
   const request = new Request(origin, { headers: { "x-real-ip": "192.0.2.52" } });
+  // A full click history does not suppress opens.
   await getOpen(request, { params: Promise.resolve({ filename }) });
   expect((await getClick(request, { params: Promise.resolve({ token }) })).headers.get("location")).toBe(target);
   expect((await getOpen(request, { params: Promise.resolve({ filename }) })).status).toBe(200);
   await recordTrackingEvent({ accountId, sendId: "send-a", type: "bounce", url: "Synthetic bounce" });
   expect(await getMessageTracking(accountId, { sendId: "send-a" }))
-    .toMatchObject({ opens: 1, clicks: 1999, bounced: true });
+    .toMatchObject({ opens: 1, clicks: 2000, bounced: true });
+});
+
+test("one link holder cannot use up the engagement history of the whole send", async () => {
+  const db = await seedSend();
+  const html = await rewrite(`<a href="${target}">One</a><a href="https://target.example.test/two">Two</a>`);
+  const [first, second] = [...html.matchAll(/\/t\/c\/([\w-]+)/g)].map(match => match[1]);
+  const at = Date.now();
+  // One client repeating one link is capped well below the send budget ...
+  for (let i = 0; i < 260; i++) {
+    await recordTrackingEvent({ accountId, sendId: "send-a", type: "click", linkToken: first, ip: "192.0.2.61", at: at + i });
+  }
+  const count = (where: string, ...args: string[]) =>
+    (db.prepare(`SELECT count(*) AS n FROM tracking_events WHERE accountId = ? AND sendId = 'send-a' AND ${where}`)
+      .get(accountId, ...args) as { n: number }).n;
+  expect(count("type = 'click' AND ip = ?", "192.0.2.61")).toBe(200);
+  // ... and so is one link across many clients, while other links, clients and opens still record.
+  for (let i = 0; i < 20; i++) {
+    await recordTrackingEvent({ accountId, sendId: "send-a", type: "click", linkToken: first, ip: `198.51.100.${i + 1}`, at: at + i });
+  }
+  expect(count("type = 'click' AND linkToken = ?", first)).toBe(200);
+  await recordTrackingEvent({ accountId, sendId: "send-a", type: "click", linkToken: second, ip: "198.51.100.200", at });
+  await recordTrackingEvent({ accountId, sendId: "send-a", type: "open", ip: "198.51.100.201", at });
+  expect(count("type = 'click' AND linkToken = ?", second)).toBe(1);
+  expect(count("type = 'open'")).toBe(1);
+});
+
+test("a mailbox that switched the addon off keeps its links working but records no activity", async () => {
+  const db = await seedSend();
+  await seedSend("send-b", "mailbox-b");
+  const html = await rewrite(`<a href="${target}">Link</a>`);
+  const token = html.match(/\/t\/c\/([\w-]+)/)![1];
+  const filename = html.match(/\/t\/o\/([\w-]+\.gif)/)![1];
+  await saveOutreachSettings(accountId, { enabled: false }, "manager-a");
+  const request = new Request(origin, { headers: { "x-real-ip": "192.0.2.71", "user-agent": "Mozilla/5.0 Firefox/130.0" } });
+  const click = await getClick(request, { params: Promise.resolve({ token }) });
+  expect([click.status, click.headers.get("location")]).toEqual([302, target]);
+  const open = await getOpen(request, { params: Promise.resolve({ filename }) });
+  expect([open.status, open.headers.get("content-type")]).toEqual([200, "image/gif"]);
+  await recordTrackingEvent({ accountId, sendId: "send-a", type: "open", ip: "192.0.2.72" });
+  // Provider feedback and other mailboxes are unaffected.
+  await recordTrackingEvent({ accountId, sendId: "send-a", type: "bounce", url: "Synthetic bounce" });
+  await recordTrackingEvent({ accountId: "mailbox-b", sendId: "send-b", type: "open", ip: "192.0.2.73" });
+  expect(db.prepare("SELECT accountId, type FROM tracking_events ORDER BY id").all())
+    .toEqual([{ accountId, type: "bounce" }, { accountId: "mailbox-b", type: "open" }]);
 });
 
 test("oversized URLs stay untouched", async () => {

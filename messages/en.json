@@ -539,6 +539,7 @@
       "evictCache": "Evict thread cache"
     },
     "logout": "Log out",
+    "detachedSignedOut": "You were signed out. This window no longer shows mail and can be closed.",
     "calendar": "Calendar",
     "compose": {
       "label": "Compose",
@@ -777,6 +778,10 @@
       "saving": "Saving...",
       "submitAndSend": "{status, select, ACCEPTED {Accept and send response} DECLINED {Decline and send response} TENTATIVE {Mark tentative and send response} other {Respond and send response}}",
       "submitWithoutSending": "{status, select, ACCEPTED {Accept and save without sending response} DECLINED {Decline and save without sending response} TENTATIVE {Mark tentative and save without sending response} other {Respond and save without sending response}}"
+    },
+    "inviteStatus": {
+      "organizerMismatch": "sender is not the event organizer",
+      "senderUnverified": "sender not confirmed by SPF/DKIM, apply manually"
     }
   },
   "Search": {
@@ -983,6 +988,7 @@
       "mailboxExists": "This mailbox already exists. Ask your admin for access.",
       "unavailable": "Sign-in is temporarily unavailable. Please try again later.",
       "provisioning": "Account creation could not finish. Contact your admin before retrying.",
+      "mailServerUnreachable": "The mail server could not be reached or could not check the login. Please try again later.",
       "invalidToken": "This reset link is invalid, expired or already used. Ask your admin for a new link.",
       "invalidRequest": "Check the form fields and try again.",
       "connection": "Unable to connect. Please try again.",
@@ -1761,6 +1767,10 @@
     "alwaysLoadSender": "Always load from this sender",
     "alwaysLoadSenderShort": "Always load",
     "unknownSender": "Sender unknown",
+    "unverifiedSender": "Sender not verified",
+    "checkingSender": "Checking sender…",
+    "remoteImage": "Remote image: {label}",
+    "blockedImage": "Image not loaded: {label}",
     "flags": {
       "forwarded": "Forwarded",
       "calendar": "Calendar Invite",
@@ -1812,6 +1822,8 @@
     "fullSyncCancelled": "Full sync cancelled",
     "syncCancelledSelectionChanged": "Full sync was cancelled before starting because you selected another mailbox.",
     "folderAccountMismatch": "The folder does not belong to this mailbox. Please select the mailbox again.",
+    "requestBodyTooLarge": "The data is too large for the server (for example attachments over 25 MB or a very large image in the signature).",
+    "requestBodyTimeout": "The upload took too long. Please try again.",
     "syncCancelledBeforeStart": "Full sync was cancelled before starting.",
     "region": "Notifications",
     "dismissLabel": "Dismiss notification",
@@ -2379,6 +2391,8 @@
       "offline": "The server cannot be reached. Check the connection and try again.",
       "generic": "That did not work. Try again.",
       "tooLarge": "The file is too large for the server.",
+      "imageQuota": "This mailbox's image storage is full. Use an image that was already uploaded.",
+      "imageStorageFull": "The server's image storage is full. Use an image that was already uploaded.",
       "unsupportedType": "This file type is not accepted.",
       "detail": "(Server: {detail})"
     },
@@ -2591,7 +2605,9 @@
       "liveFrame": "Live preview",
       "backToLive": "Back to the live preview",
       "liveHint": "Live preview of the source, placeholders not yet replaced. Scripts are off.",
-      "emptyPreview": "No content yet."
+      "emptyPreview": "No content yet.",
+      "remoteBlocked": "External content (images, fonts, stylesheets) is blocked in the preview.",
+      "loadRemote": "Load external content"
     },
     "images": {
       "insert": "Insert image",

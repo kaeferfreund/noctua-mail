@@ -4,18 +4,12 @@
 // SMTP transports — can pass through to a tested function for the
 // address-parsing portion of draft-send.
 //
-// We deliberately extract each email address via the same regex used
-// elsewhere in the codebase (`lib/drafts.ts::extractEmails`) rather than
-// a full RFC-5322 parser. That helper has been validated against the
-// shapes the compose editor actually produces, and the SMTP envelope
-// only needs bare addresses (no display names / quoting).
+// Addresses come from the shared RFC 5322 mailbox parser
+// (`parseEnvelopeAddresses`): quoted display names and comments are removed
+// before parsing, so a display name such as `"Eve, eve@example.test"` can
+// never become an envelope recipient.
 
-const EMAIL_RE = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
-
-function extractEmails(value?: string | null): string[] {
-  if (!value) return [];
-  return value.match(EMAIL_RE) ?? [];
-}
+import { parseEnvelopeAddresses } from "@/lib/ownAddresses";
 
 export type DraftSendEnvelopeInput = {
   to?: string | null;
@@ -41,9 +35,9 @@ export function buildDraftSendEnvelopeRecipients(
   draft: DraftSendEnvelopeInput
 ): string[] {
   const merged = [
-    ...extractEmails(draft.to),
-    ...extractEmails(draft.cc),
-    ...extractEmails(draft.bcc)
+    ...parseEnvelopeAddresses(draft.to),
+    ...parseEnvelopeAddresses(draft.cc),
+    ...parseEnvelopeAddresses(draft.bcc)
   ];
   const byLowercase = new Map<string, string>();
   for (const address of merged) {

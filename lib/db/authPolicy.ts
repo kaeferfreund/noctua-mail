@@ -344,9 +344,14 @@ export async function deleteSessionProofState(sessionId:string, userId?:string, 
   });
 }
 
-/** Synchronous form for callers already inside an immediate revocation transaction. */
+/**
+ * Synchronous form for callers already inside an immediate revocation transaction.
+ * Ending one session cancels that user's pending logins but not the anonymous
+ * passkey ceremonies of other people (no global epoch step); credential, reset
+ * and revoke paths still advance the epoch through invalidateUserChallenges.
+ */
 export function deleteSessionProofStateRow(db:Database, sessionId:string, userId?:string) {
-  if (userId) invalidateUserChallenges(db,userId,true);
+  if (userId) invalidateUserChallenges(db,userId,true,false);
   db.prepare(`DELETE FROM auth_verification WHERE identifier IN
     (SELECT identifier FROM auth_pending_challenges WHERE sourceSessionId=?)`).run(sessionId);
   db.prepare("DELETE FROM auth_pending_challenges WHERE sourceSessionId=?").run(sessionId);
@@ -415,13 +420,17 @@ export async function finishSecurityOperation(db: Database, op: SecurityOperatio
   await withDbWriteRetry("finishSecurityOperation", () => db.prepare(`UPDATE admin_lifecycle_operations SET slot=NULL,state='complete',updatedAt=? WHERE id=?`).run(Date.now(), op.id));
 }
 
-/** Invalidate library and Noctua challenges together. Epoch also cancels anonymous WebAuthn. */
-export function invalidateUserChallenges(db: Database, userId: string, loginsOnly = false) {
+/**
+ * Invalidate library and Noctua challenges together. With `cancelAnonymousLogins`
+ * the epoch also cancels every anonymous WebAuthn ceremony (they have no user yet).
+ */
+export function invalidateUserChallenges(db: Database, userId: string, loginsOnly = false, cancelAnonymousLogins = true) {
   const scope = loginsOnly ? " AND kind IN ('two_factor','two_factor_imap','passkey_login')" : "";
   db.prepare(`DELETE FROM auth_verification WHERE identifier IN
     (SELECT identifier FROM auth_pending_challenges WHERE userId=?${scope}) OR identifier IN
     (SELECT '2fa-attempts-' || identifier FROM auth_pending_challenges WHERE userId=?${scope})`).run(userId,userId);
   db.prepare(`DELETE FROM auth_pending_challenges WHERE userId=?${scope}`).run(userId);
+  if (!cancelAnonymousLogins) return;
   const result = db.prepare(`UPDATE auth_login_epoch SET generation=generation+1 WHERE id=1`).run();
   if (!result.changes) throw new Error("Missing auth login epoch");
 }
@@ -460,6 +469,45 @@ export async function finalizeAuthentication(db: Database, op: SecurityOperation
     if (challenge) db.prepare(`DELETE FROM auth_pending_challenges WHERE identifier=?`).run(challenge.identifier);
     return generation;
   }).immediate());
+}
+
+/** Finished security operations are kept this long (diagnostics), then swept. */
+export const FINISHED_SECURITY_OPERATION_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+/** Minimum time between two sweeps of expired authentication state in one process. */
+export const AUTH_STATE_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
+
+/**
+ * Deletes state that can no longer be used: expired challenge registry rows with
+ * their library verification rows (abandoned anonymous passkey or 2FA logins),
+ * other expired library verification rows, expired reauth grants and finished
+ * security operations past their retention. Expired rows already fail every
+ * check; this only stops them from accumulating.
+ */
+export function sweepExpiredAuthState(db: Database, now = Date.now()) {
+  return db.transaction(() => {
+    const expired = `SELECT identifier FROM auth_pending_challenges WHERE expiresAt<?`;
+    db.prepare(`DELETE FROM auth_verification WHERE identifier IN (${expired})
+      OR identifier IN (SELECT '2fa-attempts-' || identifier FROM auth_pending_challenges WHERE expiresAt<?)`).run(now, now);
+    const challenges = db.prepare(`DELETE FROM auth_pending_challenges WHERE expiresAt<?`).run(now).changes;
+    const verifications = db.prepare(`DELETE FROM auth_verification WHERE julianday(expiresAt)<julianday(?)`).run(new Date(now).toISOString()).changes;
+    const grants = db.prepare(`DELETE FROM auth_reauth_grants WHERE expiresAt<?`).run(now).changes;
+    const operations = db.prepare(`DELETE FROM admin_lifecycle_operations WHERE slot IS NULL AND action LIKE 'security.%'
+      AND state IN ('complete','cancelled') AND updatedAt<?`).run(now - FINISHED_SECURITY_OPERATION_RETENTION_MS).changes;
+    return { challenges, verifications, grants, operations };
+  }).immediate();
+}
+
+let lastAuthStateSweepAt = 0;
+
+/** Throttled, best-effort sweep for public auth entry points; never fails the request. */
+export async function maybeSweepExpiredAuthState(db: Database, now = Date.now()) {
+  if (now - lastAuthStateSweepAt < AUTH_STATE_SWEEP_INTERVAL_MS) return;
+  lastAuthStateSweepAt = now;
+  try {
+    await withDbWriteRetry("sweepExpiredAuthState", () => sweepExpiredAuthState(db, now));
+  } catch (error) {
+    console.warn("[auth] expired state sweep failed", { error: String(error) });
+  }
 }
 
 /** Startup reconciliation is deliberately conservative: partial proof is never resumed. */

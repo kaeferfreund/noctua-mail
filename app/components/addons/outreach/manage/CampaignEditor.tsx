@@ -57,7 +57,7 @@ export default function CampaignEditor({ campaign, onScheduled }: { campaign: Ca
   /** Who the campaign would reach right now, as the server counts it (consent, suppression, excluded lists). */
   const [recipientCount, setRecipientCount] = useState(0);
   /** The draft version the server counted for; scheduling is refused if the draft changed since. */
-  const [countedVersion, setCountedVersion] = useState<number | undefined>(undefined);
+  const [countedVersion, setCountedVersion] = useState<{ updatedAt: number; contentVersion: string } | undefined>(undefined);
   const [sendAt, setSendAt] = useState(() => localInputValue(Date.now() + DEFAULT_SCHEDULE_OFFSET_MS));
   const dirty = !sameForm(form, saved);
   const markClean = useUnsavedChanges(`campaign:${current?.id ?? "new"}`, canEdit && dirty);
@@ -96,16 +96,19 @@ export default function CampaignEditor({ campaign, onScheduled }: { campaign: Ca
   /** Saves the draft and asks the server who it would reach, so the confirmation shows the real number. */
   const openSchedule = () => run("count", async () => {
     const stored = dirty || !current ? await persist() : current;
-    const result = await api.send<CampaignScheduleResponse>("POST", `campaigns/${encodeURIComponent(stored.id)}/schedule`, { sendAt: null, dryRun: true });
+    // Bound to the version shown here: a collaborator's later edit makes the server refuse instead of counting it.
+    const result = await api.send<CampaignScheduleResponse>("POST", `campaigns/${encodeURIComponent(stored.id)}/schedule`,
+      { sendAt: null, dryRun: true, expectedUpdatedAt: stored.updatedAt });
     setRecipientCount(result.recipients);
-    setCountedVersion(result.campaign.updatedAt);
+    setCountedVersion({ updatedAt: result.campaign.updatedAt, contentVersion: result.contentVersion });
     setDialogOpenedAt(Date.now());
     setDialog("schedule");
   });
   const schedule = () => run("schedule", async () => {
     const stored = dirty || !current ? await persist() : current;
     const at = when === "now" ? null : new Date(sendAt).getTime();
-    const result = await api.send<CampaignScheduleResponse>("POST", `campaigns/${encodeURIComponent(stored.id)}/schedule`, { sendAt: at, expectedUpdatedAt: countedVersion });
+    const result = await api.send<CampaignScheduleResponse>("POST", `campaigns/${encodeURIComponent(stored.id)}/schedule`, { sendAt: at,
+      expectedUpdatedAt: countedVersion?.updatedAt, expectedContentVersion: countedVersion?.contentVersion });
     setDialog(null);
     markClean();
     onScheduled?.(result.campaign, result.recipients);

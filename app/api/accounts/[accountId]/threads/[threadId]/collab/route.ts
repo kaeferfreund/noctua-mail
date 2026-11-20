@@ -1,6 +1,7 @@
 import { listAccountMembersForRole } from "@/lib/accountAccess";
 import { getThreadCollabSnapshot, updateThreadCollabState, ThreadCollabError, type ThreadCollabPatch } from "@/lib/threadCollab";
 import { collabJson, threadResult, withThreadCollab, type ThreadRouteParams } from "@/app/api/_helpers/threadCollabContext";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 export async function GET(request: Request, route: ThreadRouteParams) {
   return withThreadCollab(request, route, false, async (ctx, threadId) => {
     const [snapshot, members] = await Promise.all([
@@ -11,7 +12,9 @@ export async function GET(request: Request, route: ThreadRouteParams) {
 }
 export async function PATCH(request: Request, route: ThreadRouteParams) {
   return withThreadCollab(request, route, true, async (ctx, threadId) => {
-    const body = await request.json();
+    const json = await readJsonBody<any>(request);
+    if (!json.ok) return json.response;
+    const body = json.value;
     if (!body || typeof body !== "object" || Array.isArray(body) ||
       !Object.keys(body).length || Object.keys(body).some(key => !["status", "assigneeUserId"].includes(key)))
       throw new ThreadCollabError("Expected status or assigneeUserId", 400);

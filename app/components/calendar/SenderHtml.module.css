@@ -1,0 +1,10 @@
+/*
+ * Sender HTML inside the app document. Paint containment makes this box the
+ * containing block for fixed and absolutely positioned descendants and clips
+ * everything to it, so sender inline styles cannot cover app controls.
+ */
+.senderHtml {
+  position: relative;
+  contain: paint;
+  isolation: isolate;
+}

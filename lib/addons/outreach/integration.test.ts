@@ -45,7 +45,7 @@ test("signup → welcome series → tracked mail → click → unsubscribe stops
   const { token } = await createApiToken(accountId, "manager-1", { name: "Registration", listIds: [list.id] });
   const signedUpAt = Date.now() - 20 * 60_000;
   const signup = await subscribeWithApiToken({ accountId, id: token.id }, { email: "Erika@Example.test", firstName: "Erika <b>", listId: list.id }, signedUpAt);
-  expect(signup).toMatchObject({ ok: true, status: "subscribed", created: true });
+  expect(signup).toEqual({ ok: true, contactId: expect.any(String), status: "subscribed" });
   const contact = findContactByEmail(db, accountId, "erika@example.test")!;
   expect(db.query("SELECT status, nextStepPosition FROM sequence_enrollments WHERE accountId = ? AND contactId = ?").all(accountId, contact.id))
     .toEqual([{ status: "active", nextStepPosition: expect.any(Number) }]);

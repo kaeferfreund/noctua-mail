@@ -15,7 +15,7 @@ import type { SpamInput } from "./types";
 
 /**
  * Anomaly gate for trusted senders (concept §3.5): each rule compares the
- * current mail with the sender's household profile and returns short German
+ * current mail with the sender's profile and returns short German
  * reasons. Any reason sends the mail to the model with the hint "vertrauter
  * Absender; Abweichung: …" instead of skipping it.
  */
@@ -155,7 +155,7 @@ export function detectSenderAnomalies(profile: SenderProfile, mail: SenderMailFa
 /** What the classifier needs to apply trust (classifySpam). Loaders run only when the sender could be trusted. */
 export type SpamTrustContext = {
   ownAddresses: ReadonlySet<string>;
-  /** The household-merged profile of a sender key as of `now` (the eval: only mails that arrived before). */
+  /** The sender key's profile as of `now`: the server uses the mailbox's own profile; the eval may merge mailboxes (only mails that arrived before). */
   loadProfile: (senderKey: string, now: number) => Promise<SenderProfile | null>;
   /** Other mails of the sender to this mailbox around `date` (burst rule), each with its arrival. */
   loadRecent?: (senderKey: string, date: number) => Promise<RecentSenderMail[]>;

@@ -10,6 +10,7 @@ import { Heading, Text, Theme } from "@radix-ui/themes";
 import { useComposeContext } from "./ComposeContext";
 import styles from "./Compose.module.css";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
+import { useSingleWindowApp } from "@/lib/ui/displayMode";
 
 type ComposeModalProps = {
   open: boolean;
@@ -99,6 +100,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
 
   const { messages: senderMessages, resolve } = useSenderMessages();
   const t = useTranslations("Compose");
+  const singleWindow = useSingleWindowApp();
   const returnFocusRef = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
     if (open) returnFocusRef.current = document.activeElement as HTMLElement | null;
@@ -148,7 +150,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
             </TooltipIconButton>}
             {!isMobile && !detachedWindow && (
               <>
-                <TooltipIconButton
+                {!singleWindow && <TooltipIconButton
                   variant="ghost"
                   size="2"
                   tooltip={t("window.openInNewWindow")}
@@ -157,7 +159,7 @@ export default function ComposeModal({ open, isMobile = false }: ComposeModalPro
                   disabled={detachingCompose || sendingMail || discardingDraft}
                 >
                   <ExternalLink size={16} />
-                </TooltipIconButton>
+                </TooltipIconButton>}
                 <TooltipIconButton
                   variant="ghost"
                   size="2"

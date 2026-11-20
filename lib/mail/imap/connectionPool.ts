@@ -40,9 +40,10 @@ import { onShutdown } from "../../server/shutdown";
 // ## Identity key
 //
 // We key on `buildImapIdentityKey(account)` — the same JSON tuple the
-// circuit breaker uses: `[accountId, host, port, secure]`. So if a user
-// edits their IMAP host mid-session, the new connections land in a new
-// slot and the old slot ages out.
+// circuit breaker uses: `[accountId, host, port, secure, user, credential
+// digest]`. So if a user edits their IMAP host or login mid-session, the new
+// connections land in a new slot and the old slot (still authenticated as
+// the previous upstream mailbox) is never reused and ages out.
 //
 // ## Runtime state lives on `globalThis`
 //

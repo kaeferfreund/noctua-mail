@@ -2,7 +2,10 @@ import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { type AccountRouteParams, getAccountIdFromParams } from "@/app/api/_helpers/accountContext";
-import { getMessageSource, statMessageSource } from "@/lib/storage";
+import { getMessageSource, getMessageSourceBuffer, statMessageSource } from "@/lib/storage";
+import { attachmentContentDisposition, attachmentDocumentCsp } from "@/lib/attachmentDocument";
+import { rawMessageSourceBytes, rawMessageSourceText } from "@/lib/messageSource";
+import { MESSAGE_SOURCE_EML_FORMAT } from "@/lib/accountApiPaths";
 import { getMessageById } from "@/lib/db";
 import { requireActiveUserSession } from "@/lib/auth";
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
@@ -58,8 +61,27 @@ export async function handleGetMessageSourceRequest(
       return new NextResponse(null, { status: 304, headers: cacheHeaders });
     }
 
+    // `?format=eml`: the stored bytes unchanged as a download (no scrubbing, no
+    // truncation, no UTF-8 decoding), so 8bit parts in other charsets survive.
+    if (new URL(request.url).searchParams.get("format") === MESSAGE_SOURCE_EML_FORMAT) {
+      const storedBytes = await getMessageSourceBuffer(accountId, message.id);
+      const bytes = storedBytes ?? (message.source !== undefined ? rawMessageSourceBytes(message.source) : null);
+      if (!bytes?.length) {
+        return NextResponse.json({ ok: false, message: "Source not found" }, { status: 404 });
+      }
+      return new NextResponse(new Uint8Array(bytes), {
+        headers: {
+          "Content-Type": "message/rfc822",
+          "Content-Disposition": attachmentContentDisposition("attachment", "message.eml"),
+          "X-Content-Type-Options": "nosniff",
+          "Content-Security-Policy": attachmentDocumentCsp("message/rfc822"),
+          ...(storedBytes && cacheHeaders ? cacheHeaders : { "Cache-Control": "private, no-store" })
+        }
+      });
+    }
+
     const storedSource = await getMessageSource(accountId, message.id);
-    const fallbackSource = message.source ?? null;
+    const fallbackSource = message.source !== undefined ? rawMessageSourceText(message.source) : null;
     const source = storedSource ?? fallbackSource;
     if (!source) {
       return NextResponse.json({ ok: false, message: "Source not found" }, { status: 404 });

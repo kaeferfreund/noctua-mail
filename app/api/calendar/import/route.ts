@@ -6,6 +6,7 @@ import { NextResponse } from "next/server";
 import { ensureActiveAccountId, requireActiveUserSession } from "@/lib/auth";
 import { getAccountById } from "@/lib/serverDb";
 import { processStandaloneCalendarInvite } from "@/lib/calendarInviteProcessor";
+import { JSON_BODY_LIMITS, readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 /**
  * Imports a standalone .ics file (e.g. from the PWA file handler or an
@@ -22,7 +23,9 @@ export async function POST(request: Request) {
   if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
 
-    const payload = (await request.json().catch(() => null)) as unknown;
+    const json = await readJsonBody(request, { limit: JSON_BODY_LIMITS.calendar });
+    if (!json.ok) return json.response;
+    const payload = json.value;
     if (!payload || typeof payload !== "object") {
       return NextResponse.json({ ok: false, message: "Invalid body" }, { status: 400 });
     }

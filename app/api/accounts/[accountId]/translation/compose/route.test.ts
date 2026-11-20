@@ -234,4 +234,34 @@ describe("compose translate route", () => {
     expect(response.status).toBe(400);
     expect((await response.json()).message).toContain("API key");
   });
+
+  test("DeepL calls are rate limited per user and mailbox; the limit answers 429 without an upstream call", async () => {
+    const { DEEPL_CALLS_PER_USER_MAILBOX_PER_MINUTE } = await import("@/app/api/_helpers/deeplRateLimit");
+    const accountId = uniqueAccountId("acc-compose-translate-limit");
+    await upsertAccount(buildAccount(accountId, { enabled: true, apiKey: "test-key:fx", targetLang: "EN-US" }));
+    const calls = mockDeeplFetch(() => deeplSuccessResponse("Hello"));
+    // One signed-in user: the per-user budget of this mailbox applies.
+    const cookie = await buildCookieHeader(accountId);
+    const request = () => new Request(`http://localhost/api/accounts/${accountId}/translation/compose`, {
+      method: "POST", headers: { "content-type": "application/json", origin: "http://localhost:3000", cookie },
+      body: JSON.stringify({ text: "Hallo" })
+    });
+    for (let n = 0; n < DEEPL_CALLS_PER_USER_MAILBOX_PER_MINUTE; n++) {
+      const response = await POST(request(), routeParams(accountId));
+      expect(response.status).toBe(200);
+    }
+    const limited = await POST(request(), routeParams(accountId));
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("retry-after")).toBe("60");
+    expect(calls).toHaveLength(DEEPL_CALLS_PER_USER_MAILBOX_PER_MINUTE);
+  });
+
+  test("an oversized body answers 413 without reaching DeepL", async () => {
+    const accountId = uniqueAccountId("acc-compose-translate-large");
+    await upsertAccount(buildAccount(accountId, { enabled: true, apiKey: "test-key:fx", targetLang: "EN-US" }));
+    const calls = mockDeeplFetch(() => deeplSuccessResponse("Hello"));
+    const response = await POST(await buildRequest(accountId, { text: "x".repeat(5 * 1024 * 1024) }), routeParams(accountId));
+    expect(response.status).toBe(413);
+    expect(calls).toHaveLength(0);
+  });
 });

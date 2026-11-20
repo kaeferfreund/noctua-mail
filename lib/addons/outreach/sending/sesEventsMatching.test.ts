@@ -68,7 +68,7 @@ test("events of other senders and closed rows are acknowledged at once without e
     expect(suppressed).toEqual([]);
 
     const handler = createSnsHandler({
-      enabled: () => true, topic: () => "arn:aws:sns:eu-central-1:000000000000:test-topic", isLimited: () => false,
+      enabled: () => true, topic: () => "arn:aws:sns:eu-central-1:000000000000:test-topic", isLimited: () => false, unverifiedLimited: () => false,
       fetch: async () => new Response(null), verify: async () => true,
       apply: (id, event, publishedAt) => applySesEvent(id, event, deps, publishedAt)
     });

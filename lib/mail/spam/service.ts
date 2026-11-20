@@ -214,11 +214,16 @@ async function householdIdentity() {
   return (await household()).sets;
 }
 
-/** The sender's profiles of every mailbox, merged (concept §3.4); a mailbox that fails to open is left out. */
-async function loadHouseholdSenderProfile(senderKey: string, now: number) {
-  const profiles = await Promise.all((await household()).accountIds.map((accountId) =>
-    getSenderProfile(accountId, senderKey).catch(() => null)));
-  return mergeSenderProfiles(profiles.filter((profile): profile is SenderProfile => profile !== null), now);
+/**
+ * The sender's profile in this mailbox only. Other mailboxes' history must not
+ * decide (and be described in the stored verdict) for members of this one; the
+ * single-profile merge applies the same decay rules as before.
+ */
+function mailboxSenderProfileLoader(accountId: string) {
+  return async (senderKey: string, now: number) => {
+    const profile = await getSenderProfile(accountId, senderKey).catch(() => null);
+    return profile ? mergeSenderProfiles([profile], now) : null;
+  };
 }
 
 async function loadSpamInput(accountId: string, message: Message) {
@@ -250,7 +255,7 @@ async function checkMessage(job: SpamCheckJob) {
   };
   const trust: SpamTrustContext = {
     ownAddresses: identity.ownAddresses,
-    loadProfile: loadHouseholdSenderProfile,
+    loadProfile: mailboxSenderProfileLoader(job.accountId),
     loadRecent: (senderKey) => loadRecentSenderMails(job.accountId, message, senderKey, identity.ownAddresses),
     canaryKey: message.id
   };
@@ -300,18 +305,19 @@ async function learnSenderProfile(accountId: string, messageId: string, input: A
 }
 
 /**
- * "Als Spam" by a user (concept §4): the sender is never trusted again in any
- * mailbox, the marked mail counts into the sender's junk share, and its INBOX
- * mail of the last 7 days that was skipped as trusted is checked again. Never
- * throws: the user's action must not fail.
+ * "Als Spam" by a user (concept §4): the sender is never trusted again in this
+ * mailbox and in every other mailbox where the acting user may edit, the
+ * marked mail counts into the sender's junk share, and those mailboxes' INBOX
+ * mail of the last 7 days that was skipped as trusted is checked again. Other
+ * mailboxes are not touched. Never throws: the user's action must not fail.
  */
-export async function revokeSenderTrust(accountId: string, from: string, messageId?: string) {
+export async function revokeSenderTrust(accountId: string, from: string, messageId?: string, actorUserId?: string | null) {
   const senderKey = spamSenderKey(parseAddressEmails(from)[0]);
   if (!senderKey) return;
   try {
     const now = Date.now();
-    await markSenderProfileUserSpam(accountId, senderKey, now, messageId);
-    for (const id of (await household()).accountIds) {
+    for (const id of await revocationAccountIds(accountId, actorUserId)) {
+      await markSenderProfileUserSpam(id, senderKey, now, id === accountId ? messageId : undefined);
       const inbox = findInboxFolder(await getFolders(id), id);
       if (!inbox) continue;
       const ids = await resetTrustedSpamChecks(id, inbox.id, senderKey, now - REVOKE_WINDOW_MS);
@@ -320,6 +326,14 @@ export async function revokeSenderTrust(accountId: string, from: string, message
   } catch (error) {
     console.warn("[spam] failed to revoke sender trust", { accountId, error: String(error) });
   }
+}
+
+/** The marked mailbox first, then the other mailboxes where the actor is at least editor. */
+async function revocationAccountIds(accountId: string, actorUserId?: string | null) {
+  if (!actorUserId) return [accountId];
+  const others = (await household()).accountIds.filter((id) => id !== accountId);
+  const roles = await Promise.all(others.map((id) => deps().accountRole(actorUserId, id).catch(() => null)));
+  return [accountId, ...others.filter((_, index) => roleAtLeast(roles[index], "editor"))];
 }
 
 async function autoMoveToJunk(accountId: string, message: Message) {

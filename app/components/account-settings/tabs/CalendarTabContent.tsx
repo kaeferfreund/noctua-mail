@@ -69,6 +69,7 @@ export default function CalendarTabContent({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          accountId: editingAccount.id,
           url: caldav?.url ?? "",
           user: caldav?.user ?? "",
           password: caldav?.password ?? ""
@@ -83,7 +84,8 @@ export default function CalendarTabContent({
     }
   };
 
-  const canTest = Boolean(caldav?.url?.trim() && caldav?.user?.trim() && caldav?.password?.trim());
+  // The test runs against a saved mailbox the user manages (server-side role check).
+  const canTest = isExistingAccount && Boolean(caldav?.url?.trim() && caldav?.user?.trim() && caldav?.password?.trim());
 
   const weekStartsOn = editingAccount.settings?.calendar?.weekStartsOn ?? "monday";
 

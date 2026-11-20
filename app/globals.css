@@ -766,6 +766,34 @@ a {
   color: var(--link);
 }
 
+/* Remote or unknown image in sender content shown in the app document that
+   was not loaded: rendered Markdown (MarkdownContent) and the rich compose
+   editor (lexical/ImageNode). */
+.remote-image-placeholder {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  max-width: 100%;
+  padding: 0.15em 0.5em;
+  border: 1px dashed var(--gray-a7);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--gray-11);
+  font: inherit;
+  font-size: 0.875em;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+
+button.remote-image-placeholder {
+  cursor: pointer;
+}
+
+button.remote-image-placeholder:hover {
+  background: var(--gray-a3);
+}
+
 .markdown-view code {
   font-family: var(--font-mono);
   font-size: 12px;

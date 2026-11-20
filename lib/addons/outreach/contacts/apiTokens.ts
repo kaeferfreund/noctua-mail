@@ -4,7 +4,7 @@ import { newOutreachId, newOutreachToken } from "../ids";
 import type { OutreachApiToken, SubscribeRequest, SubscribeResponse } from "../types";
 import { subscribeToList } from "./consent";
 import { ContactError } from "./input";
-import { findContactByEmail, insertContact, requireList, updateContactFields } from "./records";
+import { findContactByEmail, insertContact, requireList } from "./records";
 
 type TokenRow = Omit<OutreachApiToken, "listIds"> & { listIds: string };
 type AuthenticatedToken = { accountId: string; id: string };
@@ -92,13 +92,14 @@ export async function subscribeWithApiToken({ accountId, id }: AuthenticatedToke
     // a stamp from a clock that runs ahead would otherwise outrun an unsubscribe or erase recorded
     // after the first acceptance. Against those, the claim counts as its earliest possible true time.
     const decisionAt = input.consentAt === undefined ? at : claimed - CONSENT_CLOCK_SKEW_MS;
-    const existing = findContactByEmail(db, accountId, input.email);
-    const contact = existing ? updateContactFields(db, existing, input, now) : insertContact(db, accountId, input, "api", now);
+    // A token may add an address to its lists, never edit the mailbox-wide profile that other lists
+    // share: a known contact keeps its name and properties, and the answer does not say it existed.
+    const contact = findContactByEmail(db, accountId, input.email) ?? insertContact(db, accountId, input, "api", now);
     subscribeToList(db, contact, input.listId, {
       at, decisionAt, source: input.consentSource ?? "api", explicit: input.consentAt !== undefined
     }, now);
     db.query("UPDATE api_tokens SET lastUsedAt = ? WHERE accountId = ? AND id = ?").run(now, accountId, id);
-    return { contactId: contact.id, created: !existing };
+    return { contactId: contact.id };
   }).immediate();
-  return { ok: true, contactId: result.contactId, status: "subscribed", created: result.created };
+  return { ok: true, contactId: result.contactId, status: "subscribed" };
 }

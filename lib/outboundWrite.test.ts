@@ -61,7 +61,7 @@ test("guarded replacement INSERT failure restores draft, attachments, FTS and so
   try {
     await expect(f.api.upsertMessages(f.accountId, null, [next], false, { beforeWrite, replaceDraftId: old.id })).rejects.toThrow("synthetic INSERT failure");
     expect(snapshot()).toBe(before);
-    expect(await getMessageSource(f.accountId, old.id)).toBe(old.source!);
+    expect(await getMessageSource(f.accountId, old.id)).toBe(old.source as string);
     expect((await getAttachmentData(f.accountId, old.id, "synthetic-attachment"))?.toString()).toBe("old");
     await expect(f.api.upsertMessages(f.accountId, null, [next], false, { beforeWrite: async () => ({ ...await beforeWrite(), assertCurrent: () => { throw new Error("synthetic revocation"); } }), replaceDraftId: old.id })).rejects.toThrow("synthetic revocation");
     expect(snapshot()).toBe(before);

@@ -33,6 +33,7 @@ import {
   buildAccountMessageSourcePath,
   buildAccountSmtpSendPath
 } from "@/lib/accountApiPaths";
+import { rawMessageSourceText } from "@/lib/messageSource";
 import { hasHtmlContent } from "@/lib/ui/messageView";
 import {
   removeDetachedComposeHandoff,
@@ -1312,7 +1313,7 @@ function ComposeOrchestratorImpl(
       const hydrateDraftComposeMetadata = async (msg: Message) => {
         if (!isDraftMessage(msg)) return msg;
         if (msg.draftInvite) return msg;
-        const source = msg.source ?? (msg.hasSource
+        const source = (msg.source !== undefined ? rawMessageSourceText(msg.source) : undefined) ?? (msg.hasSource
           ? await apiFetch(buildAccountMessageSourcePath(msg.accountId, msg.id))
               .then(async (response) => {
                 if (!response.ok) return "";
@@ -1494,6 +1495,7 @@ function ComposeOrchestratorImpl(
     <ComposeMessageField
       darkMode={darkMode}
       composeMode={composeMode}
+      composeReplyMessage={composeReplyMessage}
       composeTab={composeTab}
       composeBody={composeBody}
       composeHtml={composeHtml}

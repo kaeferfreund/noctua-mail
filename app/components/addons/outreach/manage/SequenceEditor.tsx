@@ -109,7 +109,9 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
   const setStatus = (status: "live" | "paused") => run("status", async () => {
     // Pausing stops sending first; unsaved edits stay in the form and are saved separately.
     const stored = status === "paused" && current ? current : dirty || !current ? await persist() : current;
-    const result = await api.send<{ sequence: Sequence }>("POST", `sequences/${encodeURIComponent(stored.id)}/status`, { status });
+    // Going live approves the version shown here; pausing never needs to wait for a review.
+    const result = await api.send<{ sequence: Sequence }>("POST", `sequences/${encodeURIComponent(stored.id)}/status`,
+      status === "live" ? { status, expectedUpdatedAt: stored.updatedAt } : { status });
     setCurrent(result.sequence);
     setReportVersion(version => version + 1);
     setDialog(null);

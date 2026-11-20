@@ -76,6 +76,20 @@ test("creates every mode, lists a token in both mailboxes, editor sees own and m
   }
 });
 
+test("a manager who is not the creator removes only their mailbox from a shared token", async () => {
+  const { tokenRecord } = await create();
+  const master = fixture.master;
+  expect((await DELETE(request(sharedId, "DELETE", undefined, other), params(sharedId, tokenRecord.id))).status).toBe(200);
+  expect(master.prepare("SELECT accountId FROM mcp_token_accounts WHERE tokenId=?").all(tokenRecord.id)).toEqual([{ accountId }]);
+  expect(master.prepare("SELECT accountId FROM mcp_tokens WHERE id=?").get(tokenRecord.id)).toEqual({ accountId });
+  expect((await (await GET(request(accountId), params(accountId))).json()).tokens.find((token: { id: string }) => token.id === tokenRecord.id))
+    .toMatchObject({ accountIds: [accountId] });
+  expect((await (await GET(request(sharedId, "GET", undefined, other), params(sharedId))).json()).tokens
+    .map((token: { id: string }) => token.id)).not.toContain(tokenRecord.id);
+  // Gone from this mailbox: a second delete there finds nothing.
+  expect((await DELETE(request(sharedId, "DELETE", undefined, other), params(sharedId, tokenRecord.id))).status).toBe(404);
+});
+
 test("defaults to drafts and rejects invalid sets/modes or membership without creating tokens", async () => {
   expect((await create({ mode: undefined })).tokenRecord.scopes).toEqual(["read", "drafts"]);
   for (const extra of [{ mode: "send" }, { mode: null }, { accountIds: [] }, { accountIds: [sharedId] }, { accountIds: [accountId, 3] }, { accountIds: "all" }]) {

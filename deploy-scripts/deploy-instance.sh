@@ -37,6 +37,8 @@ mkdir -p "$DEPLOY_PATH/data-$INSTANCE"
 # Ensure proper permissions for the noctua user in the container
 # The noctua user has UID 999 (created with useradd -r in Dockerfile)
 chown -R 999:999 "$DEPLOY_PATH/data-$INSTANCE"
+# Mail, databases and credentials: no access for other host users.
+chmod 700 "$DEPLOY_PATH/data-$INSTANCE"
 
 cd "$DEPLOY_PATH"
 
@@ -81,6 +83,11 @@ if [[ "$INSTANCE" == "dev" ]]; then
 fi
 HOST_PORT_VALUE="${HOST_PORT:-$DEFAULT_HOST_PORT}"
 
+# Secrets are passed by name only (`-e NAME`): docker reads the value from its
+# environment, so it never appears in the process list of the host.
+: "${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}"
+export BETTER_AUTH_SECRET IMAP_SECRET_KEY
+
 DOCKER_ARGS=(
   -d
   --name "noctua-mail-$INSTANCE"
@@ -91,13 +98,13 @@ DOCKER_ARGS=(
   -p "$HOST_BIND_IP:$HOST_PORT_VALUE:$PORT_VALUE"
   -e PORT="$PORT_VALUE"
   -e NOCTUA_DATA_DIR="$DATA_DIR_VALUE"
-  -e BETTER_AUTH_SECRET="${BETTER_AUTH_SECRET:?BETTER_AUTH_SECRET is required}"
+  -e BETTER_AUTH_SECRET
   -e BETTER_AUTH_URL="${BETTER_AUTH_URL:?BETTER_AUTH_URL is required}"
   -e PASSKEY_RP_ID="${PASSKEY_RP_ID:-}"
   -e BETTER_AUTH_TELEMETRY=0
   -e NOCTUA_TRUSTED_ORIGINS="${NOCTUA_TRUSTED_ORIGINS:-}"
   -e NOCTUA_IMAP_LOGIN_HOSTS="${NOCTUA_IMAP_LOGIN_HOSTS:-}"
-  -e IMAP_SECRET_KEY="${IMAP_SECRET_KEY:-}"
+  -e IMAP_SECRET_KEY
   -e IMAP_CREDENTIALS_STORAGE="${IMAP_CREDENTIALS_STORAGE:-db}"
   -e APP_ENV_LABEL="$APP_ENV_LABEL_VALUE"
 )

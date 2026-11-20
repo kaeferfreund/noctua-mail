@@ -12,14 +12,64 @@ import { ImageInsertDialog, imageTag } from "./ImageInsertDialog";
 
 const LIVE_PREVIEW_DELAY_MS = 300;
 
+// Resource references that make the preview contact another host: absolute
+// or protocol-relative URLs in resource attributes and CSS, and stylesheets.
+const REMOTE_RESOURCE = /\b(?:src|srcset|background|poster|data)\s*=\s*["']?\s*(?:https?:)?\/\/|url\(\s*["']?\s*(?:https?:)?\/\/|@import\b|<link\b/i;
+
+export function hasRemoteResources(html: string) {
+  return REMOTE_RESOURCE.test(html);
+}
+
+/**
+ * Policy of the preview document (SD56): no scripts, forms or base URL; images
+ * only inline or from this Noctua's media path (`/t/m/`), until the viewer
+ * loads external content. Combined with the app policy the frame inherits.
+ */
+export function previewCsp(origin: string | null, allowRemote: boolean) {
+  const media = origin ? ` ${origin}/t/m/` : "";
+  const remote = allowRemote ? " https: http:" : "";
+  return [
+    "default-src 'none'",
+    `img-src data: blob:${media}${remote}`,
+    `style-src 'unsafe-inline'${remote}`,
+    `font-src data:${remote}`,
+    `media-src data:${media}${remote}`,
+    "form-action 'none'",
+    "base-uri 'none'"
+  ].join("; ");
+}
+
+/** Puts the policy first in the document, after a doctype so the rendering mode stays. */
+export function withPreviewCsp(html: string, csp: string) {
+  const meta = `<meta http-equiv="Content-Security-Policy" content="${csp.replace(/"/g, "&quot;")}">`;
+  const doctype = /^\s*<!doctype[^>]*>/i.exec(html);
+  return doctype ? doctype[0] + meta + html.slice(doctype[0].length) : meta + html;
+}
+
+function currentOrigin() {
+  return typeof window === "undefined" ? null : window.location.origin;
+}
+
 /**
  * Foreign HTML (templates, campaign bodies) is only ever shown here: an iframe with an empty
  * `sandbox` (no scripts, no same-origin access, no forms, no top navigation) fed through `srcdoc`.
+ * External resources stay blocked until the viewer loads them for this preview.
  */
 export function SandboxedHtml({ html, title }: { html: string; title: string }) {
+  const t = useTranslations("outreach");
+  const [allowRemote, setAllowRemote] = useState(false);
+  const blocked = !allowRemote && hasRemoteResources(html);
   return (
-    <iframe sandbox="" srcDoc={html} title={title} referrerPolicy="no-referrer"
-      className="h-[28rem] w-full rounded-md border bg-white max-md:h-80" />
+    <div className="flex min-w-0 flex-col gap-1">
+      {blocked ? (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span className="flex-1">{t("content.remoteBlocked")}</span>
+          <Button variant="outline" size="sm" onClick={() => setAllowRemote(true)}>{t("content.loadRemote")}</Button>
+        </div>
+      ) : null}
+      <iframe sandbox="" srcDoc={withPreviewCsp(html, previewCsp(currentOrigin(), allowRemote))} title={title} referrerPolicy="no-referrer"
+        className="h-[28rem] w-full rounded-md border bg-white max-md:h-80" />
+    </div>
   );
 }
 

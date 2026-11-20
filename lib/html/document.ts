@@ -63,6 +63,8 @@ export function shouldShowHtmlViewerFrame(input: string) {
 
 export function ensureHtmlDocumentTitle(html: string, title: string) {
   const nextTitle = `<title>${escapeHtml(title)}</title>`;
+  // Function replacers only: in a replacement string, `$\``, `$'` and `$&`
+  // would splice parts of the sanitized document into the title (DS-04).
 
   if (!/<html[\s>]/i.test(html)) {
     return `<!doctype html>
@@ -80,10 +82,10 @@ export function ensureHtmlDocumentTitle(html: string, title: string) {
 
   if (/<head[\s>]/i.test(html)) {
     if (/<title[\s>][\s\S]*?<\/title>/i.test(html)) {
-      return html.replace(/<title[\s>][\s\S]*?<\/title>/i, nextTitle);
+      return html.replace(/<title[\s>][\s\S]*?<\/title>/i, () => nextTitle);
     }
-    return html.replace(/<head([^>]*)>/i, `<head$1>${nextTitle}`);
+    return html.replace(/<head([^>]*)>/i, (_match, attrs: string) => `<head${attrs}>${nextTitle}`);
   }
 
-  return html.replace(/<html([^>]*)>/i, `<html$1><head>${nextTitle}</head>`);
+  return html.replace(/<html([^>]*)>/i, (_match, attrs: string) => `<html${attrs}><head>${nextTitle}</head>`);
 }

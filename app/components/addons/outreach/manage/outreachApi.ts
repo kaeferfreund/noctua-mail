@@ -45,13 +45,15 @@ export function createOutreachApi(accountId: string, fetchImpl: AdminFetch = fet
 
 export type OutreachErrorKey =
   | "errors.disabled" | "errors.conflict" | "errors.invalid" | "errors.forbidden" | "errors.notFound"
-  | "errors.session" | "errors.rateLimited" | "errors.offline" | "errors.tooLarge" | "errors.unsupportedType" | "errors.generic";
+  | "errors.session" | "errors.rateLimited" | "errors.offline" | "errors.tooLarge" | "errors.unsupportedType" | "errors.imageQuota" | "errors.imageStorageFull" | "errors.generic";
 
 /** Maps a failed request to a translated message key plus the server's own text where it helps (400/409). */
 export function outreachErrorKey(error: unknown): { key: OutreachErrorKey; detail: string | null } {
   if (!(error instanceof AdminApiError)) return { key: error instanceof TypeError ? "errors.offline" : "errors.generic", detail: null };
   const detail = error.message && !/^Request failed/.test(error.message) ? error.message : null;
   if (error.code === "outreach_disabled") return { key: "errors.disabled", detail: null };
+  if (error.code === "image_quota_exceeded") return { key: "errors.imageQuota", detail: null };
+  if (error.code === "image_storage_full") return { key: "errors.imageStorageFull", detail: null };
   switch (error.status) {
     case 400: return { key: "errors.invalid", detail };
     case 401: return { key: "errors.session", detail: null };

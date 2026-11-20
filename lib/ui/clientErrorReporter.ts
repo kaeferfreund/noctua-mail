@@ -1,3 +1,4 @@
+import { isStandaloneDisplay } from "@/lib/ui/displayMode";
 import { CLIENT_ERROR_LIMITS, clientErrorLocation, type ClientErrorReport, type ClientErrorSource } from "@/lib/clientErrors";
 
 /** The same message is reported at most once per minute and tab. */
@@ -21,11 +22,6 @@ function describe(error: unknown): { message: string; stack: string; digest: str
   return { message: `${error.name}: ${error.message}`, stack: error.stack ?? "", digest: typeof digest === "string" ? digest : "" };
 }
 
-function isStandalone() {
-  return (navigator as Navigator & { standalone?: boolean }).standalone === true ||
-    (typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches);
-}
-
 /** Never throws: it runs on error paths, including inside an error boundary. */
 export function reportClientError(source: ClientErrorSource, error: unknown, now = Date.now(), detail?: Pick<ClientErrorReport, "kind" | "count" | "blank" | "notificationOpen">) {
   try {
@@ -39,7 +35,7 @@ export function reportClientError(source: ClientErrorSource, error: unknown, now
     const report: ClientErrorReport = {
       source, ...detail, message: key, stack: stack.slice(0, CLIENT_ERROR_LIMITS.stack), digest: digest.slice(0, CLIENT_ERROR_LIMITS.digest),
       ...clientErrorLocation(window.location.href), build: build.slice(0, CLIENT_ERROR_LIMITS.build),
-      userAgent: navigator.userAgent.slice(0, CLIENT_ERROR_LIMITS.userAgent), standalone: isStandalone()
+      userAgent: navigator.userAgent.slice(0, CLIENT_ERROR_LIMITS.userAgent), standalone: isStandaloneDisplay()
     };
     // keepalive: the report still leaves when the user reloads right away.
     void fetch("/api/client-errors", { method: "POST", credentials: "same-origin", keepalive: true,

@@ -28,6 +28,7 @@ import {
   normalizeDeeplForSave
 } from "./utils/accountControllerHelpers";
 import type { MailboxViewCache } from "./mailboxViewCache";
+import { setCalendarReminderStoragePrincipal } from "./utils/calendarReminders";
 
 type SelectionView = { accountId: string; accounts: Account[] };
 type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -187,6 +188,12 @@ export function useAccountController({
         if ((response?.status === 401 || response?.status === 403) && version === switchVersion.current) void bootstrap();
       }, () => {});
   }, [persistSelection]);
+  // Views that show one signed-in person's data and survive in this mounted client:
+  // the mailbox settings dialog with its editing snapshot and the error log.
+  const clearPrincipalViews = useCallback(() => {
+    setManageOpen(false); setEditingAccount(null);
+    setExceptionEntries([]); setMessageListError(null);
+  }, [setManageOpen, setEditingAccount, setExceptionEntries, setMessageListError]);
   const loadInitialData = useCallback(
     async function bootstrap(): Promise<void> {
       const version = ++loadVersion.current;
@@ -206,6 +213,7 @@ export function useAccountController({
         if (!me.ok) {
           if (me.status === 401) {
             publishLocalePreference(null);
+            clearPrincipalViews();
             switchVersion.current++; lastIdentity.current = null; instanceAdmin.current = false;
             setMessages([]); setViewMessage(null); setActiveMessageId("");
             setAuthState("unauth"); setCurrentUser(null); setAccounts([]);
@@ -219,8 +227,11 @@ export function useAccountController({
         if (lastIdentity.current !== data.user?.id) {
           setMessages([]); setViewMessage(null); setActiveMessageId(""); setMessagesPage(1);
           setHasMoreMessages(true); setTotalMessages(null); setActiveFolderId("");
+          // Another person signed in on this mounted client: nothing of the previous one stays open.
+          if (lastIdentity.current) clearPrincipalViews();
         }
         lastIdentity.current = data.user?.id ?? null;
+        if (data.user?.id) setCalendarReminderStoragePrincipal(data.user.id);
         instanceAdmin.current = data.user?.role === "admin";
         setAuthState("ok"); setCurrentUser(data.user); setSecurity(data.security);
         setSessionTtlSeconds(data.ttlSeconds);
@@ -261,7 +272,7 @@ export function useAccountController({
         if (version === loadVersion.current) setBootstrapError("Failed to load mailbox data. Please retry.");
       }
     },
-    [apiFetch, settleDeferredBootstrap, readErrorMessage, reportError, setAccounts, setActiveAccountId, setAuthState,
+    [apiFetch, settleDeferredBootstrap, clearPrincipalViews, readErrorMessage, reportError, setAccounts, setActiveAccountId, setAuthState,
       setCurrentUser, setFolders, setInitialDataReady, setInitialFoldersLoadedAccountId, setSessionTtlSeconds,
       setMessages, setViewMessage, setActiveMessageId, setMessagesPage, setHasMoreMessages, setTotalMessages, setActiveFolderId, setLastFolderId]
   );
@@ -269,10 +280,11 @@ export function useAccountController({
   const logout = async () => {
     try {
       await createAuthClient(apiFetch).logout();
+      clearPrincipalViews();
       loadVersion.current++; switchVersion.current++; lastIdentity.current = null; instanceAdmin.current = false;
       setAuthState("unauth"); setCurrentUser(null); setAccounts([]); setFolders([]);
       setActiveAccountId(""); setMailboxState(null); setSecurity(null);
-      setMessages([]); setViewMessage(null); setExceptionEntries([]); setMessageListError(null);
+      setMessages([]); setViewMessage(null);
       return true;
     } catch {
       reportError("Unable to log out. Your session is still open. Try again.");

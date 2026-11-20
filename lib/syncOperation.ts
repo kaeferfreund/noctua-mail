@@ -23,10 +23,12 @@ import {
   upsertMessages
 } from "@/lib/db";
 import { processCalendarInviteForMessage } from "@/lib/calendarInviteProcessor";
+import { inviteSenderAuthenticationResults } from "@/lib/calendarInviteAuthority";
 import { getAttachmentContentBuffer, sanitizeSyncedMessage } from "@/lib/mail/syncMessageSanitizer";
 import { hasMessageFlag, isCalendarAttachment, CALENDAR_INVITE_FLAG } from "@/lib/messageFlags";
 import type { SyncMode } from "@/lib/syncPolicy";
 import { deleteMessageFiles } from "@/lib/storage";
+import { buildFolderId } from "@/lib/mail/imap/_shared";
 import {
   deleteImapMessage,
   listImapMailboxUidsAndFlags,
@@ -187,6 +189,9 @@ export function planTwoPhaseNewBackfill(
 type CalendarInviteImport = {
   messageId: string;
   icsSource: string;
+  senderAddress?: string;
+  /** Receiving server's Authentication-Results; automatic updates need SPF/DKIM for the organizer. */
+  senderAuthenticationResults?: string[];
   dateValue: number;
   imapUid?: number;
   process: boolean;
@@ -216,14 +221,22 @@ export function sortCalendarInviteImportsForProcessing(invites: CalendarInviteIm
   });
 }
 
+/**
+ * The local folder a sync enumerates remotely. Without an explicit folder the
+ * IMAP fetch opens INBOX, so reconciliation must be bound to INBOX as well and
+ * never to the whole mailbox.
+ */
+export function resolveSyncedFolderId(accountId: string, folderId: string | null | undefined, mailboxPath: string) {
+  return folderId ?? buildFolderId(accountId, mailboxPath);
+}
+
 export function resolveOrphanedMessageFileRefs(params: {
   removed: Array<{ messageId: string; attachmentIds: string[] }>;
   existingFolderIds: Map<string, string>;
-  currentFolderId?: string | null;
+  currentFolderId: string;
 }) {
-  const { removed, existingFolderIds, currentFolderId = null } = params;
+  const { removed, existingFolderIds, currentFolderId } = params;
   if (removed.length === 0) return [];
-  if (!currentFolderId) return removed;
   return removed.filter((item) => {
     const existingFolderId = existingFolderIds.get(item.messageId);
     if (!existingFolderId) return true;
@@ -628,8 +641,9 @@ export async function runSyncOperationBatched(
   // can reconcile orphans (messages deleted from the server) at the end.
   // Resumed syncs skip reconciliation because we only re-fetch a subset of UIDs.
   const isFreshFullSync = syncMode === "full" && !payload.resumeFromUid;
+  const syncedFolderId = resolveSyncedFolderId(account.id, payload.folderId, resolvedMailboxPath);
   const existingFileRefs = isFreshFullSync
-    ? await listMessageFileRefs(account.id, payload.folderId ?? null)
+    ? await listMessageFileRefs(account.id, syncedFolderId)
     : [];
 
   // Process each batch as it arrives from IMAP
@@ -808,6 +822,8 @@ export async function runSyncOperationBatched(
           calendarInviteImports.push({
             messageId: message.id,
             icsSource,
+            senderAddress: message.from,
+            senderAuthenticationResults: inviteSenderAuthenticationResults(message.source),
             dateValue: message.dateValue,
             imapUid: typeof message.imapUid === "number" ? message.imapUid : undefined,
             process: shouldProcessInvite,
@@ -879,6 +895,8 @@ export async function runSyncOperationBatched(
       icsSource: invite.icsSource,
       process: invite.process && !fullyProcessedInviteMessageIds.has(invite.messageId),
       accountEmail: getOwnAddresses(account),
+      senderAddress: invite.senderAddress,
+      senderAuthenticationResults: invite.senderAuthenticationResults,
       reminderUserId: autoProcessCalendarInvites ? account.ownerUserId : undefined,
       processedByUserId: autoProcessCalendarInvites ? account.ownerUserId : undefined,
       processedAutomatically: autoProcessCalendarInvites ? true : undefined
@@ -908,7 +926,7 @@ export async function runSyncOperationBatched(
       const orphaned = resolveOrphanedMessageFileRefs({
         removed,
         existingFolderIds,
-        currentFolderId: payload.folderId ?? null
+        currentFolderId: syncedFolderId
       });
       if (orphaned.length > 0) {
         emitFinalizing(

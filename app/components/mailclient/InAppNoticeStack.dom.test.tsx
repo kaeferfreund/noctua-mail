@@ -116,7 +116,7 @@ describe("in-app notice stack", () => {
       views: { inbox: null, collab: [], virtual: [] },
       topics: { topics: [], activeTopicId: null, onTopicClick: () => {} },
       folders: {
-        accountFolderCount: 0, isRecomputingThreads: false, isRecomputingCategories: false,
+        accountFolderCount: 0, isRecomputingThreads: false, isRecomputingCategories: false, canRecompute: true,
         syncAccount: () => {}, recomputeThreads: () => {}, recomputeCategories: () => {},
         rootFolders: [], folderTree: new Map(), folderById: new Map(), searchScope: "folder",
         activeFolderId: "", setActiveFolderId: () => {}, setSearchScope: () => {}, clearSearch: () => {},

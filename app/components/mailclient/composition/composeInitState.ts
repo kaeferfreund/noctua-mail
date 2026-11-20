@@ -18,6 +18,8 @@ import {
 } from "@/lib/html";
 import { prefixSubject } from "@/lib/mail/subjectPrefix";
 import { splitRecipientEntries } from "@/lib/recipientLists";
+import { extractUnambiguousPrimaryMailbox, formatAddress, splitAddressList } from "@/lib/senderIdentity";
+import addressParser from "nodemailer/lib/addressparser/index.js";
 import { hasHtmlContent } from "@/lib/ui/messageView";
 import { buildTextReplyBody } from "./composeContentBuilder";
 import { computeDraftHash } from "./draftSaveUtils";
@@ -31,16 +33,32 @@ function getPrimaryEmail(value?: string) {
   return parseAddressEmails(value)[0] ?? null;
 }
 
+function parseRecipientMailboxes(value: string): { name: string; mailbox: string }[] {
+  return splitAddressList(value).flatMap(entry => {
+    const mailbox = extractUnambiguousPrimaryMailbox(entry) ?? getPrimaryEmail(entry);
+    if (!mailbox) return [];
+    return [{ name: addressParser(entry, { flatten: true })[0]?.name?.trim() ?? "", mailbox }];
+  });
+}
+
+/**
+ * Re-serialize an address (list) for a compose recipient field. Display names
+ * are re-quoted by the shared formatter, so a name such as
+ * `"Eve, eve@example.test"` stays one display name and never becomes an extra
+ * recipient. Entries without an actual mailbox are dropped.
+ */
 export function getDisplayRecipient(value: string): string {
   if (!value) return "";
-  const match = value.match(/(.+)<([^>]+)>/);
-  if (match) {
-    const name = match[1].trim().replace(/^"|"$/g, "").trim();
-    const email = match[2].trim();
-    return name ? `${name} <${email}>` : email;
-  }
-  const email = getPrimaryEmail(value);
-  return email || value.trim();
+  return parseRecipientMailboxes(value)
+    .map(({ name, mailbox }) => formatAddress(name, mailbox) || formatAddress("", mailbox))
+    .filter(Boolean).join(", ");
+}
+
+/** Human-readable label (forward header table only, never a recipient field). */
+function getRecipientLabel(value: string): string {
+  if (!value) return "";
+  return parseRecipientMailboxes(value)
+    .map(({ name, mailbox }) => name ? `${name} <${mailbox}>` : mailbox).join(", ");
 }
 
 export function uniqueEmails(entries: string[]): string[] {
@@ -272,7 +290,9 @@ function computeBaseComposeInitState(
     if (isSentByCurrentUser) {
       toList = uniqueRecipients(splitRecipientEntries(message.to)
         .filter(recipient => !isOwnAddress(recipient, ownAddresses)).map(getDisplayRecipient));
-      ccList = uniqueEmails([message.cc, message.bcc].flatMap(value => parseAddressEmails(value))
+      // Original Bcc recipients stay blind: Reply All builds To/Cc from the
+      // visible headers only. The sender can add anyone back deliberately.
+      ccList = uniqueEmails(parseAddressEmails(message.cc)
         .filter(email => !isOwnAddress(email, ownAddresses)));
     } else {
       // When Reply-To is set we deliberately do not add the original From
@@ -292,8 +312,7 @@ function computeBaseComposeInitState(
       );
       const allRecipientParts = [
         ...splitRecipientEntries(message.to),
-        ...splitRecipientEntries(message.cc),
-        ...splitRecipientEntries(message.bcc)
+        ...splitRecipientEntries(message.cc)
       ]
         .map((s) => s.trim())
         .filter(Boolean);
@@ -327,7 +346,7 @@ function computeBaseComposeInitState(
   // -------------------------------------------------------------------------
   if (mode === "forward") {
     const formatAddresses = (value?: string | null) =>
-      splitRecipientEntries(value).map(getDisplayRecipient).filter(Boolean).join(", ");
+      splitRecipientEntries(value).map(getRecipientLabel).filter(Boolean).join(", ");
     const replyToDiffersFromSender = replyToEmails.some(
       (email) => !fromEmails.some((from) => from.toLowerCase() === email.toLowerCase())
     );

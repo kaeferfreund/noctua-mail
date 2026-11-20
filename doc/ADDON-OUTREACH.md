@@ -153,7 +153,11 @@ local database. Event listings and the latest event in a send summary truncate e
 as soon as the retention window ends. Each physical cleanup run processes up to 20 batches
 of 500 rows per mailbox and yields between transactions.
 
-One send can store up to 2,000 open and click events combined. A click stores a reference
+One send can store up to 2,000 open events and, separately, up to 2,000 click events. One
+client address and one click link can each fill at most 200 of them, so a single link holder
+cannot use up the history of the whole send. Opens and clicks are stored only while the
+mailbox has the addon switched on; links of mail sent earlier keep redirecting and the pixel
+keeps answering after it is switched off, but no activity is recorded. A click stores a reference
 to its link, which holds the target URL. Links longer than 2,048 characters keep their
 original href. The open pixel is omitted if the rewritten HTML cannot render it as an
 image.
@@ -171,7 +175,9 @@ milliseconds. The caller's clock may differ from this server's by up to 60 secon
 that far ahead is stored as "now", anything further in the future answers 400. Against a recorded
 unsubscribe or erase the claim counts 60 seconds earlier than stated, so the same request never
 becomes "newer" by being sent again; a new consent must therefore be later than the unsubscribe by
-more than 60 seconds, otherwise the answer is 409 `new_consent_required`.
+more than 60 seconds, otherwise the answer is 409 `new_consent_required`. The token only adds the
+address to its list: a known contact keeps its name and properties (they belong to the mailbox and
+are shared by its other lists), and the answer is the same for new and known addresses.
 
 Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 
@@ -194,16 +200,16 @@ Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 | GET, PATCH, DELETE | `{base}/templates/{templateId}` | `Partial<EmailTemplateInput>` → `{ok, template}`; DELETE archives |
 | POST | `{base}/render` | `{subject, html, text?, contactId?}` → `RenderResponse` |
 | GET | `{base}/images` | → `OutreachImageListResponse` |
-| POST | `{base}/images?filename=` | file bytes as `application/octet-stream` → `OutreachImageUploadResponse` (PNG, JPEG, GIF, WebP; at most 5 MiB; 413 if oversized, 415 if unsupported or the extension disagrees with the detected type) |
+| POST | `{base}/images?filename=` | file bytes as `application/octet-stream` → `OutreachImageUploadResponse` (PNG, JPEG, GIF, WebP; at most 5 MiB; 413 if oversized, 413 `image_quota_exceeded` when a new image would exceed the mailbox's 200 MiB image storage (an image the mailbox already has is free), 415 if unsupported or the extension disagrees with the detected type) |
 | GET, POST | `{base}/campaigns` | `CampaignInput` → `{ok, campaigns: CampaignSummary[]}` / `{ok, campaign}` |
 | GET, PATCH, DELETE | `{base}/campaigns/{campaignId}` | `CampaignInput` → `{ok, campaign: Campaign}`; only drafts change or delete. `Campaign` and `CampaignSummary` carry `scheduledByUserId` and `scheduledVia` |
 | POST | `{base}/campaigns/{campaignId}/test` | `TestSendRequest` → `{ok}` |
-| POST | `{base}/campaigns/{campaignId}/schedule` | `CampaignScheduleRequest` → `CampaignScheduleResponse`; `dryRun: true` checks and counts without scheduling. Pass its `campaign.updatedAt` as `expectedUpdatedAt` to reject a changed draft with 409 `campaign_changed`. Scheduling a campaign that would reach nobody answers 409 `no_recipients`. |
+| POST | `{base}/campaigns/{campaignId}/schedule` | `CampaignScheduleRequest` → `CampaignScheduleResponse`; `dryRun: true` checks and counts without scheduling. Pass the reviewed `campaign.updatedAt` as `expectedUpdatedAt` (also on the dry run) and the dry run's `contentVersion` (resolved content incl. a referenced template, sender, lists, tracking) as `expectedContentVersion` to reject a changed draft with 409 `campaign_changed`; the app always sends both. Scheduling a campaign that would reach nobody answers 409 `no_recipients`. |
 | POST | `{base}/campaigns/{campaignId}/cancel` | → `{ok, campaign}` |
 | GET | `{base}/campaigns/{campaignId}/report?cursor=` | → `CampaignReport` |
 | GET, POST | `{base}/sequences` | `SequenceInput` → `{ok, sequences: SequenceSummary[]}` / `{ok, sequence}` |
 | GET, PATCH, DELETE | `{base}/sequences/{sequenceId}` | `SequenceInput` → `{ok, sequence: Sequence}`; only drafts delete. `Sequence` and `SequenceSummary` carry `statusChangedByUserId` and `statusChangedVia` |
-| POST | `{base}/sequences/{sequenceId}/status` | `{status: "live" \| "paused"}` → `{ok, sequence}` |
+| POST | `{base}/sequences/{sequenceId}/status` | `SequenceStatusRequest` (`{status: "live" \| "paused", expectedUpdatedAt?}`) → `{ok, sequence}`; a reviewed `expectedUpdatedAt` that no longer matches answers 409 `sequence_changed` |
 | GET | `{base}/sequences/{sequenceId}/report` | → `SequenceReport` |
 
 Errors: `{ok:false, message, code?}`; 404 flag off or unknown id, 409 `outreach_disabled`

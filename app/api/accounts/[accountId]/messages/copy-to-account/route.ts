@@ -18,6 +18,7 @@ import {
   requireAccountContext,
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 type CopyToAccountPayload = {
   messageIds?: string[];
@@ -41,8 +42,13 @@ type MessageResult = {
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const payload = (await request.json().catch(() => null)) as CopyToAccountPayload | null;
   const sourceAccountId = await getAccountIdFromParams(params);
+  // Source and destination each require current editor access; the source first, before reading the body.
+  const sourceContext = await requireAccountContext(request, sourceAccountId, { minRole: "editor" });
+  if (sourceContext instanceof NextResponse) return sourceContext;
+  const body = await readJsonBody<CopyToAccountPayload>(request);
+  if (!body.ok) return body.response;
+  const payload = body.value;
   const destinationAccountId = payload?.destinationAccountId?.trim() ?? "";
   const destinationFolderId = payload?.destinationFolderId?.trim() ?? "";
   const mode = payload?.mode === "move" ? "move" : "copy";
@@ -67,9 +73,6 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     );
   }
 
-  // Source and destination each require current editor access.
-  const sourceContext = await requireAccountContext(request, sourceAccountId, { minRole: "editor" });
-  if (sourceContext instanceof NextResponse) return sourceContext;
   return withAuthResponse(sourceContext, async () => {
     const destinationContext = await requireAccountContext(request, destinationAccountId, { minRole: "editor" });
     if (destinationContext instanceof NextResponse) return destinationContext;

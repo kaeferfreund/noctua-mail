@@ -11,7 +11,10 @@ const workerConfig = {
   readStderrText: true,
   runtimeMissingMessage: "Bun runtime is required to spawn a recompute worker."
 };
-const threadRecomputeJobs = createWorkerJobRegistry(workerConfig);
+// Account-wide rebuilds: one job per mailbox, at most two at once on the host.
+const threadRecomputeJobs = createWorkerJobRegistry({
+  ...workerConfig, registryName: "thread-recompute", maxConcurrentJobs: 2
+});
 const identityRecomputeJobs = createWorkerJobRegistry({
   ...workerConfig, registryName: "sender-identity-recompute", maxConcurrentJobs: 2, sharedWorkerBudget: true
 });

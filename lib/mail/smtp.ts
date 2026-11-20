@@ -77,6 +77,8 @@ function createSmtpTransport(account: Account) {
     host: account.smtp.host,
     port: account.smtp.port,
     secure: account.smtp.secure,
+    // Mandatory STARTTLS: never send AUTH over an unencrypted connection.
+    requireTLS: !account.smtp.secure && Boolean(account.smtp.requireTls),
     auth: {
       user: account.smtp.user,
       pass: account.smtp.password

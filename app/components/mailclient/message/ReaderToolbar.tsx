@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { Archive, ArrowLeft, ArrowRightLeft, CheckCheck, ChevronLeft, ChevronRight, Maximize2, Minimize2, Printer, Shield, ShieldOff, SquareArrowOutUpRight, Tags, Trash2, X } from "lucide-react";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
 import type { ReaderLayout } from "@/lib/ui/readerFocus";
+import { useSingleWindowApp } from "@/lib/ui/displayMode";
 import styles from "./ReaderToolbar.module.css";
 
 type Props = {
@@ -21,6 +22,7 @@ export default function ReaderToolbar(props: Props) {
   const t = useTranslations("Reader");
   const positionId = useId();
   const focus = props.layout === "focus";
+  const singleWindow = useSingleWindowApp();
   const action = (label: string, icon: ReactNode, onClick: () => void, disabled = props.busy, shortcut?: string) =>
     <TooltipIconButton size="2" variant="ghost" color="gray" tooltip={shortcut ? `${label} (${shortcut})` : label} aria-label={label} aria-keyshortcuts={shortcut} onClick={onClick} disabled={disabled}>{icon}</TooltipIconButton>;
   // The split reader has no actions of its own: MessageViewOrchestrator places this
@@ -39,7 +41,7 @@ export default function ReaderToolbar(props: Props) {
           {props.renderMenu()}
         </div>
         <div className={styles.navigation}>
-          {action(t("openWindow"), <SquareArrowOutUpRight size={16} />, props.openWindow, false)}
+          {!singleWindow && action(t("openWindow"), <SquareArrowOutUpRight size={16} />, props.openWindow, false)}
           {action(t("focus.print"), <Printer size={16} />, props.print ?? (() => window.print()), false)}
           <span className={styles.counter} data-reader-position="" aria-live="polite" aria-describedby={positionId} title={t(props.hasMore ? "focus.loadedPosition" : "focus.position", { position: props.position, total: props.total })}>{t(props.hasMore ? "focus.counterMore" : "focus.counter", { position: props.position, total: props.total })}</span>
           <span id={positionId} className="sr-only">{t(props.hasMore ? "focus.loadedPosition" : "focus.position", { position: props.position, total: props.total })}</span>

@@ -257,3 +257,86 @@ describe("assertPublicUrl — protocols option", () => {
     }
   });
 });
+
+describe("isPublicIp — complete special-purpose table (CF-08, A41)", () => {
+  const nonPublicV4 = [
+    "0.0.0.0", "0.255.255.255", // this network
+    "100.64.0.0", "100.100.100.100", "100.127.255.255", // shared address space / tailnets
+    "192.0.0.1", "192.0.0.255", // IETF protocol assignments
+    "192.0.2.1", "198.51.100.7", "203.0.113.9", // documentation
+    "192.88.99.1", // 6to4 relay anycast
+    "198.18.0.1", "198.19.255.255", // benchmarking
+    "224.0.0.1", "239.255.255.255", // multicast
+    "240.0.0.1", "250.1.2.3", "255.255.255.255" // reserved + broadcast
+  ];
+  const publicV4 = ["100.63.255.255", "100.128.0.0", "192.0.1.255", "192.0.3.0", "198.17.255.255", "198.20.0.0", "223.255.255.255", "203.0.114.1"];
+
+  for (const addr of nonPublicV4) it(`rejects ${addr}`, () => expect(isPublicIp(addr)).toBe(false));
+  for (const addr of publicV4) it(`accepts ${addr}`, () => expect(isPublicIp(addr)).toBe(true));
+
+  const nonPublicV6 = [
+    "::ffff:7f00:1", "::ffff:7f00:0001", "0:0:0:0:0:ffff:7f00:1", "::FFFF:7F00:1", // hex mapped loopback
+    "::ffff:a9fe:a9fe", // mapped metadata address
+    "::ffff:a00:1", "::ffff:6464:6464", // mapped 10.0.0.1, 100.100.100.100
+    "::ffff:0:0", // mapped 0.0.0.0
+    "::7f00:1", "::127.0.0.1", "::8.8.8.8", // IPv4-compatible (deprecated)
+    "64:ff9b::7f00:1", "64:ff9b::8.8.8.8", "64:ff9b:1::1", // NAT64
+    "2002:7f00:1::", "2002:0808:0808::1", // 6to4
+    "2001::1", "2001:0:4136:e378:8000:63bf:3fff:fdd2", // Teredo
+    "2001:2::1", "2001:10::1", "2001:20::1", // benchmarking, ORCHID
+    "2001:db8::1", "3fff::1", "3fff:fff::1", // documentation
+    "100::1", // discard
+    "fec0::1", "feff::1", // site-local (deprecated)
+    "fe80::1%eth0", // zone id
+    "5f00::1", "4000::1", "1fff::1" // outside 2000::/3
+  ];
+  for (const addr of nonPublicV6) it(`rejects ${addr}`, () => expect(isPublicIp(addr)).toBe(false));
+
+  const publicV6 = ["2001:4860:4860::8888", "2606:4700:4700::1111", "2a00:1450::1", "::ffff:808:808", "::ffff:8.8.8.8", "2001:200::1", "3ffe::1", "3fff:1000::1"];
+  for (const addr of publicV6) it(`accepts ${addr}`, () => expect(isPublicIp(addr)).toBe(true));
+
+  it("rejects non-canonical IPv4 forms that are not IP literals", () => {
+    for (const addr of ["127.1", "0x7f.0.0.1", "2130706433", "010.0.0.1", "1.2.3.4.5"]) expect(isPublicIp(addr)).toBe(false);
+  });
+});
+
+describe("assertPublicUrl — URL-normalized hosts (CF-08, A41, S21)", () => {
+  const denyLookup: LookupFn = async () => {
+    throw new Error("DNS should not be called for IP literals");
+  };
+  const literalUrls = [
+    "https://[::ffff:127.0.0.1]:8443/", // the URL parser turns this into [::ffff:7f00:1]
+    "https://[::ffff:169.254.169.254]/",
+    "https://[::ffff:a9fe:a9fe]/",
+    "https://[64:ff9b::7f00:1]/",
+    "https://[2002:7f00:1::]/",
+    "https://[2001::1]/",
+    "https://[fec0::1]/",
+    "https://100.100.100.100/",
+    "https://127.1/", // parsed to 127.0.0.1
+    "https://0x7f000001/",
+    "https://2130706433/",
+    "https://0177.0.0.1/",
+    "https://198.18.0.1/",
+    "https://255.255.255.255/"
+  ];
+  for (const url of literalUrls) {
+    it(`rejects ${url}`, async () => {
+      const res = await assertPublicUrl(url, { lookup: denyLookup });
+      expect(res).toEqual({ ok: false, reason: "private-ip" });
+    });
+  }
+
+  it("rejects hostnames that resolve to mapped, CGNAT or NAT64 addresses", async () => {
+    for (const address of ["::ffff:7f00:1", "100.64.0.1", "64:ff9b::a00:1", "2001:db8::5"]) {
+      const lookup: LookupFn = async () => [{ address, family: address.includes(":") ? 6 : 4 }];
+      expect(await assertPublicUrl("https://rebind.example.test/", { lookup })).toEqual({ ok: false, reason: "private-ip" });
+    }
+  });
+
+  it("returns the checked addresses with their family", async () => {
+    const lookup: LookupFn = async () => [{ address: "93.184.216.34", family: 4 }, { address: "2606:2800:220:1::1", family: 6 }];
+    const res = await assertPublicUrl("https://example.com/", { lookup });
+    expect(res.ok && res.addresses).toEqual([{ address: "93.184.216.34", family: 4 }, { address: "2606:2800:220:1::1", family: 6 }]);
+  });
+});

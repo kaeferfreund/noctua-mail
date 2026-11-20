@@ -62,6 +62,17 @@ export default function CalendarEventBrowser({
   const [createDialog, setCreateDialog] = useState<CreateDialogState>({ open: false });
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const { inAppNotices, pushNotice, dismissNotice } = useInAppNotices();
+  // An open event (with its stored invitation mail) belongs to the mailbox it
+  // was opened in: switching mailboxes closes it and any dialog seeded from it.
+  const [selectionAccountId, setSelectionAccountId] = useState(accountId);
+  if (selectionAccountId !== accountId) {
+    setSelectionAccountId(accountId);
+    setSelectedEvent(null);
+    setSelectedKind(null);
+    setSelectedOccurrenceStartAtMs(undefined);
+    setEditingEvent(null);
+    setCreateDialog({ open: false });
+  }
 
   // Toolbar "＋ Event": open a blank dialog (EventDialog defaults to now → +1h).
   const handleCreateEvent = useCallback(() => {
@@ -128,7 +139,8 @@ export default function CalendarEventBrowser({
     const fullEvent = await fetchCalendarEventById(accountId, event.id);
     if (!fullEvent) return;
     setSelectedEvent((current) =>
-      current?.id === fullEvent.id && current.updatedAtMs <= fullEvent.updatedAtMs
+      current?.id === fullEvent.id && current.accountId === fullEvent.accountId &&
+      current.updatedAtMs <= fullEvent.updatedAtMs
         ? fullEvent
         : current
     );

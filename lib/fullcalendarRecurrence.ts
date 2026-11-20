@@ -1,6 +1,6 @@
 import type { Options as RRuleOptions } from "rrule";
 import type { CalendarEvent } from "@/lib/data";
-import { buildCalendarRecurrenceOptions } from "./calendarRecurrence";
+import { buildCalendarRecurrenceOptions, UnsupportedRecurrenceRuleError } from "./calendarRecurrence";
 
 type FullCalendarRRuleInput = Partial<RRuleOptions>;
 
@@ -22,11 +22,18 @@ export function buildFullCalendarRecurringFields(
   const normalizedRule = event.recurrenceRule ? normalizeRRule(event.recurrenceRule) : null;
   if (!normalizedRule) return null;
 
-  const { options, timeZone } = buildCalendarRecurrenceOptions(
-    normalizedRule,
-    event.startAtMs,
-    event.startTimezone
-  );
+  let recurrence: ReturnType<typeof buildCalendarRecurrenceOptions>;
+  try {
+    // Anchored at now: an old daily series still shows its current occurrences.
+    recurrence = buildCalendarRecurrenceOptions(normalizedRule, event.startAtMs, event.startTimezone, {
+      nearMs: Date.now()
+    });
+  } catch (error) {
+    // Rules outside the recurrence work limits are shown as a single event.
+    if (error instanceof UnsupportedRecurrenceRuleError) return null;
+    throw error;
+  }
+  const { options, timeZone } = recurrence;
   const durationMs =
     typeof event.endAtMs === "number" && event.endAtMs > event.startAtMs
       ? event.endAtMs - event.startAtMs

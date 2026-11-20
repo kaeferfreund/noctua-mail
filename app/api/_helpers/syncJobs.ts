@@ -5,8 +5,9 @@ import { getRequestClientId } from "./clientId";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { requireActiveUserSession } from "@/lib/auth";
-import { getSyncJob, startSyncJob } from "@/lib/syncJobs";
+import { getSyncJob, presentSyncJobForRole, startSyncJob } from "@/lib/syncJobs";
 import type { SyncPayload } from "@/lib/syncOperation";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 type SyncHandlerOptions = {
   accountId?: string;
@@ -20,8 +21,10 @@ export async function handleSyncStartRequest(
   if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
     const clientId = getRequestClientId(request);
-    const body = (await request.json().catch(() => null)) as Omit<SyncPayload, "accountId"> &
-      Partial<Pick<SyncPayload, "accountId">> | null;
+    const json = await readJsonBody<Omit<SyncPayload, "accountId"> &
+      Partial<Pick<SyncPayload, "accountId">>>(request);
+    if (!json.ok) return json.response;
+    const body = json.value;
     const accountId = options?.accountId?.trim() || "";
 
     if (!accountId) {
@@ -54,7 +57,7 @@ export async function handleSyncStartRequest(
     }
     if (job.status === "failed") {
       return NextResponse.json(
-        { ok: false, message: job.error || "Failed to start sync job." },
+        { ok: false, message: presentSyncJobForRole(job, access.role).error || "Failed to start sync job." },
         { status: 500 }
       );
     }
@@ -123,6 +126,6 @@ export async function handleSyncStatusRequest(
       progressUpdatedAt: job.progress?.updatedAt,
       progressMessage: job.progress?.message
     });
-    return NextResponse.json({ ok: true, job });
+    return NextResponse.json({ ok: true, job: presentSyncJobForRole(job, access.role) });
   });
 }

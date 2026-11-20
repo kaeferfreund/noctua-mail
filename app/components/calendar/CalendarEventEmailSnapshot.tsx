@@ -8,8 +8,9 @@ import {
   hasCalendarEventEmailSnapshot,
   type CalendarEventEmailSnapshot as CalendarEventEmailSnapshotData
 } from "@/lib/calendarEventEmailSnapshot";
-import { enforceSafeLinks, sanitizeHtmlForDisplay, stripStyleTags } from "@/lib/html";
+import { sanitizeHtmlForAppDocument } from "@/lib/html";
 import shellStyles from "./EmbeddedPreviewShell.module.css";
+import senderHtmlStyles from "./SenderHtml.module.css";
 import styles from "./CalendarEventEmailSnapshot.module.css";
 
 export type { CalendarEventEmailSnapshotData };
@@ -64,15 +65,14 @@ export default function CalendarEventEmailSnapshot({
       ? formatAccountMediumDateTime(snapshot.sourceDateMs, dateFormat) ?? null
       : null;
 
-  // Prefer HTML, fall back to text. Sanitize through the same pipeline used
-  // by the regular message viewer, then enforce safe link attributes (so
-  // external links carry `rel="noopener noreferrer"` and open in a new
-  // tab — preventing reverse-tabnabbing). This is display-only — no link
-  // preview, no font rescaling, no inline image resolution (we intentionally
-  // don't store attachments with the snapshot).
-  const renderedHtml = bodyHtml
-    ? enforceSafeLinks(sanitizeHtmlForDisplay(stripStyleTags(bodyHtml)))
-    : null;
+  // Prefer HTML, fall back to text. The body is inserted into the app
+  // document, so it goes through the app-document sanitizer: the viewer's
+  // allowlist without sender stylesheets, with safe link attributes (new
+  // tab, no opener or referrer) and remote images blocked. The container
+  // confines inline styles. This is display-only — no link preview, no font
+  // rescaling, no inline image resolution (we intentionally don't store
+  // attachments with the snapshot).
+  const renderedHtml = bodyHtml ? sanitizeHtmlForAppDocument(bodyHtml) : null;
 
   const rootClassName = className ? `${shellStyles.preview} ${className}` : shellStyles.preview;
 
@@ -147,8 +147,8 @@ export default function CalendarEventEmailSnapshot({
         )}
         {renderedHtml ? (
           <div
-            className={styles.body}
-            // sanitizeHtmlForDisplay is the standard viewer sanitizer.
+            className={`${styles.body} ${senderHtmlStyles.senderHtml}`}
+            // sanitizeHtmlForAppDocument: sender HTML inside the app document.
             dangerouslySetInnerHTML={{ __html: renderedHtml }}
           />
         ) : bodyText ? (

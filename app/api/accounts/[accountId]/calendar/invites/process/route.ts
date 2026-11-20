@@ -10,24 +10,25 @@ import {
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
 import { processCalendarInviteForMessage } from "@/lib/calendarInviteProcessor";
 import { getMessageById } from "@/lib/db";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const payload = (await request.json().catch(() => null)) as
-    | {
-        accountId?: string;
-        messageId?: string;
-        icsSource?: string;
-      }
-    | null;
   const accountId = await getAccountIdFromParams(params);
-  const messageId = payload?.messageId?.trim() ?? "";
-  const icsSource = payload?.icsSource ?? "";
   const accountContext = await requireAccountContext(request, accountId, {
     minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  const body = await readJsonBody<{
+        accountId?: string;
+        messageId?: string;
+        icsSource?: string;
+      }>(request);
+  if (!body.ok) return body.response;
+  const payload = body.value;
+  const messageId = payload?.messageId?.trim() ?? "";
+  const icsSource = payload?.icsSource ?? "";
   return withAuthResponse(accountContext, async () => {
     if (!messageId) {
       return NextResponse.json({ ok: false, message: "Missing messageId" }, { status: 400 });
@@ -50,6 +51,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       icsSource,
       process: true,
       accountEmail: getOwnAddresses(accountContext.account),
+      senderAddress: message.from,
       reminderUserId: accountContext.session.userId,
       processedByUserId: accountContext.session.userId,
       processedAutomatically: false

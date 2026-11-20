@@ -6,6 +6,8 @@ import {
   uniqueEmails,
   uniqueRecipients
 } from "./composeInitState";
+import { parseAddressEmails } from "@/lib/ownAddresses";
+import addressParser from "nodemailer/lib/addressparser/index.js";
 import type { ComposeInviteDraft } from "@/lib/composeInvite";
 import type { Message } from "@/lib/data";
 import { formatForwardedMessageDate } from "@/lib/dateFormatting";
@@ -59,6 +61,15 @@ function makeMessage(overrides: Partial<Message> = {}): Message {
 // ---------------------------------------------------------------------------
 
 describe("getDisplayRecipient", () => {
+  it("re-quotes display names that contain address-list punctuation", () => {
+    expect(getDisplayRecipient('"Eve, eve@evil.example" <a@example.test>')).toBe('"Eve, eve@evil.example" <a@example.test>');
+    expect(getDisplayRecipient('"Eve <x@evil.example>" <a@example.test>')).toBe('"Eve <x@evil.example>" <a@example.test>');
+  });
+
+  it("drops entries without a mailbox", () => {
+    expect(getDisplayRecipient("not an email")).toBe("");
+  });
+
   it("extracts name and email from full format", () => {
     expect(getDisplayRecipient("Alice Smith <alice@example.com>")).toBe(
       "Alice Smith <alice@example.com>"
@@ -164,7 +175,29 @@ describe("computeComposeInitState — reply", () => {
       opts,
       deps
     );
-    expect(fields.composeTo).toBe("Example, Nadine <nadine@example.test>");
+    expect(fields.composeTo).toBe('"Example, Nadine" <nadine@example.test>');
+  });
+
+  it("keeps display names with commas, @ and < out of the recipient list", () => {
+    const hostileNames = [
+      '"Eve, eve@evil.example" <sender@example.test>',
+      '"Eve <eve@evil.example>" <sender@example.test>',
+      '"Eve \\"x\\", eve@evil.example" <sender@example.test>'
+    ];
+    for (const from of hostileNames) {
+      for (const mode of ["reply", "replyAll"] as const) {
+        const fields = computeComposeInitState(mode, makeMessage({ from, to: "me@example.com" }), false, opts, deps);
+        expect(parseAddressEmails(fields.composeTo)).toEqual(["sender@example.test"]);
+        expect(parseAddressEmails(fields.composeCc)).toEqual([]);
+        expect(addressParser(fields.composeTo, { flatten: true }).map(entry => entry.address)).toEqual(["sender@example.test"]);
+      }
+    }
+    const replyTo = computeComposeInitState("reply",
+      makeMessage({ from: "list@example.test", replyTo: '"Eve, eve@evil.example" <answers@example.test>' }), false, opts, deps);
+    expect(addressParser(replyTo.composeTo, { flatten: true }).map(entry => entry.address)).toEqual(["answers@example.test"]);
+    const replyAllCc = computeComposeInitState("replyAll",
+      makeMessage({ from: "a@example.test", to: 'me@example.com, "Eve, eve@evil.example" <carol@example.test>' }), false, opts, deps);
+    expect(addressParser(replyAllCc.composeCc, { flatten: true }).map(entry => entry.address)).toEqual(["carol@example.test"]);
   });
 
   it("prefixes subject with Re:", () => {
@@ -307,6 +340,41 @@ describe("computeComposeInitState — reply", () => {
 // ---------------------------------------------------------------------------
 
 describe("computeComposeInitState — replyAll", () => {
+  it("never promotes original Bcc recipients into visible reply headers", () => {
+    const sent = computeComposeInitState(
+      "replyAll",
+      makeMessage({
+        from: "me@example.com",
+        to: "Bob <bob@example.test>",
+        cc: "Carol <carol@example.test>",
+        bcc: "Blind <blind@example.test>, \"Hidden, Two\" <hidden@example.test>"
+      }),
+      false,
+      opts,
+      deps
+    );
+    const received = computeComposeInitState(
+      "replyAll",
+      makeMessage({
+        from: "Alice <alice@example.test>",
+        to: "me@example.com, Bob <bob@example.test>",
+        bcc: "Blind <blind@example.test>"
+      }),
+      false,
+      opts,
+      deps
+    );
+    for (const fields of [sent, received]) {
+      const visible = [fields.composeTo, fields.composeCc].join(",");
+      expect(visible).not.toContain("blind@example.test");
+      expect(visible).not.toContain("hidden@example.test");
+      expect(fields.composeBcc).toBe("");
+    }
+    expect(sent.composeTo).toContain("bob@example.test");
+    expect(sent.composeCc).toContain("carol@example.test");
+    expect(received.composeCc).toContain("bob@example.test");
+  });
+
   it("excludes own email from Cc", () => {
     const fields = computeComposeInitState(
       "replyAll",
@@ -385,7 +453,7 @@ describe("computeComposeInitState — replyAll", () => {
       opts,
       deps
     );
-    expect(fields.composeTo).toContain("Example, Nadine <nadine@example.test>");
+    expect(fields.composeTo).toContain('"Example, Nadine" <nadine@example.test>');
     expect(fields.composeTo).toContain("Bob <bob@example.com>");
     expect(fields.composeCc).toBe("carol@example.com");
   });

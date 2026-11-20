@@ -1,5 +1,8 @@
 import { describe, expect, mock, test } from "bun:test";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import type { LookupFn } from "@/lib/net/urlSafety";
+import { pinnedHttpTransport, PublicRequestError, type HopTransport } from "@/lib/net/publicHttp";
 
 // We mock `tsdav` before importing the client module so that `createDAVClient`
 // never tries to reach the network. `assertPublicUrl` catches SSRF-ish URLs
@@ -12,10 +15,31 @@ mock.module("tsdav", () => ({ createDAVClient }));
 
 const {
   assertSafeCaldavUrl,
+  CaldavCalendarSelectionError,
   CaldavUrlRejectedError,
+  CALDAV_MAX_RESPONSE_BYTES,
+  CALDAV_REQUEST_TIMEOUT_MS,
   createCaldavClient,
+  createCaldavPublicFetch,
+  createGuardedCaldavFetch,
+  isHrefInCalendarCollection,
+  MAX_CALDAV_REDIRECTS,
+  selectConfiguredCalendars,
   testCaldavConnection
 } = await import("./client");
+
+// Synthetic name → address table for the guard's DNS step; never touches DNS.
+const hostTable: Record<string, string> = {
+  "caldav.example.com": "93.184.216.34",
+  "other.example.com": "93.184.216.35",
+  "internal.example.test": "10.0.0.5"
+};
+const tableLookup: LookupFn = async (hostname) => {
+  const address = hostTable[hostname];
+  if (!address) throw new Error(`unexpected lookup ${hostname}`);
+  return [{ address, family: 4 }];
+};
+
 
 describe("assertSafeCaldavUrl", () => {
   const denyLookup: LookupFn = async () => {
@@ -31,7 +55,16 @@ describe("assertSafeCaldavUrl", () => {
     expect(url.hostname).toBe("caldav.example.com");
   });
 
-  test("accepts http:// public host (self-hosted CalDAV case)", async () => {
+  test("rejects http:// when the connection uses a password", async () => {
+    const err = await assertSafeCaldavUrl("http://caldav.example.com/", {
+      lookup: publicLookup,
+      requireHttps: true
+    }).catch((e: Error) => e);
+    expect(err).toBeInstanceOf(CaldavUrlRejectedError);
+    expect((err as InstanceType<typeof CaldavUrlRejectedError>).reason).toBe("https-required");
+  });
+
+  test("accepts http:// public host without password (self-hosted CalDAV case)", async () => {
     const url = await assertSafeCaldavUrl("http://caldav.example.com/", {
       lookup: publicLookup
     });
@@ -121,6 +154,26 @@ describe("createCaldavClient — SSRF guard", () => {
     expect(createDAVClient.mock.calls.length).toBe(callsBefore);
   });
 
+  test("refuses plain http:// with a password before calling tsdav", async () => {
+    const callsBefore = createDAVClient.mock.calls.length;
+    const err = await createCaldavClient(
+      { url: "http://caldav.example.com/", user: "u", password: "p" },
+      { lookup: tableLookup }
+    ).catch((e: Error) => e);
+    expect(err).toBeInstanceOf(CaldavUrlRejectedError);
+    expect((err as InstanceType<typeof CaldavUrlRejectedError>).reason).toBe("https-required");
+    expect(createDAVClient.mock.calls.length).toBe(callsBefore);
+  });
+
+  test("hands tsdav a guarded fetch for every request", async () => {
+    await createCaldavClient(
+      { url: "https://caldav.example.com/", user: "u", password: "p" },
+      { lookup: tableLookup }
+    );
+    const lastCall = createDAVClient.mock.calls[createDAVClient.mock.calls.length - 1];
+    expect(typeof (lastCall[0] as { fetch?: unknown }).fetch).toBe("function");
+  });
+
   test("calls tsdav when the URL is public", async () => {
     const lookup: LookupFn = async () => [{ address: "93.184.216.34", family: 4 }];
     const callsBefore = createDAVClient.mock.calls.length;
@@ -146,6 +199,21 @@ describe("createCaldavClient — SSRF guard", () => {
   });
 });
 
+describe("createCaldavClient — every tsdav request is checked and pinned (S21, CF-09)", () => {
+  test("tsdav gets a fetch that refuses server-supplied hrefs and redirects to internal hosts", async () => {
+    const lookup: LookupFn = async (host) => [{ address: host === "caldav.example.com" ? "93.184.216.34" : "10.0.0.5", family: 4 }];
+    await createCaldavClient({ url: "https://caldav.example.com/dav", user: "u", password: "p" }, { lookup });
+    const arg = createDAVClient.mock.calls[createDAVClient.mock.calls.length - 1][0] as { fetch?: typeof fetch };
+    expect(typeof arg.fetch).toBe("function");
+    for (const href of ["http://127.0.0.1:8008/internal-admin/", "https://[::ffff:7f00:1]/", "https://internal.example.test/cal/"]) {
+      const error = await arg.fetch!(href, { method: "PROPFIND" }).catch((e: unknown) => e);
+      // The CalDAV guard rejects first; the pinned public fetch underneath would reject too.
+      expect(error instanceof CaldavUrlRejectedError || error instanceof PublicRequestError).toBe(true);
+      expect(["private-ip", "https-required"]).toContain((error as { reason: string }).reason);
+    }
+  });
+});
+
 describe("testCaldavConnection — SSRF guard surfaces a clear message", () => {
   const denyLookup: LookupFn = async () => {
     throw new Error("DNS should not be called");
@@ -153,7 +221,7 @@ describe("testCaldavConnection — SSRF guard surfaces a clear message", () => {
 
   test("returns {ok:false, message} with the rejection reason for private URLs", async () => {
     const res = await testCaldavConnection(
-      { url: "http://169.254.169.254/", user: "u", password: "p" },
+      { url: "https://169.254.169.254/", user: "u", password: "p" },
       { lookup: denyLookup }
     );
     expect(res.ok).toBe(false);
@@ -167,5 +235,191 @@ describe("testCaldavConnection — SSRF guard surfaces a clear message", () => {
     );
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.message).toContain("unsupported-protocol");
+  });
+});
+
+type BaseCall = { url: string; init: RequestInit };
+function scriptedFetch(responses: Array<() => Response>) {
+  const calls: BaseCall[] = [];
+  const base = async (input: string | URL | Request, init?: RequestInit) => {
+    calls.push({ url: String(input), init: init ?? {} });
+    const next = responses.shift();
+    if (!next) throw new Error("unexpected request");
+    return next();
+  };
+  return { calls, base };
+}
+const redirect = (status: number, location: string) => () =>
+  new Response(null, { status, headers: { location } });
+const ok = () => new Response("<multistatus/>", { status: 207 });
+
+describe("createGuardedCaldavFetch — every hop is checked", () => {
+  test("rejects a private server-supplied href without connecting", async () => {
+    const { calls, base } = scriptedFetch([ok]);
+    const guarded = createGuardedCaldavFetch({ lookup: tableLookup, fetch: base });
+    const err = await guarded("https://internal.example.test/cal/", { method: "PROPFIND" }).catch((e: Error) => e);
+    expect(err).toBeInstanceOf(CaldavUrlRejectedError);
+    expect(calls).toHaveLength(0);
+    const literal = await guarded("http://127.0.0.1:8008/internal-admin/", { method: "PROPFIND" }).catch((e: Error) => e);
+    expect(literal).toBeInstanceOf(CaldavUrlRejectedError);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("does not follow a redirect to an internal address", async () => {
+    const { calls, base } = scriptedFetch([redirect(301, "http://127.0.0.1:8008/internal-admin/"), ok]);
+    const guarded = createGuardedCaldavFetch({ lookup: tableLookup, fetch: base });
+    const err = await guarded("https://caldav.example.com/dav/", {
+      method: "PROPFIND",
+      headers: { authorization: "Basic c2VjcmV0" }
+    }).catch((e: Error) => e);
+    expect(err).toBeInstanceOf(CaldavUrlRejectedError);
+    expect(calls.map((c) => c.url)).toEqual(["https://caldav.example.com/dav/"]);
+    expect(calls[0].init.redirect).toBe("manual");
+  });
+
+  test("does not follow a redirect to a hostname that resolves privately", async () => {
+    const { calls, base } = scriptedFetch([redirect(307, "https://internal.example.test/x"), ok]);
+    const guarded = createGuardedCaldavFetch({ lookup: tableLookup, fetch: base });
+    await expect(guarded("https://caldav.example.com/dav/", { method: "PROPFIND" })).rejects.toBeInstanceOf(CaldavUrlRejectedError);
+    expect(calls).toHaveLength(1);
+  });
+
+  test("follows a public redirect, keeps method and auth on the same origin", async () => {
+    const { calls, base } = scriptedFetch([redirect(308, "/dav/calendars/"), ok]);
+    const guarded = createGuardedCaldavFetch({ lookup: tableLookup, requireHttps: true, fetch: base });
+    const res = await guarded("https://caldav.example.com/dav/", {
+      method: "PROPFIND",
+      body: "<propfind/>",
+      headers: { authorization: "Basic c2VjcmV0" }
+    });
+    expect(res.status).toBe(207);
+    expect(calls.map((c) => c.url)).toEqual(["https://caldav.example.com/dav/", "https://caldav.example.com/dav/calendars/"]);
+    expect(calls[1].init.method).toBe("PROPFIND");
+    expect(calls[1].init.body).toBe("<propfind/>");
+    expect(new Headers(calls[1].init.headers).get("authorization")).toBe("Basic c2VjcmV0");
+  });
+
+  test("drops the Authorization header when a redirect leaves the origin", async () => {
+    const { calls, base } = scriptedFetch([redirect(307, "https://other.example.com/dav/"), ok]);
+    const guarded = createGuardedCaldavFetch({ lookup: tableLookup, fetch: base });
+    await guarded("https://caldav.example.com/dav/", { method: "PROPFIND", headers: { authorization: "Basic c2VjcmV0" } });
+    expect(new Headers(calls[1].init.headers).get("authorization")).toBeNull();
+  });
+
+  test("refuses a redirect to plain http:// for password connections", async () => {
+    const { calls, base } = scriptedFetch([redirect(302, "http://caldav.example.com/dav/"), ok]);
+    const guarded = createGuardedCaldavFetch({ lookup: tableLookup, requireHttps: true, fetch: base });
+    const err = await guarded("https://caldav.example.com/dav/", { method: "PROPFIND" }).catch((e: Error) => e);
+    expect((err as InstanceType<typeof CaldavUrlRejectedError>).reason).toBe("https-required");
+    expect(calls).toHaveLength(1);
+  });
+
+  test("303 switches to GET without body", async () => {
+    const { calls, base } = scriptedFetch([redirect(303, "/done"), ok]);
+    const guarded = createGuardedCaldavFetch({ lookup: tableLookup, fetch: base });
+    await guarded("https://caldav.example.com/dav/", { method: "PUT", body: "BEGIN:VCALENDAR", headers: { "content-type": "text/calendar" } });
+    expect(calls[1].init.method).toBe("GET");
+    expect(calls[1].init.body).toBeUndefined();
+    expect(new Headers(calls[1].init.headers).get("content-type")).toBeNull();
+  });
+
+  test("stops after the redirect limit", async () => {
+    const loops = Array.from({ length: MAX_CALDAV_REDIRECTS + 2 }, (_, i) => redirect(302, `/hop-${i}`));
+    const { calls, base } = scriptedFetch(loops);
+    const guarded = createGuardedCaldavFetch({ lookup: tableLookup, fetch: base });
+    const err = await guarded("https://caldav.example.com/dav/").catch((e: Error) => e);
+    expect((err as InstanceType<typeof CaldavUrlRejectedError>).reason).toBe("too-many-redirects");
+    expect(calls).toHaveLength(MAX_CALDAV_REDIRECTS + 1);
+  });
+
+  test("returns the 3xx untouched for redirect: manual (tsdav discovery re-requests the target through the guard)", async () => {
+    const { calls, base } = scriptedFetch([redirect(301, "http://127.0.0.1/")]);
+    const guarded = createGuardedCaldavFetch({ lookup: tableLookup, fetch: base });
+    const res = await guarded("https://caldav.example.com/.well-known/caldav", { method: "PROPFIND", redirect: "manual" });
+    expect(res.status).toBe(301);
+    expect(calls).toHaveLength(1);
+    await expect(guarded(res.headers.get("location")!, { method: "PROPFIND" })).rejects.toBeInstanceOf(CaldavUrlRejectedError);
+    expect(calls).toHaveLength(1);
+  });
+});
+
+describe("selectConfiguredCalendars — fail closed", () => {
+  const calendars = [
+    { url: "https://caldav.example.com/dav/calendars/user/personal/", displayName: "Personal" },
+    { url: "https://caldav.example.com/dav/calendars/user/personal-private/", displayName: "Private" },
+    { url: "https://caldav.example.com/dav/calendars/user/team%20plan/", displayName: "Team" }
+  ];
+
+  test("blank selector keeps auto-discovery", () => {
+    expect(selectConfiguredCalendars(calendars, "  ")).toHaveLength(3);
+    expect(selectConfiguredCalendars(calendars, undefined)).toHaveLength(3);
+  });
+
+  test("matches exactly one collection by path or full URL", () => {
+    expect(selectConfiguredCalendars(calendars, "/dav/calendars/user/personal/").map((c) => c.displayName)).toEqual(["Personal"]);
+    expect(selectConfiguredCalendars(calendars, "/dav/calendars/user/personal").map((c) => c.displayName)).toEqual(["Personal"]);
+    expect(selectConfiguredCalendars(calendars, "https://caldav.example.com/dav/calendars/user/personal-private/").map((c) => c.displayName)).toEqual(["Private"]);
+    expect(selectConfiguredCalendars(calendars, "/dav/calendars/user/team plan/").map((c) => c.displayName)).toEqual(["Team"]);
+  });
+
+  test("an unmatched selector does not fall back to all calendars", () => {
+    expect(() => selectConfiguredCalendars(calendars, "/dav/calendars/user/gone/")).toThrow(CaldavCalendarSelectionError);
+    // A substring of several collections is no longer a match.
+    expect(() => selectConfiguredCalendars(calendars, "personal")).toThrow(CaldavCalendarSelectionError);
+    expect(() => selectConfiguredCalendars(calendars, "https://other.example.com/dav/calendars/user/personal/")).toThrow(CaldavCalendarSelectionError);
+  });
+
+  test("an ambiguous selector fails closed", () => {
+    const twoOrigins = [
+      { url: "https://caldav.example.com/cal/" },
+      { url: "https://other.example.com/cal/" }
+    ];
+    expect(() => selectConfiguredCalendars(twoOrigins, "/cal/")).toThrow(CaldavCalendarSelectionError);
+  });
+});
+
+describe("isHrefInCalendarCollection", () => {
+  const calendar = "https://caldav.example.com/dav/cal/";
+  test("accepts objects inside the collection", () => {
+    expect(isHrefInCalendarCollection("https://caldav.example.com/dav/cal/a.ics", calendar)).toBe(true);
+    expect(isHrefInCalendarCollection("/dav/cal/a.ics", calendar)).toBe(true);
+  });
+  test("rejects other origins, other collections and traversal", () => {
+    expect(isHrefInCalendarCollection("https://other.example.com/dav/cal/a.ics", calendar)).toBe(false);
+    expect(isHrefInCalendarCollection("https://caldav.example.com/dav/other/a.ics", calendar)).toBe(false);
+    expect(isHrefInCalendarCollection("https://caldav.example.com/dav/cal/../other/a.ics", calendar)).toBe(false);
+    expect(isHrefInCalendarCollection("https://caldav.example.com/dav/cal/%2e%2e/other/a.ics", calendar)).toBe(false);
+    expect(isHrefInCalendarCollection("https://caldav.example.com/dav/cal/", calendar)).toBe(false);
+    expect(isHrefInCalendarCollection("https://caldav.example.com/dav/cal/a.ics", undefined)).toBe(false);
+  });
+});
+
+describe("createCaldavPublicFetch bounds", () => {
+  test("a full-calendar REPORT larger than the generic 20 MiB cap still loads", async () => {
+    const size = 24 * 1024 * 1024;
+    const server = http.createServer((_req, res) => {
+      res.writeHead(207, { "content-type": "application/xml" });
+      res.end(Buffer.alloc(size, 0x61));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as AddressInfo).port;
+    // Real pinned transport; the checked public address is served locally.
+    const transport: HopTransport = (hop) =>
+      pinnedHttpTransport({ ...hop, addresses: [{ address: "127.0.0.1", family: 4 }] });
+    try {
+      const caldavFetch = createCaldavPublicFetch({
+        lookup: async () => [{ address: "93.184.216.34", family: 4 }],
+        requireHttps: false,
+        transport
+      });
+      const response = await caldavFetch(`http://caldav.example.com:${port}/dav/cal/`, { method: "REPORT" });
+      expect(response.status).toBe(207);
+      expect((await response.arrayBuffer()).byteLength).toBe(size);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+    expect(CALDAV_MAX_RESPONSE_BYTES).toBeGreaterThanOrEqual(100 * 1024 * 1024);
+    expect(CALDAV_REQUEST_TIMEOUT_MS).toBeGreaterThanOrEqual(120_000);
   });
 });

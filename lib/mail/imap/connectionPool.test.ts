@@ -118,6 +118,24 @@ describe("acquirePooledImapClient", () => {
     expect(clientB).not.toBe(clientA);
     expect(connectCount).toBe(2);
   });
+
+  test("a changed upstream login or password never reuses the previous session", async () => {
+    const before = makeAccount("acc-1");
+    const old = await acquirePooledImapClient(before, logCtx);
+    releasePooledImapClient(before, old, logCtx);
+    for (const imap of [
+      { ...before.imap, user: "other-login" },
+      { ...before.imap, password: "rotated" }
+    ]) {
+      const after = { ...before, imap } as Account;
+      const client = await acquirePooledImapClient(after, logCtx);
+      expect(client).not.toBe(old);
+      releasePooledImapClient(after, client, logCtx, { evict: true });
+    }
+    expect(connectCount).toBe(3);
+    // The unchanged identity still finds its own idle session.
+    expect(await acquirePooledImapClient(before, logCtx)).toBe(old);
+  });
 });
 
 describe("releasePooledImapClient", () => {

@@ -18,7 +18,7 @@ import { DEEPL_TARGET_LANGUAGES } from "@/lib/deeplLanguages";
 import { useDeeplLanguageLabel } from "@/lib/i18n/useDeeplLanguageLabel";
 import type { ComposeInviteDraft } from "@/lib/composeInvite";
 import type { ComposeQuotedParts, PendingImageDrop, ComposeSignatureState } from "./composeTypes";
-import type { Attachment } from "@/lib/data";
+import type { Attachment, Message } from "@/lib/data";
 import { assembleQuotedHtml, hasForwardMetaHtml, stripForwardMetaHtml } from "@/lib/html";
 import {
   computeBodyOnSwitchToText,
@@ -71,6 +71,8 @@ type Signature = {
 type ComposeMessageFieldProps = {
   darkMode: boolean;
   composeMode: ComposeMode;
+  /** Replied-to/forwarded message: its remote-content consent applies to editor images. */
+  composeReplyMessage?: Pick<Message, "accountId" | "id" | "senderKey"> | null;
   composeTab: ComposeTab;
   composeBody: string;
   composeHtml: string;
@@ -149,6 +151,7 @@ export default function ComposeMessageField(props: ComposeMessageFieldProps) {
 function ReadyComposeMessageField({
   darkMode,
   composeMode,
+  composeReplyMessage,
   composeTab,
   composeBody,
   composeHtml,
@@ -720,6 +723,7 @@ function ReadyComposeMessageField({
             editorRef={composeEditorRef}
             initialHtml={composeHtml}
             resetKey={composeEditorReset}
+            remoteImageSource={composeReplyMessage}
             quotedMessage={{
               visible: hasQuotedContent && composeIncludeOriginal,
               html: previewQuotedHtml,

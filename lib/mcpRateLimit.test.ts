@@ -43,3 +43,30 @@ test("tools/call enforces token budgets across HTTP requests and within batches"
   expect(last.responses[0]).toMatchObject({ id: 31, result: { isError: true,
     structuredContent: { ok: false, code: "rate_limited", status: 429, retryAfterSeconds: 60 } } });
 });
+
+test("batches are capped and every batch item counts against the token's message budget", async () => {
+  const { MCP_MAX_BATCH_ITEMS, MCP_MESSAGES_PER_MINUTE } = await import("./mcpRateLimit");
+  const accountId = `mcp-batch-${crypto.randomUUID()}`;
+  const account = identityTestAccount(accountId);
+  const db = await dbModulePromise;
+  await db.upsertAccount(account);
+  const fixture = await createAuthenticatedTestSession(accountId);
+  const session = await requireActiveUserSession(new Request("http://localhost:3000", { headers: fixture.jar.headers() }));
+  if (session instanceof Response) throw new Error("Synthetic session missing");
+  const tokenRecord = (await mintMcpToken(session, accountId, "Synthetic batch", 3600, { mode: "read" })).tokenRecord;
+  const ping = (id: number) => ({ jsonrpc: "2.0", id, method: "ping" });
+  const call = (body: unknown) => executeMcpHttpRequest({ body, accountId, account, tokenRecord });
+  const oversized = await call(Array.from({ length: MCP_MAX_BATCH_ITEMS + 1 }, (_, n) => ping(n + 1)));
+  expect(oversized.responses).toEqual([expect.objectContaining({ id: null, error: expect.objectContaining({ code: -32600 }) })]);
+  let id = 0;
+  for (let sent = 0; sent < MCP_MESSAGES_PER_MINUTE; sent += MCP_MAX_BATCH_ITEMS) {
+    const size = Math.min(MCP_MAX_BATCH_ITEMS, MCP_MESSAGES_PER_MINUTE - sent);
+    const batch = await call(Array.from({ length: size }, () => ping(++id)));
+    expect(JSON.stringify(batch.responses)).not.toContain("rate limit");
+  }
+  const limited = await call([ping(++id), { jsonrpc: "2.0", method: "notifications/initialized" }]);
+  expect(limited.responses).toEqual([
+    expect.objectContaining({ id, error: expect.objectContaining({ code: -32029 }) }),
+    expect.objectContaining({ id: null, error: expect.objectContaining({ code: -32029 }) })
+  ]);
+});

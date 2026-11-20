@@ -119,7 +119,13 @@ export function normalizeCalendarInviteActionType(
 export function normalizeCalendarInviteUnprocessedReason(
   value?: string | null
 ): CalendarInviteUnprocessedReason | null {
-  if (value === "event_series_not_found") return value;
+  if (
+    value === "event_series_not_found" ||
+    value === "organizer_mismatch" ||
+    value === "sender_unverified"
+  ) {
+    return value;
+  }
   return null;
 }
 

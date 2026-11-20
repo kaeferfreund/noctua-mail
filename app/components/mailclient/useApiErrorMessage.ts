@@ -4,15 +4,19 @@ import { useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useLatestRef } from "@/app/hooks/useLatestRef";
 import { getExceptionAccountId } from "./utils/clientHelpers";
+import { requestBodyErrorKey } from "@/lib/requestBodyErrors";
 
 type ApiErrorMessageParams = {
   setAuthState: (state: "unauth") => void;
-  setReloginAccountId: (accountId: string) => void;
+  /** Ask for the mailbox credentials dialog; the prompt decides whether it opens (see useReloginPrompt). */
+  requestRelogin: (accountId: string) => void;
+  /** The answer says this person cannot repair the mailbox: close its dialog. */
+  closeRelogin: (accountId: string) => void;
   setReloginDescription: (description: string) => void;
 };
 
 /** Resolve structured API errors at the UI boundary before generic diagnostics. */
-export function useApiErrorMessage({ setAuthState, setReloginAccountId, setReloginDescription }: ApiErrorMessageParams) {
+export function useApiErrorMessage({ setAuthState, requestRelogin, closeRelogin, setReloginDescription }: ApiErrorMessageParams) {
   const tn = useTranslations("Notifications");
   // Keep the resolver's identity locale-independent: the mount bootstrap effect
   // depends on it, and a UI language switch must not re-bootstrap the mailbox
@@ -43,6 +47,8 @@ export function useApiErrorMessage({ setAuthState, setReloginAccountId, setRelog
       }
       return message;
     };
+    // Body limits of the shared reader (413 also when a proxy answered without JSON).
+    if (res.status === 413) return tnRef.current("requestBodyTooLarge");
     try {
       const data = (await res.json()) as {
         message?: string;
@@ -57,12 +63,14 @@ export function useApiErrorMessage({ setAuthState, setReloginAccountId, setRelog
       const resolvedAccountId =
         data?.accountId?.trim() || getExceptionAccountId(responsePath ?? "") || "";
       if (data?.code === "folder_account_mismatch") return tnRef.current("folderAccountMismatch");
+      const bodyErrorKey = requestBodyErrorKey(res.status, data?.code);
+      if (bodyErrorKey) return tnRef.current(bodyErrorKey);
       if (data?.code === "mailbox_credentials_invalid") {
         if (data.repairAllowed && resolvedAccountId) {
-          setReloginAccountId(resolvedAccountId); setReloginDescription("Repair the mailbox credentials to restore access.");
+          requestRelogin(resolvedAccountId); setReloginDescription("Repair the mailbox credentials to restore access.");
           return "Mailbox credentials need repair.";
         }
-        setReloginAccountId("");
+        closeRelogin(resolvedAccountId);
         return "Mailbox unavailable; contact a manager.";
       }
       // Personal auth 401 is logout. Form proof/permission failures use 403.
@@ -81,5 +89,5 @@ export function useApiErrorMessage({ setAuthState, setReloginAccountId, setRelog
       // ignore
     }
     return withRequestPath(`Request failed (${res.status})`);
-  }, [setAuthState, setReloginAccountId, setReloginDescription, tnRef]);
+  }, [setAuthState, requestRelogin, closeRelogin, setReloginDescription, tnRef]);
 }

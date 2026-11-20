@@ -12,22 +12,27 @@ import {
   getSourcesDir
 } from "./runtimePaths";
 
+// Raw mail and attachments are private to the service user, even under a
+// permissive umask (owner-only directories and files on creation).
+const PRIVATE_DIR = { recursive: true, mode: 0o700 } as const;
+const PRIVATE_FILE_MODE = 0o600;
+
 const dataDir = getDataDir();
 const sourcesDir = getSourcesDir();
 const attachmentsDir = getAttachmentsDir();
 
 async function ensureDataDir() {
-  await fs.mkdir(dataDir, { recursive: true });
+  await fs.mkdir(dataDir, PRIVATE_DIR);
 }
 
 async function ensureSourcesDir() {
   await ensureDataDir();
-  await fs.mkdir(sourcesDir, { recursive: true });
+  await fs.mkdir(sourcesDir, PRIVATE_DIR);
 }
 
 async function ensureAttachmentsDir() {
   await ensureDataDir();
-  await fs.mkdir(attachmentsDir, { recursive: true });
+  await fs.mkdir(attachmentsDir, PRIVATE_DIR);
 }
 
 function sourceFileName(accountId: string, messageId: string) {
@@ -78,7 +83,7 @@ function attachmentLegacyFilePath(accountId: string, messageId: string, attachme
 }
 
 async function ensureParentDir(filePath: string) {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.mkdir(path.dirname(filePath), PRIVATE_DIR);
 }
 
 async function unlinkIfExists(filePath: string) {
@@ -130,7 +135,7 @@ async function readJson<T>(fileName: string, fallback: T): Promise<T> {
 async function writeJson<T>(fileName: string, data: T) {
   await ensureDataDir();
   const filePath = path.join(dataDir, fileName);
-  await fs.writeFile(filePath, JSON.stringify(data, null, 2));
+  await fs.writeFile(filePath, JSON.stringify(data, null, 2), { mode: PRIVATE_FILE_MODE });
 }
 
 export async function getAccounts() {
@@ -197,7 +202,7 @@ export async function saveMessageSource(
   await ensureSourcesDir();
   const filePath = sourceFilePath(accountId, messageId);
   await ensureParentDir(filePath);
-  await fs.writeFile(filePath, source);
+  await fs.writeFile(filePath, source, { mode: PRIVATE_FILE_MODE });
   return Buffer.byteLength(source);
 }
 
@@ -208,17 +213,17 @@ export async function saveMessageSource(
  * assignment, file publication and the ownership digest stored in that row.
  */
 export async function stageMessageFiles(accountId: string, messages: Array<{
-  source?: string;
+  source?: string | Buffer;
   attachments: Array<{ id: string; data: Buffer }>;
 }>) {
   type StagedFile = { path: string; attachmentId?: string };
   const temporaryPaths = new Set<string>();
   const installed: Array<{ target: string; backup: string; published: boolean; hadPrevious: boolean }> = [];
   const stage = async (directory: string, data: string | Buffer, attachmentId?: string): Promise<StagedFile> => {
-    await fs.mkdir(directory, { recursive: true });
+    await fs.mkdir(directory, PRIVATE_DIR);
     const temporary = path.join(directory, `.pending-${randomUUID()}`);
     temporaryPaths.add(temporary);
-    await fs.writeFile(temporary, data, { flag: "wx" });
+    await fs.writeFile(temporary, data, { flag: "wx", mode: PRIVATE_FILE_MODE });
     return { path: temporary, attachmentId };
   };
   const cleanup = async () => {
@@ -247,7 +252,7 @@ export async function stageMessageFiles(accountId: string, messages: Array<{
       });
     }
     const publish = (file: StagedFile, target: string) => {
-      mkdirSync(path.dirname(target), { recursive: true });
+      mkdirSync(path.dirname(target), PRIVATE_DIR);
       const backup = `${file.path}.previous`;
       const entry = { target, backup, published: false, hadPrevious: false };
       installed.push(entry);
@@ -327,6 +332,12 @@ export async function listMessageSourceSizes(accountId: string) {
   return sizes;
 }
 
+/**
+ * UTF-8 text view of the stored source, for display and for header-level checks
+ * of sources Noctua generated itself. Lossy for 8bit/binary parts in other
+ * charsets: MIME parsing, attachment extraction, digests and uploads must read
+ * the bytes with getMessageSourceBuffer.
+ */
 export async function getMessageSource(accountId: string, messageId: string, options: { exact?: boolean } = {}) {
   await ensureSourcesDir();
   const candidates = options.exact ? [messageId] : buildMessageRowIdLookupCandidates(messageId);
@@ -340,12 +351,13 @@ export async function getMessageSource(accountId: string, messageId: string, opt
   return null;
 }
 
-// Raw-bytes variant of getMessageSource. Rewriting a message's MIME must
-// operate on the exact bytes (binary/8bit parts included); reading as utf-8
-// would mangle them before the surgery even runs.
-export async function getMessageSourceBuffer(accountId: string, messageId: string) {
+// Raw-bytes variant of getMessageSource. Parsing or rewriting a message's MIME
+// must operate on the exact bytes (binary/8bit parts included); reading as
+// utf-8 would mangle them first. Sources written before ingestion kept the wire
+// bytes were stored as UTF-8 text; those files read back unchanged here.
+export async function getMessageSourceBuffer(accountId: string, messageId: string, options: { exact?: boolean } = {}) {
   await ensureSourcesDir();
-  const candidates = buildMessageRowIdLookupCandidates(messageId);
+  const candidates = options.exact ? [messageId] : buildMessageRowIdLookupCandidates(messageId);
   for (const candidateId of candidates) {
     try {
       return await fs.readFile(sourceFilePath(accountId, candidateId));
@@ -383,7 +395,7 @@ export async function saveAttachmentData(
   await ensureAttachmentsDir();
   const filePath = attachmentFilePath(accountId, messageId, attachmentId);
   await ensureParentDir(filePath);
-  await fs.writeFile(filePath, data);
+  await fs.writeFile(filePath, data, { mode: PRIVATE_FILE_MODE });
 }
 
 export async function getAttachmentData(

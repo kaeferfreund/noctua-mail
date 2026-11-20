@@ -562,7 +562,9 @@ export async function parseImapMessage(
   const previewSource =
     htmlBody && (hasQpArtifacts || !hasTextBody) ? htmlToText(htmlBody) : body;
   const preview = buildPreview(previewSource);
-  const source = message.source.toString();
+  // Keep the wire bytes: decoding as UTF-8 would replace 8bit/binary bytes of
+  // other charsets (e.g. Latin-1) and corrupt attachments extracted later.
+  const source = message.source;
   const referencesArray = parseHeaderMessageIdList(getHeaderValue(headers, "references"));
   const xForwardedMessageId = headerValue("x-forwarded-message-id");
   const envelopeInReplyTo = resolveEnvelopeInReplyTo(envelope);

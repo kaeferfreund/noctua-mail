@@ -1,7 +1,8 @@
 import type { Account, Message } from "@/lib/data";
 import { resolveThreadingForAccountMessages, upsertMessages } from "@/lib/serverDb";
 import { appendImapMessage, syncImapMessage } from "@/lib/serverImap";
-import { getMessageSource } from "@/lib/storage";
+import { getMessageSourceBuffer } from "@/lib/storage";
+import { rawMessageSourceBytes } from "@/lib/messageSource";
 import { sanitizeSyncedMessage } from "@/lib/mail/syncMessageSanitizer";
 
 /**
@@ -19,13 +20,13 @@ import { sanitizeSyncedMessage } from "@/lib/mail/syncMessageSanitizer";
 // can exercise the IMAP/db/storage paths with plain fakes — no global
 // mock.module(), which leaks across Bun's single-process test suite.
 export type CopyDeps = {
-  getMessageSource: typeof getMessageSource;
+  getMessageSourceBuffer: typeof getMessageSourceBuffer;
   appendImapMessage: typeof appendImapMessage;
   syncImapMessage: typeof syncImapMessage;
 };
 
 const defaultCopyDeps: CopyDeps = {
-  getMessageSource,
+  getMessageSourceBuffer,
   appendImapMessage,
   syncImapMessage
 };
@@ -62,15 +63,16 @@ async function loadRawSource(
   clientId: string | undefined,
   deps: CopyDeps
 ): Promise<Buffer | null> {
-  const stored = await deps.getMessageSource(sourceAccountId, message.id);
-  if (stored) return Buffer.from(stored, "utf-8");
+  // APPEND the stored wire bytes unchanged (8bit parts in other charsets included).
+  const stored = await deps.getMessageSourceBuffer(sourceAccountId, message.id);
+  if (stored?.length) return stored;
   // No cached source (e.g. header-only sync): pull it fresh from IMAP. Guard the
   // UID the way the rest of the codebase does — finite and positive — so a
   // NaN/Infinity/non-positive value doesn't trigger a bogus IMAP fetch.
   const { imapUid, mailboxPath } = message;
   if (typeof imapUid === "number" && Number.isFinite(imapUid) && imapUid > 0 && mailboxPath) {
     const synced = await deps.syncImapMessage(sourceAccount, mailboxPath, imapUid, clientId);
-    if (synced?.source) return Buffer.from(synced.source, "utf-8");
+    if (synced?.source) return rawMessageSourceBytes(synced.source);
   }
   return null;
 }

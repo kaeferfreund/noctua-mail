@@ -29,7 +29,7 @@ async function verifyCurrentCredential(auth: NoctuaAuth, db: Database, source: S
   const credential = db.prepare(`SELECT password FROM auth_account WHERE userId=? AND providerId='credential' AND password IS NOT NULL`).get(source.userId);
   if (credential?.password) {
     if (!await (await auth.$context).password.verify({password,hash:credential.password})) badProof();
-  } else await verifyEligibleImap(db, source.userId, password, request);
+  } else await verifyEligibleImap(db, source.userId, password, request, false, undefined, "reauth");
 }
 
 export async function reauthenticate(auth: NoctuaAuth, db: Database, source: SessionSecurity, request: Request, body: unknown, limiter: RateLimiter = proofAttempts) {
@@ -71,7 +71,7 @@ export async function reauthenticate(auth: NoctuaAuth, db: Database, source: Ses
       if (purpose === "password.change" && !hasPassword) throw new AuthPolicyError("password_not_set");
       if (!setup && (source.assurance !== "mfa" || !enrolled)) throw new AuthPolicyError("mfa_required");
       if (setup && !["totp.enroll","password.set"].includes(purpose)) throw new AuthPolicyError("mfa_required");
-      if (purpose === "admin.recovery") {
+      if (purpose === "admin.recovery" || purpose === "admin.grant") {
         if (!hasPassword || db.prepare(`SELECT role FROM auth_user WHERE id=?`).get(source.userId)?.role !== "admin") throw new AuthPolicyError("admin_required");
       }
       const uvOnly = body.proofMode === "passkey" && ["passkey.enroll","passkey.remove","passkey.rename"].includes(purpose);

@@ -35,9 +35,10 @@ import {
   CALENDAR_EVENT_SNAPSHOT_VERSION,
   serializeCalendarEventSnapshot
 } from "@/lib/calendarEventSnapshot";
-import { getMessageSource } from "@/lib/storage";
+import { getMessageSourceBuffer } from "@/lib/storage";
 import { extractIcsSourceFromEmailSource } from "@/lib/mail/attachmentFromSource";
 import { reconcileSeriesAnchorSiblings } from "@/lib/calendarSeriesReanchor";
+import { calendarInviteAuthorityFailure } from "@/lib/calendarInviteAuthority";
 
 const DEFAULT_AUTOMATIC_REMINDER = {
   leadMinutes: 15,
@@ -180,14 +181,15 @@ async function hydrateExistingEventFromPriorInviteSource(
   accountId: string,
   messageId: string,
   eventUid: string,
-  accountEmail?: OwnAddressInput
+  accountEmail?: OwnAddressInput,
+  canModifySibling?: (sibling: CalendarEvent) => boolean
 ) {
   const candidates = await listCalendarInviteSourceMessagesByEventUid(accountId, eventUid, {
     excludeMessageId: messageId
   });
   for (const candidate of candidates) {
-    const emailSource = await getMessageSource(accountId, candidate.messageId);
-    if (!emailSource?.trim()) continue;
+    const emailSource = await getMessageSourceBuffer(accountId, candidate.messageId);
+    if (!emailSource?.length) continue;
     const icsSource = await extractIcsSourceFromEmailSource(emailSource);
     if (!icsSource?.trim()) continue;
     const parsed = parseIcsInvite(icsSource);
@@ -214,7 +216,7 @@ async function hydrateExistingEventFromPriorInviteSource(
     });
     // Bootstrapping a missing series row is just as much a new anchor
     // as a fresh REQUEST — cap any prior siblings that share the key.
-    await reconcileSeriesAnchorSiblings(accountId, saved);
+    await reconcileSeriesAnchorSiblings(accountId, saved, { canModifySibling });
     return saved;
   }
   return null;
@@ -226,6 +228,14 @@ export type ProcessCalendarInviteForMessageParams = {
   icsSource: string;
   process: boolean;
   accountEmail?: OwnAddressInput;
+  /** The message's From header. Automatic processing only lets the organizer change existing events. */
+  senderAddress?: string | null;
+  /**
+   * The receiving server's Authentication-Results of the message
+   * (inviteSenderAuthenticationResults). Automatic processing needs SPF or
+   * DKIM passing for the organizer's domain.
+   */
+  senderAuthenticationResults?: readonly string[] | null;
   reminderUserId?: string | null;
   processedByUserId?: string | null;
   processedAutomatically?: boolean | null;
@@ -250,6 +260,8 @@ export async function processCalendarInviteForMessage({
   icsSource,
   process,
   accountEmail,
+  senderAddress,
+  senderAuthenticationResults,
   reminderUserId,
   processedByUserId,
   processedAutomatically
@@ -297,13 +309,44 @@ export async function processCalendarInviteForMessage({
   const processedStateByUid = new Map<string, boolean>();
   const unprocessedReasonByUid = new Map<string, CalendarInviteUnprocessedReason>();
   let processedAtMs: number | undefined;
+  // Only an explicit manual "Process" (false) applies a change the user has
+  // looked at. Automatic and unknown callers may only change or cancel an
+  // existing event on behalf of its organizer (see calendarInviteAuthority).
+  const requireOrganizerAuthority = processedAutomatically !== false;
 
   for (const group of groups) {
     let existingEvent = existingEventsByUid.get(group.eventUid) ?? null;
     const actionType = resolveInviteActionType(group, existingEvent);
+    const authorityFailure = (event: CalendarEvent) =>
+      calendarInviteAuthorityFailure({
+        existingEvent: event,
+        group,
+        senderAddress,
+        senderAuthenticationResults,
+        ownAddresses: accountEmail
+      });
+    const isFromOrganizer = (event: CalendarEvent) => authorityFailure(event) === null;
+    const canModifySibling = requireOrganizerAuthority ? isFromOrganizer : undefined;
+    const keepUnprocessed = (reason: CalendarInviteUnprocessedReason) => {
+      processedStateByUid.set(group.eventUid, false);
+      unprocessedReasonByUid.set(group.eventUid, reason);
+    };
 
     try {
       if (actionType === "cancellation") {
+        if (requireOrganizerAuthority) {
+          if (!existingEvent) {
+            // Nothing to cancel; reminders carry no organizer to check against.
+            processedEventUids.push(group.eventUid);
+            processedStateByUid.set(group.eventUid, true);
+            continue;
+          }
+          const failure = authorityFailure(existingEvent);
+          if (failure) {
+            keepUnprocessed(failure);
+            continue;
+          }
+        }
         await cancelCalendarEventByUid(accountId, group.eventUid);
         await cancelCalendarRemindersByEventUid(accountId, group.eventUid);
         processedEventUids.push(group.eventUid);
@@ -335,9 +378,15 @@ export async function processCalendarInviteForMessage({
           accountId,
           messageId,
           group.eventUid,
-          accountEmail
+          accountEmail,
+          canModifySibling
         );
         existingEventsByUid.set(group.eventUid, existingEvent);
+      }
+      const failure = existingEvent && requireOrganizerAuthority ? authorityFailure(existingEvent) : null;
+      if (failure) {
+        keepUnprocessed(failure);
+        continue;
       }
       const missingSeriesForOccurrenceChange =
         !existingEvent && !group.baseEvent && group.hasInstanceChanges;
@@ -411,7 +460,7 @@ export async function processCalendarInviteForMessage({
         ...snapshotFields,
         occurrenceSnapshots: occurrenceSnapshotsField
       });
-      await reconcileSeriesAnchorSiblings(accountId, savedEvent);
+      await reconcileSeriesAnchorSiblings(accountId, savedEvent, { canModifySibling });
       await rescheduleCalendarRemindersByEventUid(accountId, group.eventUid, {
         eventTitle: savedEvent.summary,
         eventLocation: savedEvent.location,
@@ -468,16 +517,12 @@ export async function processCalendarInviteForMessage({
       }
     );
   }
-  const eventSeriesNotFoundUids = Array.from(unprocessedReasonByUid.entries())
-    .filter(([, reason]) => reason === "event_series_not_found")
-    .map(([eventUid]) => eventUid);
-  if (eventSeriesNotFoundUids.length > 0) {
-    await markMessageCalendarInviteStatesUnprocessed(
-      accountId,
-      messageId,
-      eventSeriesNotFoundUids,
-      "event_series_not_found"
-    );
+  const unprocessedUidsByReason = new Map<CalendarInviteUnprocessedReason, string[]>();
+  for (const [eventUid, reason] of unprocessedReasonByUid) {
+    unprocessedUidsByReason.set(reason, [...(unprocessedUidsByReason.get(reason) ?? []), eventUid]);
+  }
+  for (const [reason, eventUids] of unprocessedUidsByReason) {
+    await markMessageCalendarInviteStatesUnprocessed(accountId, messageId, eventUids, reason);
   }
 
   return {

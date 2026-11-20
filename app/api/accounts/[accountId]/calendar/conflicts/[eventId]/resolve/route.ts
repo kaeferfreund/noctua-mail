@@ -15,9 +15,10 @@ import {
   type CalendarEventConflict
 } from "@/lib/db";
 import type { Account, CalendarEvent } from "@/lib/data";
-import { createCaldavClient, updateRemoteEvent } from "@/lib/caldav/client";
+import { createCaldavClient, isHrefInCalendarCollection, updateRemoteEvent } from "@/lib/caldav/client";
 import { mergeRemoteIcsIntoEvent } from "@/lib/caldav/remoteMerge";
 import { patchIcsForEvent } from "@/lib/caldav/icsSerializer";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; eventId?: string }>;
@@ -54,6 +55,10 @@ export async function applyConflictResolution(
   if (resolution === "local") {
     if (!account?.caldav?.url || !event.remoteHref) {
       return { ok: false, status: 400, message: "No remote target" };
+    }
+    if (!isHrefInCalendarCollection(event.remoteHref, event.calendarId)) {
+      // Only overwrite a resource inside the event's own calendar collection.
+      return { ok: false, status: 400, message: "Remote target is outside the event's calendar" };
     }
     if (!conflict.remoteEtag) {
       // Without the server's current revision an If-Match PUT would blindly
@@ -98,22 +103,23 @@ export async function applyConflictResolution(
 
 export async function POST(request: Request, { params }: Params) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const body = (await request.json().catch(() => null)) as { resolution?: string } | null;
   const accountId = await getAccountIdFromParams(params);
   const { eventId: rawEventId } = await params;
   const eventId = typeof rawEventId === "string" ? rawEventId.trim() : "";
-  const resolution = body?.resolution;
   if (!accountId || !eventId) {
     return NextResponse.json({ ok: false, message: "Missing accountId or eventId" }, { status: 400 });
-  }
-  if (resolution !== "local" && resolution !== "remote") {
-    return NextResponse.json({ ok: false, message: "Invalid resolution" }, { status: 400 });
   }
   const accountContext = await requireAccountContext(request, accountId, {
     minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  const json = await readJsonBody<{ resolution?: string }>(request);
+  if (!json.ok) return json.response;
+  const resolution = json.value?.resolution;
+  if (resolution !== "local" && resolution !== "remote") {
+    return NextResponse.json({ ok: false, message: "Invalid resolution" }, { status: 400 });
+  }
   return withAuthResponse(accountContext, async () => {
 
     const conflict = await getCalendarEventConflict(accountId, eventId);

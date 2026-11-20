@@ -423,7 +423,8 @@ function ThreadMessageCard({
           // Resolve cid: image refs to attachment URLs, as the HTML panel does;
           // otherwise the markdown body renders <img src="cid:…"> as a broken image.
           replaceInlineImageSources(message.body ?? "", message.attachments ?? []),
-          fontScale
+          fontScale,
+          message
         );
 
   const wrapPanel = (key: string, node: React.ReactNode) => (
@@ -500,7 +501,7 @@ function ThreadMessageCard({
     if (format === "html") return renderHtmlPanel(text);
     // Translated Markdown previously used a separate virtual id without a
     // font override; preserve that default presentation.
-    if (tab === "markdown") return renderMarkdownPanel(text, 1);
+    if (tab === "markdown") return renderMarkdownPanel(text, 1, message);
     return renderTextPanel(text);
   };
 

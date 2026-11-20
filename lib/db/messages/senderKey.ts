@@ -1,8 +1,9 @@
 import type { Database } from "bun:sqlite";
-import { getMessageSource, messageSourceSha256 } from "../../storage";
+import { getMessageSourceBuffer, messageSourceSha256 } from "../../storage";
 import { withDbWriteRetry } from "../../dbWriteRetry";
 import { getHeaderValue, normalizeEnvelopeHeaderId, parseHeaderMap, resolveMessageSenderKey } from "../../mail/imap/parser";
 import { extractUnambiguousPrimaryEmail } from "../../senderIdentity";
+import { rawMessageSourceBytes, type RawMessageSource } from "../../messageSource";
 
 /** Backfill only on opening a message, using its retained wire From header. */
 export async function backfillMessageSenderKey(
@@ -13,9 +14,10 @@ export async function backfillMessageSenderKey(
   // A collision variant's base-id fallback may belong to a different copy.
   // A matching filename alone does not establish ownership for legacy files.
   // Require the digest recorded with this final row id by the fixed writer.
-  const source = await getMessageSource(row.accountId, row.id, { exact: true });
-  if (!source || messageSourceSha256(source) !== row.sourceSha256) return;
-  const key = resolveMessageSenderKey(undefined, parseHeaderMap(Buffer.from(source)));
+  // The digest was taken over the bytes the writer stored, so compare bytes.
+  const source = await getMessageSourceBuffer(row.accountId, row.id, { exact: true });
+  if (!source?.length || messageSourceSha256(source) !== row.sourceSha256) return;
+  const key = resolveMessageSenderKey(undefined, parseHeaderMap(source));
   if (!key) return;
   await withDbWriteRetry("backfillMessageSenderKey", async () => {
     db.prepare(`UPDATE messages SET senderKey = ?
@@ -40,18 +42,21 @@ export type LegacySourceSkipReason = "size" | "message-id" | "no-sender-key" | "
  */
 export function checkLegacySourceOwnership(
   row: { messageId: string | null; fromAddr: string; sizeBytes: number | null },
-  source: string
+  source: RawMessageSource
 ): { senderKey: string; sourceSha256: string } | { skip: LegacySourceSkipReason } {
-  if (Buffer.byteLength(source) !== row.sizeBytes) return { skip: "size" };
+  const bytes = rawMessageSourceBytes(source);
+  if (bytes.length !== row.sizeBytes) return { skip: "size" };
   // parseHeaderMap stops at the first empty line: split only the header block
   // (up to the newline before that line) instead of a possibly large body.
-  const headerEnd = source.search(/\n\r?\n/);
-  const headers = parseHeaderMap(Buffer.from(headerEnd < 0 ? source : source.slice(0, headerEnd + 1)));
+  const lfEnd = bytes.indexOf("\n\n");
+  const crlfEnd = bytes.indexOf("\n\r\n");
+  const headerEnd = lfEnd < 0 ? crlfEnd : crlfEnd < 0 ? lfEnd : Math.min(lfEnd, crlfEnd);
+  const headers = parseHeaderMap(headerEnd < 0 ? bytes : bytes.subarray(0, headerEnd + 1));
   const messageId = normalizeEnvelopeHeaderId(getHeaderValue(headers, "message-id"));
   if (!messageId || messageId !== row.messageId) return { skip: "message-id" };
   // The same derivation as ingestion without an envelope and as the lazy backfill above.
   const senderKey = resolveMessageSenderKey(undefined, headers);
   if (!senderKey) return { skip: "no-sender-key" };
   if (senderKey !== extractUnambiguousPrimaryEmail(row.fromAddr)) return { skip: "sender" };
-  return { senderKey, sourceSha256: messageSourceSha256(source) };
+  return { senderKey, sourceSha256: messageSourceSha256(bytes) };
 }

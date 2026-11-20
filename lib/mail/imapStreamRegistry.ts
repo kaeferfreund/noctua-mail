@@ -13,6 +13,45 @@ type StreamControl = {
 
 const streamsByAccount = new Map<string, Set<StreamControl>>();
 
+/**
+ * Concurrent live streams. Each one holds its own IMAP connections (watched folders plus a
+ * poller) outside the sync worker budget, so admission is capped per user and mailbox, per user,
+ * per mailbox and for the whole process. A refused browser falls back to polling.
+ */
+export const IMAP_STREAM_LIMITS = { perUserMailbox: 3, perUser: 6, perMailbox: 8, total: 48 } as const;
+export type ImapStreamLimits = { [K in keyof typeof IMAP_STREAM_LIMITS]: number };
+
+const admitted = { total: 0, byUser: new Map<string, number>(), byMailbox: new Map<string, number>(),
+  byUserMailbox: new Map<string, number>() };
+
+function adjust(map: Map<string, number>, key: string, delta: number) {
+  const next = (map.get(key) ?? 0) + delta;
+  if (next > 0) map.set(key, next);
+  else map.delete(key);
+}
+
+/** Reserves a stream slot before any upstream connection; null when a limit is reached. */
+export function reserveStreamSlot(accountId: string, userId: string, limits: ImapStreamLimits = IMAP_STREAM_LIMITS) {
+  const userMailbox = JSON.stringify([userId, accountId]);
+  if (admitted.total >= limits.total
+    || (admitted.byUser.get(userId) ?? 0) >= limits.perUser
+    || (admitted.byMailbox.get(accountId) ?? 0) >= limits.perMailbox
+    || (admitted.byUserMailbox.get(userMailbox) ?? 0) >= limits.perUserMailbox) return null;
+  admitted.total++;
+  adjust(admitted.byUser, userId, 1);
+  adjust(admitted.byMailbox, accountId, 1);
+  adjust(admitted.byUserMailbox, userMailbox, 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    admitted.total--;
+    adjust(admitted.byUser, userId, -1);
+    adjust(admitted.byMailbox, accountId, -1);
+    adjust(admitted.byUserMailbox, userMailbox, -1);
+  };
+}
+
 export function registerStream(accountId: string, control: StreamControl) {
   const existing = streamsByAccount.get(accountId) ?? new Set<StreamControl>();
   existing.add(control);

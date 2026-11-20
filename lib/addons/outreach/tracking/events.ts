@@ -5,7 +5,13 @@ import { lookupTrackingLocation, normalizeTrackingIp, trackingIpExpiryCutoff, tr
 import { isRecentOpen, OPEN_DEDUP_MS, recentOpenDigest, rememberRecentOpen } from "./recentOpens";
 import type { NewTrackingEvent } from "./index";
 
+/** Stored opens per send, and separately stored clicks per send: one kind never crowds out the other. */
 const MAX_ENGAGEMENT_EVENTS_PER_SEND = 2_000;
+/**
+ * One client (address as stored) and one click link get a fraction of a kind's send budget, so a
+ * single link holder cannot use up the history every other recipient of the send records into.
+ */
+const MAX_ENGAGEMENT_EVENTS_PER_SOURCE = 200;
 
 export async function recordTrackingEvent(event: NewTrackingEvent): Promise<void> {
   const at = event.at ?? Date.now();
@@ -36,8 +42,8 @@ export async function recordTrackingEvent(event: NewTrackingEvent): Promise<void
     if (contactId && contactId !== event.contactId && !contactExists.get(event.accountId, contactId)) return;
 
     if (publicEvent && event.sendId && db.prepare(`SELECT 1 FROM tracking_events
-      WHERE accountId = ? AND sendId = ? AND type IN ('open', 'click') LIMIT 1 OFFSET ?`)
-      .get(event.accountId, event.sendId, MAX_ENGAGEMENT_EVENTS_PER_SEND - 1)) return;
+      WHERE accountId = ? AND sendId = ? AND type = ? LIMIT 1 OFFSET ?`)
+      .get(event.accountId, event.sendId, event.type, MAX_ENGAGEMENT_EVENTS_PER_SEND - 1)) return;
 
     // Existing callers can still provide a click URL. Resolve it against the send's links.
     if (event.type === "click" && !linkToken && event.sendId && event.url) {
@@ -46,10 +52,21 @@ export async function recordTrackingEvent(event: NewTrackingEvent): Promise<void
       linkToken = link?.token ?? null;
     }
 
-    const settings = db.prepare("SELECT ipRetentionDays FROM account_settings WHERE accountId = ?")
-      .get(event.accountId) as { ipRetentionDays: number } | null;
+    const settings = db.prepare("SELECT enabled, ipRetentionDays FROM account_settings WHERE accountId = ?")
+      .get(event.accountId) as { enabled: number; ipRetentionDays: number } | null;
+    // Opens and clicks are recorded only while the owning mailbox has the addon switched on.
+    // Links of mail sent earlier keep working (public.ts); they just stop collecting activity.
+    if (publicEvent && !settings?.enabled) return;
     const truncate = Boolean(fullIp && at <= trackingIpExpiryCutoff(now, settings?.ipRetentionDays));
     const ip = truncate && fullIp ? truncateTrackingIp(fullIp) : fullIp;
+    if (publicEvent && event.sendId) {
+      const sourceOffset = MAX_ENGAGEMENT_EVENTS_PER_SOURCE - 1;
+      if (db.prepare(`SELECT 1 FROM tracking_events WHERE accountId = ? AND sendId = ? AND type = ? AND ip IS ?
+        LIMIT 1 OFFSET ?`).get(event.accountId, event.sendId, event.type, ip, sourceOffset)) return;
+      if (event.type === "click" && linkToken && db.prepare(`SELECT 1 FROM tracking_events
+        WHERE accountId = ? AND sendId = ? AND type = 'click' AND linkToken = ? LIMIT 1 OFFSET ?`)
+        .get(event.accountId, event.sendId, linkToken, sourceOffset)) return;
+    }
     const client = classifyTrackingClient(userAgent, event.type, at, send?.sentAt ?? (send?.status === "sending" ? at : null), event.detail?.requestMethod);
     const machine = Number(client.machine);
 

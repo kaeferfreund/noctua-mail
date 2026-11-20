@@ -19,7 +19,26 @@ const WINDOWS_TIMEZONE_MAP: Record<string, string> = {
   UTC: "UTC"
 };
 
+// TZIDs come from untrusted calendar data. Real zone names are short
+// (IANA ids, Windows names, Outlook labels), so longer values are rejected
+// before any work, and the validity cache keeps a bounded number of entries.
+const MAX_TIMEZONE_ID_LENGTH = 128;
+const MAX_TIMEZONE_ID_SEGMENTS = 3;
+const MAX_TIMEZONE_CACHE_ENTRIES = 1024;
 const timezoneValidityCache = new Map<string, boolean>();
+
+function rememberTimeZoneValidity(timeZone: string, valid: boolean) {
+  if (timezoneValidityCache.size >= MAX_TIMEZONE_CACHE_ENTRIES) {
+    const oldest = timezoneValidityCache.keys().next();
+    if (!oldest.done) timezoneValidityCache.delete(oldest.value);
+  }
+  timezoneValidityCache.set(timeZone, valid);
+}
+
+/** Test seam: number of cached validity entries. */
+export function getCalendarTimeZoneCacheSize() {
+  return timezoneValidityCache.size;
+}
 
 function normalizeRawTimeZone(value: string) {
   return value.trim().replace(/^"|"$/g, "");
@@ -42,7 +61,12 @@ function buildTimeZoneCandidates(raw: string) {
   push(withoutLeadingSlashes);
 
   const segments = withoutLeadingSlashes.split("/").filter(Boolean);
-  for (let index = 0; index < segments.length; index += 1) {
+  // IANA ids have at most three segments (America/Argentina/Buenos_Aires).
+  for (
+    let index = Math.max(0, segments.length - MAX_TIMEZONE_ID_SEGMENTS);
+    index < segments.length;
+    index += 1
+  ) {
     const tail = segments.slice(index).join("/");
     if (!tail.includes("/")) continue;
     push(tail);
@@ -52,21 +76,22 @@ function buildTimeZoneCandidates(raw: string) {
 }
 
 export function isValidCalendarTimeZone(timeZone: string) {
+  if (timeZone.length > MAX_TIMEZONE_ID_LENGTH) return false;
   const cached = timezoneValidityCache.get(timeZone);
   if (typeof cached === "boolean") return cached;
   try {
     new Intl.DateTimeFormat(undefined, { timeZone }).format(new Date());
-    timezoneValidityCache.set(timeZone, true);
+    rememberTimeZoneValidity(timeZone, true);
     return true;
   } catch {
-    timezoneValidityCache.set(timeZone, false);
+    rememberTimeZoneValidity(timeZone, false);
     return false;
   }
 }
 
 export function resolveCalendarTimeZoneId(timeZone?: string) {
   const raw = timeZone?.trim();
-  if (!raw) return undefined;
+  if (!raw || raw.length > MAX_TIMEZONE_ID_LENGTH) return undefined;
   const normalized = normalizeRawTimeZone(raw);
   const mapped = WINDOWS_TIMEZONE_MAP[normalized.toUpperCase()];
   if (mapped) return mapped;

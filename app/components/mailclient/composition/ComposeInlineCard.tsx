@@ -9,6 +9,7 @@ import threadStyles from "../message/ThreadMessageCard.module.css";
 import styles from "./ComposeInlineCard.module.css";
 import composeStyles from "./Compose.module.css";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
+import { useSingleWindowApp } from "@/lib/ui/displayMode";
 
 export default function ComposeInlineCard() {
   const {
@@ -64,6 +65,7 @@ export default function ComposeInlineCard() {
   } = useComposeContext();
 
   const t = useTranslations("Compose");
+  const singleWindow = useSingleWindowApp();
   const composeModeLabel = t(`modes.${composeMode}`);
 
   return (
@@ -98,7 +100,7 @@ export default function ComposeInlineCard() {
               >
                 <ArrowUpRight size={14} />
               </TooltipIconButton>
-              {!detachedWindow && (
+              {!detachedWindow && !singleWindow && (
                 <TooltipIconButton
                   variant="ghost"
                   size="2"

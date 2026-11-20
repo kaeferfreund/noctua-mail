@@ -48,8 +48,8 @@ test("seed is reproducible, has 25 inbox threads, both team members and realisti
 });
 test("Noctua verifyImapCredentials accepts plaintext and rejects bad credentials", async () => {
   const account = { id: "fixture", avatar: "", email: demoUser, name: "MonkeyDent", imap: { host: "127.0.0.1", port: imap.port, secure: false, user: demoUser, password: demoPass }, smtp: { host: "127.0.0.1", port: smtp.port, secure: false, user: demoUser, password: demoPass } } satisfies Account;
-  expect(await verifyImapCredentials(account, demoPass)).toBe(true);
-  expect(await verifyImapCredentials(account, "wrong")).toBe(false);
+  expect(await verifyImapCredentials(account, demoPass)).toBe("ok");
+  expect(await verifyImapCredentials(account, "wrong")).toBe("invalid");
 });
 test("QA-006 SELECT UNSEEN is a sequence number while STATUS UNSEEN is the count", async () => {
   const store = new MailStore("qa-unread", anchor, join(directory, "qa-unread-uidvalidity.sqlite"));

@@ -44,9 +44,9 @@ export function validateSignupInvite(db:Database, code:string, email:string) {
 
 export async function reserveProvisioning(db:Database, email:string, code:string, account?:Account) {
   return withDbWriteRetry("reserveProvisioning",()=>db.transaction(()=>{
+    const role=validateSignupInvite(db,code,email);
     assertNewIdentity(db,email,account);
     if (db.prepare(`SELECT 1 FROM user_provisioning WHERE normalizedEmail=? AND state IN ${ACTIVE_PROVISIONING}`).get(email)) throw new AuthPolicyError("provisioning_pending",409);
-    const role=validateSignupInvite(db,code,email);
     const id=crypto.randomUUID(), userId=crypto.randomUUID(), now=Date.now();
     db.prepare(`INSERT INTO user_provisioning(id,userId,normalizedEmail,inviteCode,kind,state,createdAt,updatedAt) VALUES(?,?,?,?,'signup','reserved',?,?)`).run(id,userId,email,code,now,now);
     return {id,userId,normalizedEmail:email,inviteCode:code,kind:"signup",state:"reserved",createdAt:now,role};

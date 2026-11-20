@@ -18,7 +18,7 @@ import type { SpamAdminSettings } from "./config";
 import type { SpamServiceDeps } from "./service";
 
 // The service with a mocked model and a recorded Junk move: no API call, no IMAP.
-const { replaceSpamServiceDeps, runSpamSweep, runRescanSpamChecks, spamChecksIdle } = await import("./service");
+const { replaceSpamServiceDeps, revokeSenderTrust, runSpamSweep, runRescanSpamChecks, spamChecksIdle } = await import("./service");
 
 const ADMIN = "spam-service-test";
 const answer = (verdict: string, confidence: number) => JSON.stringify({ verdict, confidence, reasons: ["Synthetischer Grund"] });
@@ -251,5 +251,79 @@ test("rules-only rescans persist only allowlist/static decisions and leave trust
     expect(f.row(plain.id).spamVerdict).toBe("ham");
     expect(f.row(canary.id).spamVerdict).toBe("ham");
     expect(model.doGenerateCalls).toHaveLength(1);
+  } finally { restore(); }
+});
+
+/** A sender with a trusted history (profile) and one of its mails (input) addressed to `email`. */
+function trustedSenderCase(email: string) {
+  const now = Date.now();
+  const offset = now - (START + 61 * DAY);
+  const profile = trustedProfile(25, 60, {
+    senderKey: "notify@service.example.invalid", fromDomain: "service.example.invalid",
+    dkimDomains: ["service.example.invalid"], linkHosts: ["app.service.example.invalid"], messageIdDomain: "example.invalid"
+  });
+  profile.firstSeenAt += offset;
+  profile.lastSeenAt += offset;
+  const input: typeof trustedInput = {
+    ...trustedInput, from: "Service <notify@service.example.invalid>", fromEmail: "notify@service.example.invalid", to: email,
+    messageId: "<abc@mail.service.example.invalid>", listId: "<builds.service.example.invalid>", linkDomains: ["app.service.example.invalid"],
+    authenticationResults: ["mx.example.test; spf=pass smtp.mailfrom=bounce.service.example.invalid; dkim=pass header.d=service.example.invalid"]
+  };
+  const source = Buffer.from(`From: ${input.from}\r\nTo: ${input.to}\r\nSubject: ${input.subject}\r\nMessage-ID: ${input.messageId}\r\n`
+    + `List-Id: ${input.listId}\r\nAuthentication-Results: ${input.authenticationResults[0]}\r\n\r\n${input.text}`);
+  return { profile, input, source };
+}
+
+test("another mailbox's sender history neither trusts the sender here nor appears in this mailbox's verdict", async () => {
+  const own = await fixture();
+  const other = await fixture();
+  const ownCase = trustedSenderCase(own.account.email);
+  const otherCase = trustedSenderCase(other.account.email);
+  await other.api.replaceSenderProfiles(other.accountId, [otherCase.profile]);
+  const plainId = (f: typeof own) => Array.from({ length: 2000 }, (_, index) => `${f.accountId}-trusted-${index}`).find(id => !isTrustCanary(id))!;
+  const [ownMail] = await own.seed(own.mail({ id: plainId(own), from: ownCase.input.from, to: ownCase.input.to, subject: ownCase.input.subject }));
+  const [otherMail] = await other.seed(other.mail({ id: plainId(other), from: otherCase.input.from, to: otherCase.input.to, subject: otherCase.input.subject }));
+  const model = mockSpamModel(answer("ham", 0.99));
+  const restore = replaceSpamServiceDeps({ languageModel: () => model, sleep: async () => {},
+    readSource: async (_accountId, id) => id === ownMail.id ? ownCase.source : id === otherMail.id ? otherCase.source : null });
+  try {
+    const options = () => ({ rescanJobId: crypto.randomUUID(), isCancelled: () => false, onProgress: () => {} });
+    // The mailbox that holds the history skips its sender as trusted …
+    await runRescanSpamChecks(other.accountId, [otherMail], options());
+    expect(other.row(otherMail.id).spamReasons).toContain("trusted:profile");
+    expect(model.doGenerateCalls).toHaveLength(0);
+    // … another mailbox decides by its own history only.
+    await runRescanSpamChecks(own.accountId, [ownMail], options());
+    expect(model.doGenerateCalls).toHaveLength(1);
+    expect(own.row(ownMail.id).spamReasons).not.toContain("trusted:");
+    expect(own.row(ownMail.id).spamReasons).not.toContain("Mails seit");
+  } finally { restore(); }
+});
+
+test("\"Als Spam\" revokes trust only in mailboxes the acting user may edit", async () => {
+  const marked = await fixture();
+  const other = await fixture();
+  const sender = "Service <notify@service.example.invalid>";
+  const [spam] = await marked.seed(marked.mail({ from: sender }));
+  const [trusted] = await other.seed(other.mail({ from: sender }));
+  await other.api.saveSpamVerdict(other.accountId, trusted.id, { verdict: "ham", confidence: 1, reasons: ["trusted:profile (synthetic)"] });
+  const roles = new Map<string, "viewer" | "editor">();
+  const model = mockSpamModel(answer("ham", 0.9));
+  const restore = replaceSpamServiceDeps({ languageModel: () => model, sleep: async () => {},
+    accountRole: async (userId, accountId) => userId === "user-actor" ? roles.get(accountId) ?? null : null });
+  try {
+    for (const role of [undefined, "viewer"] as const) {
+      if (role) roles.set(other.accountId, role);
+      await revokeSenderTrust(marked.accountId, sender, spam.id, "user-actor");
+      await spamChecksIdle();
+      expect((await marked.api.getSenderProfile(marked.accountId, "notify@service.example.invalid"))?.lastUserSpamAt).toBeNumber();
+      expect(await other.api.getSenderProfile(other.accountId, "notify@service.example.invalid")).toBeNull();
+      expect(other.row(trusted.id).spamReasons).toContain("trusted:profile");
+    }
+    roles.set(other.accountId, "editor");
+    await revokeSenderTrust(marked.accountId, sender, spam.id, "user-actor");
+    await spamChecksIdle();
+    expect((await other.api.getSenderProfile(other.accountId, "notify@service.example.invalid"))?.lastUserSpamAt).toBeNumber();
+    expect(other.row(trusted.id).spamReasons ?? "").not.toContain("trusted:profile");
   } finally { restore(); }
 });

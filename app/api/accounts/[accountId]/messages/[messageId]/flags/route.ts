@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { applyFlagMutationsToMessage, MESSAGE_FLAG_MAP } from "@/lib/messageFlagMutation";
 import { requireImapMessageMutationContext } from "@/app/api/_helpers/message/routeHelpers";
 import { getAccountIdFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; messageId?: string }>;
@@ -15,21 +16,21 @@ export async function POST(request: Request, { params }: Params) {
   const accountId = await getAccountIdFromParams(params);
   const { messageId: rawMessageId } = await params;
   const messageId = typeof rawMessageId === "string" ? rawMessageId.trim() : "";
-  const payload = (await request.json().catch(() => null)) as
-    | {
+  const context = await requireImapMessageMutationContext(request, { accountId, messageId });
+  if (context instanceof NextResponse) return context;
+  const body = await readJsonBody<{
         accountId?: string;
         messageId?: string;
         flag?: keyof typeof MESSAGE_FLAG_MAP;
         keyword?: string;
         value?: boolean;
-      }
-    | null;
+      }>(request);
+  if (!body.ok) return body.response;
+  const payload = body.value;
   const value = payload?.value;
   if (typeof value !== "boolean") {
     return NextResponse.json({ ok: false, message: "Missing flag mutation value" }, { status: 400 });
   }
-  const context = await requireImapMessageMutationContext(request, { accountId, messageId });
-  if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
     const {
       accountId: resolvedAccountId,

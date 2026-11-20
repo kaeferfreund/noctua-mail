@@ -11,6 +11,7 @@ import {
   createRecipientAlias,
   listRecipientAliases
 } from "@/lib/recipientAliases";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
@@ -30,12 +31,12 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
 
-    const body = (await request.json().catch(() => null)) as
-      | {
+    const json = await readJsonBody<{
           name?: string;
           recipients?: string;
-        }
-      | null;
+        }>(request);
+    if (!json.ok) return json.response;
+    const body = json.value;
     const name = body?.name?.trim() ?? "";
     const recipients = body?.recipients?.trim() ?? "";
 
