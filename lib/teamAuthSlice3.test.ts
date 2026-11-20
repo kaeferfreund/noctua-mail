@@ -130,6 +130,21 @@ describe("Slice 3 credentials", () => {
     expect((await f.db.getAccountById(f.id))?.imap.host).toBe("imap.example.test");
     await expect(updateMailboxCredentials(f.id, { imap: { password: "new" } }, { userId: f.user.id }, { imap: async () => { await f.db.patchAccount(f.id, { name: "Concurrent update" }); return true; }, smtp: verified.smtp })).rejects.toThrow("retry");
   });
+  test("mandatory STARTTLS is stored, verified with the requirement and cannot be dropped without the password (A14, S3)", async () => {
+    const f = await fixture();
+    const seen: Account[] = [];
+    const recording = { imap: async (account: Account) => { seen.push(account); return true; }, smtp: async (account: Account) => { seen.push(account); return true; } };
+    await updateMailboxCredentials(f.id, { imap: { secure: false, requireTls: true, port: 143, password: "new-imap" }, smtp: { secure: false, requireTls: true, port: 587, password: "new-smtp" } }, { userId: f.user.id }, recording);
+    expect(seen.map(account => [account.imap.requireTls, account.smtp.requireTls])).toEqual([[true, true], [true, true]]);
+    const stored = (await f.db.getAccountById(f.id))!;
+    expect([stored.imap.secure, stored.imap.requireTls, stored.smtp.secure, stored.smtp.requireTls]).toEqual([false, true, false, true]);
+    expect(f.master.prepare("SELECT imapSecure, smtpSecure FROM accounts WHERE id=?").get(f.id)).toEqual({ imapSecure: 2, smtpSecure: 2 });
+    await expect(updateMailboxCredentials(f.id, { imap: { requireTls: false } }, { userId: f.user.id }, verified)).rejects.toThrow("requires its password");
+    await expect(updateMailboxCredentials(f.id, { smtp: { requireTls: "no" } } as unknown as MailboxPatch, { userId: f.user.id }, verified)).rejects.toThrow("Invalid requireTls");
+    // Saving unrelated settings with the unchanged mode needs no password and keeps the requirement.
+    await updateMailboxCredentials(f.id, { name: "Renamed", imap: { requireTls: true, password: "" } }, { userId: f.user.id }, verified);
+    expect((await f.db.getAccountById(f.id))?.imap.requireTls).toBe(true);
+  });
   test("login-owner generation, sessions/tokens/challenges revoked atomically; ownerless stays ownerless", async () => {
     const f = await fixture(); await f.db.upsertAccount({ ...f.account, email: f.user.email, imap: { ...f.account.imap, user: f.user.email }, ownerUserId: f.user.id });
     const token = await mintMcpToken(f.context, f.id, "Synthetic", 3600);
@@ -292,6 +307,16 @@ test("CalDAV passwords are only accepted for https:// servers", async () => {
   await updateMailboxCredentials(f.id, { caldav: null } as unknown as MailboxPatch, manager, verified);
   const open = await updateMailboxCredentials(f.id, { caldav: { url: "http://calendar.example.test/", user: "synthetic", password: "" } }, manager, verified);
   expect(open.caldav).toMatchObject({ url: "http://calendar.example.test/", password: "" });
+});
+
+test("admin mailbox creation keeps a mandatory STARTTLS choice (A14, S3)", async () => {
+  const admin = await createAuthenticatedTestSession(undefined, "admin");
+  const email = `starttls-${crypto.randomUUID()}@example.test`;
+  const server = { user: email, password: "synthetic", secure: false, requireTls: true };
+  const account = await createAdminMailbox(admin.user.id, { name: "STARTTLS", email, avatar: "",
+    imap: { ...server, host: "imap.example.test", port: 143 }, smtp: { ...server, host: "smtp.example.test", port: 587 } }, "synthetic", verified);
+  const stored = (await (await dbModulePromise).getAccountById(account.id))!;
+  expect([stored.imap.requireTls, stored.smtp.requireTls]).toEqual([true, true]);
 });
 
 test("admin mailbox creation makes the creator owner; admin override only as a member; manager failures carry no repair payload for viewers", async () => {

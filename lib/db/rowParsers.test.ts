@@ -5,7 +5,9 @@ import {
   mapUserAccountLinkRow,
   mapUserRow,
   mergeAccount,
-  parseUserAccountPrefs
+  parseUserAccountPrefs,
+  transportSecurityColumn,
+  transportSecurityFromColumn
 } from "./rowParsers";
 
 function buildAccount(overrides: Partial<Account> = {}): Account {
@@ -217,5 +219,23 @@ describe("mapAdminAuditRow", () => {
       payload: { role: "editor" },
       createdAt: 42
     });
+  });
+});
+
+describe("transport security column (A14, S3)", () => {
+  test("round-trips implicit TLS, mandatory STARTTLS and no requirement", () => {
+    for (const mode of [{ secure: true, requireTls: false }, { secure: false, requireTls: true }, { secure: false, requireTls: false }]) {
+      expect(transportSecurityFromColumn(transportSecurityColumn(mode))).toEqual(mode);
+    }
+    expect(transportSecurityColumn({ secure: true, requireTls: true })).toBe(1);
+    expect(transportSecurityColumn({ secure: false })).toBe(0);
+    // Existing rows (0/1) keep their meaning.
+    expect(transportSecurityFromColumn(0)).toEqual({ secure: false, requireTls: false });
+    expect(transportSecurityFromColumn(1)).toEqual({ secure: true, requireTls: false });
+  });
+
+  test("mergeAccount applies a requireTls patch", () => {
+    const merged = mergeAccount(buildAccount(), { imap: { secure: false, requireTls: true } as Account["imap"] });
+    expect([merged.imap.secure, merged.imap.requireTls]).toEqual([false, true]);
   });
 });

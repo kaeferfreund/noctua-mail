@@ -3,7 +3,8 @@ import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { requireAccountAndMessageContext } from "@/app/api/_helpers/message/routeHelpers";
 import { getAccountIdFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
-import { assertPublicUrl, type LookupFn } from "@/lib/net/urlSafety";
+import type { LookupFn } from "@/lib/net/urlSafety";
+import { publicRequest, PublicRequestError, type HopTransport, type PublicRequestFailure } from "@/lib/net/publicHttp";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; messageId?: string }>;
@@ -11,52 +12,43 @@ type Params = AccountRouteParams & {
 
 /**
  * Performs the RFC 8058 one-click unsubscribe POST. Extracted from the route
- * handler so it can be unit-tested with injected `fetch`/DNS and so the SSRF
- * guard has a single chokepoint.
+ * handler so it can be unit-tested with injected transport/DNS.
  *
  * SSRF-critical: `targetUrl` comes from an attacker-controlled email header
- * (`List-Unsubscribe`). We validate it through `assertPublicUrl` (which
- * enforces https and rejects loopback / RFC 1918 / link-local / multicast /
- * IPv6 unique-local hosts — both literal and DNS-resolved) before issuing
- * any server-side request.
- *
- * Residual risk: the fetch keeps `redirect: "follow"`, so a 3xx Location
- * header can still land on a private IP after the initial check passes.
- * Walking the redirect chain manually with per-hop validation is a bigger
- * change deferred for later.
+ * (`List-Unsubscribe`). `publicRequest` checks it and every redirect hop with
+ * `assertPublicUrl` (https only, public addresses only), connects to the
+ * checked addresses (no second DNS lookup) and bounds the redirects, time and
+ * response size.
  */
 export type OneClickUnsubscribeResult =
   | { ok: true; status: number }
   | { ok: false; status: number; message: string };
 
+const UNSUBSCRIBE_MAX_REDIRECTS = 3;
+const UNSUBSCRIBE_MAX_RESPONSE_BYTES = 64 * 1024;
+/** Failures caused by the remote server (502); every other guard reason is a rejected URL (400). */
+const UPSTREAM_FAILURES = new Set<PublicRequestFailure>(["network-error", "timeout", "response-too-large", "too-many-redirects", "redirect-not-allowed"]);
+
 export async function performOneClickUnsubscribe(
   targetUrl: string,
   options?: {
-    fetchImpl?: typeof fetch;
+    transport?: HopTransport;
     lookup?: LookupFn;
     timeoutMs?: number;
   }
 ): Promise<OneClickUnsubscribeResult> {
-  const validated = await assertPublicUrl(targetUrl, { lookup: options?.lookup });
-  if (!validated.ok) {
-    return {
-      ok: false,
-      status: 400,
-      message: `Unsubscribe URL rejected: ${validated.reason}`
-    };
-  }
-
-  const fetchImpl = options?.fetchImpl ?? fetch;
-  const timeoutMs = options?.timeoutMs ?? 15000;
   try {
-    const res = await fetchImpl(validated.url.toString(), {
+    const res = await publicRequest(targetUrl, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: "List-Unsubscribe=One-Click",
-      redirect: "follow",
-      signal: AbortSignal.timeout(timeoutMs)
+      lookup: options?.lookup,
+      transport: options?.transport,
+      maxRedirects: UNSUBSCRIBE_MAX_REDIRECTS,
+      maxResponseBytes: UNSUBSCRIBE_MAX_RESPONSE_BYTES,
+      timeoutMs: options?.timeoutMs ?? 15000
     });
-    if (res.ok) {
+    if (res.status >= 200 && res.status < 300) {
       return { ok: true, status: res.status };
     }
     return {
@@ -65,6 +57,9 @@ export async function performOneClickUnsubscribe(
       message: `Unsubscribe request returned status ${res.status}`
     };
   } catch (error) {
+    if (error instanceof PublicRequestError && !UPSTREAM_FAILURES.has(error.reason)) {
+      return { ok: false, status: 400, message: `Unsubscribe URL rejected: ${error.reason}` };
+    }
     const msg = error instanceof Error ? error.message : "Network error";
     return { ok: false, status: 502, message: `Unsubscribe request failed: ${msg}` };
   }

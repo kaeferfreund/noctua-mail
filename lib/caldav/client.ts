@@ -5,6 +5,7 @@ import {
   type AssertPublicUrlRejectionReason,
   type LookupFn
 } from "@/lib/net/urlSafety";
+import { createPublicFetch } from "@/lib/net/publicHttp";
 
 export type CaldavClient = Awaited<ReturnType<typeof createDAVClient>>;
 
@@ -54,6 +55,9 @@ type FetchFn = (input: string | URL | Request, init?: RequestInit) => Promise<Re
  * server returns. Rejects loopback / RFC 1918 / link-local / multicast /
  * IPv6 unique-local hosts (literal and DNS-resolved), non-`http(s)` schemes,
  * and plain `http:` when `requireHttps` is set (password authentication).
+ *
+ * The actual connection is made through `createPublicFetch`, which checks
+ * again and connects only to the checked address (no second DNS lookup).
  */
 export async function assertSafeCaldavUrl(
   rawUrl: string,
@@ -133,7 +137,16 @@ export async function createCaldavClient(
     credentials: { username: config.user, password: config.password },
     authMethod: "Basic",
     defaultAccountType: "caldav",
-    fetch: createGuardedCaldavFetch({ lookup: options?.lookup, requireHttps, fetch: options?.fetch })
+    fetch: createGuardedCaldavFetch({
+      lookup: options?.lookup,
+      requireHttps,
+      fetch:
+        options?.fetch ??
+        createPublicFetch({
+          lookup: options?.lookup,
+          protocols: requireHttps ? CALDAV_PASSWORD_PROTOCOLS : CALDAV_ALLOWED_PROTOCOLS
+        })
+    })
   });
   return client;
 }

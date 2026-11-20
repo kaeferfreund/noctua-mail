@@ -4,10 +4,18 @@ import { mapAccountRow } from "./db/rowParsers";
 import { readGeneration, AuthPolicyError } from "./db/authPolicy";
 import { verifyImapCredentials } from "./mail/imapAuth";
 import { updateMailboxCredentials } from "./mailboxCredentials";
-import { createRateLimiter, getRequestIp } from "./rateLimit";
+import { createFailureLimiter, getRequestIp } from "./rateLimit";
 import { getRequestClientId } from "../app/api/_helpers/clientId";
 
-const attempts = createRateLimiter({ windowMs: 60000, max: 5 });
+/**
+ * Only failed IMAP verifications count. Per source address they stop password
+ * guessing from one client; the user-wide budget is a high emergency brake so
+ * anonymous failures cannot lock the real user out (CF-12). Sign-in and
+ * re-authentication of a signed-in session use separate buckets.
+ */
+const sourceFailures = createFailureLimiter({ windowMs: 60_000, max: 5 });
+const userFailures = createFailureLimiter({ windowMs: 15 * 60_000, max: 50 });
+export type ImapVerificationScope = "sign-in" | "reauth";
 export function imapLoginAvailable(env: NodeJS.ProcessEnv = process.env) {
   return (env.NOCTUA_IMAP_LOGIN_HOSTS ?? "").split(",").some(host => host.trim());
 }
@@ -31,16 +39,22 @@ export function eligibleImapLoginMailbox(db: Database, userId: string): Account 
 }
 
 export async function verifyEligibleImap(db: Database, userId: string, password: string, request: Request,
-  writeBack = false, verify = verifyImapCredentials) {
+  writeBack = false, verify = verifyImapCredentials, scope: ImapVerificationScope = "sign-in") {
   if (!password || password.length > 256) throw new AuthPolicyError("invalid_credentials", 401);
   const account = eligibleImapLoginMailbox(db, userId);
   const ip = getRequestIp(request);
   const checkSnapshot = () => {
     if (JSON.stringify(eligibleImapLoginMailbox(db, userId)) !== JSON.stringify(account)) throw new AuthPolicyError("invalid_credentials", 401);
   };
+  const sourceKey = `${scope}:ip:${ip}`;
+  const userKey = `${scope}:user:${userId}`;
   const limitedVerify: typeof verify = async (...args) => {
-    if (attempts.isLimited(`ip:${ip}`) || attempts.isLimited(`user:${userId}`)) throw new AuthPolicyError("invalid_credentials", 401);
-    if (!await verify(...args)) throw new AuthPolicyError("invalid_credentials", 401);
+    if (sourceFailures.isBlocked(sourceKey) || userFailures.isBlocked(userKey)) throw new AuthPolicyError("invalid_credentials", 401);
+    if (!await verify(...args)) {
+      sourceFailures.recordFailure(sourceKey);
+      userFailures.recordFailure(userKey);
+      throw new AuthPolicyError("invalid_credentials", 401);
+    }
     checkSnapshot();
     return true;
   };

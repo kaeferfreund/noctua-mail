@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import SettingsFrame, { SettingsHeader, settingsNavClass } from "@/app/components/shell/SettingsFrame";
 import { Flex, Tabs } from "@radix-ui/themes";
-import type { Account, AccountSettings, RecipientAlias, Topic } from "@/lib/data";
+import type { Account, AccountSettings, MailServerConfig, RecipientAlias, Topic } from "@/lib/data";
 import { hasSavableAccountSettingsChanges } from "@/lib/accountSettings";
 import AccountTabContent from "@/app/components/account-settings/tabs/AccountTabContent";
 import IdentitiesTabContent from "@/app/components/account-settings/tabs/IdentitiesTabContent";
@@ -43,15 +43,10 @@ export type ManageTab =
   | "spam"
   | "outreach";
 
-function deriveImapSecurity(imap: Account["imap"]): "tls" | "starttls" | "none" {
-  if (imap.secure) return "tls";
-  return imap.port === 143 ? "starttls" : "none";
-}
-
-function deriveSmtpSecurity(smtp: Account["smtp"]): "tls" | "starttls" | "none" {
-  if (smtp.secure) return "tls";
-  if (smtp.port === 587) return "starttls";
-  return "none";
+/** Shows the stored transport mode; "starttls" only when the upgrade is actually enforced. */
+function deriveTransportSecurity(server: MailServerConfig): "tls" | "starttls" | "none" {
+  if (server.secure) return "tls";
+  return server.requireTls ? "starttls" : "none";
 }
 
 type Props = {
@@ -111,10 +106,10 @@ export default function AccountSettingsModal({
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [localAccount, setLocalAccount] = useState<Account>(initialAccount);
   const [imapSecurity, setImapSecurity] = useState<"tls" | "starttls" | "none">(() =>
-    deriveImapSecurity(initialAccount.imap)
+    deriveTransportSecurity(initialAccount.imap)
   );
   const [smtpSecurity, setSmtpSecurity] = useState<"tls" | "starttls" | "none">(() =>
-    deriveSmtpSecurity(initialAccount.smtp)
+    deriveTransportSecurity(initialAccount.smtp)
   );
   const [imapDetecting, setImapDetecting] = useState(false);
   const [smtpDetecting, setSmtpDetecting] = useState(false);
@@ -189,7 +184,8 @@ export default function AccountSettingsModal({
       const response = await fetchFn("/api/probe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ protocol, host: config.host, port: config.port }),
+        // Non-admin probes are limited to mailboxes the caller manages (see /api/probe).
+        body: JSON.stringify({ protocol, host: config.host, port: config.port, ...(isExistingAccount ? { accountId: localAccount.id } : {}) }),
         signal: controller.signal
       });
       if (!response.ok) return;
@@ -198,25 +194,25 @@ export default function AccountSettingsModal({
         setImapProbe({ tls: data.supportsTLS, starttls: data.supportsStartTLS });
         if (data.supportsTLS) {
           setImapSecurity("tls");
-          setLocalAccount((prev) => ({ ...prev, imap: { ...prev.imap, secure: true, port: 993 } }));
+          setLocalAccount((prev) => ({ ...prev, imap: { ...prev.imap, secure: true, requireTls: false, port: 993 } }));
         } else if (data.supportsStartTLS) {
           setImapSecurity("starttls");
-          setLocalAccount((prev) => ({ ...prev, imap: { ...prev.imap, secure: false, port: 143 } }));
+          setLocalAccount((prev) => ({ ...prev, imap: { ...prev.imap, secure: false, requireTls: true, port: 143 } }));
         } else {
           setImapSecurity("none");
-          setLocalAccount((prev) => ({ ...prev, imap: { ...prev.imap, secure: false, port: 143 } }));
+          setLocalAccount((prev) => ({ ...prev, imap: { ...prev.imap, secure: false, requireTls: false, port: 143 } }));
         }
       } else {
         setSmtpProbe({ tls: data.supportsTLS, starttls: data.supportsStartTLS });
         if (data.supportsTLS) {
           setSmtpSecurity("tls");
-          setLocalAccount((prev) => ({ ...prev, smtp: { ...prev.smtp, secure: true, port: 465 } }));
+          setLocalAccount((prev) => ({ ...prev, smtp: { ...prev.smtp, secure: true, requireTls: false, port: 465 } }));
         } else if (data.supportsStartTLS) {
           setSmtpSecurity("starttls");
-          setLocalAccount((prev) => ({ ...prev, smtp: { ...prev.smtp, secure: false, port: 587 } }));
+          setLocalAccount((prev) => ({ ...prev, smtp: { ...prev.smtp, secure: false, requireTls: true, port: 587 } }));
         } else {
           setSmtpSecurity("none");
-          setLocalAccount((prev) => ({ ...prev, smtp: { ...prev.smtp, secure: false, port: 25 } }));
+          setLocalAccount((prev) => ({ ...prev, smtp: { ...prev.smtp, secure: false, requireTls: false, port: 25 } }));
         }
       }
     } finally {

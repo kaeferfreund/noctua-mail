@@ -137,7 +137,7 @@ export default function AccountTabContent({
                   onImapSecurityChange(next);
                   onUpdateAccount({
                     ...editingAccount,
-                    imap: { ...editingAccount.imap, secure: next === "tls", port }
+                    imap: { ...editingAccount.imap, secure: next === "tls", requireTls: next === "starttls", port }
                   });
                 }}
               >
@@ -231,7 +231,7 @@ export default function AccountTabContent({
                   onSmtpSecurityChange(next);
                   onUpdateAccount({
                     ...editingAccount,
-                    smtp: { ...editingAccount.smtp, secure: next === "tls", port }
+                    smtp: { ...editingAccount.smtp, secure: next === "tls", requireTls: next === "starttls", port }
                   });
                 }}
               >
