@@ -67,7 +67,7 @@ function mount(apiFetch: UseAccountControllerParams["apiFetch"], firstSync?: (ac
     const [switchPending, setSwitchPending] = useState(false);
     renders.push({ accountId: activeAccountId, folderId: activeFolderId, switchPending });
     // With a locale, use the production error resolver under a switchable provider.
-    const productionReadErrorMessage = useApiErrorMessage({ setAuthState, setReloginAccountId: noop, setReloginDescription: noop });
+    const productionReadErrorMessage = useApiErrorMessage({ setAuthState, requestRelogin: noop, closeRelogin: noop, setReloginDescription: noop });
     const readErrorMessage = localeRef ? productionReadErrorMessage : defaults.readErrorMessage;
     const controller = useAccountController({ ...defaults, readErrorMessage, activeAccountId, setActiveAccountId,
       accounts: loadedAccounts, setAccounts, setInitialDataReady, setAuthState,
