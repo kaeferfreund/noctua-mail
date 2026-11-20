@@ -74,7 +74,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     if (action === "add") {
       const topicId = body?.topicId?.trim();
       if (!topicId) return NextResponse.json({ ok: false, message: "Missing topicId" }, { status: 400 });
-      await addThreadTopic(accountId, threadId, topicId);
+      if (!(await addThreadTopic(accountId, threadId, topicId))) {
+        return NextResponse.json({ ok: false, message: "Topic not found" }, { status: 404 });
+      }
       return NextResponse.json({ ok: true });
     }
 

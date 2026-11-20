@@ -434,15 +434,22 @@ result) and a summary. Run it on the server from the app directory (Bun loads
 may run while the service is running. Shards without the spam schema are
 refused (deploy the spam build first, see Deploy above).
 
+The reports name senders, subjects and mailbox paths. Keep them in a private
+directory (`mktemp -d` creates one with mode 700) and remove it afterwards. The
+scripts write reports with mode 600 and refuse an input file that belongs to
+another user or that others may write.
+
 ```sh
+REPORTS=$(mktemp -d)
 # 1. Eval with output file (read-only)
 bun scripts/spam-eval.ts --data /path/to/noctua-data \
   --sample briefs/spam/eval-sample.json --rules briefs/spam/static-rules.json \
-  --out /tmp/spam-eval-result.json
+  --out "$REPORTS/spam-eval-result.json"
 # 2. Preview: databases opened read-only, nothing is moved
-bun scripts/spam-apply.ts --in /tmp/spam-eval-result.json --data /path/to/noctua-data --dry-run
+bun scripts/spam-apply.ts --in "$REPORTS/spam-eval-result.json" --data /path/to/noctua-data --dry-run
 # 3. Move (optionally one mailbox: --account <accountId>)
-bun scripts/spam-apply.ts --in /tmp/spam-eval-result.json --data /path/to/noctua-data
+bun scripts/spam-apply.ts --in "$REPORTS/spam-eval-result.json" --data /path/to/noctua-data
+rm -r "$REPORTS"
 ```
 
 Wrongly moved mail must be moved back in Noctua — with „Kein Spam“ or by moving
@@ -465,11 +472,13 @@ collaboration assignment, status, note or topic; when the classifier already
 judged it or will (last three days); or when the mailbox has no Junk folder.
 
 ```sh
+REPORTS=$(mktemp -d)
 # 1. Dry run on an online .backup copy (refused on a live dir), list with every decision (mode 600)
-bun scripts/spam-apply.ts --server-flagged --data /path/to/copy --dry-run --out /tmp/flagged.json
-# 2. Review /tmp/flagged.json; delete entries that must stay in the INBOX
+bun scripts/spam-apply.ts --server-flagged --data /path/to/copy --dry-run --out "$REPORTS/flagged.json"
+# 2. Review "$REPORTS/flagged.json"; delete entries that must stay in the INBOX
 # 3. Move only reviewed "move" entries the live data still selects (resumable)
-bun scripts/spam-apply.ts --server-flagged --data /path/to/noctua-data --only /tmp/flagged.json --out /tmp/applied.json
+bun scripts/spam-apply.ts --server-flagged --data /path/to/noctua-data --only "$REPORTS/flagged.json" --out "$REPORTS/applied.json"
+rm -r "$REPORTS"
 ```
 
 The spam examples get the source `server-flag-backfill` and the mail's arrival

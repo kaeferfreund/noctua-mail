@@ -11,7 +11,9 @@ import {
   areEquivalentDbPaths,
   cleanupAccountLifecycleArtifacts,
   closeAccountDbConnection,
-  getDb
+  getAccountDb,
+  getDb,
+  purgeAccountRowsFromRetainedShard
 } from "./connection";
 import {
   mapAccountRow,
@@ -155,20 +157,19 @@ export class AccountDeletionForbiddenError extends Error {
 }
 
 export async function deleteAccountControlPlane(accountId: string, actorUserId?: string) {
-  return withDbWriteRetry("deleteAccountControlPlane", async () => {
+  const deleted = await withDbWriteRetry("deleteAccountControlPlane", async () => {
     const db = await getDb();
     const row = db
       .prepare(`SELECT id, dbPath FROM accounts WHERE id = ?`)
       .get(accountId) as { id?: string; dbPath?: string | null } | undefined;
-    if (!row?.id) return false;
+    if (!row?.id) return null;
 
     const dbPath = resolveAccountDbPathForPersist(accountId, row.dbPath ?? null);
-    const sharedPathRow = db
-      .prepare(`SELECT COUNT(*) as count FROM accounts WHERE id <> ? AND dbPath = ?`)
-      .get(accountId, dbPath) as { count: number } | undefined;
-    const mainDbPath = getMainDbPath();
-    const deleteShardFile =
-      (sharedPathRow?.count ?? 0) === 0 && !(await areEquivalentDbPaths(dbPath, mainDbPath));
+    // Compare file identities, not path text: another spelling of the same file
+    // (relative, symlinked, ...) must keep the shard of the other mailbox.
+    const deleteShardFile = !(await isDbFileInUseElsewhere(db, accountId, dbPath));
+    // A kept shard still holds this mailbox's rows; open it while the account exists.
+    const retainedShard = deleteShardFile ? null : await getAccountDb(accountId);
 
     db.transaction(() => {
       if (actorUserId) {
@@ -184,14 +185,42 @@ export async function deleteAccountControlPlane(accountId: string, actorUserId?:
       deleteMcpTokenAccountRows(db, accountId);
       db.prepare(`DELETE FROM sender_identities WHERE accountId = ?`).run(accountId);
       deleteSpamRescanRowsForAccount(db, accountId);
+      // Control-plane rows keyed by the address-derived id would pass to a mailbox recreated later.
+      db.prepare(`DELETE FROM scheduled_sends WHERE accountId = ?`).run(accountId);
+      db.prepare(`DELETE FROM mailbox_watcher_auth WHERE accountId = ?`).run(accountId);
       db.prepare(`DELETE FROM accounts WHERE id = ?`).run(accountId);
       if (actorUserId) recordAdminAuditRow(db, { actorUserId, action: "account.delete", targetAccountId: accountId });
     }).immediate();
-
-    closeAccountDbConnection(dbPath);
-
-    revokeAuthStreams({ accountId });
-    await cleanupAccountLifecycleArtifacts(accountId, dbPath, deleteShardFile);
-    return true;
+    return { dbPath, deleteShardFile, retainedShard };
   });
+  if (!deleted) return false;
+
+  // After the commit: a retry of the block above would no longer find the mailbox.
+  const { dbPath, deleteShardFile, retainedShard } = deleted;
+  revokeAuthStreams({ accountId });
+  // Every step runs even when an earlier one fails; the first failure is reported.
+  const failures: unknown[] = [];
+  const step = async (name: string, run: () => Promise<void>) => {
+    try { await run(); } catch (error) {
+      console.error("[account-lifecycle] cleanup step failed", { accountId, step: name, error });
+      failures.push(error);
+    }
+  };
+  if (retainedShard) await step("retained-shard", () => purgeAccountRowsFromRetainedShard(retainedShard, accountId));
+  closeAccountDbConnection(dbPath);
+  await cleanupAccountLifecycleArtifacts(accountId, dbPath, deleteShardFile);
+  await step("outreach", async () => (await import("../addons/outreach/accountPurge")).purgeOutreachAccount(accountId));
+  if (failures.length) throw failures[0];
+  return true;
+}
+
+/** Whether the main database or another mailbox uses the same file as this shard. */
+async function isDbFileInUseElsewhere(db: any, accountId: string, dbPath: string) {
+  if (await areEquivalentDbPaths(dbPath, getMainDbPath())) return true;
+  const others = db.prepare(`SELECT id, dbPath FROM accounts WHERE id <> ?`).all(accountId) as
+    Array<{ id: string; dbPath?: string | null }>;
+  for (const other of others) {
+    if (await areEquivalentDbPaths(dbPath, resolveAccountDbPathForPersist(other.id, other.dbPath ?? null))) return true;
+  }
+  return false;
 }

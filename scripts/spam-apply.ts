@@ -36,11 +36,12 @@
  * instead of migrating them outside the deploy runbook.
  */
 import { Database } from "bun:sqlite";
-import { chmodSync, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import type { Folder, Message } from "../lib/data";
 import { applySpamItems, parseSpamEvalRecords, selectSpamApplyItems, type SpamEvalDecision, type SpamEvalRecord } from "../lib/mail/spam/apply";
 import { assertShardsInsideDataDir, openSpamDataDir } from "../lib/mail/spam/evalData";
+import { readPrivateJson, writePrivateJson } from "../lib/mail/spam/privateReport";
 import type { SpamExampleSource } from "../lib/mail/spam/examples";
 import {
   createCorrespondentCheck,
@@ -107,7 +108,7 @@ async function applyEvalFile() {
   if (label !== "ham" && label !== "spam") throw new Error("--label must be ham or spam");
   if (!["spam", "ham", "unsure"].includes(decision)) throw new Error("--decision must be spam, ham or unsure");
 
-  const records = parseSpamEvalRecords(JSON.parse(readFileSync(inPath, "utf8")));
+  const records = parseSpamEvalRecords(readPrivateJson(inPath));
   const items = selectSpamApplyItems(records, { label, decision: decision as SpamEvalDecision, accountId: accountFilter });
   const accountIds = [...new Set(items.map((item) => item.accountId))];
 
@@ -169,11 +170,6 @@ function outputPath(name: string, dataDir: string) {
   if (inside(dataDir)) throw new Error(`--${name} must not point into the data dir`);
   if (inside(repoRoot) && !inside(path.join(repoRoot, ".tmp"))) throw new Error(`--${name} must not point into the repository`);
   return file;
-}
-
-function writePrivateJson(file: string, value: unknown) {
-  writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
-  chmodSync(file, 0o600);
 }
 
 /**
@@ -253,7 +249,7 @@ async function applyServerFlagged() {
 
   const onlyPath = arg("only");
   if (!onlyPath || !existsSync(onlyPath)) throw new Error("The real run needs --only <reviewed file written by --server-flagged --dry-run --out>");
-  const reviewed = parseReviewedServerFlagItems(JSON.parse(readFileSync(onlyPath, "utf8")))
+  const reviewed = parseReviewedServerFlagItems(readPrivateJson(onlyPath))
     .filter((item) => !accountFilter || item.accountId === accountFilter);
   const accountIds = [...new Set(reviewed.map((item) => item.accountId))];
 

@@ -64,7 +64,8 @@ type Props = {
   onClose: () => void;
   onTabChange: (tab: ManageTab) => void;
   onSave: (account: Account) => void;
-  onDelete: () => void;
+  /** Receives the id of the mailbox the confirmation named. */
+  onDelete: (accountId: string) => void;
   isAdminUser?: boolean;
   onNotifySuccess?: (title: string, description: string) => void;
   apiFetch?: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -390,9 +391,10 @@ export default function AccountSettingsModal({
             </Tabs.Content>}
 
           </Tabs.Root>
-          {deleteConfirm && (initialAccount.isOwner === true || isAdminUser) && <AdminConfirmDialog
+          {/* The confirmation names and submits one mailbox; a changed target closes it. */}
+          {deleteConfirm && localAccount.id === initialAccount.id && (initialAccount.isOwner === true || isAdminUser) && <AdminConfirmDialog
             title={t("modal.deleteTitle")} description={t("modal.deleteDescription", { email: localAccount.email })}
-            busy={false} onCancel={() => setDeleteConfirm(false)} onConfirm={() => { setDeleteConfirm(false); onDelete(); }} />}
+            busy={false} onCancel={() => setDeleteConfirm(false)} onConfirm={() => { setDeleteConfirm(false); onDelete(localAccount.id); }} />}
 
         </Flex>
     </SettingsFrame>

@@ -21,7 +21,7 @@ import {
 } from "./schema";
 import { ensureTopicLearningRuntimeData } from "./topics";
 import { withDbWriteRetry } from "../dbWriteRetry";
-import { prepareAccountShardConnection } from "./shardFormat";
+import { ACCOUNT_SHARD_TABLES, prepareAccountShardConnection, SHARD_FTS_TABLE } from "./shardFormat";
 
 const sqliteModulePromise = () => import("bun:sqlite" /* webpackIgnore: true */);
 let DatabaseCtor: any | null = null;
@@ -123,7 +123,8 @@ export async function getAuthDb() {
 }
 
 function ensureDbParentDir(dbPath: string) {
-  mkdirSync(path.dirname(dbPath), { recursive: true });
+  // Mail databases are private to the service user.
+  mkdirSync(path.dirname(dbPath), { recursive: true, mode: 0o700 });
 }
 
 function clearAccountDbIdleTimer(dbPath: string) {
@@ -214,16 +215,36 @@ async function unlinkIfExists(filePath: string) {
   }
 }
 
+/**
+ * Whether two configured paths name the same database file. Compares the file
+ * identity (device and inode), so different spellings, relative paths, symlinks,
+ * hard links and bind mounts of one file are equal. Without both files, the
+ * normalized absolute paths are compared.
+ */
 export async function areEquivalentDbPaths(leftPath: string, rightPath: string) {
-  try {
-    const [leftRealPath, rightRealPath] = await Promise.all([
-      fs.realpath(leftPath),
-      fs.realpath(rightPath)
-    ]);
-    return leftRealPath === rightRealPath;
-  } catch {
-    return leftPath === rightPath;
-  }
+  const [left, right] = await Promise.all([
+    fs.stat(leftPath).catch(() => null),
+    fs.stat(rightPath).catch(() => null)
+  ]);
+  if (left && right) return left.dev === right.dev && left.ino === right.ino;
+  return path.resolve(leftPath) === path.resolve(rightPath);
+}
+
+/**
+ * A deleted mailbox's shard is kept while another mailbox (or the main
+ * database) still uses the same file. Its rows are removed from that file so a
+ * mailbox created later with the same id cannot inherit them. Only the audited
+ * account-scoped shard tables are touched.
+ */
+export async function purgeAccountRowsFromRetainedShard(db: any, accountId: string) {
+  await withDbWriteRetry("purgeAccountRowsFromRetainedShard", () => db.transaction(() => {
+    db.prepare(`DELETE FROM ${SHARD_FTS_TABLE}
+      WHERE rowid IN (SELECT ftsRowid FROM message_fts_identity WHERE accountId = ?)`).run(accountId);
+    // Messages first: attachments, translations and FTS identities follow by cascade.
+    for (const table of ["messages", ...ACCOUNT_SHARD_TABLES.filter(name => name !== "messages")]) {
+      db.prepare(`DELETE FROM "${table}" WHERE accountId = ?`).run(accountId);
+    }
+  }).immediate());
 }
 
 export async function cleanupAccountLifecycleArtifacts(
