@@ -1,24 +1,32 @@
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
-import { requireActiveUserSession } from "@/lib/auth";
 import { testCaldavConnection } from "@/lib/caldav/client";
 
+/**
+ * Tests CalDAV credentials for one mailbox. Only managers of that mailbox may
+ * change its calendar settings, so only they may probe a CalDAV server here.
+ */
 export async function POST(request: Request) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const session = await requireActiveUserSession(request);
-  if (session instanceof NextResponse) return session;
-  return withAuthResponse(session, async () => {
+  const body = (await request.json().catch(() => null)) as {
+    accountId?: unknown;
+    url?: unknown;
+    user?: unknown;
+    password?: unknown;
+  } | null;
+  const accountId = typeof body?.accountId === "string" ? body.accountId.trim() : "";
+  const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "manager",
+    missingAccountMessage: "Missing accountId"
+  });
+  if (accountContext instanceof NextResponse) return accountContext;
+  return withAuthResponse(accountContext, async () => {
 
-    const body = (await request.json().catch(() => null)) as {
-      url?: string;
-      user?: string;
-      password?: string;
-    } | null;
-
-    const url = body?.url?.trim() ?? "";
-    const user = body?.user?.trim() ?? "";
-    const password = body?.password ?? "";
+    const url = typeof body?.url === "string" ? body.url.trim() : "";
+    const user = typeof body?.user === "string" ? body.user.trim() : "";
+    const password = typeof body?.password === "string" ? body.password : "";
 
     if (!url || !user) {
       return NextResponse.json({ ok: false, message: "Missing URL or username" }, { status: 400 });
