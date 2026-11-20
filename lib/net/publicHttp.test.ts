@@ -170,6 +170,14 @@ describe("publicRequest — bounds", () => {
     expect(error.reason).toBe("response-too-large");
   });
 
+  test("truncateResponse keeps the status and the first maxResponseBytes instead of failing", async () => {
+    const response = await publicRequest(`http://public.example.test:${port}/big`, {
+      protocols: HTTP, lookup: publicLookup, transport: loopbackTransport(), maxResponseBytes: 1024, truncateResponse: true
+    });
+    expect(response.status).toBe(200);
+    expect(response.body.byteLength).toBe(1024);
+  });
+
   test("enforces the overall deadline", async () => {
     const started = Date.now();
     const error = await publicRequest(`http://public.example.test:${port}/hang`, {

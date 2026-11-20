@@ -43,6 +43,8 @@ export type PinnedHop = {
   body: Uint8Array | null;
   signal: AbortSignal;
   maxResponseBytes: number;
+  /** Keep the first `maxResponseBytes` and end the response instead of failing with `response-too-large`. */
+  truncateResponse?: boolean;
 };
 
 export type HopResponse = { status: number; statusText: string; headers: Headers; body: Uint8Array<ArrayBuffer> };
@@ -61,6 +63,11 @@ export type PublicRequestOptions = {
   /** Deadline for the whole exchange including all redirects. */
   timeoutMs?: number;
   maxResponseBytes?: number;
+  /**
+   * Callers that only judge status and headers (one-click unsubscribe): a
+   * longer body is cut at `maxResponseBytes` instead of failing the request.
+   */
+  truncateResponse?: boolean;
   signal?: AbortSignal;
   /** Test seam; defaults to `pinnedHttpTransport`. */
   transport?: HopTransport;
@@ -95,7 +102,16 @@ export async function publicRequest(rawUrl: string, options: PublicRequestOption
     if (!checked.ok) throw new PublicRequestError(checked.reason);
     let response: HopResponse;
     try {
-      response = await transport({ url: checked.url, addresses: checked.addresses, method, headers, body, signal, maxResponseBytes });
+      response = await transport({
+        url: checked.url,
+        addresses: checked.addresses,
+        method,
+        headers,
+        body,
+        signal,
+        maxResponseBytes,
+        truncateResponse: options.truncateResponse
+      });
     } catch (error) {
       if (error instanceof PublicRequestError) throw error;
       if (signal.aborted) throw abortFailure(signal, timeout);
@@ -182,16 +198,7 @@ export const pinnedHttpTransport: HopTransport = (hop) => new Promise<HopRespons
   }, (response) => {
     const chunks: Buffer[] = [];
     let size = 0;
-    response.on("data", (chunk: Buffer) => {
-      size += chunk.length;
-      if (size > hop.maxResponseBytes) {
-        fail(new PublicRequestError("response-too-large"));
-        request.destroy();
-        return;
-      }
-      chunks.push(chunk);
-    });
-    response.on("end", () => {
+    const finish = () => {
       if (settled) return;
       settled = true;
       resolve({
@@ -200,7 +207,24 @@ export const pinnedHttpTransport: HopTransport = (hop) => new Promise<HopRespons
         headers: toHeaders(response.headers),
         body: new Uint8Array(Buffer.concat(chunks))
       });
+    };
+    response.on("data", (chunk: Buffer) => {
+      if (settled) return;
+      if (size + chunk.length > hop.maxResponseBytes) {
+        if (hop.truncateResponse) {
+          chunks.push(chunk.subarray(0, hop.maxResponseBytes - size));
+          size = hop.maxResponseBytes;
+          finish();
+        } else {
+          fail(new PublicRequestError("response-too-large"));
+        }
+        request.destroy();
+        return;
+      }
+      size += chunk.length;
+      chunks.push(chunk);
     });
+    response.on("end", finish);
     response.on("error", fail);
   });
   request.on("error", fail);

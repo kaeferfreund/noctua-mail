@@ -1,6 +1,8 @@
 import { describe, expect, mock, test } from "bun:test";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import type { LookupFn } from "@/lib/net/urlSafety";
-import type { HopResponse, PinnedHop } from "@/lib/net/publicHttp";
+import { pinnedHttpTransport, type HopResponse, type HopTransport, type PinnedHop } from "@/lib/net/publicHttp";
 import { parseListUnsubscribeUrls, performOneClickUnsubscribe } from "./route";
 
 const hopResponse = (status: number, headers: Record<string, string> = {}): HopResponse =>
@@ -221,5 +223,40 @@ describe("parseListUnsubscribeUrls — http/https separation", () => {
   test("returns empty buckets for a header with no angle-bracketed URLs", () => {
     const result = parseListUnsubscribeUrls("junk without brackets");
     expect(result).toEqual({ https: [], http: [], mailto: [] });
+  });
+});
+
+describe("performOneClickUnsubscribe — large confirmation pages", () => {
+  test("a 200 with a body over the 64 KiB cap counts as unsubscribed", async () => {
+    const server = http.createServer((req, res) => {
+      req.resume();
+      req.on("end", () => {
+        res.writeHead(200, { "content-type": "text/html" });
+        res.end("<p>Abgemeldet</p>" + "x".repeat(100 * 1024));
+      });
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as AddressInfo).port;
+    // Real pinned transport (size cap and truncation); the checked https hop is served locally over http.
+    const hops: PinnedHop[] = [];
+    const transport: HopTransport = (hop) => {
+      hops.push(hop);
+      return pinnedHttpTransport({
+        ...hop,
+        url: new URL(`http://127.0.0.1:${port}${hop.url.pathname}`),
+        addresses: [{ address: "127.0.0.1", family: 4 }]
+      });
+    };
+    try {
+      const res = await performOneClickUnsubscribe("https://public.example.test/unsub", {
+        transport,
+        lookup: async () => [{ address: "93.184.216.34", family: 4 }]
+      });
+      expect(res).toEqual({ ok: true, status: 200 });
+      expect(hops[0]?.maxResponseBytes).toBe(64 * 1024);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });
