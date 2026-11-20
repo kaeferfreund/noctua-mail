@@ -16,6 +16,7 @@ import type { CalendarEvent, CalendarEventSourceType } from "@/lib/data";
 import { toFiniteNumber, toPositiveNumberArray } from "@/app/api/_helpers/numberParsing";
 import { deleteCalendarEventAndRelatedData } from "@/lib/calendarEventDeletion";
 import { buildCalendarEventEmailSnapshotFromMessageId } from "@/lib/calendarEventEmailSnapshot.server";
+import { toCalendarEventResponse } from "@/lib/calendarEventEmailSnapshot";
 
 function generateId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -45,7 +46,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     try {
       if (eventUid) {
         const event = await getCalendarEventByUid(accountId, eventUid);
-        return NextResponse.json({ ok: true, event });
+        return NextResponse.json({ ok: true, event: event && toCalendarEventResponse(event) });
       }
       const events = await listCalendarEvents(accountId, startMs, endMs);
       return NextResponse.json({ ok: true, items: events });

@@ -20,6 +20,7 @@ import { getAccountDb } from "../connection";
 import { normalizeCalendarEventUid, normalizeCalendarEventUidKey } from "../../calendarEventUids";
 import { normalizeCalendarParticipationStatus } from "../../calendarParticipation";
 import { safeParseJson } from "../messages/_shared";
+import { compactOccurrenceSnapshots, expandOccurrenceSnapshots } from "../../calendarEventEmailSnapshot";
 
 function rowToCalendarEvent(row: any): CalendarEvent {
   return {
@@ -60,8 +61,8 @@ function rowToCalendarEvent(row: any): CalendarEvent {
     sourceDateMs: typeof row.sourceDateMs === "number" ? row.sourceDateMs : undefined,
     sourceBodyText: row.sourceBodyText ?? undefined,
     sourceBodyHtml: row.sourceBodyHtml ?? undefined,
-    occurrenceSnapshots: safeParseJson<Record<string, CalendarEventEmailSnapshotFields>>(
-      row.occurrenceSnapshots
+    occurrenceSnapshots: expandOccurrenceSnapshots(
+      safeParseJson<Record<string, unknown>>(row.occurrenceSnapshots)
     ),
     occurrenceRecurrenceIds: safeParseJson<Record<string, number>>(row.occurrenceRecurrenceIds),
     eventUidKey: row.eventUidKey ?? undefined,
@@ -482,8 +483,9 @@ function upsertCalendarEventRow(db: Database, accountId: string, event: Calendar
     typeof event.sourceDateMs === "number" ? event.sourceDateMs : null,
     event.sourceBodyText ?? null,
     event.sourceBodyHtml ?? null,
+    // One stored copy per distinct email snapshot (see compactOccurrenceSnapshots).
     event.occurrenceSnapshots && Object.keys(event.occurrenceSnapshots).length > 0
-      ? JSON.stringify(event.occurrenceSnapshots)
+      ? JSON.stringify(compactOccurrenceSnapshots(event.occurrenceSnapshots))
       : null,
     event.occurrenceRecurrenceIds && Object.keys(event.occurrenceRecurrenceIds).length > 0
       ? JSON.stringify(event.occurrenceRecurrenceIds)

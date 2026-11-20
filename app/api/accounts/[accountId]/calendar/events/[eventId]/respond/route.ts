@@ -31,6 +31,7 @@ import { randomUUID } from "crypto";
 import { normalizeCalendarParticipationStatus } from "@/lib/calendarParticipation";
 import { buildReplyThreadHeaders } from "@/lib/replyThreadHeaders";
 import { toFiniteNumber } from "@/app/api/_helpers/numberParsing";
+import { toCalendarEventResponse } from "@/lib/calendarEventEmailSnapshot";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; eventId?: string }>;
@@ -218,7 +219,7 @@ export async function POST(request: Request, { params }: Params) {
         inviteProcessing = { processedAtMs, processedAutomatically: false };
       }
 
-      return NextResponse.json({ ok: true, event: updatedEvent, participation, inviteProcessing, ...(identityId ? { identityId } : {}), ...sentResult });
+      return NextResponse.json({ ok: true, event: toCalendarEventResponse(updatedEvent), participation, inviteProcessing, ...(identityId ? { identityId } : {}), ...sentResult });
     } catch (error) {
       if (sentResult) return NextResponse.json({ ok: true, identityId, ...sentResult,
         postSendWarning: "RSVP email sent, but saving local calendar participation failed. Do not send it again." });
