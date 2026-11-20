@@ -225,6 +225,15 @@ function sanitizeNormalized(normalized: string, blockRemote: RemoteRewriteGate, 
           delete attribs.content;
         }
         if (attribs.style) attribs.style = css(attribs.style, true);
+        // Inside the app document sender classes would pick up app styles
+        // (look like app controls) and ids/names would clobber document
+        // globals or collide with app anchors (SD20). Neither is needed
+        // without the sender's own stylesheet.
+        if (!profile.styleElements) {
+          delete attribs.class;
+          delete attribs.id;
+          delete attribs.name;
+        }
         if (tagName === "img") attribs.referrerpolicy = "no-referrer";
         if (tagName === "a" && profile.safeLinks) applySafeLinkAttributes(attribs, !profile.styleElements);
         // The only mode-dependent code, and it runs only through the gate.
@@ -267,7 +276,8 @@ export function sanitizeHtmlForDisplay(input: string, mode: RemoteContentMode = 
  * Sender HTML that is inserted into the app document itself (calendar event
  * descriptions and source-mail snapshots) instead of the sandboxed message
  * frame: no `<style>` elements (a sender stylesheet would apply to the whole
- * app), safe link attributes, remote images blocked. Inline styles stay for
+ * app), no class/id/name attributes, safe link attributes, remote images
+ * blocked. Inline styles stay for
  * formatting; the container must confine them (`contain: paint`, see
  * app/components/calendar/SenderHtml.module.css) so positioned content cannot cover
  * app controls.
