@@ -129,6 +129,7 @@ function reminderToFcEvent(r: CalendarReminder): EventInput {
   };
 }
 
+const NO_EVENTS: EventInput[] = [];
 const CALENDAR_VIEW_KEY = "noctua:calendarView";
 // sessionStorage so reopening the app starts at today, while navigating
 // away (event detail unmounts FullCalendar) and back restores the spot.
@@ -227,7 +228,10 @@ export default function CalendarView({
   }), [t, tGrid]);
   const internalRef = useRef<CalendarRef>(null);
   const calendarRef = (externalRef ?? internalRef) as React.RefObject<CalendarRef>;
-  const [fullCalendarEvents, setFullCalendarEvents] = useState<EventInput[]>([]);
+  // Entries are shown only for the mailbox they were loaded for: after a
+  // mailbox switch the previous mailbox's entries disappear at once.
+  const [loadedEvents, setLoadedEvents] = useState<{ accountId: string; events: EventInput[] }>({ accountId, events: [] });
+  const fullCalendarEvents = loadedEvents.accountId === accountId ? loadedEvents.events : NO_EVENTS;
   const fetchRangeRef = useRef<{ startMs: number; endMs: number } | null>(null);
   const fetchRequestIdRef = useRef(0);
   const previousAccountIdRef = useRef<string | null>(null);
@@ -280,7 +284,7 @@ export default function CalendarView({
         if (fetchRequestIdRef.current !== requestId) {
           return;
         }
-        setFullCalendarEvents(events);
+        setLoadedEvents({ accountId, events });
       } catch (err) {
         console.error("[CalendarView] fetch error:", err);
       }
@@ -334,7 +338,8 @@ export default function CalendarView({
     [dateFormat]
   );
 
-  // Refetch when accountId changes
+  // Refetch the visible range when accountId changes; a request still running
+  // for the previous mailbox is discarded.
   useEffect(() => {
     if (previousAccountIdRef.current === null) {
       previousAccountIdRef.current = accountId;
@@ -342,9 +347,10 @@ export default function CalendarView({
     }
     if (previousAccountIdRef.current === accountId) return;
     previousAccountIdRef.current = accountId;
-    fetchRangeRef.current = null;
     fetchRequestIdRef.current += 1;
-  }, [accountId]);
+    const range = fetchRangeRef.current;
+    if (range) void fetchEvents(range.startMs, range.endMs);
+  }, [accountId, fetchEvents]);
 
   // Month view has no time axis, so CSS positions the "now" line from this
   // fraction. Written straight to the DOM: re-rendering FullCalendar every
