@@ -38,6 +38,11 @@ const nextConfig: NextConfig = {
     { source: "/reset-password", headers: [
       {key:"Cache-Control",value:"no-store"},{key:"Referrer-Policy",value:"no-referrer"}
     ] },
+    // The reset link carries its token in the URL: the handover redirect and the
+    // reset POST keep `no-referrer` (the global rule above would replace the
+    // route's own header with `same-origin`).
+    { source: "/api/ba/reset-password/:path*", headers: [{key:"Referrer-Policy",value:"no-referrer"}] },
+    { source: "/api/ba/reset-password", headers: [{key:"Referrer-Policy",value:"no-referrer"}] },
     // Font and icon file names are stable but not content-hashed, so they
     // get a bounded, revalidating cache instead of `immutable`. No rule for
     // /runtime-config.js: it is regenerated per deployment and must stay

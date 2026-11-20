@@ -42,6 +42,8 @@ describe("next.config headers", () => {
       "/:path*",
       "/api/:path*",
       "/fonts/:path*",
+      "/api/ba/reset-password",
+      "/api/ba/reset-password/:path*",
       "/icons/:file(icon-\\d+\\.png|base\\.svg)",
       "/reset-password"
     ]);
@@ -80,6 +82,10 @@ describe("next.config security headers", () => {
   test("sends no referrer to other sites and none at all from the reset page", async () => {
     expect((await responseHeaders("/")).get("referrer-policy")).toBe("same-origin");
     expect((await responseHeaders("/reset-password")).get("referrer-policy")).toBe("no-referrer");
+    // The handover redirect and the reset POST carry the token in the URL.
+    for (const path of ["/api/ba/reset-password/synthetic-token", "/api/ba/reset-password"]) {
+      expect({ path, policy: (await responseHeaders(path)).get("referrer-policy") }).toEqual({ path, policy: "no-referrer" });
+    }
   });
 });
 
