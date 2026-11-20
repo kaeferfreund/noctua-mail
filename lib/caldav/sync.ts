@@ -22,7 +22,8 @@ import {
   fetchRemoteEvents,
   pushEventToRemote,
   updateRemoteEvent,
-  deleteRemoteEvent
+  deleteRemoteEvent,
+  isHrefInCalendarCollection
 } from "./client";
 import type { CalendarEvent } from "@/lib/data";
 
@@ -94,8 +95,16 @@ export async function syncCalendarEvents(
         const remoteByHref = new Map<string, { etag: string; icsData: string }>();
         const remoteByUid = new Map<string, { href: string; etag: string; icsData: string }>();
 
+        let skippedOutside = 0;
         for (const obj of remoteObjects) {
           const href = obj.url ?? "";
+          // The server names each object's href. Only objects inside the configured collection are imported, so a
+          // later PUT/DELETE (with credentials) never targets another calendar or origin.
+          if (!isHrefInCalendarCollection(href, calendarId)) {
+            result.errors.push(`Skip remote object outside calendar ${calendarId}: ${href}`);
+            skippedOutside++;
+            continue;
+          }
           const etag = (obj.etag as string | undefined) ?? "";
           const icsData = (obj.data as string | undefined) ?? "";
           remoteByHref.set(href, { etag, icsData });
@@ -164,8 +173,12 @@ export async function syncCalendarEvents(
           }
         }
 
-        // Handle remote deletions: local events not in remote anymore
-        for (const [uid, local] of localByUid) {
+        // Handle remote deletions: local events not in remote anymore. A skipped object may be one of
+        // ours under an href we refuse to use, so a listing with skipped objects deletes nothing locally.
+        if (skippedOutside > 0) {
+          result.errors.push(`Skip local deletions for calendar ${calendarId}: ${skippedOutside} remote object(s) outside the collection`);
+        }
+        for (const [uid, local] of skippedOutside > 0 ? [] : localByUid) {
           if (local.calendarId !== calendarId) continue;
           if (!remoteByUid.has(uid) && local.remoteHref) {
             await softDeleteCalendarEvent(accountId, local.id);
@@ -203,6 +216,10 @@ export async function syncCalendarEvents(
         for (const ev of localEvents) {
           if (ev.calendarId !== calendarId) continue;
           if (!ev.pendingRemoteSync || !ev.remoteHref || ev.deletedAtMs) continue;
+          if (!isHrefInCalendarCollection(ev.remoteHref, calendarId)) {
+            result.errors.push(`Skip push for UID ${ev.eventUid}: ${ev.remoteHref} is outside calendar ${calendarId}`);
+            continue;
+          }
           // Resolve the remote object by its actual identity (href) so the
           // If-Match check matches what we'd PUT. Fall back to the UID listing
           // to catch a moved object (same UID under a different href).
@@ -277,6 +294,10 @@ export async function syncCalendarEvents(
         const deletedEvents = await listSoftDeletedCaldavEventsToPush(accountId);
         for (const ev of deletedEvents) {
           if (ev.calendarId !== calendarId || !ev.remoteHref) continue;
+          if (!isHrefInCalendarCollection(ev.remoteHref, calendarId)) {
+            result.errors.push(`Skip delete for UID ${ev.eventUid}: ${ev.remoteHref} is outside calendar ${calendarId}`);
+            continue;
+          }
           const remote = remoteByHref.get(ev.remoteHref);
           // Delete with an If-Match against the server's *current* etag so a
           // revision that changed since our listing isn't removed blindly. No

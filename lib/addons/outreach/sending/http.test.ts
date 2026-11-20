@@ -104,7 +104,7 @@ test("REST rejects an unknown sender identity on a live or paused sequence", asy
     await (await dbModulePromise).upsertAccount(identityTestAccount(accountId));
     const editor = await createAuthenticatedTestSession();
     await editor.addMembership(editor.user.id, accountId, "editor");
-    await saveOutreachSettings(accountId, { enabled: true }, editor.user.id);
+    await saveOutreachSettings(accountId, { enabled: true, transport: "mailbox-smtp" }, editor.user.id);
     const db = await getOutreachDb();
     db.query(`INSERT INTO sequences (accountId, id, name, status, createdAt, updatedAt)
       VALUES (?, 'sequence', 'Sequence', 'live', 0, 0)`).run(accountId);

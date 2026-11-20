@@ -6,8 +6,8 @@ import { sequenceInput, validated } from "@/lib/addons/outreach/sending/input";
 export const GET = sendingRoute("read", ({ db, accountId, params }) => ({
   ok: true, sequence: getSequence(db, accountId, routeId(params, "sequenceId"))
 }));
-export const PATCH = sendingRoute("json", async ({ db, accountId, params, body }) => ({
-  ok: true, sequence: await editSequence(db, accountId, routeId(params, "sequenceId"), validated(sequenceInput, body))
+export const PATCH = sendingRoute("json", async ({ db, params, body, ...actor }) => ({
+  ok: true, sequence: await editSequence(db, actor, routeId(params, "sequenceId"), validated(sequenceInput, body))
 }));
 export const DELETE = sendingRoute("delete", ({ db, accountId, params }) => ({
   ok: true, sequence: deleteSequence(db, accountId, routeId(params, "sequenceId"))

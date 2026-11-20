@@ -3,7 +3,9 @@ import type { McpScope } from "@/lib/mcpPermissions";
 /**
  * Explicit allowlist of the addon's MCP tools (pure constants; safe for client bundles).
  * A token without `send` can prepare everything; starting a campaign or switching a sequence
- * live needs `send`. Consent changes need `manage`.
+ * live needs `send`, and so does editing a sequence that is not a draft (`save_sequence` checks
+ * that per call through authorizeOutbound, since editing a live sequence changes what it sends).
+ * Consent changes need `manage`.
  */
 export const OUTREACH_MCP_TOOL_SCOPES: Readonly<Record<string, McpScope>> = {
   // tracking

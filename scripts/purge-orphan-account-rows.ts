@@ -16,6 +16,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { getDataDir, getMainDbPath } from "../lib/runtimePaths";
 import { ACCOUNT_KEYED_MASTER_TABLES, deleteAccountKeyedMasterRows } from "../lib/db/accountDeletion";
+import { spamScopeAccountId } from "../lib/db/spamSettingsScope";
 import { configureAccountDb, configureDb, purgeAccountRowsFromRetainedShard, removeDbFiles } from "../lib/db/connection";
 import { resolveAccountDbPathForPersist } from "../lib/db/rowParsers";
 import { ACCOUNT_SHARD_RUNTIME_TABLES, ACCOUNT_SHARD_TABLES, SHARD_FTS_TABLE } from "../lib/db/shardFormat";
@@ -97,6 +98,15 @@ function scanMaster(mainPath: string) {
       const items = db.query(`SELECT j.accountId, COUNT(*) AS n FROM spam_rescan_items i
         JOIN spam_rescan_jobs j ON j.id = i.jobId GROUP BY j.accountId`).all() as Array<{ accountId: string; n: number }>;
       for (const row of items) if (!live.has(row.accountId)) addCount(master, row.accountId, "spam_rescan_items", row.n);
+    }
+    if (present.has("spam_settings")) {
+      // Keyed by scope (`account:<id>`, legacy bare id, or "global"), not by accountId.
+      const scopes = db.query("SELECT scope FROM spam_settings").all() as Array<{ scope: string }>;
+      for (const { scope } of scopes) {
+        const accountId = spamScopeAccountId(scope);
+        if (accountId === null || live.has(accountId)) continue;
+        addCount(master, accountId, "spam_settings", (master[accountId]?.spam_settings ?? 0) + 1);
+      }
     }
     return { accounts, live, master };
   } finally {
