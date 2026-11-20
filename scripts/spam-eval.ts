@@ -26,7 +26,7 @@
  * 180-day decay) with the household history of the mails that arrived before
  * it, as the server would have seen it then.
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { simpleParser } from "mailparser";
 import { sentToAddressInDb } from "../lib/db/sentRecipients";
@@ -35,6 +35,7 @@ import type { SpamTrustContext } from "../lib/mail/spam/anomaly";
 import { classifySpam, shouldMarkAsSpam } from "../lib/mail/spam/classifySpam";
 import { isValidThreshold, resolveSpamConfig, SPAM_MODEL_PRICES } from "../lib/mail/spam/config";
 import { openSpamDataDir, seededShuffle, selectEvalItems } from "../lib/mail/spam/evalData";
+import { writePrivateJson } from "../lib/mail/spam/privateReport";
 import { buildSpamInput, buildSpamInputFromMessage } from "../lib/mail/spam/input";
 import { loadHouseholdProfiles, type HouseholdProfiles } from "../lib/mail/spam/profileFile";
 import { getSpamLanguageModel, getSpamProviderOptions } from "../lib/mail/spam/provider";
@@ -234,6 +235,6 @@ if (outPath) {
     mailboxPath: outcome.mailboxPath,
     serverSpamFlag: outcome.serverFlag
   }));
-  writeFileSync(outPath, `${JSON.stringify({ generatedAt: new Date().toISOString(), threshold, items: records }, null, 2)}\n`);
+  writePrivateJson(outPath, { generatedAt: new Date().toISOString(), threshold, items: records });
   console.log(`Wrote ${records.length} items to ${outPath}`);
 }
