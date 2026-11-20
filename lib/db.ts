@@ -497,6 +497,7 @@ export {
   type StoredSpamRescanItem,
   type StoredSpamRescanJob
 } from "./db/spamRescan";
+export { GLOBAL_SPAM_SCOPE, legacyMailboxSpamScope, mailboxSpamScope } from "./db/spamSettingsScope";
 export {
   type DomainIconRow,
   deleteDomainIconRow,
