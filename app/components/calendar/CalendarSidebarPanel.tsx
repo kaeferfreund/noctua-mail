@@ -4,6 +4,7 @@ import { Flex, Heading } from "@radix-ui/themes";
 import { useTranslations } from "next-intl";
 import { X, ExternalLink } from "lucide-react";
 import { openDetachedWindow } from "@/lib/ui/openDetachedWindow";
+import { useSingleWindowApp } from "@/lib/ui/displayMode";
 import { formatCalendarPageTitle } from "@/lib/appBranding";
 import CalendarEventBrowser from "./CalendarEventBrowser";
 import CalendarDropOverlay from "./CalendarDropOverlay";
@@ -27,6 +28,7 @@ export default function CalendarSidebarPanel({
   onFindRelatedByInviteUid
 }: Props) {
   const t = useTranslations("Calendar.panel");
+  const singleWindow = useSingleWindowApp();
   const { dropProps, isDragOver, status, resetStatus } = useCalendarIcsDrop({ accountId });
 
   const handleOpenWindow = () => {
@@ -40,7 +42,7 @@ export default function CalendarSidebarPanel({
       <Flex align="center" justify="between" className={styles.header}>
         <Heading size="2">{t("title")}</Heading>
         <Flex gap="1" align="center">
-          <TooltipIconButton
+          {!singleWindow && <TooltipIconButton
             size="1"
             variant="ghost"
             color="gray"
@@ -49,7 +51,7 @@ export default function CalendarSidebarPanel({
             onClick={handleOpenWindow}
           >
             <ExternalLink size={13} />
-          </TooltipIconButton>
+          </TooltipIconButton>}
           <TooltipIconButton
             size="1"
             variant="ghost"

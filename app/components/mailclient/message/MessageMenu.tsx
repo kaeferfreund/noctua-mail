@@ -55,6 +55,7 @@ import { MessageMenuControlContext } from "./messageMenuControl";
 import { useDraftScheduleAction } from "../scheduledSend/ScheduledSend";
 import { useMessageReaderActions } from "./MessageReaderActions";
 import { useAiReplyPromptFromMenu } from "./AiReplyPrompt";
+import { useSingleWindowApp } from "@/lib/ui/displayMode";
 
 type ComposeMode = "new" | "reply" | "replyAll" | "forward" | "edit" | "editAsNew";
 export type MessageMenuAction =
@@ -202,6 +203,8 @@ export default function MessageMenu({
     message.category === "transactional"
       ? message.category
       : null;
+  // A home-screen app on a phone has no way back from a new window (lib/ui/displayMode.ts).
+  const singleWindow = useSingleWindowApp();
   const isVisible = (action: MessageMenuAction, defaultValue = true) =>
     actionVisibility?.[action] ?? defaultValue;
   const isDisabled = (action: MessageMenuAction, defaultValue = false) =>
@@ -598,7 +601,7 @@ export default function MessageMenu({
             isVisible("copyContent") && readerActions
               ? buildItem("copyContent", t("copyContent"), <Copy size={14} />, () => void readerActions.copyContent(message))
               : null,
-            isVisible("openWindow")
+            isVisible("openWindow", !singleWindow)
               ? buildItem(
                   "openWindow",
                   t("openWindow"),

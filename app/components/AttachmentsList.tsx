@@ -7,7 +7,9 @@ import { openDetachedWindow } from "@/lib/ui/openDetachedWindow";
 import { formatByteSize } from "@/lib/ui/byteSize";
 import { formatAttachmentPageTitle } from "@/lib/appBranding";
 import { isRenderableInlineAttachment, shouldHideAttachmentFromList } from "@/lib/messageFlags";
-import { blobPreviewMimeType, normalizeMimeType } from "@/lib/attachmentDocument";
+import { blobPreviewMimeType, isPdfMimeType, normalizeMimeType } from "@/lib/attachmentDocument";
+import { isSingleWindowApp } from "@/lib/ui/displayMode";
+import InAppPreview, { type InAppPreviewTarget } from "@/app/components/InAppPreview";
 
 const PREVIEW_MIME_PREFIXES = ["image/", "text/"];
 const PREVIEW_MIME_TYPES = new Set([
@@ -68,16 +70,34 @@ export function getAttachmentPreviewHref(
   return attachment.url ?? attachment.dataUrl ?? null;
 }
 
+/**
+ * A data: attachment (a draft's) has no server URL, so it opens as a blob:
+ * document. That document has the app's origin, so only passive types keep
+ * their type; others show as text.
+ */
+async function attachmentBlobPreview(url: string) {
+  const blob = await (await fetch(url)).blob();
+  const type = blobPreviewMimeType(blob.type);
+  return { src: URL.createObjectURL(new Blob([blob], { type })), type };
+}
+
+/** Frames like the route's preview shell: sandboxed, except PDFs, whose viewers do not run in a sandbox. */
+const attachmentFrameSandbox = (contentType?: string) => (isPdfMimeType(contentType) ? undefined : "");
+
+/** Preview inside a home-screen app (see InAppPreview): the attachment bytes in a frame. */
+async function inAppAttachmentPreview(url: string, file: Pick<Attachment, "contentType" | "filename">, fallbackTitle: string): Promise<InAppPreviewTarget> {
+  const title = file.filename || fallbackTitle;
+  if (!url.startsWith("data:")) return { src: url, title, sandbox: attachmentFrameSandbox(file.contentType) };
+  const { src, type } = await attachmentBlobPreview(url);
+  return { src, title, sandbox: attachmentFrameSandbox(type) };
+}
+
 function openAttachmentPreview(url: string, filename?: string) {
   const options = { width: 920, height: 760, title: formatAttachmentPageTitle(filename) };
-  // A data: attachment has no server URL to wrap, so it keeps the blob route
-  // and the window stays named after the blob. The blob document has the app's
-  // origin, so only passive types keep their type; others show as text.
+  // A data: attachment has no server URL to wrap, so the window stays named after the blob.
   if (url.startsWith("data:")) {
-    fetch(url)
-      .then((response) => response.blob())
-      .then((blob) => openDetachedWindow(
-        URL.createObjectURL(new Blob([blob], { type: blobPreviewMimeType(blob.type) })), options))
+    attachmentBlobPreview(url)
+      .then(({ src }) => openDetachedWindow(src, options))
       .catch(() => {});
     return;
   }
@@ -264,6 +284,11 @@ export default function AttachmentsList({
   const t = useTranslations("Reader");
   const locale = useLocale();
   const [hoveredImagePreview, setHoveredImagePreview] = useState<HoveredImagePreview | null>(null);
+  const [inAppPreview, setInAppPreview] = useState<InAppPreviewTarget | null>(null);
+  useEffect(() => {
+    const src = inAppPreview?.src;
+    return () => { if (src?.startsWith("blob:")) URL.revokeObjectURL(src); };
+  }, [inAppPreview]);
   const visibleAttachments = getVisibleAttachments(attachments, htmlBody);
   const downloadableAttachments = visibleAttachments.filter(
     (attachment) => Boolean(getAttachmentDownloadHref(attachment))
@@ -326,7 +351,11 @@ export default function AttachmentsList({
           onClick={(event) => {
             if (previewHref) {
               event.preventDefault();
-              openAttachmentPreview(previewHref, file.filename);
+              if (isSingleWindowApp()) {
+                inAppAttachmentPreview(previewHref, file, t("attachmentPreview")).then(setInAppPreview).catch(() => {});
+              } else {
+                openAttachmentPreview(previewHref, file.filename);
+              }
               return;
             }
             if (!downloadHref) {
@@ -429,6 +458,7 @@ export default function AttachmentsList({
         </div>
       )}
       <AttachmentImagePreviewPortal preview={hoveredImagePreview} />
+      <InAppPreview target={inAppPreview} onClose={() => setInAppPreview(null)} />
     </>
   );
 }

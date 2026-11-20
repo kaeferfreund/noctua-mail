@@ -202,6 +202,8 @@ import {
   buildAccountTopicsPath
 } from "@/lib/accountApiPaths";
 import { openDetachedWindow } from "@/lib/ui/openDetachedWindow";
+import { isSingleWindowApp } from "@/lib/ui/displayMode";
+import InAppPreview, { type InAppPreviewTarget } from "@/app/components/InAppPreview";
 import { useWindowTitle } from "@/lib/ui/windowTitle";
 import { setAppBadge, unreadBadgeCount } from "@/lib/push/badge";
 import { useCurrentPushDeviceSettings } from "@/app/hooks/useCurrentPushDeviceSettings";
@@ -505,6 +507,7 @@ export default function MailClient({
   );
   const readerListScrollRef = useRef<number | null>(null);
   const [viewMessage, setViewMessage] = useState<Message | null>(null);
+  const [htmlPreview, setHtmlPreview] = useState<InAppPreviewTarget | null>(null);
   const viewMessageId = viewMessage?.id;
   const clearMobileMessage = useCallback(() => setViewMessage(null), []);
   const [query, setQuery] = useState("");
@@ -5366,10 +5369,14 @@ export default function MailClient({
 
   const handleOpenHtmlInNewWindow = (message: Message) => {
     if (typeof window === "undefined") return;
-    const opened = openDetachedWindow(
-      withRemoteContentDecision(buildAccountMessageHtmlPath(message.accountId, message.id), message.accountId, message.id),
-      { title: formatMessageHtmlPageTitle(message.subject) }
-    );
+    const htmlPath = withRemoteContentDecision(buildAccountMessageHtmlPath(message.accountId, message.id), message.accountId, message.id);
+    if (isSingleWindowApp()) {
+      // Same-origin for the mailbox's inline images (as the reader's frame); the
+      // route's CSP runs no script. Links open outside the preview.
+      setHtmlPreview({ src: htmlPath, title: message.subject?.trim() || "HTML", sandbox: "allow-same-origin allow-popups allow-popups-to-escape-sandbox" });
+      return;
+    }
+    const opened = openDetachedWindow(htmlPath, { title: formatMessageHtmlPageTitle(message.subject) });
     if (!opened) {
       pushNotice({
         type: "warning",
@@ -5594,6 +5601,7 @@ export default function MailClient({
     <CollabRowsContext.Provider value={{ members: collab.members, threadCollabById }}>
     <DomainIconVersionsContext.Provider value={domainIcons}>
       {identityDialogs}
+      <InAppPreview target={htmlPreview} onClose={() => setHtmlPreview(null)} />
       <AppShell
         onReaderNavigate={() => { readerListScrollRef.current = null; resetReaderLayout(); setViewMessage(null); }}
         mobileNavigation={{ messageId: viewMessageId ?? null, clearMessage: clearMobileMessage, urlManaged: true }}
