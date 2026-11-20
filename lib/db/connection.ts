@@ -123,7 +123,8 @@ export async function getAuthDb() {
 }
 
 function ensureDbParentDir(dbPath: string) {
-  mkdirSync(path.dirname(dbPath), { recursive: true });
+  // Mail databases are private to the service user.
+  mkdirSync(path.dirname(dbPath), { recursive: true, mode: 0o700 });
 }
 
 function clearAccountDbIdleTimer(dbPath: string) {
