@@ -13,11 +13,14 @@ export function emulateDisplayMode({ standalone = false, touch = false, iosStand
     addEventListener() {},
     removeEventListener() {}
   } as MediaQueryList));
-  const hadStandalone = Object.prototype.hasOwnProperty.call(navigator, "standalone");
-  if (iosStandalone !== undefined) Object.defineProperty(navigator, "standalone", { configurable: true, value: iosStandalone });
+  // Always pin navigator.standalone for the emulation: other DOM tests may leave
+  // it set on the shared navigator, which would leak into this one.
+  const previous = Object.getOwnPropertyDescriptor(navigator, "standalone");
+  Object.defineProperty(navigator, "standalone", { configurable: true, value: iosStandalone ?? false });
   return () => {
     media.mockRestore();
-    if (iosStandalone !== undefined && !hadStandalone) delete (navigator as Navigator & { standalone?: boolean }).standalone;
+    if (previous) Object.defineProperty(navigator, "standalone", previous);
+    else delete (navigator as Navigator & { standalone?: boolean }).standalone;
   };
 }
 
