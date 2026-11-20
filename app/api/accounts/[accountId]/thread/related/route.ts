@@ -13,6 +13,7 @@ import { listThreadMessages, listThreadMessageWindow, ThreadWindowCursorError } 
 import { normalizeThreadDateSource } from "@/lib/threadDate";
 import type { Message } from "@/lib/data";
 import { listDomainLinkedMessages, threadExcludedFolderIds } from "@/lib/domainConversations";
+import { THREAD_LOOKUP_BUDGETS, THREAD_LOOKUP_MAX_SELECTORS } from "@/lib/threadLookupBudget";
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
@@ -67,6 +68,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
         { ok: false, message: "Missing accountId or threadIds/messageIds" },
         { status: 400 }
       );
+    }
+    if (threadIds.length + messageIds.length > THREAD_LOOKUP_MAX_SELECTORS) {
+      return NextResponse.json({ ok: false, message: "Too many threadIds/messageIds" }, { status: 400 });
     }
     if (payload.excludeSpecialFolders === true) {
       excludeFolderIds.push(...(await threadExcludedFolderIds(context.accountId)));
@@ -139,10 +143,11 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       groupBy,
       threadDateSource,
       projection,
-      excludeFolderIds
+      excludeFolderIds,
+      budget: THREAD_LOOKUP_BUDGETS[projection]
     });
     await enrich(data.items);
 
-    return NextResponse.json({ items: data.items });
+    return NextResponse.json(data.truncated ? { items: data.items, truncated: true } : { items: data.items });
   });
 }

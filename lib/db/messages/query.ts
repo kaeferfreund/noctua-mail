@@ -21,6 +21,7 @@ import type { Attachment, Message } from "../../data";
 import { getAccountDb } from "../connection";
 import { getAccountOwnAddresses } from "../senderIdentities";
 import { isOwnAddress, ownAddressList, parseAddressEmails, type OwnAddressInput } from "../../ownAddresses";
+import type { ThreadLookupBudget } from "../../threadLookupBudget";
 import {
   CALENDAR_FILENAME_EXTENSIONS,
   CALENDAR_INVITE_FLAG,
@@ -3235,7 +3236,13 @@ export async function listThreadMessages(params: {
   /** `headers` omits body/htmlBody; bodies are read per message on demand. */
   projection?: ThreadMessageProjection;
   excludeFolderIds?: string[];
-}) {
+  /**
+   * Stop reading once this many rows (or body characters) are loaded and
+   * report `truncated`. Request-driven callers pass one; internal callers that
+   * need every message of one thread do not.
+   */
+  budget?: ThreadLookupBudget;
+}): Promise<{ items: Message[]; truncated?: true }> {
   const {
     accountId,
     threadIds,
@@ -3243,7 +3250,8 @@ export async function listThreadMessages(params: {
     groupBy = "date",
     threadDateSource = DEFAULT_THREAD_DATE_SOURCE,
     projection = "full",
-    excludeFolderIds = []
+    excludeFolderIds = [],
+    budget
   } = params;
   const uniqueThreads = Array.from(
     new Set(threadIds.map((value) => value.trim()).filter(Boolean))
@@ -3265,25 +3273,38 @@ export async function listThreadMessages(params: {
   const folderWhere = applyExcludedFolderFilters("", folderArgs, excludeFolderIds.slice(0, QUERY_BATCH_SIZE));
 
   const rowsById = new Map<string, any>();
+  let bodyChars = 0;
+  let truncated = false;
   const loadRowsBy = (column: "threadId" | "id", values: string[]) => {
-    for (let start = 0; start < values.length; start += QUERY_BATCH_SIZE) {
+    for (let start = 0; start < values.length && !truncated; start += QUERY_BATCH_SIZE) {
       const chunk = values.slice(start, start + QUERY_BATCH_SIZE);
-      const batchRows = db
-        .prepare(
-          `
+      const statement = db.prepare(
+        `
           SELECT ${threadMessageSelectColumns(projection)}
           FROM messages m
           WHERE m.accountId = ?
             AND m.${column} IN (${chunk.map(() => "?").join(",")})
             AND COALESCE(m.deleted, 0) = 0${folderWhere}
           `
-        )
-        .all(accountId, ...chunk, ...folderArgs) as any[];
-      batchRows.forEach((row) => {
+      );
+      // Iterate so a budget stops reading before oversized rows are materialized.
+      for (const row of statement.iterate(accountId, ...chunk, ...folderArgs) as Iterable<any>) {
+        const id = String(row.id);
         // Dedup across the two queries (and any duplicates inside a
         // chunk) keyed by message id — replaces the prior SELECT DISTINCT.
-        rowsById.set(String(row.id), row);
-      });
+        if (rowsById.has(id)) { rowsById.set(id, row); continue; }
+        if (budget) {
+          const rowChars = (typeof row.body === "string" ? row.body.length : 0) +
+            (typeof row.htmlBody === "string" ? row.htmlBody.length : 0);
+          if (rowsById.size >= budget.maxRows ||
+              (budget.maxBodyChars !== undefined && rowsById.size > 0 && bodyChars + rowChars > budget.maxBodyChars)) {
+            truncated = true;
+            break;
+          }
+          bodyChars += rowChars;
+        }
+        rowsById.set(id, row);
+      }
     }
   };
   if (uniqueThreads.length > 0) loadRowsBy("threadId", uniqueThreads);
@@ -3293,7 +3314,7 @@ export async function listThreadMessages(params: {
     threadDateSource,
     projection
   });
-  return { items };
+  return truncated ? { items, truncated: true } : { items };
 }
 
 /**

@@ -78,6 +78,7 @@ import {
 import { listRecipientAliases } from "@/lib/recipientAliases";
 import { readAuthEnv } from "@/lib/betterAuth";
 import { appDeepLink, messageDeepLink, parseDeepLink, type DeepLinkState } from "@/lib/navigation/deepLinks";
+import { MCP_THREAD_LOOKUP_MAX_SELECTORS, THREAD_LOOKUP_BUDGETS } from "@/lib/threadLookupBudget";
 import {
   AI_MODIFIED_FLAG,
   DONE_FLAG,
@@ -166,11 +167,11 @@ const SEARCH_MESSAGES_SCHEMA = {
   relatedId: z.string().trim().optional().describe(
     `${RELATED_SEARCH_ONLY_DESCRIPTION} Finds messages related to the given message id or Message-ID.`
   ),
-  threadIds: z.array(z.string().trim().min(1)).optional().describe(
-    `${THREAD_RELATED_ONLY_DESCRIPTION} Returns messages from the specified thread ids.`
+  threadIds: z.array(z.string().trim().min(1)).max(MCP_THREAD_LOOKUP_MAX_SELECTORS).optional().describe(
+    `${THREAD_RELATED_ONLY_DESCRIPTION} Returns messages from the specified thread ids (at most ${MCP_THREAD_LOOKUP_MAX_SELECTORS}).`
   ),
-  messageIds: z.array(z.string().trim().min(1)).optional().describe(
-    `${THREAD_RELATED_ONLY_DESCRIPTION} Returns messages for the threads that contain these message ids.`
+  messageIds: z.array(z.string().trim().min(1)).max(MCP_THREAD_LOOKUP_MAX_SELECTORS).optional().describe(
+    `${THREAD_RELATED_ONLY_DESCRIPTION} Returns messages for the threads that contain these message ids (at most ${MCP_THREAD_LOOKUP_MAX_SELECTORS}).`
   ),
   topics: z.array(z.string().trim().min(1)).optional().describe(
     `Topic filters for standard mode. Accepts topic ids or topic names. ${STANDARD_SEARCH_ONLY_DESCRIPTION}`
@@ -962,7 +963,9 @@ async function searchMessages(
       accountId: context.accountId,
       threadIds,
       messageIds,
-      groupBy: args.groupBy ?? "date"
+      groupBy: args.groupBy ?? "date",
+      // Large results stop early and report `truncated`.
+      budget: THREAD_LOOKUP_BUDGETS.full
     });
     await enrichMessagesWithThreadCollab(data.items, { accountId: context.accountId });
     await enrichMessagesWithThreadTopics(data.items, {

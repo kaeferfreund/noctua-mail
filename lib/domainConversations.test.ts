@@ -1,8 +1,9 @@
-import { beforeAll, describe, expect, test } from "bun:test";
+import { beforeAll, describe, expect, spyOn, test } from "bun:test";
 import type { Account, Folder, Message } from "./data";
 import { dbModulePromise } from "./testDbHarness";
 import { createAuthenticatedTestSession } from "./testAuthHarness";
 import {
+  DOMAIN_THREAD_WINDOW_MAX,
   listDomainLinkedMessages,
   listDomainThreads,
   listReadableDomainAccounts
@@ -13,6 +14,7 @@ import {
   readLinkedConversationSource
 } from "./db/messages/linkedConversation";
 import { getAccountDb } from "./db/connection";
+import * as messageQuery from "./db/messages/query";
 import { GET as getDomainThreads } from "@/app/api/domains/[domain]/threads/route";
 import { POST as postThreadRelated } from "@/app/api/accounts/[accountId]/thread/related/route";
 
@@ -260,6 +262,21 @@ describe("domain view thread list", () => {
     const second = await listDomainThreads({ accounts, role: "inbox", page: 2, pageSize: 1, viewerUserId: base.principal.user.id });
     expect(first.hasMore).toBe(true);
     expect([...first.items, ...second.items].map((item) => item.id)).toEqual(all.items.slice(0, 2).map((item) => item.id));
+  });
+
+  test("deep pages read at most the bounded window from each mailbox", async () => {
+    const accounts = await listReadableDomainAccounts(base.principal.user.id, base.domain);
+    const listThreads = spyOn(messageQuery, "listThreads");
+    try {
+      const deep = await listDomainThreads({ accounts, role: "inbox", page: 1000, pageSize: 600, viewerUserId: base.principal.user.id });
+      expect(listThreads.mock.calls.length).toBeGreaterThan(0);
+      expect(listThreads.mock.calls.every(([call]) => call.pageSize <= DOMAIN_THREAD_WINDOW_MAX)).toBe(true);
+      expect(deep.items).toEqual([]);
+      expect(deep.hasMore).toBe(false);
+      // The last page inside the window never announces more.
+      const last = await listDomainThreads({ accounts, role: "inbox", page: DOMAIN_THREAD_WINDOW_MAX, pageSize: 1, viewerUserId: base.principal.user.id });
+      expect(last.hasMore).toBe(false);
+    } finally { listThreads.mockRestore(); }
   });
 
   test("route: only readable mailboxes; a domain without access answers 404", async () => {
