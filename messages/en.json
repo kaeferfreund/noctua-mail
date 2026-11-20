@@ -1768,6 +1768,8 @@
     "alwaysLoadSenderShort": "Always load",
     "unknownSender": "Sender unknown",
     "unverifiedSender": "Sender not verified",
+    "unverifiedSenderBadge": "Unverified",
+    "unverifiedSenderTitle": "The sender is not verified: the receiving mail server could confirm neither SPF nor DKIM for the sender's domain. The address could be forged.",
     "checkingSender": "Checking sender…",
     "remoteImage": "Remote image: {label}",
     "blockedImage": "Image not loaded: {label}",

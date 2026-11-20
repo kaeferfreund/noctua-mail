@@ -3,7 +3,8 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { UserAccountPrefs } from "@/lib/data";
-import { isRemoteContentSenderVerified, remoteContentSenderDecision } from "./remoteContentSender.server";
+import type { Folder } from "@/lib/data";
+import { isRemoteContentSenderVerified, messageSenderVerified, remoteContentSenderDecision, senderVerifiedByHeaders } from "./remoteContentSender.server";
 
 const ACCOUNT = "acct-1";
 const SENDER = "news@example.test";
@@ -59,13 +60,56 @@ describe("remote-content sender verification", () => {
     expect(await isRemoteContentSenderVerified(ACCOUNT, message("sender-inserted"), sourcesDir)).toBe(false);
   });
 
-  it("without any authentication signal the stored (mailbox, user, exact address) permission applies", async () => {
-    expect(await remoteContentSenderDecision(prefs, ACCOUNT, message("no-results"), sourcesDir)).toEqual({ senderVerified: true, allowed: true });
-    expect(await isRemoteContentSenderVerified(ACCOUNT, message("no-source", { hasSource: false }), sourcesDir)).toBe(true);
+  // Changed 2026-11-20 (user decision): no recognised Authentication-Results is
+  // no longer "no signal = verified"; "always load" needs SPF or DKIM pass.
+  it("without any authentication signal or stored source the sender is not verified", async () => {
+    expect(await remoteContentSenderDecision(prefs, ACCOUNT, message("no-results"), sourcesDir)).toEqual({ senderVerified: false, allowed: false });
+    expect(await isRemoteContentSenderVerified(ACCOUNT, message("no-source", { hasSource: false }), sourcesDir)).toBe(false);
+    expect(await isRemoteContentSenderVerified(ACCOUNT, message("missing-file"), sourcesDir)).toBe(false);
   });
 
   it("never applies without a sender key or a matching permission", async () => {
     expect(await remoteContentSenderDecision(prefs, ACCOUNT, message("dkim-pass", { senderKey: null }), sourcesDir)).toEqual({ senderVerified: false, allowed: false });
     expect(await remoteContentSenderDecision({}, ACCOUNT, message("dkim-pass"), sourcesDir)).toEqual({ senderVerified: true, allowed: false });
+  });
+});
+
+describe("strict sender check (senderVerifiedByHeaders)", () => {
+  const headers = (authenticationResults?: string) =>
+    [received, ...(authenticationResults ? [`Authentication-Results: ${authenticationResults}`] : []), `From: <${SENDER}>`].join("\r\n");
+
+  it("passes on SPF or DKIM pass for the From domain", () => {
+    expect(senderVerifiedByHeaders(headers("mx.example.test; dkim=pass header.d=example.test"), SENDER)).toBe(true);
+    expect(senderVerifiedByHeaders(headers("mx.example.test; spf=pass smtp.mailfrom=bounce.example.test"), SENDER)).toBe(true);
+  });
+
+  it("fails on fail results, on results for another domain and without results", () => {
+    expect(senderVerifiedByHeaders(headers("mx.example.test; dkim=fail header.d=example.test; spf=softfail smtp.mailfrom=example.test"), SENDER)).toBe(false);
+    expect(senderVerifiedByHeaders(headers("mx.example.test; dkim=pass header.d=attacker.test; spf=pass smtp.mailfrom=attacker.test"), SENDER)).toBe(false);
+    expect(senderVerifiedByHeaders(headers(), SENDER)).toBe(false);
+  });
+});
+
+describe("reader sender badge signal (messageSenderVerified)", () => {
+  const folders = [
+    { id: "inbox", accountId: ACCOUNT, name: "INBOX", count: 0, unreadCount: 0, specialUse: "\\Inbox" },
+    { id: "sent", accountId: ACCOUNT, name: "Sent", count: 0, unreadCount: 0, specialUse: "\\Sent" },
+    { id: "drafts", accountId: ACCOUNT, name: "Drafts", count: 0, unreadCount: 0, specialUse: "\\Drafts" }
+  ] as Folder[];
+  const mailbox = { ownAddresses: ["owner@example.test"], folders };
+  const opened = (id: string, overrides: { folderId?: string; senderKey?: string; hasSource?: boolean } = {}) =>
+    ({ ...message(id, overrides), from: overrides.senderKey ?? SENDER, folderId: overrides.folderId ?? "inbox" });
+
+  it("is true or false from the strict check for received mail", async () => {
+    expect(await messageSenderVerified(ACCOUNT, opened("dkim-pass"), mailbox, sourcesDir)).toBe(true);
+    expect(await messageSenderVerified(ACCOUNT, opened("no-results"), mailbox, sourcesDir)).toBe(false);
+    expect(await messageSenderVerified(ACCOUNT, opened("forged"), mailbox, sourcesDir)).toBe(false);
+  });
+
+  it("is null for own mail, Sent, Drafts and messages without a stored source", async () => {
+    expect(await messageSenderVerified(ACCOUNT, opened("no-results", { senderKey: "owner@example.test" }), mailbox, sourcesDir)).toBeNull();
+    expect(await messageSenderVerified(ACCOUNT, opened("no-results", { folderId: "sent" }), mailbox, sourcesDir)).toBeNull();
+    expect(await messageSenderVerified(ACCOUNT, opened("no-results", { folderId: "drafts" }), mailbox, sourcesDir)).toBeNull();
+    expect(await messageSenderVerified(ACCOUNT, opened("no-source", { hasSource: false }), mailbox, sourcesDir)).toBeNull();
   });
 });

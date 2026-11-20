@@ -5,6 +5,15 @@ import { GET } from "@/app/api/accounts/[accountId]/messages/[messageId]/html/ro
 import { GET as getPrefs, PUT } from "@/app/api/accounts/[accountId]/prefs/route";
 import { legacyUnkeyedSenders, senderPermissionLookupCases } from "./testFixtures/senderPermissions";
 
+// "Always load from this sender" applies only when the receiving server's
+// Authentication-Results show SPF or DKIM pass for the From domain (strict
+// sender check since 2026-11-20); a stored source carries them.
+const authenticatedSource = (senderKey: string) => [
+  "Received: from relay.example.net by mx.example.test with ESMTPS; Mon, 2 Nov 2026 10:00:00 +0000",
+  `Authentication-Results: mx.example.test; dkim=pass header.d=${senderKey.slice(senderKey.lastIndexOf("@") + 1)}`,
+  "Subject: Synthetic", "", "Body", ""
+].join("\r\n");
+
 test("HTML route never recovers a sender permission from ambiguous unkeyed legacy strings", async () => {
   const f = await createCollabFixture();
   const user = await createAuthenticatedTestSession(f.accountId);
@@ -30,7 +39,7 @@ test("HTML route blocks remote resources and navigation and applies document pol
   const f = await createCollabFixture();
   const user = await createAuthenticatedTestSession(f.accountId);
   const html = '<html><head><meta http-equiv="refresh" content="0;url=https://images.example.test/next"><style>@import url("https://images.example.test/style");</style></head><body><img src="https://images.example.test/pixel?message=synthetic" onerror="alert(1)"><script>alert(1)</script><form action="https://images.example.test/"></form><img src="cid:logo"></body></html>';
-  const [message] = await f.seed(f.message("<privacy@example.test>", { from: "Synthetic <SENDER@EXAMPLE.TEST>", senderKey: "sender@example.test", htmlBody: html }));
+  const [message] = await f.seed(f.message("<privacy@example.test>", { from: "Synthetic <SENDER@EXAMPLE.TEST>", senderKey: "sender@example.test", htmlBody: html, source: authenticatedSource("sender@example.test") }));
   const params = { params: Promise.resolve({ accountId: f.accountId, messageId: message.id }) };
   const get = (query = "") => GET(new Request(`http://localhost:3000/html${query}`, { headers: user.jar.headers() }), params);
   const blocked = await get();
@@ -73,7 +82,7 @@ test("HTML route matches the real From mailbox and rejects a quoted display-name
   const user = await createAuthenticatedTestSession(f.accountId);
   const [message] = await f.seed(f.message("<sender-privacy@example.test>", {
     from: '"Trusted <trusted@example.test>" <ACTUAL@EXAMPLE.TEST>', senderKey: "actual@example.test",
-    htmlBody: '<img src="https://images.example.test/pixel">'
+    htmlBody: '<img src="https://images.example.test/pixel">', source: authenticatedSource("actual@example.test")
   }));
   const params = { params: Promise.resolve({ accountId: f.accountId, messageId: message.id }) };
   const setAllowed = (email: string) => PUT(new Request(`http://localhost:3000/api/accounts/${f.accountId}/prefs`, {
@@ -98,7 +107,9 @@ test("HTML route rejects unrelated sender permissions and saves/reads the full s
   for (const { name, from, key } of senderPermissionLookupCases) {
     await patchPrefs({ remoteContent: null });
     expect((await patchPrefs({ remoteContent: { allowedSenders: { "trusted@example.test": true } } })).status).toBe(200);
-    const [message] = await f.seed(f.message(`<${crypto.randomUUID()}@example.test>`, { from, senderKey: key || null, htmlBody: '<img src="https://images.example.test/pixel">' }));
+    const [message] = await f.seed(f.message(`<${crypto.randomUUID()}@example.test>`, {
+      from, senderKey: key || null, htmlBody: '<img src="https://images.example.test/pixel">', ...(key ? { source: authenticatedSource(key) } : {})
+    }));
     const get = () => GET(new Request("http://localhost:3000/html", { headers: user.jar.headers() }), {
       params: Promise.resolve({ accountId: f.accountId, messageId: message.id })
     });
