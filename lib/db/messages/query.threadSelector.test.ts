@@ -61,7 +61,9 @@ describe("thread selector flagged EXISTS differential", () => {
   beforeAll(async () => {
     fixture = await createSharedShardFixture();
     for (const [f, second] of [[fixture.a, false], [fixture.b, true]] as const) {
-      await f.api.saveFoldersForAccount(f.accountId, [
+      // Folder ids are shard-wide keys: B owns these unprefixed ids (as before the write was
+      // scoped, when B's save re-owned A's rows). A has no folder rows.
+      if (second) await f.api.saveFoldersForAccount(f.accountId, [
         { id: "inbox", accountId: f.accountId, name: "INBOX", count: 0, specialUse: "\\Inbox" },
         { id: "archive", accountId: f.accountId, name: "Archive", count: 0 },
         { id: "sent", accountId: f.accountId, name: "Sent", count: 0, specialUse: "\\Sent" }

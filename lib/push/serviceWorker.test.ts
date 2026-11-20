@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { NOTIFICATION_BADGE_ICON, NOTIFICATION_ICON } from "@/lib/appBranding";
 import { PENDING_OPEN_CACHE, PENDING_OPEN_URL } from "@/lib/push/pendingOpen";
+import { REMINDER_META_CACHE } from "@/lib/browserUserState";
 
 const workerSource = readFileSync(new URL("../../public/sw.js", import.meta.url), "utf8");
 const origin = "https://noctua.example.test";
@@ -91,7 +92,11 @@ function loadWorker(options: {
     const value = stored.get(PENDING_OPEN_CACHE)?.get(PENDING_OPEN_URL);
     return value === undefined ? undefined : JSON.parse(value) as { url: string; at: number };
   };
-  return { dispatch, push, notifications, badges, fetches, subscribed, posted, focused, opened, steps, pendingOpen };
+  const reminderMeta = () => {
+    const value = stored.get(REMINDER_META_CACHE)?.get("/__noctua/reminder-meta");
+    return value === undefined ? undefined : JSON.parse(value) as { principal: string | null; accountIds: string[]; deliveredByAccount: Record<string, Record<string, number>> };
+  };
+  return { dispatch, push, notifications, badges, fetches, subscribed, posted, focused, opened, steps, pendingOpen, reminderMeta };
 }
 
 const mail = {
@@ -300,5 +305,35 @@ describe("service worker pushsubscriptionchange", () => {
     await unconfigured.dispatch("pushsubscriptionchange", {});
     expect(unconfigured.subscribed).toEqual([]);
     expect(unconfigured.fetches.map(call => call.method)).toEqual(["GET"]);
+  });
+});
+
+describe("service worker reminder state per signed-in user", () => {
+  const state = (principal: string | null, accountIds: string[], deliveredByAccount: Record<string, Record<string, number>> = {}) =>
+    ({ data: { type: "noctua:reminder-state", principal, accountIds, deliveredByAccount, activeAccountId: accountIds[0] ?? null, activeReminderIds: [] } });
+
+  it("merges updates of the same user", async () => {
+    const worker = loadWorker();
+    await worker.dispatch("message", state("user-a", ["acc-1"], { "acc-1": { r1: 1 } }));
+    await worker.dispatch("message", state("user-a", ["acc-2"], { "acc-1": { r2: 2 } }));
+    expect(worker.reminderMeta()).toEqual({ principal: "user-a", accountIds: ["acc-1", "acc-2"], deliveredByAccount: { "acc-1": { r1: 1, r2: 2 } } });
+  });
+
+  it("replaces another user's mailboxes and delivered reminders instead of merging them", async () => {
+    const worker = loadWorker();
+    await worker.dispatch("message", state("user-a", ["acc-private-a"], { "acc-private-a": { "reminder-a": 1 } }));
+    await worker.dispatch("message", state("user-b", ["acc-b"]));
+    expect(worker.reminderMeta()).toEqual({ principal: "user-b", accountIds: ["acc-b"], deliveredByAccount: {} });
+  });
+
+  it("keeps nothing without a known user", async () => {
+    const worker = loadWorker();
+    await worker.dispatch("message", state("user-a", ["acc-1"], { "acc-1": { r1: 1 } }));
+    await worker.dispatch("message", state(null, ["acc-1"], { "acc-1": { r1: 1 } }));
+    expect(worker.reminderMeta()).toEqual({ principal: null, accountIds: [], deliveredByAccount: {} });
+  });
+
+  it("uses the reminder cache name the page deletes on sign-out", () => {
+    expect(workerSource).toContain(`const REMINDER_META_CACHE = "${REMINDER_META_CACHE}";`);
   });
 });

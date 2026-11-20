@@ -76,7 +76,9 @@ import { Button as AuthButton } from "./ui/button";
 import { Dialog as AuthDialog, DialogContent as AuthDialogContent, DialogTitle as AuthDialogTitle, DialogDescription as AuthDialogDescription } from "./ui/dialog";
 import LazyDialogLoading from "./LazyDialogLoading";
 import type { Proof, AuthUser, AuthMe } from "@/lib/authClient";
-import MoveToDialog, { recordRecentMoveFolder, getRecentMoveFolderIds } from "./mailclient/message/MoveToDialog";
+import MoveToDialog from "./mailclient/message/MoveToDialog";
+import { recordRecentMoveFolder, getRecentMoveFolderIds } from "./mailclient/utils/recentMoveFolders";
+import { usePrincipalBoundary } from "./mailclient/usePrincipalBoundary";
 import CopyToAccountDialog from "./mailclient/message/CopyToAccountDialog";
 import InAppNoticeStack, { type InAppNotice } from "./mailclient/InAppNoticeStack";
 import DialogsHost from "./mailclient/dialogs/DialogsHost";
@@ -194,12 +196,14 @@ import {
   buildAccountMessagesActionPath,
   buildAccountMessageHtmlPath,
   buildAccountMessagePath,
-  buildAccountMessageSourcePath,
+  buildAccountMessageEmlPath,
   buildAccountMessagesPath,
   buildAccountTopicSuggestionsPath,
   buildAccountTopicsPath
 } from "@/lib/accountApiPaths";
 import { openDetachedWindow } from "@/lib/ui/openDetachedWindow";
+import { isSingleWindowApp } from "@/lib/ui/displayMode";
+import InAppPreview, { type InAppPreviewTarget } from "@/app/components/InAppPreview";
 import { useWindowTitle } from "@/lib/ui/windowTitle";
 import { setAppBadge, unreadBadgeCount } from "@/lib/push/badge";
 import { useCurrentPushDeviceSettings } from "@/app/hooks/useCurrentPushDeviceSettings";
@@ -231,6 +235,7 @@ import {
   VIRTUAL_FOLDERS,
   getVirtualFolderLabels
 } from "./mailclient/useSearchState";
+import { useSearchInput } from "./mailclient/useSearchInput";
 import { useReminderNotifications } from "./mailclient/useReminderNotifications";
 import { useMessageData } from "./mailclient/useMessageData";
 import { useMailboxViewCache } from "./mailclient/mailboxViewCache";
@@ -254,6 +259,7 @@ import {
 import { withLoadedMessageBodyMemo } from "./mailclient/utils/threadContentCache";
 import RecipientAliasDialog from "./mailclient/RecipientAliasDialog";
 import AccountReloginDialog from "./mailclient/AccountReloginDialog";
+import { useReloginPrompt } from "./mailclient/useReloginPrompt";
 import TopicBadge from "./mailclient/TopicBadge";
 import { applyActiveTopicSuggestion } from "./mailclient/topicSuggestionActions";
 import { parseSimpleTopicSearchMode } from "./mailclient/topicSearch";
@@ -421,6 +427,8 @@ type CopyToAccountDialogState = {
 };
 
 type RecipientAliasDialogState = {
+  /** The mailbox whose message the recipients come from; the dialog shows only while it is active. */
+  accountId: string;
   fieldLabel: "To" | "Cc";
   recipients: string;
   aliasId?: string | null;
@@ -501,9 +509,11 @@ export default function MailClient({
   );
   const readerListScrollRef = useRef<number | null>(null);
   const [viewMessage, setViewMessage] = useState<Message | null>(null);
+  const [htmlPreview, setHtmlPreview] = useState<InAppPreviewTarget | null>(null);
   const viewMessageId = viewMessage?.id;
   const clearMobileMessage = useCallback(() => setViewMessage(null), []);
   const [query, setQuery] = useState("");
+  const { searchInput, setSearchInput, submitSearchInput, resetSearchInput } = useSearchInput({ query, setQuery });
   // next-themes owns the theme (class and color-scheme on <html>, persisted
   // under "noctua:theme"); the kept renderers read the resulting html class,
   // which is correct on their first render, so the HtmlMessage iframe is
@@ -517,7 +527,8 @@ export default function MailClient({
   const [enrollmentContinuation, setEnrollmentContinuation] = useState<{ proof: Proof; password: string } | null>(null);
   const [manageTab, setManageTab] = useState<ManageTab>("account");
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-  const [reloginAccountId, setReloginAccountId] = useState("");
+  const { reloginAccountId, requestRelogin, openRelogin, dismissRelogin, completeRelogin, closeRelogin, resetRelogin } =
+    useReloginPrompt();
   const [reloginDescription, setReloginDescription] = useState("");
   const [listWidth, setListWidth] = useState(840);
   const [calendarSidebarOpen, setCalendarSidebarOpen] = useState(false);
@@ -602,7 +613,7 @@ export default function MailClient({
   const activeTopicSuggestionCacheKey =
     activeAccountId && activeTopicId ? `${activeAccountId}:${activeTopicId}` : "";
 
-  const readErrorMessage = useApiErrorMessage({ setAuthState, setReloginAccountId, setReloginDescription });
+  const readErrorMessage = useApiErrorMessage({ setAuthState, requestRelogin, closeRelogin, setReloginDescription });
 
   const {
     exceptionEntries,
@@ -969,6 +980,11 @@ export default function MailClient({
     suspiciousUnreadCount,
     activeVirtualFolder
   } = searchState;
+  // Text typed just before a mailbox / folder switch must not start a search in
+  // the new scope once its debounce fires.
+  useEffect(() => {
+    resetSearchInput();
+  }, [activeAccountId, activeFolderId, activeVirtualFolderId, resetSearchInput]);
   const {
     setSearchScope,
     setSearchFields,
@@ -977,6 +993,21 @@ export default function MailClient({
     clearSearch,
     activateVirtualFolder
   } = searchActions;
+
+  // Search text and its place, and dialogs holding one person's mail, never carry over to the
+  // next person who signs in in this tab (SD26, SD43, SD50).
+  usePrincipalBoundary(authState === "ok" ? currentUser?.id ?? null : null, authState === "unauth", () => {
+    setQuery("");
+    setSearchScope("folder");
+    setSearchFields({ ...DEFAULT_SEARCH_FIELDS });
+    setSearchBadges({ ...DEFAULT_SEARCH_BADGES });
+    setActiveVirtualFolderId(null);
+    setDomainView(null);
+    setRecipientAliasDialogState(null);
+    setMoveToDialogState(null);
+    resetRelogin();
+    setReloginDescription("");
+  });
 
   const {
     isSyncing,
@@ -1834,14 +1865,18 @@ export default function MailClient({
   );
   const openRecipientAliasDialog = useCallback(
     (fieldLabel: "To" | "Cc", recipients: string, alias?: RecipientAlias | null) => {
+      if (!activeAccountId) return;
       setRecipientAliasDialogState({
+        accountId: activeAccountId,
         fieldLabel,
         recipients,
         aliasId: alias?.id ?? null
       });
     },
-    []
+    [activeAccountId]
   );
+  const shownRecipientAliasDialog =
+    recipientAliasDialogState?.accountId === activeAccountId ? recipientAliasDialogState : null;
 
   const isDraftMessage = (message: Message) => {
     const folder = folders.find((item) => item.id === message.folderId);
@@ -1892,12 +1927,13 @@ export default function MailClient({
         return;
       }
       setReloginDescription("");
-      setReloginAccountId(targetAccount.id);
+      openRelogin(targetAccount.id);
     },
-    [accounts, activeAccountId, reportError, tn]
+    [accounts, activeAccountId, openRelogin, reportError, tn]
   );
   const handleReloginSuccess = useCallback(
     async (updatedAccount: Account) => {
+      completeRelogin(updatedAccount.id);
       setAccounts((prev) =>
         prev.map((account) =>
           account.id === updatedAccount.id
@@ -1930,7 +1966,7 @@ export default function MailClient({
         });
       }
     },
-    [activeAccountId, activeFolderId, pushNotice, setAccounts, setExceptionEntries, syncAccount, tn]
+    [activeAccountId, activeFolderId, completeRelogin, pushNotice, setAccounts, setExceptionEntries, syncAccount, tn]
   );
   // Phone pull-to-refresh: a "new" sync of the open folder (the whole account in
   // a virtual view), as after a re-login.
@@ -3768,16 +3804,16 @@ export default function MailClient({
 
   const getRecentFoldersFor = useCallback((accountId: string | null): Folder[] => {
     const byId = new Map(moveFoldersFor(accountId).map((folder) => [folder.id, folder]));
-    return getRecentMoveFolderIds(accountId ?? activeAccountId ?? "")
+    return getRecentMoveFolderIds(currentUser?.id, accountId ?? activeAccountId ?? "")
       .flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
-  }, [activeAccountId, moveFoldersFor]);
+  }, [activeAccountId, currentUser?.id, moveFoldersFor]);
 
   const recordAndMove = useCallback(
     (folderId: string, options: Parameters<typeof moveMessagesToFolder>[1]) => {
-      recordRecentMoveFolder(actionFolderById.get(folderId)?.accountId ?? activeAccountId ?? "", folderId);
+      recordRecentMoveFolder(currentUser?.id, actionFolderById.get(folderId)?.accountId ?? activeAccountId ?? "", folderId);
       void moveMessagesToFolder(folderId, options);
     },
-    [actionFolderById, activeAccountId, moveMessagesToFolder]
+    [actionFolderById, activeAccountId, currentUser?.id, moveMessagesToFolder]
   );
 
   const handleMoveToFolder = useCallback(
@@ -4512,6 +4548,7 @@ export default function MailClient({
     };
   }, [clientId]);
 
+  const currentUserId = currentUser?.id ?? null;
   const refreshVisibleSession = useCallback(async () => {
       try {
         const res = await apiFetch("/api/auth/me", {
@@ -4529,7 +4566,9 @@ export default function MailClient({
         if (typeof data?.ttlSeconds === "number") {
           setSessionTtlSeconds(data.ttlSeconds);
         }
-        if (data && (data.mailboxState !== mailboxState || (data.accountId ?? "") !== activeAccountId ||
+        // Another person signed in elsewhere in this browser: the bootstrap closes the previous
+        // person's views (settings form, error log) before anything of the new one shows.
+        if (data && ((data.user?.id ?? null) !== currentUserId || data.mailboxState !== mailboxState || (data.accountId ?? "") !== activeAccountId ||
           data.security.enrollmentRequired !== authSecurity?.enrollmentRequired || data.security.reauthRequired !== authSecurity?.reauthRequired)) {
           await loadInitialData();
         } else if (data) {
@@ -4538,7 +4577,7 @@ export default function MailClient({
       } catch {
         // ignore refresh errors
       }
-  }, [apiFetch, mailboxState, activeAccountId, authSecurity, loadInitialData]);
+  }, [apiFetch, mailboxState, activeAccountId, authSecurity, currentUserId, loadInitialData]);
   useVisibleInterval(refreshVisibleSession, authState === "ok" && sessionTtlSeconds
     ? Math.max(60_000, Math.min(30 * 60_000, Math.floor((sessionTtlSeconds * 1000) / 3))) : null);
 
@@ -5302,15 +5341,15 @@ export default function MailClient({
   const handleDownloadEml = async (message: Message) => {
     try {
       const res = await apiFetch(
-        buildAccountMessageSourcePath(message.accountId || activeAccountId, message.id)
+        buildAccountMessageEmlPath(message.accountId || activeAccountId, message.id)
       );
       if (!res.ok) {
         reportError(await readErrorMessage(res));
         return;
       }
-      const data = (await res.json()) as { source?: string };
-      if (!data?.source) return;
-      const blob = new Blob([data.source], { type: "message/rfc822" });
+      // The exact stored bytes: re-encoding text would alter 8bit parts.
+      const blob = new Blob([await res.arrayBuffer()], { type: "message/rfc822" });
+      if (!blob.size) return;
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -5342,10 +5381,14 @@ export default function MailClient({
 
   const handleOpenHtmlInNewWindow = (message: Message) => {
     if (typeof window === "undefined") return;
-    const opened = openDetachedWindow(
-      withRemoteContentDecision(buildAccountMessageHtmlPath(message.accountId, message.id), message.accountId, message.id),
-      { title: formatMessageHtmlPageTitle(message.subject) }
-    );
+    const htmlPath = withRemoteContentDecision(buildAccountMessageHtmlPath(message.accountId, message.id), message.accountId, message.id);
+    if (isSingleWindowApp()) {
+      // Same-origin for the mailbox's inline images (as the reader's frame); the
+      // route's CSP runs no script. Links open outside the preview.
+      setHtmlPreview({ src: htmlPath, title: message.subject?.trim() || "HTML", sandbox: "allow-same-origin allow-popups allow-popups-to-escape-sandbox" });
+      return;
+    }
+    const opened = openDetachedWindow(htmlPath, { title: formatMessageHtmlPageTitle(message.subject) });
     if (!opened) {
       pushNotice({
         type: "warning",
@@ -5570,6 +5613,7 @@ export default function MailClient({
     <CollabRowsContext.Provider value={{ members: collab.members, threadCollabById }}>
     <DomainIconVersionsContext.Provider value={domainIcons}>
       {identityDialogs}
+      <InAppPreview target={htmlPreview} onClose={() => setHtmlPreview(null)} />
       <AppShell
         onReaderNavigate={() => { readerListScrollRef.current = null; resetReaderLayout(); setViewMessage(null); }}
         mobileNavigation={{ messageId: viewMessageId ?? null, clearMessage: clearMobileMessage, urlManaged: true }}
@@ -5649,6 +5693,7 @@ export default function MailClient({
             accountFolderCount: accountFolders.length,
             isRecomputingThreads,
             isRecomputingCategories,
+            canRecompute: !!activeAccountId && canEditMailbox(activeAccountId),
             syncAccount,
             recomputeThreads,
             recomputeCategories,
@@ -5681,7 +5726,7 @@ export default function MailClient({
             : [currentAccount?.name || currentAccount?.email, activeVirtualFolder?.name || activeFolderName].filter((part): part is string => Boolean(part)),
           search: {
             state: {
-              query,
+              searchInput,
               searchScope,
               includeSentInEverywhere,
               sentFolderName: sentFolderBySpecialUse ? getFolderDisplayName(sentFolderBySpecialUse, locale) : null,
@@ -5695,7 +5740,8 @@ export default function MailClient({
               searchBadgesLabel
             },
             actions: {
-              setQuery,
+              setSearchInput,
+              submitSearchInput,
               setSearchScope,
               setIncludeSentInEverywhere,
               setSearchFields,
@@ -6108,6 +6154,8 @@ export default function MailClient({
 
       {manageOpen && editingAccount && (
         <UrlHistoryContext.Provider value={true}><AccountSettingsModal
+          // History navigation can switch the mailbox under an open dialog: start over with its data.
+          key={editingAccount.id}
           editingAccount={editingAccount}
           accounts={accounts}
           isOpen={manageOpen}
@@ -6125,7 +6173,7 @@ export default function MailClient({
             notifySenderSettingsChanged(account.id);
             setManageOpen(false);
           } : saveAccountSettings}
-          onDelete={() => deleteAccount(editingAccount.id)}
+          onDelete={deleteAccount}
           isAdminUser={isAdminUser}
           onNotifySuccess={(title, description) => {
             pushNotice({
@@ -6158,7 +6206,7 @@ export default function MailClient({
         readErrorMessage={readErrorMessage}
         onOpenChange={(open) => {
           if (!open) {
-            setReloginAccountId("");
+            dismissRelogin();
             setReloginDescription("");
           }
         }}
@@ -6166,7 +6214,7 @@ export default function MailClient({
       />
 
       <RecipientAliasDialog
-        open={recipientAliasDialogState !== null}
+        open={shownRecipientAliasDialog !== null}
         onOpenChange={(open) => {
           if (!open) {
             setRecipientAliasDialogState(null);
@@ -6174,12 +6222,12 @@ export default function MailClient({
         }}
         aliases={recipientAliases}
         resetKey={
-          recipientAliasDialogState
-            ? `${recipientAliasDialogState.aliasId ?? "new"}:${recipientAliasDialogState.recipients}`
+          shownRecipientAliasDialog
+            ? `${shownRecipientAliasDialog.aliasId ?? "new"}:${shownRecipientAliasDialog.recipients}`
             : "closed"
         }
-        initialAliasId={recipientAliasDialogState?.aliasId ?? null}
-        initialRecipients={recipientAliasDialogState?.recipients ?? ""}
+        initialAliasId={shownRecipientAliasDialog?.aliasId ?? null}
+        initialRecipients={shownRecipientAliasDialog?.recipients ?? ""}
         onCreateAlias={createRecipientAliasForAccount}
         onUpdateAlias={updateRecipientAliasForAccount}
         onDeleteAlias={deleteRecipientAliasForAccount}
@@ -6249,6 +6297,7 @@ export default function MailClient({
       <MoveToDialog
         open={moveToDialogState !== null}
         onOpenChange={(open) => { if (!open) setMoveToDialogState(null); }}
+        userId={currentUser?.id}
         accountId={moveDialogFolders.accountId}
         rootFolders={moveDialogFolders.rootFolders}
         folderTree={moveDialogFolders.folderTree}

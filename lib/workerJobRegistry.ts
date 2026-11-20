@@ -1,6 +1,4 @@
-import { assertServerRunning, trackBackgroundWork, trackWorker } from "./server/backgroundWork";
 import { createBoundedWorkerJobRegistry } from "./boundedWorkerJobRegistry";
-import { randomUUID } from "crypto";
 
 export type WorkerJobStatus = "queued" | "running" | "done" | "failed";
 
@@ -15,7 +13,8 @@ export type WorkerJobRecord = {
 };
 
 export type WorkerJobRegistryConfig = {
-  maxConcurrentJobs?: number;
+  /** Global cap on running workers of this registry; each mailbox also has at most one active job. */
+  maxConcurrentJobs: number;
   sharedWorkerBudget?: boolean;
   registryName?: string;
   scriptPath: string;
@@ -27,122 +26,8 @@ export type WorkerJobRegistryConfig = {
   commandPrefix?: string[];
 };
 
-type WorkerJobRegistryState = {
-  jobs: Map<string, WorkerJobRecord>;
-};
-
-const runtimeState = globalThis as typeof globalThis & {
-  __noctuaWorkerJobRegistryState?: Map<string, WorkerJobRegistryState>;
-};
-
-if (!runtimeState.__noctuaWorkerJobRegistryState) {
-  runtimeState.__noctuaWorkerJobRegistryState = new Map();
-}
-
-function isProcessAlive(pid: number) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    const code = (error as NodeJS.ErrnoException | undefined)?.code;
-    if (code === "EPERM") return true;
-    return false;
-  }
-}
-
+/** Every worker registry is bounded: one active job per mailbox (repeat starts
+ * coalesce onto it) and at most `maxConcurrentJobs` workers at once. */
 export function createWorkerJobRegistry(config: WorkerJobRegistryConfig) {
-  if (config.maxConcurrentJobs) return createBoundedWorkerJobRegistry(config);
-  const registryKey = config.scriptPath;
-  const existingState = runtimeState.__noctuaWorkerJobRegistryState?.get(registryKey);
-  const state = existingState ?? {
-    jobs: new Map<string, WorkerJobRecord>()
-  };
-  runtimeState.__noctuaWorkerJobRegistryState?.set(registryKey, state);
-  const jobs = state.jobs;
-  const jobTtlMs = config.jobTtlMs ?? 1000 * 60 * 30;
-
-  const scheduleCleanup = (jobId: string) => {
-    setTimeout(() => jobs.delete(jobId), jobTtlMs);
-  };
-
-  const getJob = (jobId: string) => {
-    const job = jobs.get(jobId) ?? null;
-    if (!job) return null;
-    if (
-      job.status === "running" &&
-      typeof job.pid === "number" &&
-      !isProcessAlive(job.pid)
-    ) {
-      job.status = "failed";
-      job.finishedAt = Date.now();
-      job.error = "Worker process is no longer running.";
-      scheduleCleanup(job.id);
-    }
-    return job;
-  };
-
-  const startJob = (accountId: string, args: string[] = []) => {
-    assertServerRunning();
-    const id = randomUUID();
-    const job: WorkerJobRecord = {
-      id,
-      accountId,
-      status: "running",
-      startedAt: Date.now()
-    };
-    jobs.set(id, job);
-
-    try {
-      const bun = (globalThis as typeof globalThis & { Bun?: any }).Bun;
-      if (!bun?.spawn) {
-        throw new Error(
-          config.runtimeMissingMessage ?? "Bun runtime is required to spawn a worker."
-        );
-      }
-      const child = bun.spawn(
-        [...(config.commandPrefix ?? []), "bun", "run", config.scriptPath, accountId, ...args],
-        {
-          cwd: process.cwd(),
-          // Bun otherwise inherits the original OS environment, ignoring runtime path overrides.
-          env: { ...process.env },
-          stdout: config.spawnStdout ?? "ignore",
-          stderr: config.spawnStderr ?? "pipe"
-        }
-      );
-      trackWorker(child);
-      job.pid = child.pid;
-
-      const completion = (async () => {
-        const exitCode = await child.exited;
-        let stderrText = "";
-        if (config.readStderrText !== false && child.stderr) {
-          try {
-            stderrText = (await new Response(child.stderr).text()).trim();
-          } catch {
-            stderrText = "";
-          }
-        }
-        if (exitCode === 0) {
-          job.status = "done";
-          job.finishedAt = Date.now();
-        } else {
-          job.status = "failed";
-          job.finishedAt = Date.now();
-          job.error = stderrText || `Worker exited with code ${exitCode}`;
-        }
-        scheduleCleanup(job.id);
-      })();
-      trackBackgroundWork(`worker-monitor:${child.pid}`, completion);
-    } catch (error) {
-      job.status = "failed";
-      job.finishedAt = Date.now();
-      job.error = error instanceof Error ? error.message : "Failed to start worker";
-      scheduleCleanup(job.id);
-    }
-
-    return job;
-  };
-
-  const getLatestJob = (accountId: string) => [...jobs.values()].filter(job => job.accountId === accountId).at(-1) ?? null;
-  return { getJob, startJob, getLatestJob, settleJob: async (_id: string) => { void _id; }, resumeJobs: () => {} };
+  return createBoundedWorkerJobRegistry(config);
 }

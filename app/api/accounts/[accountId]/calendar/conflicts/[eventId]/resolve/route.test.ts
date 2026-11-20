@@ -154,6 +154,26 @@ describe("applyConflictResolution", () => {
     expect(await getCalendarEventConflict(accountId, event.id)).not.toBeNull();
   });
 
+  test("local: refuses to write to a stored href outside the event's calendar collection", async () => {
+    const { upsertCalendarEventConflict } = await dbModulePromise;
+    for (const remoteHref of [
+      "https://attacker.example.test/cal/x.ics",
+      "https://caldav.example.test/other/x.ics",
+      "https://caldav.example.test/cal/../other/x.ics"
+    ]) {
+      const accountId = `acc-resolve-href-${randomUUID()}`;
+      const { account, event, conflict } = await setupConflict(accountId);
+      await upsertCalendarEventConflict(accountId, conflict);
+      const outcome = await applyConflictResolution(
+        { accountId, event: { ...event, remoteHref }, conflict, account, resolution: "local" },
+        deps
+      );
+      expect(outcome).toMatchObject({ ok: false, status: 400 });
+      expect(updateRemoteEvent).not.toHaveBeenCalled();
+      expect(await getCalendarEventConflict(accountId, event.id)).not.toBeNull();
+    }
+  });
+
   test("remote: fails without clearing the conflict when the server ICS is unusable", async () => {
     const accountId = `acc-resolve-bad-${randomUUID()}`;
     const { account, event, conflict } = await setupConflict(accountId);

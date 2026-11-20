@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import styles from "./ComposeEditor.module.css";
 import { LexicalComposer } from "@lexical/react/LexicalComposer";
+import { EditorRemoteImagesProvider, type RemoteImageSource } from "./lexical/remoteImages";
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin";
 import { ContentEditable } from "@lexical/react/LexicalContentEditable";
 import { HistoryPlugin } from "@lexical/react/LexicalHistoryPlugin";
@@ -141,6 +142,8 @@ type ComposeEditorProps = {
   resetKey?: number | string;
   className?: string;
   quotedMessage?: QuotedMessageConfig;
+  /** The replied-to/forwarded message whose remote-content consent applies to editor images. */
+  remoteImageSource?: RemoteImageSource | null;
   onChange: (html: string, text: string) => void;
   onInlineImage?: (file: File, dataUrl: string) => void;
   onFilesDrop?: (
@@ -1035,6 +1038,7 @@ const ComposeEditor = forwardRef<ComposeEditorHandle, ComposeEditorProps>(functi
   resetKey,
   className,
   quotedMessage,
+  remoteImageSource,
   onChange,
   onInlineImage,
   onFilesDrop
@@ -1113,54 +1117,56 @@ const ComposeEditor = forwardRef<ComposeEditorHandle, ComposeEditorProps>(functi
         .join(" ")}
       style={{ ["--compose-toolbar-height" as any]: `${toolbarHeight}px` }}
     >
-      <LexicalComposer initialConfig={initialConfig}>
-        <ComposeToolbar
-          toolbarRef={toolbarRef}
-          showSource={showSource}
-          onEnterSource={handleEnterSource}
-          onExitSource={handleExitSource}
-        />
-        <AppendPlugin handleRef={ref} onInlineImage={onInlineImage} onExport={(snapshot) => {
-          // An immediate body action supersedes the queued animation-frame
-          // export. Flush it now so a stale callback cannot restore old text.
-          if (changeFrameRef.current !== null) {
-            window.cancelAnimationFrame(changeFrameRef.current);
-            changeFrameRef.current = null;
-          }
-          pendingChangeRef.current = null;
-          onChange(snapshot.html, snapshot.text);
-        }} />
-        <ComposerInitializer initialHtml={initialHtml} resetKey={resetKey} />
-        <SourceSyncPlugin html={sourceHtml} showSource={showSource} />
-        {quotedMessage && <QuotedMessagePlugin config={quotedMessage} />}
-        <RichTextPlugin
-          contentEditable={<ComposeEditable onInlineImage={onInlineImage} onFilesDrop={onFilesDrop} />}
-          placeholder={<ComposePlaceholder />}
-          ErrorBoundary={LexicalErrorBoundary}
-        />
-        <HistoryPlugin />
-        <ListPlugin />
-        <LinkPlugin />
-        <AutoLinkPlugin matchers={composeAutoLinkMatchers} />
-        <TablePlugin hasHorizontalScroll />
-        <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
-        <OnChangePlugin
-          onChange={(editorState, editor) => {
-            editorState.read(() => {
-              const html = cleanLexicalHtml($generateHtmlFromNodes(editor, null));
-              const text = $getRoot().getTextContent();
-              pendingChangeRef.current = { html, text };
-              if (changeFrameRef.current !== null) return;
-              changeFrameRef.current = window.requestAnimationFrame(() => {
-                changeFrameRef.current = null;
-                const payload = pendingChangeRef.current;
-                if (!payload) return;
-                onChange(payload.html, payload.text);
+      <EditorRemoteImagesProvider source={remoteImageSource} sessionKey={resetKey}>
+        <LexicalComposer initialConfig={initialConfig}>
+          <ComposeToolbar
+            toolbarRef={toolbarRef}
+            showSource={showSource}
+            onEnterSource={handleEnterSource}
+            onExitSource={handleExitSource}
+          />
+          <AppendPlugin handleRef={ref} onInlineImage={onInlineImage} onExport={(snapshot) => {
+            // An immediate body action supersedes the queued animation-frame
+            // export. Flush it now so a stale callback cannot restore old text.
+            if (changeFrameRef.current !== null) {
+              window.cancelAnimationFrame(changeFrameRef.current);
+              changeFrameRef.current = null;
+            }
+            pendingChangeRef.current = null;
+            onChange(snapshot.html, snapshot.text);
+          }} />
+          <ComposerInitializer initialHtml={initialHtml} resetKey={resetKey} />
+          <SourceSyncPlugin html={sourceHtml} showSource={showSource} />
+          {quotedMessage && <QuotedMessagePlugin config={quotedMessage} />}
+          <RichTextPlugin
+            contentEditable={<ComposeEditable onInlineImage={onInlineImage} onFilesDrop={onFilesDrop} />}
+            placeholder={<ComposePlaceholder />}
+            ErrorBoundary={LexicalErrorBoundary}
+          />
+          <HistoryPlugin />
+          <ListPlugin />
+          <LinkPlugin />
+          <AutoLinkPlugin matchers={composeAutoLinkMatchers} />
+          <TablePlugin hasHorizontalScroll />
+          <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+          <OnChangePlugin
+            onChange={(editorState, editor) => {
+              editorState.read(() => {
+                const html = cleanLexicalHtml($generateHtmlFromNodes(editor, null));
+                const text = $getRoot().getTextContent();
+                pendingChangeRef.current = { html, text };
+                if (changeFrameRef.current !== null) return;
+                changeFrameRef.current = window.requestAnimationFrame(() => {
+                  changeFrameRef.current = null;
+                  const payload = pendingChangeRef.current;
+                  if (!payload) return;
+                  onChange(payload.html, payload.text);
+                });
               });
-            });
-          }}
-        />
-      </LexicalComposer>
+            }}
+          />
+        </LexicalComposer>
+      </EditorRemoteImagesProvider>
       {showSource && (
         <textarea
           ref={sourceTextareaRef}

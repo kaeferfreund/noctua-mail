@@ -9,6 +9,7 @@ import {
 import { listTopics, createTopic } from "@/lib/topics";
 import { TOPIC_COLORS } from "@/lib/data";
 import type { TopicColor } from "@/lib/data";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
@@ -23,16 +24,18 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const body = (await request.json().catch(() => null)) as {
-    accountId?: string;
-    name?: string;
-    shortName?: string | null;
-    color?: string;
-  } | null;
 
   const accountId = await getAccountIdFromParams(params);
   const context = await requireAccountContext(request, accountId, { minRole: "editor" });
   if (context instanceof NextResponse) return context;
+  const json = await readJsonBody<{
+    accountId?: string;
+    name?: string;
+    shortName?: string | null;
+    color?: string;
+  }>(request);
+  if (!json.ok) return json.response;
+  const body = json.value;
   return withAuthResponse(context, async () => {
 
     const name = body?.name?.trim();

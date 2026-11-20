@@ -31,6 +31,21 @@ function resolveDetachedWindowSize(options: OpenDetachedWindowOptions) {
   };
 }
 
+// Windows opened from this window. Sign-out closes them: a later user of the browser must not
+// find a previous user's mail, draft or attachment there (detached pages also end their own view).
+const openedWindows = new Set<Window>();
+
+export function closeDetachedWindows() {
+  for (const opened of openedWindows) {
+    try {
+      if (!opened.closed) opened.close();
+    } catch {
+      // ignore
+    }
+  }
+  openedWindows.clear();
+}
+
 export function openDetachedWindow(
   url: string,
   options: OpenDetachedWindowOptions = {}
@@ -60,6 +75,10 @@ export function openDetachedWindow(
     } catch {
       // ignore
     }
+  }
+  if (opened) {
+    for (const known of openedWindows) if (known.closed) openedWindows.delete(known);
+    openedWindows.add(opened);
   }
   opened?.focus();
   return opened;

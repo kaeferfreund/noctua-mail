@@ -79,6 +79,13 @@ export async function threadExcludedFolderIds(accountId: string) {
 const threadSortValue = (item: Message) => item.threadSortDateValue ?? item.dateValue;
 
 /**
+ * Deepest merged position the domain list pages to. Every page reads the first
+ * `page * pageSize` threads of each mailbox, so the depth bounds the work of one
+ * request; older conversations stay reachable in each mailbox's own list.
+ */
+export const DOMAIN_THREAD_WINDOW_MAX = 5000;
+
+/**
  * One thread list across mailboxes: each mailbox's own list of the role
  * folder, merged newest first. One conversation is listed once:
  * - a row that is the same message in two mailboxes (equal row id, i.e. equal
@@ -87,7 +94,7 @@ const threadSortValue = (item: Message) => item.threadSortDateValue ?? item.date
  *   newest message (the reader merges the other mailboxes' messages, see
  *   listDomainLinkedMessages), so the list never groups rows of two mailboxes.
  * Paging reads the first `page * pageSize` threads of every mailbox, so deep
- * pages cost more than in one mailbox.
+ * pages cost more than in one mailbox; paging stops at DOMAIN_THREAD_WINDOW_MAX.
  */
 export async function listDomainThreads(params: {
   accounts: readonly Account[];
@@ -103,6 +110,8 @@ export async function listDomainThreads(params: {
   const page = Math.max(1, Math.trunc(params.page) || 1);
   const pageSize = Math.max(1, Math.trunc(params.pageSize) || 1);
   const groupBy = params.groupBy ?? "date";
+  const offset = (page - 1) * pageSize;
+  const windowSize = Math.min(page * pageSize, DOMAIN_THREAD_WINDOW_MAX);
   const perAccount = await Promise.all(
     params.accounts.map(async (account) => {
       const folder = await resolveDomainRoleFolder(account.id, params.role);
@@ -111,7 +120,7 @@ export async function listDomainThreads(params: {
         accountId: account.id,
         folderId: folder.id,
         page: 1,
-        pageSize: page * pageSize,
+        pageSize: windowSize,
         groupBy,
         threadDateSource: params.threadDateSource,
         query: params.query,
@@ -138,11 +147,11 @@ export async function listDomainThreads(params: {
   }
   const merged = rows.filter((item) => threadOwner.get(item.threadId)?.accountId === item.accountId);
   merged.sort((a, b) => threadSortValue(b) - threadSortValue(a) || b.dateValue - a.dateValue || a.id.localeCompare(b.id));
-  const offset = (page - 1) * pageSize;
-  const items = merged.slice(offset, offset + pageSize);
+  const items = merged.slice(offset, Math.min(offset + pageSize, windowSize));
   const total = results.reduce((sum, { data }) => sum + (data.total ?? 0), 0);
   const baseCount = results.reduce((sum, { data }) => sum + (data.baseCount ?? 0), 0);
-  const hasMore = merged.length > offset + pageSize || results.some(({ data }) => data.hasMore);
+  const hasMore = offset + pageSize < DOMAIN_THREAD_WINDOW_MAX &&
+    (merged.length > offset + pageSize || results.some(({ data }) => data.hasMore));
   let groups: GroupMeta[];
   if (groupBy === "date") {
     groups = getLoadedDateGroups(items);

@@ -341,6 +341,12 @@ take a coordinated backup of master, shards, files and keys; see [Storage](STORA
 Opening a shard performs the atomic upgrade. An older binary requires restoring
 the complete backup; dropping guards or lowering user_version is unsupported.
 
+The data directory holds raw mail, databases and encrypted credentials. The
+server sets its umask to 077 at startup, so new files are owner-only; the
+Docker deploy script sets the data directory to mode 700. Files created by
+older versions keep their modes: restrict an existing directory once with
+`chmod 700 <data dir>`.
+
 ### Database Architecture
 
 Noctua Mail uses a **master + sharded database architecture**:

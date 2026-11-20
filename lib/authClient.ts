@@ -1,6 +1,7 @@
 /** Browser-only auth boundary. Capabilities live in call/component memory, never storage. */
 import { publishLocalePreference } from "./i18n/localeEvents";
-import { forgetPushSubscriptionOnServer } from "./push/client";
+import { forgetPushSubscriptionOnSignOut } from "./push/client";
+import { clearSignedOutBrowserState } from "./browserUserState";
 import type { Account, User } from "./data";
 
 export type MailboxState = "enrollment" | "none" | "unselected" | "selected";
@@ -33,7 +34,7 @@ export type SecurityInfo = {
   sessions: { id: string; current: boolean; createdAt: string; updatedAt: string; userAgent?: string; ip?: string }[];
 };
 export type ProofPurpose = "totp.enroll" | "totp.replace" | "passkey.enroll" | "passkey.remove" |
-  "passkey.rename" | "password.set" | "password.change" | "backup.regenerate" | "sessions.revoke" | "admin.recovery" | "mcp.create";
+  "passkey.rename" | "password.set" | "password.change" | "backup.regenerate" | "sessions.revoke" | "admin.recovery" | "admin.grant" | "mcp.create";
 export type Proof = { ok: true; grant: string; purpose: ProofPurpose; expiresAt: number; ceremonyRequired?: boolean };
 export type ProofInput = { purpose: ProofPurpose; currentPassword?: string; totpCode?: string; backupCode?: string; proofMode?: "passkey" };
 export type SignupInput = { inviteCode: string; email: string; name: string; password: string };
@@ -71,6 +72,7 @@ const messages: Record<string, string> = {
   mailbox_exists: "This mailbox already exists. Ask your admin for access.",
   auth_integration_pending: "Sign-in is temporarily unavailable. Please try again later.",
   provisioning_failed: "Account creation could not finish. Contact your admin before retrying.",
+  mail_server_unreachable: "The mail server could not be reached or could not check the login. Please try again later.",
   INVALID_TOKEN: "This reset link is invalid, expired or already used. Ask your admin for a new link.",
   invalid_request: "Check the form fields and try again."
 };
@@ -128,9 +130,10 @@ export function createAuthClient(fetcher: AuthFetch = (input, init) => fetch(inp
     methods: () => request<{ ok: true; methods: { password: boolean; passkey: boolean; imap: boolean } }>("/api/auth/methods"),
     logout: async () => {
       // Needs the session, so it runs before the logout request.
-      await forgetPushSubscriptionOnServer(fetcher);
+      await forgetPushSubscriptionOnSignOut(fetcher);
       const result = await request<{ ok: true }>("/api/auth/logout", undefined, undefined, "POST");
       publishLocalePreference(null);
+      await clearSignedOutBrowserState();
       return result;
     },
     switchAccount: (accountId: string) => request<{ ok: true; accountId: string }>("/api/auth/switch-account", { accountId }),

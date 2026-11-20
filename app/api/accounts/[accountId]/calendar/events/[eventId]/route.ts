@@ -14,6 +14,8 @@ import {
 import type { CalendarEvent } from "@/lib/data";
 import { toFiniteNumber, toPositiveNumberArray } from "@/app/api/_helpers/numberParsing";
 import { deleteCalendarEventAndRelatedData } from "@/lib/calendarEventDeletion";
+import { toCalendarEventResponse } from "@/lib/calendarEventEmailSnapshot";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 /**
  * Compute the write-back dirty flag after a local edit: stamp the change time
@@ -51,7 +53,7 @@ export async function GET(request: Request, { params }: Params) {
       if (!event) {
         return NextResponse.json({ ok: false, message: "Event not found" }, { status: 404 });
       }
-      return NextResponse.json({ ok: true, event });
+      return NextResponse.json({ ok: true, event: event && toCalendarEventResponse(event) });
     } catch (err) {
       console.error("[calendar/events/[eventId]] GET error:", err);
       return NextResponse.json({ ok: false, message: "Failed to load event" }, { status: 500 });
@@ -61,9 +63,6 @@ export async function GET(request: Request, { params }: Params) {
 
 export async function PUT(request: Request, { params }: Params) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const body = (await request.json().catch(() => null)) as Partial<CalendarEvent> & {
-    accountId?: string;
-  } | null;
   const accountId = await getAccountIdFromParams(params);
   const { eventId: rawEventId } = await params;
   const eventId = typeof rawEventId === "string" ? rawEventId.trim() : "";
@@ -75,6 +74,11 @@ export async function PUT(request: Request, { params }: Params) {
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  const json = await readJsonBody<Partial<CalendarEvent> & {
+    accountId?: string;
+  }>(request);
+  if (!json.ok) return json.response;
+  const body = json.value;
   return withAuthResponse(accountContext, async () => {
 
     const existing = await getCalendarEventById(accountId, eventId);
@@ -117,8 +121,10 @@ export async function PUT(request: Request, { params }: Params) {
         body?.myAttendeeEmail !== undefined ? body.myAttendeeEmail?.trim() || undefined : existing.myAttendeeEmail,
       replyRequested:
         body?.replyRequested !== undefined ? Boolean(body.replyRequested) : existing.replyRequested,
-      remoteEtag: body?.remoteEtag !== undefined ? body.remoteEtag?.trim() || undefined : existing.remoteEtag,
-      remoteHref: body?.remoteHref !== undefined ? body.remoteHref?.trim() || undefined : existing.remoteHref,
+      // The CalDAV linkage is server-owned (set only by sync): a client-chosen href would
+      // direct the authenticated write-back to another resource.
+      remoteEtag: existing.remoteEtag,
+      remoteHref: existing.remoteHref,
       rawIcs: body?.rawIcs !== undefined ? body.rawIcs ?? undefined : existing.rawIcs,
       // Flag CalDAV-sourced edits for write-back; the next sync pushes and clears it.
       pendingRemoteSync: resolvePendingRemoteSync(existing, Date.now()),
@@ -142,7 +148,7 @@ export async function PUT(request: Request, { params }: Params) {
           messageId: updated.messageId
         });
       }
-      return NextResponse.json({ ok: true, event: updated });
+      return NextResponse.json({ ok: true, event: toCalendarEventResponse(updated) });
     } catch (err) {
       console.error("[calendar/events/[eventId]] PUT error:", err);
       return NextResponse.json({ ok: false, message: "Failed to update event" }, { status: 500 });

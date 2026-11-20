@@ -14,6 +14,7 @@ import {
   addThreadTopic,
   removeThreadTopic
 } from "@/lib/topics";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 // GET /api/accounts/[accountId]/message-topics?threadIds=id1,id2,...
 export async function GET(request: Request, { params }: AccountRouteParams) {
@@ -42,16 +43,18 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
   const accountId = await getAccountIdFromParams(params);
-  const body = (await request.json().catch(() => null)) as {
+
+  const context = await requireAccountContext(request, accountId, { minRole: "editor" });
+  if (context instanceof NextResponse) return context;
+  const json = await readJsonBody<{
     accountId?: string;
     threadId?: string;
     action?: "set" | "add" | "remove";
     topicIds?: string[];
     topicId?: string;
-  } | null;
-
-  const context = await requireAccountContext(request, accountId, { minRole: "editor" });
-  if (context instanceof NextResponse) return context;
+  }>(request);
+  if (!json.ok) return json.response;
+  const body = json.value;
   return withAuthResponse(context, async () => {
 
     const threadId = body?.threadId?.trim();
@@ -74,7 +77,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     if (action === "add") {
       const topicId = body?.topicId?.trim();
       if (!topicId) return NextResponse.json({ ok: false, message: "Missing topicId" }, { status: 400 });
-      await addThreadTopic(accountId, threadId, topicId);
+      if (!(await addThreadTopic(accountId, threadId, topicId))) {
+        return NextResponse.json({ ok: false, message: "Topic not found" }, { status: 404 });
+      }
       return NextResponse.json({ ok: true });
     }
 

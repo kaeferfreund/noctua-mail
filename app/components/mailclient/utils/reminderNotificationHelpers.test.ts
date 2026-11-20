@@ -87,9 +87,11 @@ describe("buildReminderServiceWorkerPayload", () => {
       ["a", "b", "c"],
       "a",
       [reminder],
-      (accountId): Record<string, number> => (accountId === "b" ? { r99: 1 } : {})
+      (accountId): Record<string, number> => (accountId === "b" ? { r99: 1 } : {}),
+      "user-1"
     );
     expect(payload.type).toBe("noctua:reminder-state");
+    expect(payload.principal).toBe("user-1");
     expect(payload.accountIds).toEqual(["a", "b", "c"]);
     expect(payload.deliveredByAccount).toEqual({ b: { r99: 1 } });
     expect(payload.activeAccountId).toBe("a");
@@ -97,7 +99,7 @@ describe("buildReminderServiceWorkerPayload", () => {
   });
 
   it("emits null activeAccountId when none is active", () => {
-    const payload = buildReminderServiceWorkerPayload([], "", [], () => ({}));
+    const payload = buildReminderServiceWorkerPayload([], "", [], () => ({}), null);
     expect(payload.activeAccountId).toBeNull();
     expect(payload.activeReminderIds).toEqual([]);
   });

@@ -225,11 +225,17 @@ funktionieren unverändert weiter.
   `includeSubject: false` the subject is not part of the payload at all.
 - Signing out removes the device on the server: before `POST /api/auth/logout`
   the client sends `DELETE /api/push/subscriptions` for its current endpoint
-  (best effort, errors are ignored). The browser subscription itself stays, so
-  a shared device shows nothing for the signed-out user until a signed-in user
-  registers it again in the notification settings. Turning notifications off removes both the
+  (best effort, errors are ignored) and then drops the browser subscription as
+  well, also when the server request failed: the dead endpoint answers the next
+  delivery with 404/410 and the server removes the row. A shared device shows
+  nothing for the signed-out user; the next user switches notifications on again
+  in the notification settings. Turning notifications off removes both the
   server row and the browser subscription. A device of a user without any
   access receives nothing.
+- Known gap: revoking a session from another device ("Abmelden" in the device
+  list) does not remove that device's push subscription, because subscriptions
+  are not bound to a session yet (needs a `sessionId` column on
+  `push_subscriptions`).
 - The high-water marks and collapse windows live in process memory; a restart
   only means the first sync per mailbox sets a new baseline. Expired windows
   are dropped at the next dispatch.

@@ -44,20 +44,24 @@ export type Account = {
   settings?: AccountSettings;
   caldav?: CaldavConfig;
   deepl?: DeeplConfig;
-  imap: {
-    host: string;
-    port: number;
-    secure: boolean;
-    user: string;
-    password: string;
-  };
-  smtp: {
-    host: string;
-    port: number;
-    secure: boolean;
-    user: string;
-    password: string;
-  };
+  imap: MailServerConfig;
+  smtp: MailServerConfig;
+};
+
+/** IMAP or SMTP endpoint of a mailbox. */
+export type MailServerConfig = {
+  host: string;
+  port: number;
+  /** Implicit TLS from the first byte (IMAPS 993, SMTPS 465). */
+  secure: boolean;
+  /**
+   * Only with `secure: false`: the STARTTLS upgrade is mandatory before
+   * authentication; the connection fails if the server does not offer it.
+   * Without it, `secure: false` upgrades opportunistically ("none" in the UI).
+   */
+  requireTls?: boolean;
+  user: string;
+  password: string;
 };
 
 export type AccountDateFormat = "locale" | "mdy" | "dmy" | "ymd";
@@ -177,7 +181,12 @@ export type Message = {
   htmlBody?: string;
   /** Whether `body`/`htmlBody` are present in this payload; see MessageContentState. */
   contentState?: import("./messageContentState").MessageContentState;
-  source?: string;
+  /**
+   * Raw RFC 822 source. Server-side ingestion carries the exact wire bytes
+   * (Buffer) so 8bit/binary parts in non-UTF-8 charsets survive storage;
+   * locally generated sources (drafts, sent copies) may be strings.
+   */
+  source?: string | Buffer;
   hasSource?: boolean;
   /** Byte length of the stored raw RFC822 source. */
   sizeBytes?: number;

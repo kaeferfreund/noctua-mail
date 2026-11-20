@@ -13,6 +13,8 @@ mock.module("@/i18n/request", () => ({ getLocaleSettings: async () => ({
   locale, messages: getMessages(locale), timeZone, uiLocale: input.uiLocale ?? null, deviceLocale: input.cookie ?? null
 }) }));
 mock.module("@/app/components/i18n/LocaleSessionSync", () => ({default: () => null}));
+// The nonce the CSP proxy passes to the layout for its inline scripts.
+mock.module("next/headers", () => ({ headers: async () => new Headers({ "x-nonce": "c3ludGhldGljLW5vbmNl" }) }));
 function Probe() {
   const t = useTranslations("Settings.language");
   return <p data-locale={useLocale()} data-zone={useTimeZone()}>{t("label")}</p>;

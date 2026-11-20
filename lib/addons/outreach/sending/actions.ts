@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { rows } from "./sql";
 import type { Database } from "bun:sqlite";
 import { authorizeOutbound, prepareOutboundAssertion, type OutboundAuthorization } from "@/lib/outboundAuthorization";
@@ -55,6 +56,13 @@ function campaignChanged() {
   return new SendingError(409, "Der Entwurf wurde inzwischen geändert. Prüfe die Kampagne erneut.", "campaign_changed");
 }
 
+/** What a confirmation approves: the content as it will be sent (templates resolved), the sender and the audience. */
+function campaignContentVersion(content: object, identityId: string, campaign: Pick<import("../types").Campaign,
+  "listIds" | "excludedListIds" | "trackOpens" | "trackClicks">) {
+  const { listIds, excludedListIds, trackOpens, trackClicks } = campaign;
+  return createHash("sha256").update(JSON.stringify([content, identityId, listIds, excludedListIds, trackOpens, trackClicks])).digest("base64url");
+}
+
 export async function scheduleCampaign(db: Database, actor: SendingActor, id: string, input: CampaignScheduleRequest,
   listRecipients = listSendableRecipients): Promise<CampaignScheduleResponse> {
   const { accountId } = actor;
@@ -73,21 +81,25 @@ export async function scheduleCampaign(db: Database, actor: SendingActor, id: st
     throw new SendingError(409, "Die Kampagne erreicht derzeit niemanden: In den gewählten Listen ist kein Kontakt eingetragen, der den Newsletter erhalten darf.", "no_recipients");
   }
   const preview = input.dryRun ? await campaignSummary(campaign) : null;
-  const next = db.transaction(() => {
+  const { next, contentVersion } = db.transaction(() => {
     assertAuthorized();
     const live = getCampaign(db, accountId, id);
     if (JSON.stringify(live) !== JSON.stringify(campaign)) throw campaignChanged();
     assertLists(db, accountId, [...live.listIds, ...live.excludedListIds]);
     const content = resolveContent(db, accountId, live);
     assertContent(content);
-    if (preview) return live;
+    // A referenced template can change without touching the campaign row: the confirmation must
+    // approve exactly what the dry run resolved.
+    const contentVersion = campaignContentVersion(content, identity.id, live);
+    if (input.expectedContentVersion !== undefined && input.expectedContentVersion !== contentVersion) throw campaignChanged();
+    if (preview) return { next: live, contentVersion };
     const now = Date.now();
     db.query(`UPDATE campaigns SET status = 'scheduled', scheduledByUserId = ?, scheduledVia = ?, sendAt = ?, updatedAt = ?,
       senderIdentityId = ?, subject = ?, previewText = ?, html = ?, text = ?
       WHERE accountId = ? AND id = ? AND status = 'draft'`).run(userId, actor.via, scheduled?.sendAt ?? now, Math.max(now, live.updatedAt + 1), identity.id, content.subject, content.previewText, content.html, content.text, accountId, id);
-    return getCampaign(db, accountId, id);
+    return { next: getCampaign(db, accountId, id), contentVersion };
   }).immediate();
-  return { ok: true, campaign: preview ?? await campaignSummary(next), recipients };
+  return { ok: true, campaign: preview ?? await campaignSummary(next), recipients, contentVersion };
 }
 
 export async function cancelCampaign(db: Database, actor: SendingActor, id: string) {
@@ -121,9 +133,14 @@ export async function editSequence(db: Database, accountId: string, id: string, 
   }).immediate();
 }
 
-export async function setSequenceStatus(db: Database, actor: SendingActor, id: string, status: Exclude<SequenceStatus, "draft">) {
+export async function setSequenceStatus(db: Database, actor: SendingActor, id: string, status: Exclude<SequenceStatus, "draft">,
+  expectedUpdatedAt?: number) {
   const { accountId } = actor;
   const sequence = getSequence(db, accountId, id);
+  // Going live approves the steps the caller reviewed, not a later edit by a collaborator.
+  if (expectedUpdatedAt !== undefined && sequence.updatedAt !== expectedUpdatedAt) {
+    throw new SendingError(409, "Die Sequenz wurde inzwischen geändert. Prüfe sie erneut.", "sequence_changed");
+  }
   const authorized = status === "live" ? await checkTransportAndSender(actor, sequence.senderIdentityId)
     : await (async () => {
       const authorized = await authorizeOutbound(actor.authorization, { accountId, minRole: "editor" });

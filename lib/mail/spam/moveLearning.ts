@@ -64,9 +64,9 @@ export async function learnFromMessageMove(
     if (!message) return null;
     if (decision === "spam") {
       await recordSpamDecision({ accountId: move.accountId, message, label: "spam", source: "move-junk", userId: move.userId });
-      // Same effect as "Als Spam": the sender loses trusted-sender status everywhere; lazy like the route (AI SDK).
+      // Same effect as "Als Spam" (the mailboxes the mover may edit); lazy like the route (AI SDK).
       await import("./service")
-        .then(({ revokeSenderTrust }) => revokeSenderTrust(move.accountId, message.from, message.id))
+        .then(({ revokeSenderTrust }) => revokeSenderTrust(move.accountId, message.from, message.id, move.userId))
         .catch((error) => console.warn("[spam] failed to revoke sender trust", { accountId: move.accountId, error: String(error) }));
     } else {
       await recordSpamDecision({ accountId: move.accountId, message, label: "ham", source: "move-from-junk", userId: move.userId });

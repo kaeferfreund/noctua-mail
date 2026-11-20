@@ -13,6 +13,8 @@ type FolderPaneProps = {
     accountFolderCount: number;
     isRecomputingThreads: boolean;
     isRecomputingCategories: boolean;
+    /** Rebuilding threads/categories needs the editor role (viewers only read). */
+    canRecompute: boolean;
   };
   actions: {
     setFolderQuery: React.Dispatch<React.SetStateAction<string>>;
@@ -33,7 +35,7 @@ type FolderPaneProps = {
  */
 export default function FolderPane({ state, actions, children }: FolderPaneProps) {
   const t = useTranslations("List");
-  const { folderQuery, accountFolderCount, isRecomputingThreads, isRecomputingCategories } = state;
+  const { folderQuery, accountFolderCount, isRecomputingThreads, isRecomputingCategories, canRecompute } = state;
   const { setFolderQuery, syncAccount, recomputeThreads, recomputeCategories } = actions;
 
   return (
@@ -64,14 +66,18 @@ export default function FolderPane({ state, actions, children }: FolderPaneProps
                   })
                 }
               >{t("fullMailboxSync")}</DropdownMenu.Item>
-              <DropdownMenu.Item
-                onSelect={() => recomputeThreads()}
-                disabled={isRecomputingThreads}
-              >{t("recomputeThreads")}</DropdownMenu.Item>
-              <DropdownMenu.Item
-                onSelect={() => recomputeCategories()}
-                disabled={isRecomputingCategories}
-              >{t("recomputeCategories")}</DropdownMenu.Item>
+              {canRecompute ? (
+                <>
+                  <DropdownMenu.Item
+                    onSelect={() => recomputeThreads()}
+                    disabled={isRecomputingThreads}
+                  >{t("recomputeThreads")}</DropdownMenu.Item>
+                  <DropdownMenu.Item
+                    onSelect={() => recomputeCategories()}
+                    disabled={isRecomputingCategories}
+                  >{t("recomputeCategories")}</DropdownMenu.Item>
+                </>
+              ) : null}
             </DropdownMenu.Content>
           </DropdownMenu.Root>
         </div>

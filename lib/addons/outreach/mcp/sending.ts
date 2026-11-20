@@ -59,7 +59,7 @@ export function registerOutreachSendingTools(host: OutreachMcpHost) {
     return result("Campaign draft saved", { ok: true, campaign: saveCampaign(await getOutreachDb(), accountId, userId, input, campaignId) });
   });
   server.registerTool("schedule_campaign", {
-    description: "Schedule a campaign for its eligible subscribers. Use null to send now or epoch milliseconds to send later. Use dryRun to preview and pass campaign.updatedAt as expectedUpdatedAt when confirming.",
+    description: "Schedule a campaign for its eligible subscribers. Use null to send now or epoch milliseconds to send later. Use dryRun to preview, then confirm with campaign.updatedAt as expectedUpdatedAt and contentVersion as expectedContentVersion from that preview.",
     inputSchema: scheduleInput.extend({ ...mailbox.shape, ...campaignId }), annotations: send
   }, async args => {
     const ctx = await outreachAccount(args.accountId, "editor");
@@ -95,6 +95,6 @@ export function registerOutreachSendingTools(host: OutreachMcpHost) {
     inputSchema: statusInput.extend({ ...mailbox.shape, ...sequenceId }), annotations: send
   }, async args => {
     const ctx = await outreachAccount(args.accountId, "editor");
-    return result("Sequence status saved", { ok: true, sequence: await setSequenceStatus(await getOutreachDb(), actor(ctx), args.sequenceId, args.status) });
+    return result("Sequence status saved", { ok: true, sequence: await setSequenceStatus(await getOutreachDb(), actor(ctx), args.sequenceId, args.status, args.expectedUpdatedAt) });
   });
 }

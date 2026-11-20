@@ -3,7 +3,8 @@ import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { getAccountIdFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { requireActiveUserSession } from "@/lib/auth";
-import { getAccountById } from "@/lib/db";
+import { getAccountById, getUserAccountPrefs } from "@/lib/db";
+import { senderIconsEnabled } from "@/lib/accountPrefs";
 import { resolveSenderIcon } from "@/lib/senderIcons";
 import { getSenderIdentity } from "@/lib/senderIdentity";
 import { findSenderDomainIcon } from "@/lib/domainIcons";
@@ -37,10 +38,12 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     const override = await findSenderDomainIcon(getSenderIdentity({ from, fromEmail }), { mailboxEmail: account.email, userId: session.userId });
     if (override) return domainIconOverrideResponse(request, override);
 
+    // The caller's own opt-out wins over the mailbox default for every
+    // client (main and detached reader, sidebar), before any provider fetch.
     const result = await resolveSenderIcon({
       from,
       fromEmail,
-      enabled: account.settings?.appearance?.senderIcons ?? true
+      enabled: senderIconsEnabled(account.settings, await getUserAccountPrefs(session.userId, accountId))
     });
     // `fallback=none`: the caller draws its own initials when no logo exists.
     return senderIconResponse(result, url.searchParams.get("fallback") === "none");

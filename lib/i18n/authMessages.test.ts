@@ -12,7 +12,7 @@ const admin = (locale: "en" | "de") => createTranslator({locale, messages: local
 
 describe("localized authentication presentation", () => {
   it("retains English copy and error priority for stable auth codes", () => {
-    const codes = ["invalid_proof", "INVALID_PASSWORD", "INVALID_CODE", "INVALID_TOTP", "INVALID_BACKUP_CODE", "invalid_challenge", "SESSION_NOT_FRESH", "reauth_required", "factor_proof_required", "another_passkey_required", "passkey_uv_required", "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED", "security_state_changed", "security_operation_pending", "mfa_state_inconsistent", "invalid_invite", "invite_exhausted", "user_exists", "mailbox_exists", "auth_integration_pending", "provisioning_failed", "INVALID_TOKEN", "invalid_request", "UNKNOWN"];
+    const codes = ["invalid_proof", "INVALID_PASSWORD", "INVALID_CODE", "INVALID_TOTP", "INVALID_BACKUP_CODE", "invalid_challenge", "SESSION_NOT_FRESH", "reauth_required", "factor_proof_required", "another_passkey_required", "passkey_uv_required", "ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED", "security_state_changed", "security_operation_pending", "mfa_state_inconsistent", "invalid_invite", "invite_exhausted", "user_exists", "mailbox_exists", "auth_integration_pending", "provisioning_failed", "mail_server_unreachable", "INVALID_TOKEN", "invalid_request", "UNKNOWN"];
     for (const code of codes) for (const status of [400, 401, 403, 429]) for (const generic of [false, true]) {
       const error = new AuthClientError(status, code, 17);
       expect(formatAuthError(error, auth("en"), generic)).toBe(authErrorMessage(error, generic));

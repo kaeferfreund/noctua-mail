@@ -1,5 +1,7 @@
 #!/bin/bash
 set -euo pipefail
+# Files the service creates (databases, mail cache) are private to it.
+umask 077
 
 BASE_TITLE="Mail"
 ENV_LABEL="${APP_ENV_LABEL:-}"

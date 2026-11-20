@@ -133,6 +133,10 @@ describe("shell mutation contracts",()=>{
   await withDbWriteRetry("test.pendingLogin",()=>f.master.prepare(`INSERT INTO auth_pending_challenges(identifier,userId,generation,authenticatedAt,kind,expiresAt)
    SELECT ?,userId,generation,?,'two_factor',? FROM auth_security_state WHERE userId=?`).run(pendingLogin,Date.now(),Date.now()+60000,f.user.id));
   const epoch=f.master.prepare(`SELECT generation FROM auth_login_epoch WHERE id=1`).get().generation;
+  // Another person's anonymous passkey sign-in in progress (no user yet).
+  const anonymousLogin=randomUUID();
+  await withDbWriteRetry("test.anonymousLogin",()=>f.master.prepare(`INSERT INTO auth_pending_challenges(identifier,loginEpoch,authenticatedAt,kind,expiresAt)
+   VALUES(?,?,?,'passkey_login',?)`).run(anonymousLogin,epoch,Date.now(),Date.now()+60000));
   const response=await logout(req(saved,"POST"));expect(response.status).toBe(200);expect(await response.json()).toEqual({ok:true});
   expect(response.headers.getSetCookie().join(";")).toContain("Max-Age=0");f.jar.absorb(response.headers);
   expect(f.jar.names()).not.toContain("noctua.session_token");
@@ -141,7 +145,10 @@ describe("shell mutation contracts",()=>{
   expect(f.master.prepare("SELECT identifier FROM auth_pending_challenges WHERE sourceSessionId=?").get(f.session.id)).toBeNull();
   expect(f.master.prepare("SELECT tokenHash FROM auth_reauth_grants WHERE sessionId=?").get(f.session.id)).toBeNull();
   expect(f.master.prepare(`SELECT 1 FROM auth_pending_challenges WHERE identifier=?`).get(pendingLogin)).toBeNull();
-  expect(f.master.prepare(`SELECT generation FROM auth_login_epoch WHERE id=1`).get().generation).toBeGreaterThan(epoch);
+  // An ordinary logout ends this session only: other users' passkey sign-ins stay valid.
+  expect(f.master.prepare(`SELECT generation FROM auth_login_epoch WHERE id=1`).get().generation).toBe(epoch);
+  expect(f.master.prepare(`SELECT 1 FROM auth_pending_challenges WHERE identifier=?`).get(anonymousLogin)).not.toBeNull();
+  await withDbWriteRetry("test.anonymousLoginCleanup",()=>f.master.prepare(`DELETE FROM auth_pending_challenges WHERE identifier=?`).run(anonymousLogin));
   for (const [table,column] of [["auth_session","id"],["auth_session_security","sessionId"],["auth_pending_challenges","sourceSessionId"],["auth_reauth_grants","sessionId"]]) {
    expect(f.master.prepare(`SELECT 1 FROM ${table} WHERE ${column}=?`).get(controlId)).not.toBeNull();
   }

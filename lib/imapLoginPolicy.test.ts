@@ -3,7 +3,7 @@ import {twoFactor} from "better-auth/plugins";
 import {betterAuth} from "better-auth";
 import {imapSignIn} from "./betterAuthImapSignIn";
 import {noctuaAuthOptions} from "./betterAuth";
-import {eligibleImapLoginMailbox,imapLoginAvailable,verifyEligibleImap} from "./imapLoginPolicy";
+import {eligibleImapLoginMailbox,imapLoginAvailable,loginSourceBucket,verifyEligibleImap} from "./imapLoginPolicy";
 import {CookieJar,createTestAuthHarness,TEST_BASE_URL,TEST_SECRET,totpFromUri,type TestAuthHarness} from "./testAuthHarness";
 import {persistAccountRow,mapAccountRow} from "./db/rowParsers";
 import * as imapAuth from "./mail/imapAuth";
@@ -17,7 +17,7 @@ const previous=process.env.NOCTUA_IMAP_LOGIN_HOSTS;
 afterEach(()=>{for(const f of fixtures.splice(0))f.close();if(previous===undefined)delete process.env.NOCTUA_IMAP_LOGIN_HOSTS;else process.env.NOCTUA_IMAP_LOGIN_HOSTS=previous;});
 async function setup() {
   let network=0;
-  const f=await createTestAuthHarness(options=>{Object.assign(options.rateLimit,{enabled:false});},{imapVerification:async()=>{network++;return true;}});
+  const f=await createTestAuthHarness(options=>{Object.assign(options.rateLimit,{enabled:false});},{imapVerification:async()=>{network++;return "ok" as const;}});
   fixtures.push(f);
   const user=await f.createUser(`imap-${crypto.randomUUID()}@example.test`);
   const account={id:crypto.randomUUID(),name:"Synthetic IMAP",avatar:"",email:user.email,ownerUserId:user.id,
@@ -101,13 +101,90 @@ describe("strict IMAP first-factor gate",()=>{
     const backup=await f.auth.handler(new Request(`${TEST_BASE_URL}/api/ba/two-factor/verify-backup-code`,{method:"POST",headers:second.jar.headers({origin:TEST_BASE_URL,"content-type":"application/json"}),body:JSON.stringify({code:f.factor.backupCodes[0]})}));
     expect(backup.status).toBe(200);
   });
-  test("the personal-identity limiter runs before the sixth network attempt",async()=>{
+  test("anonymous failures cannot lock the real user out; one source is braked after five failures (CF-12)",async()=>{
     const f=await setup();process.env.NOCTUA_IMAP_LOGIN_HOSTS="imap.example.test";
+    const from=(ip:string)=>new Request(TEST_BASE_URL,{headers:{"x-forwarded-for":ip}});
+    const attacker=`synthetic-${crypto.randomUUID()}`;
     let attempts=0;
-    for(let index=0;index<5;index++)await verifyEligibleImap(f.master,f.user.id,"synthetic-secret",
-      new Request(TEST_BASE_URL,{headers:{"x-forwarded-for":`synthetic-${crypto.randomUUID()}`}}),false,async()=>{attempts++;return true;});
-    await expect(verifyEligibleImap(f.master,f.user.id,"synthetic-secret",new Request(TEST_BASE_URL),false,async()=>{attempts++;return true;})).rejects.toThrow();
+    const wrong=async()=>{attempts++;return "invalid" as const;};
+    for(let index=0;index<5;index++)await expect(verifyEligibleImap(f.master,f.user.id,"wrong",from(attacker),false,wrong)).rejects.toThrow();
+    // The attacker's address is braked before the network...
+    await expect(verifyEligibleImap(f.master,f.user.id,"wrong",from(attacker),false,wrong)).rejects.toThrow();
     expect(attempts).toBe(5);
+    // ...while the real user still signs in from elsewhere, and successes never consume budget.
+    let good=0;
+    const right=async()=>{good++;return "ok" as const;};
+    for(let index=0;index<8;index++)await verifyEligibleImap(f.master,f.user.id,"synthetic-secret",from("synthetic-owner"),false,right);
+    expect(good).toBe(8);
+  });
+  test("the user-wide brake is high, counts only failures and does not cover re-authentication (CF-12)",async()=>{
+    const f=await setup();process.env.NOCTUA_IMAP_LOGIN_HOSTS="imap.example.test";
+    const from=()=>new Request(TEST_BASE_URL,{headers:{"x-forwarded-for":`synthetic-${crypto.randomUUID()}`}});
+    let attempts=0;
+    for(let index=0;index<50;index++)await expect(verifyEligibleImap(f.master,f.user.id,"wrong",from(),false,async()=>{attempts++;return "invalid" as const;})).rejects.toThrow();
+    await expect(verifyEligibleImap(f.master,f.user.id,"synthetic-secret",from(),false,async()=>{attempts++;return "ok" as const;})).rejects.toThrow();
+    expect(attempts).toBe(50);
+    expect(await verifyEligibleImap(f.master,f.user.id,"synthetic-secret",from(),false,async()=>{attempts++;return "ok" as const;},"reauth")).toBe(true);
+    expect(attempts).toBe(51);
+  });
+  test("IPv6 sources are braked per /64, IPv4-mapped addresses as IPv4 (CF-12)",async()=>{
+    expect(loginSourceBucket("2001:db8:1:2:aaaa::1")).toBe("2001:db8:1:2::/64");
+    expect(loginSourceBucket("[2001:DB8:1:2:bbbb::2]")).toBe("2001:db8:1:2::/64");
+    expect(loginSourceBucket("::ffff:192.0.2.7")).toBe("192.0.2.7");
+    expect(loginSourceBucket("192.0.2.7")).toBe("192.0.2.7");
+    const f=await setup();process.env.NOCTUA_IMAP_LOGIN_HOSTS="imap.example.test";
+    const prefix=`2001:db8:${(Math.random()*0xffff|0).toString(16)}:7`;
+    const from=(ip:string)=>new Request(TEST_BASE_URL,{headers:{"x-forwarded-for":ip}});
+    let attempts=0;
+    const wrong=async()=>{attempts++;return "invalid" as const;};
+    for(let index=1;index<=5;index++)await expect(verifyEligibleImap(f.master,f.user.id,"wrong",from(`${prefix}::${index}`),false,wrong)).rejects.toThrow();
+    // A fresh address in the same /64 is braked before the network.
+    await expect(verifyEligibleImap(f.master,f.user.id,"wrong",from(`${prefix}:1234::99`),false,wrong)).rejects.toThrow();
+    expect(attempts).toBe(5);
+  });
+  test("the user-wide brake never blocks a source that already signed in as this user (CF-12)",async()=>{
+    const f=await setup();process.env.NOCTUA_IMAP_LOGIN_HOSTS="imap.example.test";
+    const from=(ip:string)=>new Request(TEST_BASE_URL,{headers:{"x-forwarded-for":ip}});
+    const home=`2001:db8:${(Math.random()*0xffff|0).toString(16)}:1`;
+    let good=0;
+    const right=async()=>{good++;return "ok" as const;};
+    expect(await verifyEligibleImap(f.master,f.user.id,"synthetic-secret",from(`${home}::10`),false,right)).toBe(true);
+    // Anonymous failures from many sources fill the user-wide budget...
+    for(let index=0;index<50;index++)await expect(verifyEligibleImap(f.master,f.user.id,"wrong",from(`synthetic-${crypto.randomUUID()}`),false,async()=>"invalid" as const)).rejects.toThrow();
+    // ...an unknown source is held back (brute-force protection stays)...
+    await expect(verifyEligibleImap(f.master,f.user.id,"synthetic-secret",from(`synthetic-${crypto.randomUUID()}`),false,right)).rejects.toThrow();
+    expect(good).toBe(1);
+    // ...but the real user's network (new address in the same /64) still signs in.
+    expect(await verifyEligibleImap(f.master,f.user.id,"synthetic-secret",from(`${home}::20`),false,right)).toBe(true);
+    expect(good).toBe(2);
+  });
+  test("only an accepted IMAP login signs in; a rejected or unjudged one is refused and writes nothing back",async()=>{
+    const f=await setup();process.env.NOCTUA_IMAP_LOGIN_HOSTS="imap.example.test";
+    const from=()=>new Request(TEST_BASE_URL,{headers:{"x-forwarded-for":`synthetic-${crypto.randomUUID()}`}});
+    // Both refusals are truthy strings: a boolean test of the result would accept them.
+    for(const check of ["invalid","unreachable"] as const)for(const writeBack of [false,true]){
+      await expect(verifyEligibleImap(f.master,f.user.id,"new-synthetic-secret",from(),writeBack,async()=>check)).rejects.toMatchObject({code:"invalid_credentials",status:401});
+      expect(eligiblePassword(f)).toBe("old-synthetic-secret");
+    }
+    expect(await verifyEligibleImap(f.master,f.user.id,"new-synthetic-secret",from(),true,async()=>"ok" as const)).toBe(true);
+    expect(eligiblePassword(f)).toBe("new-synthetic-secret");
+  });
+  test("a known user without IMAP login costs the same password hash as an unknown one (DS-18)",async()=>{
+    const f=await setup();process.env.NOCTUA_IMAP_LOGIN_HOSTS="imap.example.test";
+    const options=noctuaAuthOptions({database:f.database,secret:TEST_SECRET,baseURL:TEST_BASE_URL});
+    Object.assign(options.rateLimit!,{enabled:false});
+    const hashed:string[]=[];
+    const password=options.emailAndPassword!.password!;
+    options.emailAndPassword!.password={...password,hash:async(value:string)=>{hashed.push(value);return password.hash!(value);}};
+    // Isolate the endpoint: the policy plugin needs the HTTP proof wrapper; production's verifyImap
+    // answers false for an ineligible user before any network, which the stub reproduces.
+    options.plugins=options.plugins.filter(p=>!["noctua-auth-policy","noctua-imap-sign-in"].includes(p.id)) as typeof options.plugins;
+    options.plugins.push(imapSignIn({verifyImap:async()=>false}) as never);
+    const auth=betterAuth(options);
+    const signIn=(email:string)=>auth.handler(new Request(`${TEST_BASE_URL}/api/ba/sign-in/imap`,{method:"POST",headers:{origin:TEST_BASE_URL,"content-type":"application/json"},body:JSON.stringify({email,password:"synthetic-guess"})}));
+    expect((await signIn(f.user.email)).status).toBe(401);
+    expect((await signIn(`unknown-${crypto.randomUUID()}@example.test`)).status).toBe(401);
+    expect(hashed).toEqual(["synthetic-guess","synthetic-guess"]);
   });
   test("version-coupled hook count/matcher and negative control without the bridge",async()=>{
     const plugin=twoFactor();
@@ -150,7 +227,7 @@ for(const onboarding of [true,false])test(`IMAP-only first-password enrollment s
   }
   const session=await f.auth.api.getSession({headers:signed.jar.headers()});
   const source=readSessionSecurity(f.master,session!.session.id);
-  let checks=0;const verify=spyOn(imapAuth,"verifyImapCredentials").mockImplementation(async()=>{checks++;return true;});
+  let checks=0;const verify=spyOn(imapAuth,"verifyImapCredentials").mockImplementation(async()=>{checks++;return "ok" as const;});
   try {
     const request=new Request(`${TEST_BASE_URL}/api/auth/reauth`,{method:"POST",headers:signed.jar.headers({origin:TEST_BASE_URL,"content-type":"application/json","x-forwarded-for":`synthetic-${crypto.randomUUID()}`}),body:"{}"});
     const proof=await reauthenticate(f.auth,f.master,source,request,{purpose:"password.set",currentPassword:"new-synthetic-secret",...(!onboarding?{totpCode:totpFromUri(f.factor.totpURI)}:{})},createRateLimiter({max:50}));

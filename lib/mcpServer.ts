@@ -13,7 +13,7 @@ import { listAccountMembersForRole } from "@/lib/accountAccess";
 import { getOwnAddresses } from "@/lib/ownAddresses";
 import { assertMcpToolPermission, listMcpTokenAccounts, mcpTokenScopes, resolveMcpToolContext } from "@/lib/mcpAuth";
 import { mcpToolScope, type McpScope } from "@/lib/mcpPermissions";
-import { isMcpToolRateLimited } from "@/lib/mcpRateLimit";
+import { MCP_MAX_BATCH_ITEMS, isMcpMessageRateLimited, isMcpToolRateLimited } from "@/lib/mcpRateLimit";
 import {
   MCP_ATTACHMENT_DEFAULT_TEXT_CHARS,
   MCP_ATTACHMENT_MAX_BYTES,
@@ -51,6 +51,7 @@ import {
 import { z } from "zod";
 import { enrichMessagesWithThreadTopics } from "@/app/api/_helpers/enrichMessagesWithThreadTopics";
 import { runNewMailCheck } from "@/app/api/_helpers/newMailCheck";
+import { presentSyncJobErrorForRole } from "@/lib/syncJobs";
 import type { Account, Attachment, Folder, Message, McpTokenMetadata } from "@/lib/data";
 import {
   getFolders,
@@ -78,6 +79,7 @@ import {
 import { listRecipientAliases } from "@/lib/recipientAliases";
 import { readAuthEnv } from "@/lib/betterAuth";
 import { appDeepLink, messageDeepLink, parseDeepLink, type DeepLinkState } from "@/lib/navigation/deepLinks";
+import { MCP_THREAD_LOOKUP_MAX_SELECTORS, THREAD_LOOKUP_BUDGETS } from "@/lib/threadLookupBudget";
 import {
   AI_MODIFIED_FLAG,
   DONE_FLAG,
@@ -166,11 +168,11 @@ const SEARCH_MESSAGES_SCHEMA = {
   relatedId: z.string().trim().optional().describe(
     `${RELATED_SEARCH_ONLY_DESCRIPTION} Finds messages related to the given message id or Message-ID.`
   ),
-  threadIds: z.array(z.string().trim().min(1)).optional().describe(
-    `${THREAD_RELATED_ONLY_DESCRIPTION} Returns messages from the specified thread ids.`
+  threadIds: z.array(z.string().trim().min(1)).max(MCP_THREAD_LOOKUP_MAX_SELECTORS).optional().describe(
+    `${THREAD_RELATED_ONLY_DESCRIPTION} Returns messages from the specified thread ids (at most ${MCP_THREAD_LOOKUP_MAX_SELECTORS}).`
   ),
-  messageIds: z.array(z.string().trim().min(1)).optional().describe(
-    `${THREAD_RELATED_ONLY_DESCRIPTION} Returns messages for the threads that contain these message ids.`
+  messageIds: z.array(z.string().trim().min(1)).max(MCP_THREAD_LOOKUP_MAX_SELECTORS).optional().describe(
+    `${THREAD_RELATED_ONLY_DESCRIPTION} Returns messages for the threads that contain these message ids (at most ${MCP_THREAD_LOOKUP_MAX_SELECTORS}).`
   ),
   topics: z.array(z.string().trim().min(1)).optional().describe(
     `Topic filters for standard mode. Accepts topic ids or topic names. ${STANDARD_SEARCH_ONLY_DESCRIPTION}`
@@ -674,6 +676,9 @@ function formatFolderListContent(folders: (Folder & { url: string })[]) {
   return [`Returned ${folders.length} folders:`, ...lines].join("\n");
 }
 
+/** Server-defined JSON-RPC error code for an exhausted per-token message budget. */
+const MCP_RATE_LIMITED_CODE = -32029;
+
 function makeJsonRpcError(id: RequestId | null, code: number, message: string) {
   return {
     jsonrpc: "2.0" as const,
@@ -962,7 +967,9 @@ async function searchMessages(
       accountId: context.accountId,
       threadIds,
       messageIds,
-      groupBy: args.groupBy ?? "date"
+      groupBy: args.groupBy ?? "date",
+      // Large results stop early and report `truncated`.
+      budget: THREAD_LOOKUP_BUDGETS.full
     });
     await enrichMessagesWithThreadCollab(data.items, { accountId: context.accountId });
     await enrichMessagesWithThreadTopics(data.items, {
@@ -1194,16 +1201,27 @@ class StatelessJsonResponseTransport implements Transport {
     }
 
     const rawMessages = Array.isArray(body) ? body : [body];
+    if (rawMessages.length > MCP_MAX_BATCH_ITEMS) {
+      return {
+        ok: false as const,
+        responses: [makeJsonRpcError(null, ErrorCode.InvalidRequest, `Invalid request: a batch holds at most ${MCP_MAX_BATCH_ITEMS} messages`)]
+      };
+    }
     const parsedMessages: JSONRPCMessage[] = [];
     const parseErrors: ReturnType<typeof makeJsonRpcError>[] = [];
     for (const rawMessage of rawMessages) {
+      const rawId = typeof rawMessage === "object" && rawMessage && "id" in rawMessage
+        ? ((rawMessage as { id?: RequestId | null }).id ?? null)
+        : null;
+      // Each batch item counts against the token's message budget before any work for it.
+      if (isMcpMessageRateLimited(this.tokenId)) {
+        parseErrors.push(makeJsonRpcError(rawId, MCP_RATE_LIMITED_CODE,
+          "MCP rate limit exceeded (messages per minute per token). Retry after 60 seconds."));
+        continue;
+      }
       const parsed = JSONRPCMessageSchema.safeParse(rawMessage);
       if (!parsed.success || isJSONRPCResponse(parsed.data) || isJSONRPCError(parsed.data)) {
-        const id =
-          typeof rawMessage === "object" && rawMessage && "id" in rawMessage
-            ? ((rawMessage as { id?: RequestId | null }).id ?? null)
-            : null;
-        parseErrors.push(makeJsonRpcError(id, ErrorCode.InvalidRequest, "Invalid request"));
+        parseErrors.push(makeJsonRpcError(rawId, ErrorCode.InvalidRequest, "Invalid request"));
       } else {
         parsedMessages.push(parsed.data);
       }
@@ -1396,7 +1414,8 @@ export async function executeMcpHttpRequest(params: {
     },
     async ({ accountId: requestedAccountId }) => {
       const ctx = await resolveAccountContext(context, requestedAccountId);
-      const result = await runNewMailCheck(ctx.account, ctx.accountId, `mcp:${ctx.tokenRecord.id}`);
+      const checked = await runNewMailCheck(ctx.account, ctx.accountId, `mcp:${ctx.tokenRecord.id}`);
+      const result = { ...checked, jobs: checked.jobs.map(job => ({ ...job, error: presentSyncJobErrorForRole(job.error, ctx.role) })) };
       const summary =
         result.foldersWithNewMail > 0
           ? `Synced ${result.foldersWithNewMail} folder(s) with new mail (checked ${result.foldersChecked}).${result.timedOut ? " Warning: timed out before all jobs completed." : ""}`

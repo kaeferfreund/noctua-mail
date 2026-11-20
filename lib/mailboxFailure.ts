@@ -17,8 +17,8 @@ export async function mailboxFailureDto(accountId: string, role?: AccountRole) {
 
 /** Shared REST mapping for thrown IMAP failures; personal-auth 401 is never used. */
 export async function mailboxErrorResponse(error: unknown, accountId: string, role?: AccountRole) {
-  const { getImapHttpError, isImapConnectFailure } = await import("./mail/imapError");
+  const { getImapHttpError, isImapConnectFailure, MAIL_SERVER_UNREACHABLE_MESSAGE } = await import("./mail/imapError");
   const { NextResponse } = await import("next/server");
   if (getImapHttpError(error)) return NextResponse.json(await mailboxFailureDto(accountId, role), { status: 503 });
-  return isImapConnectFailure(error) ? NextResponse.json({ ok: false, message: "Could not reach the mail server. It may be temporarily unavailable." }, { status: 503 }) : null;
+  return isImapConnectFailure(error) ? NextResponse.json({ ok: false, message: MAIL_SERVER_UNREACHABLE_MESSAGE }, { status: 503 }) : null;
 }

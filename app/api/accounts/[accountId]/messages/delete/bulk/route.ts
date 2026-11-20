@@ -12,6 +12,7 @@ import { deleteMessageFiles } from "@/lib/storage";
 import { requireAccountContext } from "@/app/api/_helpers/message/routeHelpers";
 import { findTrashFolder, resolveMessageTrashState } from "@/app/api/_helpers/message/trashUtils";
 import { getAccountIdFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 type BulkDeletePayload = {
   accountId?: string;
@@ -20,8 +21,12 @@ type BulkDeletePayload = {
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const payload = (await request.json().catch(() => null)) as BulkDeletePayload | null;
   const accountId = await getAccountIdFromParams(params);
+  const accountContext = await requireAccountContext(request, accountId, { minRole: "editor" });
+  if (accountContext instanceof NextResponse) return accountContext;
+  const body = await readJsonBody<BulkDeletePayload>(request);
+  if (!body.ok) return body.response;
+  const payload = body.value;
 
   const normalizedMessageIds = Array.from(
     new Set((payload?.messageIds ?? []).map((id) => id.trim()).filter(Boolean))
@@ -32,8 +37,6 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       { status: 400 }
     );
   }
-  const accountContext = await requireAccountContext(request, accountId, { minRole: "editor" });
-  if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
     const { account, clientId } = accountContext;
 

@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/app/components/ui/tooltip";
 import type { Message } from "@/lib/data";
 import { bindRowReadAction, resolveSelectionActionTargets } from "../messagelist/selectionActions";
 import MessageMenu from "./MessageMenu";
+import { emulateSingleWindowApp } from "@/lib/testFixtures/displayMode";
 import { MessageReaderActionsProvider, type MessageReaderActions } from "./MessageReaderActions";
 
 afterEach(cleanup);
@@ -245,4 +246,24 @@ it("portal menu actions never bubble into the owning message row", async () => {
   await menu.choose("Mark as read");
   expect(menu.rowClicks()).toBe(0);
   expect(menu.calls).toHaveLength(1);
+});
+
+describe("new-window actions in a home-screen app", () => {
+  it("offers both window actions in a browser", async () => {
+    const menu = setup({ origin: "thread" });
+    await menu.open();
+    expect(menu.view.queryByRole("menuitem", { name: "Open in new window" })).not.toBeNull();
+    expect(menu.view.queryByRole("menuitem", { name: "Open HTML in new window" })).not.toBeNull();
+  });
+  it("leaves out the message window, which would have no way back, and keeps the HTML view (shown in the app)", async () => {
+    const restore = emulateSingleWindowApp();
+    try {
+      const menu = setup({ origin: "thread" });
+      await menu.open();
+      expect(menu.view.queryByRole("menuitem", { name: "Open in new window" })).toBeNull();
+      expect(menu.view.queryByRole("menuitem", { name: "Open HTML in new window" })).not.toBeNull();
+    } finally {
+      restore();
+    }
+  });
 });

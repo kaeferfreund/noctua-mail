@@ -7,6 +7,7 @@ import { createSenderIdentityWithRecompute, SenderIdentityError } from "@/lib/se
 import { getOwnAddresses } from "@/lib/ownAddresses";
 import { startIdentityRecomputeJob, getIdentityRecomputeJob } from "@/lib/threadRecomputeJobs";
 import { resolveComposeIdentity } from "@/lib/senderIdentitySelection";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const context = await requireAccountContextFromParams(request, params, { minRole: "viewer" });
@@ -27,8 +28,10 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
     const origin = requireJsonSameOrigin(request); if (origin) return origin;
+    const json = await readJsonBody<any>(request);
+    if (!json.ok) return json.response;
     try {
-      const { identity, recomputeJob } = await createSenderIdentityWithRecompute(context.accountId, await request.json().catch(() => null), context);
+      const { identity, recomputeJob } = await createSenderIdentityWithRecompute(context.accountId, json.value, context);
       return NextResponse.json({ ok: true, identity, recomputeJob }, { status: 201 });
     } catch (error) {
       if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });
@@ -43,7 +46,9 @@ export async function PUT(request: Request, { params }: AccountRouteParams) {
   if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
     const origin = requireJsonSameOrigin(request); if (origin) return origin;
-    const payload = await request.json().catch(() => null);
+    const json = await readJsonBody<any>(request);
+    if (!json.ok) return json.response;
+    const payload = json.value;
     if (!payload || Object.keys(payload).length !== 1 || payload.recompute !== true) return NextResponse.json({ ok: false, code: "invalid_identity", message: "Expected {recompute:true}" }, { status: 400 });
     return NextResponse.json({ ok: true, recomputeJob: startIdentityRecomputeJob(context.accountId) }, { status: 202 });
   });

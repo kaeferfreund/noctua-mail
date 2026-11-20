@@ -256,7 +256,9 @@ describe("Notifications settings tab", () => {
     expect(calls.find(call => call.method === "DELETE" && call.url === "/api/push/subscriptions")!.body).toEqual({ endpoint: ENDPOINT });
     expect(subscription.unsubscribed).toBe(true);
     expect(page.getByRole("switch", { name: "Benachrichtigungen auf diesem Gerät" }).getAttribute("aria-checked")).toBe("false");
-  });
+    // Four chained async waits: on a slow CI runner each can use most of its
+    // one-second budget, which exceeded the default 5 s test timeout.
+  }, 20_000);
 });
 
 describe("Notifications settings tab: devices the server no longer knows", () => {

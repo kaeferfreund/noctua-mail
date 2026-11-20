@@ -539,6 +539,7 @@
       "evictCache": "Thread-Cache leeren"
     },
     "logout": "Abmelden",
+    "detachedSignedOut": "Du wurdest abgemeldet. Dieses Fenster zeigt keine Mails mehr an und kann geschlossen werden.",
     "calendar": "Kalender",
     "compose": {
       "label": "Schreiben",
@@ -777,6 +778,10 @@
       "saving": "Wird gespeichert …",
       "submitAndSend": "{status, select, ACCEPTED {Zusagen und Antwort senden} DECLINED {Absagen und Antwort senden} TENTATIVE {Mit Vorbehalt zusagen und Antwort senden} other {Antwort senden}}",
       "submitWithoutSending": "{status, select, ACCEPTED {Zusagen, ohne Antwort zu senden} DECLINED {Absagen, ohne Antwort zu senden} TENTATIVE {Mit Vorbehalt zusagen, ohne Antwort zu senden} other {Speichern, ohne Antwort zu senden}}"
+    },
+    "inviteStatus": {
+      "organizerMismatch": "Absender ist nicht der Organisator des Termins",
+      "senderUnverified": "Absender nicht per SPF/DKIM bestätigt, bitte manuell übernehmen"
     }
   },
   "Search": {
@@ -983,6 +988,7 @@
       "mailboxExists": "Dieses Postfach existiert bereits. Bitte deine Administration um Zugriff.",
       "unavailable": "Die Anmeldung ist vorübergehend nicht verfügbar. Versuche es später erneut.",
       "provisioning": "Das Konto konnte nicht vollständig erstellt werden. Wende dich vor einem erneuten Versuch an deine Administration.",
+      "mailServerUnreachable": "Der Mailserver ist nicht erreichbar oder konnte die Anmeldung nicht prüfen. Versuche es später erneut.",
       "invalidToken": "Dieser Link ist ungültig, abgelaufen oder bereits verwendet. Bitte deine Administration um einen neuen Link.",
       "invalidRequest": "Prüfe deine Eingaben und versuche es erneut.",
       "connection": "Verbindung nicht möglich. Versuche es erneut.",
@@ -1761,6 +1767,10 @@
     "alwaysLoadSender": "Von diesem Absender immer laden",
     "alwaysLoadSenderShort": "Immer laden",
     "unknownSender": "Absender unbekannt",
+    "unverifiedSender": "Absender nicht bestätigt",
+    "checkingSender": "Absender wird geprüft …",
+    "remoteImage": "Externes Bild: {label}",
+    "blockedImage": "Bild nicht geladen: {label}",
     "flags": {
       "forwarded": "Weitergeleitet",
       "calendar": "Kalendereinladung",
@@ -1812,6 +1822,8 @@
     "fullSyncCancelled": "Vollständige Synchronisierung abgebrochen",
     "syncCancelledSelectionChanged": "Die vollständige Synchronisierung wurde vor dem Start abgebrochen, weil du ein anderes Postfach ausgewählt hast.",
     "folderAccountMismatch": "Der Ordner gehört nicht zu diesem Postfach. Bitte wähle das Postfach neu aus.",
+    "requestBodyTooLarge": "Die Daten sind zu groß für den Server (z. B. Anhänge über 25 MB oder ein sehr großes Bild in der Signatur).",
+    "requestBodyTimeout": "Die Übertragung hat zu lange gedauert. Bitte erneut versuchen.",
     "syncCancelledBeforeStart": "Die vollständige Synchronisierung wurde vor dem Start abgebrochen.",
     "region": "Benachrichtigungen",
     "dismissLabel": "Benachrichtigung schließen",
@@ -2379,6 +2391,8 @@
       "offline": "Der Server ist nicht erreichbar. Prüfe die Verbindung und versuch es erneut.",
       "generic": "Das hat nicht geklappt. Versuch es erneut.",
       "tooLarge": "Die Datei ist zu groß für den Server.",
+      "imageQuota": "Der Bildspeicher dieses Postfachs ist voll. Verwende ein bereits hochgeladenes Bild.",
+      "imageStorageFull": "Der Bildspeicher des Servers ist voll. Verwende ein bereits hochgeladenes Bild.",
       "unsupportedType": "Dieser Dateityp wird nicht angenommen.",
       "detail": "(Server: {detail})"
     },
@@ -2591,7 +2605,9 @@
       "liveFrame": "Live-Vorschau",
       "backToLive": "Zurück zur Live-Vorschau",
       "liveHint": "Live-Vorschau des Quelltexts, Platzhalter noch nicht ersetzt. Skripte sind abgeschaltet.",
-      "emptyPreview": "Noch kein Inhalt."
+      "emptyPreview": "Noch kein Inhalt.",
+      "remoteBlocked": "Externe Inhalte (Bilder, Schriften, Stylesheets) sind in der Vorschau blockiert.",
+      "loadRemote": "Externe Inhalte laden"
     },
     "images": {
       "insert": "Bild einfügen",

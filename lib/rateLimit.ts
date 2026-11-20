@@ -151,3 +151,41 @@ const defaultResolver = createRequestIpResolver(TRUSTED_PROXY_HOPS);
 export function getRequestIp(request: Request): string {
   return defaultResolver(request);
 }
+
+/**
+ * Counts only recorded failures in fixed windows; checking does not consume
+ * budget. Use for credential checks where successful or blocked attempts must
+ * not lock out the legitimate user.
+ */
+export interface FailureLimiter {
+  isBlocked(key: string): boolean;
+  recordFailure(key: string): void;
+}
+
+export function createFailureLimiter(opts?: RateLimiterOptions): FailureLimiter {
+  const windowMs = opts?.windowMs ?? 60_000;
+  const max = opts?.max ?? 10;
+  const buckets = new Map<string, RateBucket>();
+  const live = (key: string, now: number) => {
+    const bucket = buckets.get(key);
+    if (bucket && now >= bucket.resetAt) {
+      buckets.delete(key);
+      return undefined;
+    }
+    return bucket;
+  };
+  return {
+    isBlocked(key: string): boolean {
+      return (live(key, Date.now())?.count ?? 0) >= max;
+    },
+    recordFailure(key: string): void {
+      const now = Date.now();
+      if (buckets.size >= CLEANUP_INTERVAL) {
+        for (const [entry, bucket] of buckets) if (now >= bucket.resetAt) buckets.delete(entry);
+      }
+      const bucket = live(key, now);
+      if (bucket) bucket.count++;
+      else buckets.set(key, { count: 1, resetAt: now + windowMs });
+    }
+  };
+}

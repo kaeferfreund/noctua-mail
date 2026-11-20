@@ -63,7 +63,7 @@ test("a failed batch restores existing files and removes new files and ownership
   } finally {
     f.db.exec("DROP TRIGGER reject_synthetic_batch");
   }
-  expect(await getMessageSource(f.accountId, existing.id, { exact: true })).toBe(existing.source!);
+  expect(await getMessageSource(f.accountId, existing.id, { exact: true })).toBe(existing.source as string);
   expect(await getMessageSource(f.accountId, fresh.id, { exact: true })).toBeNull();
   expect((await f.api.getMessageById(f.accountId, existing.id))?.senderKey).toBe("first@example.test");
   expect(await f.api.getMessageById(f.accountId, fresh.id)).toBeNull();

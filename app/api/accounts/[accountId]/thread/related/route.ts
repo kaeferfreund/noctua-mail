@@ -13,10 +13,18 @@ import { listThreadMessages, listThreadMessageWindow, ThreadWindowCursorError } 
 import { normalizeThreadDateSource } from "@/lib/threadDate";
 import type { Message } from "@/lib/data";
 import { listDomainLinkedMessages, threadExcludedFolderIds } from "@/lib/domainConversations";
+import { THREAD_LOOKUP_BUDGETS, THREAD_LOOKUP_MAX_SELECTORS } from "@/lib/threadLookupBudget";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const payload = (await request.json()) as {
+  const accountId = await getAccountIdFromParams(params);
+  const context = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
+    missingAccountMessage: "Missing accountId or threadIds/messageIds"
+  });
+  if (context instanceof NextResponse) return context;
+  const body = await readJsonBody<{
     accountId?: string;
     threadIds?: string[];
     messageIds?: string[];
@@ -39,8 +47,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       /** Only rows of this folder. */
       folderId?: string;
     };
-  };
-  const accountId = await getAccountIdFromParams(params);
+  }>(request);
+  if (!body.ok) return body.response;
+  const payload = body.value ?? ({} as NonNullable<typeof body.value>);
   const threadIds = Array.isArray(payload.threadIds)
     ? payload.threadIds.map((value) => value.trim()).filter(Boolean)
     : [];
@@ -56,17 +65,15 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   const projection = payload.projection === "headers" ? "headers" : "full";
   const windowRequest =
     payload.window && typeof payload.window === "object" ? payload.window : null;
-  const context = await requireAccountContext(request, accountId, {
-    minRole: "viewer",
-    missingAccountMessage: "Missing accountId or threadIds/messageIds"
-  });
-  if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
     if (threadIds.length === 0 && messageIds.length === 0) {
       return NextResponse.json(
         { ok: false, message: "Missing accountId or threadIds/messageIds" },
         { status: 400 }
       );
+    }
+    if (threadIds.length + messageIds.length > THREAD_LOOKUP_MAX_SELECTORS) {
+      return NextResponse.json({ ok: false, message: "Too many threadIds/messageIds" }, { status: 400 });
     }
     if (payload.excludeSpecialFolders === true) {
       excludeFolderIds.push(...(await threadExcludedFolderIds(context.accountId)));
@@ -139,10 +146,11 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       groupBy,
       threadDateSource,
       projection,
-      excludeFolderIds
+      excludeFolderIds,
+      budget: THREAD_LOOKUP_BUDGETS[projection]
     });
     await enrich(data.items);
 
-    return NextResponse.json({ items: data.items });
+    return NextResponse.json(data.truncated ? { items: data.items, truncated: true } : { items: data.items });
   });
 }

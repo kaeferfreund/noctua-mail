@@ -305,10 +305,24 @@ export function buildAccountMessageSourcePath(accountId: string, messageId: stri
   );
 }
 
+/** Query value of the source route that returns the stored bytes unchanged as an .eml download. */
+export const MESSAGE_SOURCE_EML_FORMAT = "eml";
+
+export function buildAccountMessageEmlPath(accountId: string, messageId: string) {
+  return `${buildAccountMessageSourcePath(accountId, messageId)}?format=${MESSAGE_SOURCE_EML_FORMAT}`;
+}
+
 export function buildAccountMessageHtmlPath(accountId: string, messageId: string) {
   return buildAccountApiPath(
     accountId,
     `/messages/${encodeURIComponent(messageId)}/html`
+  );
+}
+
+export function buildAccountMessageRemoteContentPath(accountId: string, messageId: string) {
+  return buildAccountApiPath(
+    accountId,
+    `/messages/${encodeURIComponent(messageId)}/remote-content`
   );
 }
 

@@ -22,6 +22,7 @@ import {
   upsertMessages
 } from "./serverDb";
 import { deleteMessageFiles, getMessageSource } from "@/lib/storage";
+import { rawMessageSourceText } from "@/lib/messageSource";
 import {
   normalizeCalendarAttachments,
   parseComposeAttachments,
@@ -448,7 +449,9 @@ export async function saveDraftForAccount(params: {
   authorization?: OutboundAuthorization;
 }): Promise<SaveDraftResult> {
   const { account, accountId, clientId, payload } = params;
-  const existingDraft = payload.draftId ? await getMessageById(accountId, payload.draftId) : null;
+  // Saving replaces (deletes) the named message without a trash step: only a draft qualifies,
+  // never received or sent mail named by its id.
+  const existingDraft = payload.draftId ? await findComposeDraft(accountId, payload.draftId) : null;
   if (payload.draftId && !existingDraft) throw new DraftSaveError(404, "Draft not found");
   const assertDraftVersion = (draft: Message | null) => {
     if (payload.expectedUpdatedAt !== undefined && draft?.dateValue !== payload.expectedUpdatedAt) {
@@ -629,7 +632,7 @@ export async function loadSendableDraft(accountId: string, draftId: string) {
   if (!draftHasSendableRecipients(draft)) {
     throw new DraftSendError(400, "Please add at least one recipient before sending.");
   }
-  const rawSource = (await getMessageSource(accountId, draft.id)) ?? draft.source ?? null;
+  const rawSource = (await getMessageSource(accountId, draft.id)) ?? (draft.source !== undefined ? rawMessageSourceText(draft.source) : null);
   if (!rawSource) {
     throw new DraftSendError(
       409,
@@ -643,6 +646,15 @@ export async function loadSendableDraft(accountId: string, draftId: string) {
   return { draft, rawSource, messageId, identity };
 }
 
+/** A message of this mailbox that is a draft (`\\Draft` flag or in the Drafts folder), else null. */
+export async function findComposeDraft(accountId: string, draftId: string): Promise<Message | null> {
+  const draft = await getMessageById(accountId, draftId);
+  if (!draft) return null;
+  if (hasMessageFlag(draft.flags, "\\Draft")) return draft;
+  const draftsFolder = findDraftsFolder(await getFolders(accountId), accountId);
+  return draftsFolder && draft.folderId === draftsFolder.id ? draft : null;
+}
+
 /**
  * The saved draft a compose send names by `draftId`, if it really is a draft: flagged
  * `\Draft` (compose saves it so) or in the account's Drafts folder (another client may
@@ -651,11 +663,7 @@ export async function loadSendableDraft(accountId: string, draftId: string) {
  */
 export async function findSentComposeDraft(accountId: string, draftId: string): Promise<Message | null> {
   try {
-    const draft = await getMessageById(accountId, draftId);
-    if (!draft) return null;
-    if (hasMessageFlag(draft.flags, "\\Draft")) return draft;
-    const draftsFolder = findDraftsFolder(await getFolders(accountId), accountId);
-    return draftsFolder && draft.folderId === draftsFolder.id ? draft : null;
+    return await findComposeDraft(accountId, draftId);
   } catch (error) {
     console.warn("[draft-send] could not look up the sent draft", { accountId, draftId, error });
     return null;

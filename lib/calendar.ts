@@ -4,7 +4,17 @@ import {
   isValidCalendarTimeZone,
   resolveCalendarTimeZoneId
 } from "./calendarTimezones";
+import { buildDerivedCalendarEventUid } from "./calendarEventUids";
 import { formatAccountIntl } from "./dateFormatting";
+import { timeZone as appTimeZone } from "./i18n/config";
+
+/**
+ * Zone for ICS date-times that carry neither a TZID nor a Z suffix
+ * ("floating" local times). Read in the process zone they would depend on
+ * where the code runs (UTC on the server, the device zone in the browser);
+ * Noctua shows calendars in one fixed zone, so floating times use it too.
+ */
+export const CALENDAR_FLOATING_TIME_ZONE = appTimeZone;
 
 export type CalendarEventPreview = {
   uid?: string;
@@ -280,14 +290,17 @@ export function parseCalendarDate(value: string, tzid?: string): { date?: Date; 
       tzid: "UTC"
     };
   }
-  if (resolvedTimezone && isValidCalendarTimeZone(resolvedTimezone)) {
+  // A floating time (no TZID at all) is a wall time in Noctua's fixed zone.
+  // An unknown TZID keeps its previous handling below.
+  const wallTimezone = tzid?.trim() ? resolvedTimezone : CALENDAR_FLOATING_TIME_ZONE;
+  if (wallTimezone && isValidCalendarTimeZone(wallTimezone)) {
     const wallDate = new Date(
       Date.UTC(Number(y), Number(m) - 1, Number(d), Number(hh), Number(mm), Number(ss))
     );
     return {
       allDay: false,
-      date: fromCalendarTimeZoneWallDate(wallDate, resolvedTimezone),
-      tzid: resolvedTimezone
+      date: fromCalendarTimeZoneWallDate(wallDate, wallTimezone),
+      tzid: wallTimezone
     };
   }
   return {
@@ -430,6 +443,19 @@ export function parseIcsInvite(source: string): ParsedCalendarInvite {
           if (dates.length > 0) {
             event.recurrenceDates = dates;
           }
+        }
+        if (!event.uid?.trim() && pendingDates?.start) {
+          // Some generators omit the required UID; derive a stable one from
+          // the raw values so every invite path can key the event.
+          event.uid = buildDerivedCalendarEventUid({
+            startValue: pendingDates.start.value,
+            startTzid: pendingDates.start.tzid,
+            endValue: pendingDates.end?.value,
+            endTzid: pendingDates.end?.tzid,
+            recurrenceIdValue: pendingDates.recurrenceId?.value,
+            summary: event.summary,
+            organizerEmail: event.organizerEmail
+          });
         }
         events.push(event);
       }

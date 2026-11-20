@@ -15,7 +15,7 @@ installBackendConsoleTimestamps();
 
 const { getAccounts } = await import("../lib/serverDb");
 const { getAccountDb } = await import("../lib/db/connection");
-const { getMessageSource } = await import("../lib/storage");
+const { getMessageSourceBuffer } = await import("../lib/storage");
 const { extractIcsSourceFromEmailSource } = await import("../lib/mail/attachmentFromSource");
 const {
   buildCalendarEventSnapshot,
@@ -101,8 +101,8 @@ async function backfillForAccount(accountId: string, dryRun: boolean) {
       skipped += 1;
       continue;
     }
-    const source = await getMessageSource(accountId, messageId).catch(() => null);
-    if (!source) {
+    const source = await getMessageSourceBuffer(accountId, messageId).catch(() => null);
+    if (!source?.length) {
       skipped += 1;
       continue;
     }

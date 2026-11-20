@@ -10,6 +10,7 @@ import {
   connectImapClientWithRetry,
   resetImapConnectFailureState
 } from "./imapClientOptions";
+import { isImapConnectFailure } from "./imapError";
 
 const account = {
   id: "acc-test",
@@ -468,6 +469,70 @@ describe("buildImapFlowOptions TLS identity logging", () => {
 
     expect(client).toBeTruthy();
     expect(attempts).toBe(2);
+  });
+
+  it("retries a login the server could not process and reports it as a connect failure", async () => {
+    process.env.IMAP_LOG_LEVEL = "warn";
+    process.env.IMAP_CONNECT_RETRY_COUNT = "1";
+    process.env.IMAP_CONNECT_RETRY_BASE_DELAY_MS = "1";
+    process.env.IMAP_CONNECT_BREAKER_THRESHOLD = "9";
+
+    let attempts = 0;
+    const failure = await connectImapClientWithRetry({
+      account: { ...account, id: "acc-auth-outage" } as Account,
+      createClient: () => {
+        const nextClient = new EventEmitter() as EventEmitter & {
+          connect: () => Promise<void>;
+          logout: () => Promise<void>;
+        };
+        nextClient.connect = async () => {
+          attempts += 1;
+          throw Object.assign(new Error("Command failed"), {
+            authenticationFailed: true,
+            responseStatus: "NO",
+            serverResponseCode: "UNAVAILABLE",
+            responseText: "Temporary authentication failure."
+          });
+        };
+        nextClient.logout = async () => {};
+        return nextClient as never;
+      }
+    }).catch((error: unknown) => error);
+
+    expect(attempts).toBe(2);
+    expect(isImapConnectFailure(failure)).toBe(true);
+    // The log names what the server said, not only imapflow's generic message.
+    expect(warnings.join("\n")).toContain("[UNAVAILABLE] Temporary authentication failure.");
+  });
+
+  it("does not retry rejected credentials or report them as a connect failure", async () => {
+    process.env.IMAP_LOG_LEVEL = "warn";
+    process.env.IMAP_CONNECT_RETRY_COUNT = "1";
+    process.env.IMAP_CONNECT_RETRY_BASE_DELAY_MS = "1";
+
+    let attempts = 0;
+    const failure = await connectImapClientWithRetry({
+      account: { ...account, id: "acc-auth-rejected" } as Account,
+      createClient: () => {
+        const nextClient = new EventEmitter() as EventEmitter & {
+          connect: () => Promise<void>;
+          logout: () => Promise<void>;
+        };
+        nextClient.connect = async () => {
+          attempts += 1;
+          throw Object.assign(new Error("Command failed"), {
+            authenticationFailed: true,
+            responseStatus: "NO",
+            serverResponseCode: "AUTHENTICATIONFAILED"
+          });
+        };
+        nextClient.logout = async () => {};
+        return nextClient as never;
+      }
+    }).catch((error: unknown) => error);
+
+    expect(attempts).toBe(1);
+    expect(isImapConnectFailure(failure)).toBe(false);
   });
 
   it("skipBreaker bypasses the fast-fail even when breaker is open", async () => {

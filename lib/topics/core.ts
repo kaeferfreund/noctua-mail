@@ -169,12 +169,25 @@ export async function deleteTopic(accountId: string, topicId: string): Promise<b
   });
 }
 
+/**
+ * Topic ids are unique across a whole shard, and a legacy shared shard holds
+ * several mailboxes. Only ids of this mailbox's own topics may be assigned.
+ */
+function ownedTopicIds(db: any, accountId: string, topicIds: readonly string[]): string[] {
+  const requested = Array.from(new Set(topicIds.map((topicId) => String(topicId ?? "").trim()).filter(Boolean)));
+  if (requested.length === 0) return [];
+  const owned = new Set((db
+    .prepare(`SELECT id FROM topics WHERE accountId = ? AND id IN (SELECT value FROM json_each(?))`)
+    .all(accountId, JSON.stringify(requested)) as Array<{ id: string }>).map((row) => row.id));
+  return requested.filter((topicId) => owned.has(topicId));
+}
+
 export async function getTopicsForThread(accountId: string, threadId: string): Promise<Topic[]> {
   return withAccountDb(accountId, (db) => {
     const rows = db
       .prepare(
         `SELECT t.* FROM topics t
-         JOIN thread_topics tt ON t.id = tt.topicId
+         JOIN thread_topics tt ON t.id = tt.topicId AND t.accountId = tt.accountId
          WHERE tt.threadId = ? AND tt.accountId = ?
          ORDER BY t.name ASC`
       )
@@ -193,7 +206,7 @@ export async function getTopicsForThreads(
     const rows = db
       .prepare(
         `SELECT tt.threadId, t.* FROM topics t
-         JOIN thread_topics tt ON t.id = tt.topicId
+         JOIN thread_topics tt ON t.id = tt.topicId AND t.accountId = tt.accountId
          WHERE tt.threadId IN (${placeholders}) AND tt.accountId = ?
          ORDER BY t.name ASC`
       )
@@ -228,7 +241,7 @@ export async function setThreadTopics(
   return withAccountDb(accountId, (db) => {
     const now = Date.now();
     const normalizedThreadId = threadId.trim();
-    const nextTopicIds = Array.from(new Set(topicIds.map((topicId) => topicId.trim()).filter(Boolean)));
+    const nextTopicIds = ownedTopicIds(db, accountId, topicIds);
     const previousTopicIds = (db
       .prepare(
         `SELECT topicId
@@ -260,7 +273,7 @@ export async function setThreadTopics(
     const rows = db
       .prepare(
         `SELECT t.* FROM topics t
-         JOIN thread_topics tt ON t.id = tt.topicId
+         JOIN thread_topics tt ON t.id = tt.topicId AND t.accountId = tt.accountId
          WHERE tt.threadId = ? AND tt.accountId = ?
          ORDER BY t.name ASC`
       )
@@ -269,19 +282,22 @@ export async function setThreadTopics(
   });
 }
 
+/** Returns false when the topic does not belong to this mailbox. */
 export async function addThreadTopic(
   accountId: string,
   threadId: string,
   topicId: string
-): Promise<void> {
-  await withAccountDb(accountId, (db) => {
+): Promise<boolean> {
+  return withAccountDb(accountId, (db) => {
     const normalizedThreadId = threadId.trim();
-    const normalizedTopicId = topicId.trim();
+    const [normalizedTopicId] = ownedTopicIds(db, accountId, [topicId]);
+    if (!normalizedTopicId) return false;
     db.prepare(
       `INSERT OR IGNORE INTO thread_topics (threadId, topicId, accountId, assignedAt)
        VALUES (?, ?, ?, ?)`
     ).run(normalizedThreadId, normalizedTopicId, accountId, Date.now());
     rememberTopicLearningForThread(db, accountId, normalizedThreadId, [normalizedTopicId]);
+    return true;
   });
 }
 

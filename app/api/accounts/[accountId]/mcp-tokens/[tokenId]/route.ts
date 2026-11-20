@@ -3,10 +3,11 @@ import { NextResponse } from "next/server";
 import { getAccountIdFromParams, requireAccountContext, requireAccountContextFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { requireBodylessSameOrigin, requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { listMcpTokens } from "@/lib/serverDb";
-import { deleteMcpToken } from "@/lib/serverDb";
+import { deleteMcpToken, removeMcpTokenAccount } from "@/lib/serverDb";
 import { updateMcpTokenAccounts } from "@/lib/mcpAuth";
 import { isMcpAccountIdList } from "@/lib/mcpPermissions";
 import { requireMcpGrant } from "../mcpGrant";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; tokenId?: string }>;
@@ -29,7 +30,11 @@ export async function DELETE(request: Request, { params }: Params) {
 
     const token = (await listMcpTokens(context.accountId)).find(t => t.id === tokenId);
     if (!token || (context.role !== "manager" && token.createdByUserId !== context.userId)) return NextResponse.json({ ok: false, message: "Token not found" }, { status: 404 });
-    const deleted = await deleteMcpToken(context.accountId, tokenId);
+    // The creator revokes the whole token. A manager of this mailbox only removes this
+    // mailbox from it; the creator's access to other mailboxes is not theirs to revoke.
+    const deleted = token.createdByUserId === context.userId
+      ? await deleteMcpToken(context.accountId, tokenId)
+      : await removeMcpTokenAccount(context.accountId, tokenId);
     if (!deleted) {
       return NextResponse.json({ ok: false, message: "Token not found" }, { status: 404 });
     }
@@ -46,7 +51,9 @@ export async function PATCH(request: Request, { params }: Params) {
     const origin = requireJsonSameOrigin(request); if (origin) return origin;
     const tokenId = (await params).tokenId?.trim();
     if (!tokenId) return NextResponse.json({ ok: false, message: "Missing tokenId" }, { status: 400 });
-    const body = await request.json().catch(() => null);
+    const json = await readJsonBody<any>(request);
+    if (!json.ok) return json.response;
+    const body = json.value;
     if (!body || !isMcpAccountIdList(body.accountIds, context.accountId)) return NextResponse.json({ ok: false, message: "Invalid token mailboxes" }, { status: 400 });
     // Widening a token's reach is as sensitive as creating one: same fresh factor proof.
     const proof = await requireMcpGrant(context.session, request); if (proof) return proof;

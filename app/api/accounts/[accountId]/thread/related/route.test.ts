@@ -80,3 +80,37 @@ describe("conversation window folder limit", () => {
     expect(elsewhere.items).toEqual([]);
   });
 });
+
+describe("bulk thread lookup bounds", () => {
+  const bulkRead = (body: Record<string, unknown>) => threadRelated(new Request(`http://localhost:3000/api/accounts/${accountId}/thread/related`, {
+    method: "POST", headers: new Headers({ cookie, "content-type": "application/json", origin: "http://localhost:3000" }),
+    body: JSON.stringify(body)
+  }), params());
+
+  test("too many selectors are rejected before any lookup", async () => {
+    const threadIds = Array.from({ length: 5001 }, (_, index) => `synthetic-thread-${index}`);
+    const res = await bulkRead({ threadIds });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ message: "Too many threadIds/messageIds" });
+  });
+
+  test("a lookup inside the budget returns every row without a truncation flag", async () => {
+    const res = await bulkRead({ threadIds: ["thread-target"] });
+    expect(res.status).toBe(200);
+    const data = await res.json() as { items: Message[]; truncated?: boolean };
+    expect(data.items.map(item => item.id).sort()).toEqual(["target-1", "target-2", "target-3", "target-4"]);
+    expect(data.truncated).toBeUndefined();
+  });
+
+  test("the row and body budgets stop reading and report truncation", async () => {
+    const { listThreadMessages } = await dbModulePromise;
+    const rows = await listThreadMessages({ accountId, threadIds: ["thread-target", "thread-history"], budget: { maxRows: 2 } });
+    expect(rows.items).toHaveLength(2);
+    expect(rows.truncated).toBe(true);
+    // "Synthetic body" has 14 characters: two rows fit into 30, the third does not.
+    const chars = await listThreadMessages({ accountId, threadIds: ["thread-target"], budget: { maxRows: 100, maxBodyChars: 30 } });
+    expect(chars.items).toHaveLength(2);
+    expect(chars.truncated).toBe(true);
+    expect((await listThreadMessages({ accountId, threadIds: ["thread-target"] })).items).toHaveLength(4);
+  });
+});

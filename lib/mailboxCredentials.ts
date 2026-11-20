@@ -8,7 +8,8 @@ import { getDb } from "./db/connection";
 import { mapAccountRow, mergeAccount, persistAccountRow } from "./db/rowParsers";
 import { resolveAccountRoleRow } from "./db/accountAccess";
 import { roleAtLeast } from "./accountRole";
-import { verifyImapCredentials } from "./mail/imapAuth";
+import { verifyImapCredentials, type ImapCredentialsCheck } from "./mail/imapAuth";
+import { MAIL_SERVER_UNREACHABLE_MESSAGE } from "./mail/imapError";
 import { verifySmtpCredentials } from "./mail/smtp";
 import { withDbWriteRetry } from "./dbWriteRetry";
 import { revokeAuthStreams } from "./authStreams";
@@ -24,8 +25,16 @@ export type MailboxPatch = Omit<Partial<Account>, "imap" | "smtp"> & {
 };
 export type CredentialActor = { userId: string; clientId?: string };
 export type CredentialVerification = { imap: typeof verifyImapCredentials; smtp: typeof verifySmtpCredentials; authorize?: () => void };
+/**
+ * Only `"ok"` accepts IMAP credentials. An outage is reported as such (503), not as a wrong
+ * password; it is still a rejection, so nothing is stored.
+ */
+export function assertImapCredentialsAccepted(check: ImapCredentialsCheck, invalidMessage = "Invalid IMAP credentials") {
+  if (check === "ok") return;
+  throw check === "unreachable" ? new MailboxCredentialError(MAIL_SERVER_UNREACHABLE_MESSAGE, 503) : new MailboxCredentialError(invalidMessage);
+}
 const defaultVerification: CredentialVerification = { imap: verifyImapCredentials, smtp: verifySmtpCredentials };
-const endpointKeys = ["host", "port", "secure", "user"] as const;
+const endpointKeys = ["host", "port", "secure", "requireTls", "user"] as const;
 const normalized = (value: string) => value.trim().toLowerCase();
 
 /**
@@ -55,8 +64,10 @@ export async function updateMailboxCredentials(accountId: string, patchInput: Ma
     for (const key of ["host", "user"] as const) if (key in server && (typeof server[key] !== "string" || !server[key]!.trim())) throw new MailboxCredentialError(`Invalid ${protocol}.${key}`);
     if ("port" in server && (!Number.isInteger(server.port) || server.port! < 1 || server.port! > 65535)) throw new MailboxCredentialError("Invalid port");
     if ("secure" in server && typeof server.secure !== "boolean") throw new MailboxCredentialError("Invalid secure flag");
+    if ("requireTls" in server && typeof server.requireTls !== "boolean") throw new MailboxCredentialError("Invalid requireTls flag");
     if (endpointKeys.some(k => k in server && server[k] !== original[protocol][k]) && !server.password?.trim()) throw new MailboxCredentialError(`Changing ${protocol} endpoint requires its password`);
   }
+  assertCaldavPatch(original.caldav, patch.caldav);
   if (patch.settings?.signatures !== undefined) {
     if (!Array.isArray(patch.settings.signatures)) throw new SignatureTemplateError("invalid signature list");
     for (const signature of patch.settings.signatures) {
@@ -88,7 +99,7 @@ export async function updateMailboxCredentials(accountId: string, patchInput: Ma
   const inherited = currentAuthProof()?.op;
   const operation = loginOwner && credentialChanged ? (inherited?.userId === loginOwner ? inherited : await reserveSecurityOperation(db, loginOwner, "security.mailbox.credentials")) : undefined;
   try {
-  if ((imapChanged || !!patch.imap?.password?.trim()) && !await verification.imap(next, next.imap.password, actor.clientId)) throw new MailboxCredentialError("Invalid IMAP credentials");
+  if (imapChanged || !!patch.imap?.password?.trim()) assertImapCredentialsAccepted(await verification.imap(next, next.imap.password, actor.clientId));
   if ((explicitSmtp || !!patch.smtp?.password?.trim()) && !await verification.smtp(next)) throw new MailboxCredentialError("Invalid SMTP credentials");
   await withDbWriteRetry("updateMailboxCredentials", () => db.transaction(() => {
     assertActor(); assertIdentity(); verification.authorize?.();
@@ -115,6 +126,34 @@ export async function updateMailboxCredentials(accountId: string, patchInput: Ma
   return next;
   } finally {
     if (operation && operation !== inherited) await finishSecurityOperation(db, operation);
+  }
+}
+
+/** Comparable CalDAV endpoint: parsed URL (scheme, host, port, path) or the trimmed raw text. */
+function caldavEndpoint(url: string | undefined): string {
+  const raw = (url ?? "").trim();
+  return URL.canParse(raw) ? new URL(raw).href.replace(/\/+$/, "") : raw;
+}
+
+/**
+ * The stored CalDAV password is only reused for the endpoint and user it was entered for:
+ * a different URL (scheme, host, port or path) or user requires the password again, as for
+ * IMAP/SMTP. A password is never accepted together with a plain-HTTP server URL.
+ */
+function assertCaldavPatch(original: Account["caldav"], patch: MailboxPatch["caldav"]) {
+  if (patch === undefined || patch === null) return;
+  if (typeof patch !== "object" || Array.isArray(patch)) throw new MailboxCredentialError("Invalid caldav settings");
+  for (const key of ["url", "user", "password", "calendarPath"] as const) {
+    if (patch[key] !== undefined && typeof patch[key] !== "string") throw new MailboxCredentialError(`Invalid caldav.${key}`);
+  }
+  const url = patch.url ?? original?.url ?? "";
+  const user = (patch.user ?? original?.user ?? "").trim();
+  const newPassword = !!patch.password?.trim();
+  const endpointChanged = !original || caldavEndpoint(url) !== caldavEndpoint(original.url) || user !== (original.user ?? "").trim();
+  if (endpointChanged && original?.password && !newPassword) throw new MailboxCredentialError("Changing caldav endpoint requires its password");
+  const usesPassword = newPassword || !!original?.password;
+  if (usesPassword && (endpointChanged || newPassword) && URL.canParse(url.trim()) && new URL(url.trim()).protocol === "http:") {
+    throw new MailboxCredentialError("CalDAV with a password requires an https:// URL");
   }
 }
 

@@ -9,6 +9,7 @@ import { assertSchedulableDraft, presentScheduledSend, SCHEDULED_SEND_MIN_ROLE, 
 import { getAccountIdFromParams, requireAccountContext, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { errorResponse, okResponse } from "@/app/api/_helpers/response";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 const SCHEDULE_WINDOW_SECONDS = 60;
 /** Per user: planning is cheap to repeat by hand, but each row becomes an SMTP send later. */
@@ -46,7 +47,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       limited.headers.set("retry-after", String(SCHEDULE_WINDOW_SECONDS));
       return limited;
     }
-    const body = (await request.json().catch(() => null)) as { draftId?: unknown; sendAt?: unknown } | null;
+    const json = await readJsonBody<{ draftId?: unknown; sendAt?: unknown }>(request);
+    if (!json.ok) return json.response;
+    const body = json.value;
     const draftId = typeof body?.draftId === "string" ? body.draftId.trim() : "";
     if (!draftId || draftId.length > 256) return errorResponse("Missing draftId", 400);
     const sendAt = validateScheduledSendAt(body?.sendAt);

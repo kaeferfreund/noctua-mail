@@ -1,3 +1,4 @@
+import type { Element, Root, RootContent } from "hast";
 import rehypeRaw from "rehype-raw";
 import rehypeStringify from "rehype-stringify";
 import remarkBreaks from "remark-breaks";
@@ -21,8 +22,9 @@ import { FORWARD_META_ATTR, forwardMetaHtmlToText } from "./html";
  * |----------------|-------------------------------------------|-----------------------------------------------------|
  * | md → html      | Compose tab switch (markdown → html tab)  | `markdownToHtml` (this file; remark/rehype pipeline)|
  * | md → html      | Outbound email body (styled for clients)  | `markdownToEmailHtml` (lib/markdownEmail.ts)        |
- * | md → DOM       | Rendered message view                     | `<ReactMarkdown>` (MarkdownPanel.tsx)               |
+ * | md → DOM       | Rendered message view, notes              | `<MarkdownContent>` (via MarkdownPanel.tsx)         |
  * | md → editor    | Compose markdown editor UI                | `@uiw/react-md-editor` (ComposeMarkdownEditor)      |
+ * | md → DOM       | Compose markdown preview                  | `<MarkdownContent>` (as MarkdownPanel, no raw HTML) |
  * | html → md      | Compose tab switch (html → markdown tab)  | `htmlToMarkdown` (this file; uses `turndown`)       |
  * | html → md-ish  | Outbound text/plain fallback from HTML    | `htmlToMarkdown` (reused by composeContentBuilder)  |
  * | html → text    | Compose strip (quoted-parts, tab switch)  | `stripHtmlToText` (@/lib/html; regex-based)         |
@@ -40,8 +42,8 @@ import { FORWARD_META_ATTR, forwardMetaHtmlToText } from "./html";
  * Why two `md → html` paths?
  *   `markdownToHtml` (this file) produces the raw HTML that the compose tab
  *   switch pastes into the editor. `markdownToEmailHtml` wraps it and inlines
- *   `@uiw/react-markdown-preview` CSS so outbound mail renders consistently
- *   in external clients. Both sit on top of the same remark/rehype pipeline
+ *   the `@uiw/react-markdown-preview` stylesheet (also the compose preview's
+ *   typography) so outbound mail renders consistently in external clients. Both sit on top of the same remark/rehype pipeline
  *   configured below, which shares its core plugins (`remark-gfm` +
  *   `remark-breaks`) with the display path's `react-markdown` configuration
  *   in `MarkdownPanel.tsx` — so compose preview, sent mail, and received
@@ -50,7 +52,10 @@ import { FORWARD_META_ATTR, forwardMetaHtmlToText } from "./html";
  *
  *   Intentional deltas from the display path:
  *     - The send path enables `rehype-raw` so authors can embed raw HTML in
- *       markdown source and have it reach the recipient as HTML.
+ *       markdown source and have it reach the recipient as HTML. Active
+ *       content (scripts, frames, plugins, forms, event handlers, script
+ *       URLs) is removed (`rehypeRemoveActiveContent`): a draft can be
+ *       written by another mailbox member or an MCP client.
  *       `MarkdownPanel` deliberately does not, since received-mail HTML is
  *       untrusted and the display layer prefers escaping over rendering.
  *     - `MarkdownPanel` preprocesses input via `normalizeMarkdownBody` (fixes
@@ -76,13 +81,65 @@ import { FORWARD_META_ATTR, forwardMetaHtmlToText } from "./html";
  *                     matching react-markdown's default when `rehype-raw` is
  *                     supplied (which MarkdownPanel does not currently pass,
  *                     but the send path has historically allowed via marked).
+ *  - `rehypeRemoveActiveContent`: drops scripts, frames, plugins, forms,
+ *                     event handlers and script URLs from that raw HTML.
  */
+/** Elements that run code, embed documents or plugins, submit data or redirect. */
+const ACTIVE_ELEMENTS = new Set([
+  "script", "iframe", "frame", "frameset", "object", "embed", "applet", "portal",
+  "form", "base", "meta", "link", "animate", "set", "handler", "listener"
+]);
+/** Attributes that take a URL (hast property names, lowercased). */
+const URL_PROPERTIES = new Set([
+  "href", "src", "srcset", "xlinkhref", "action", "formaction", "poster", "background", "cite", "data", "codebase", "dynsrc", "lowsrc"
+]);
+
+function isActiveUrl(value: unknown, tagName: string) {
+  const url = String(value).replace(/[\u0000-\u0020]/g, "").toLowerCase();
+  if (/^(?:javascript|vbscript|livescript):/.test(url)) return true;
+  return url.startsWith("data:") && !((tagName === "img" || tagName === "source") && url.startsWith("data:image/"));
+}
+
+function removeActiveProperties(element: Element) {
+  for (const [name, value] of Object.entries(element.properties)) {
+    const key = name.toLowerCase();
+    const values = Array.isArray(value) ? value : [value];
+    if (key.startsWith("on") || key === "srcdoc" ||
+        (URL_PROPERTIES.has(key) && values.some((entry) => isActiveUrl(entry, element.tagName)))) {
+      delete element.properties[name];
+    }
+  }
+}
+
+function removeActiveNodes(children: RootContent[]): RootContent[] {
+  return children.filter((child) => {
+    if (child.type !== "element") return true;
+    if (ACTIVE_ELEMENTS.has(child.tagName.toLowerCase())) return false;
+    removeActiveProperties(child);
+    child.children = removeActiveNodes(child.children) as Element["children"];
+    if (child.tagName === "template" && child.content) child.content.children = removeActiveNodes(child.content.children);
+    return true;
+  });
+}
+
+/**
+ * Removes active content from the HTML that raw HTML in a Markdown draft
+ * produces; everything else (layout, styles, images) reaches the recipient
+ * unchanged.
+ */
+function rehypeRemoveActiveContent() {
+  return (tree: Root) => {
+    tree.children = removeActiveNodes(tree.children);
+  };
+}
+
 const markdownProcessor = unified()
   .use(remarkParse)
   .use(remarkGfm)
   .use(remarkBreaks)
   .use(remarkRehype, { allowDangerousHtml: true })
   .use(rehypeRaw)
+  .use(rehypeRemoveActiveContent)
   .use(rehypeStringify);
 
 /**

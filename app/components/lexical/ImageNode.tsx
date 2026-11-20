@@ -20,6 +20,8 @@ import {
   KEY_DELETE_COMMAND
 } from "lexical";
 import { useTranslations } from "next-intl";
+import RemoteImagePlaceholder from "@/app/components/RemoteImagePlaceholder";
+import { classifyImageSource } from "@/lib/html/remoteContent";
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { useLexicalNodeSelection } from "@lexical/react/useLexicalNodeSelection";
 import {
@@ -27,6 +29,7 @@ import {
   type ImageResizeCorner,
   type ImageSize
 } from "./imageResize";
+import { useEditorRemoteImages } from "./remoteImages";
 
 type SerializedImageNode = {
   src: string;
@@ -185,6 +188,7 @@ function ImageComponent({
 }) {
   const [editor] = useLexicalComposerContext();
   const t = useTranslations("Editor.image");
+  const remoteImages = useEditorRemoteImages();
   const [isSelected, setSelected, clearSelection] = useLexicalNodeSelection(nodeKey);
   const imageRef = useRef<HTMLImageElement | null>(null);
   // Live size shown while dragging a handle; committed to the node on release.
@@ -373,6 +377,16 @@ function ImageComponent({
     [editor, nodeKey]
   );
 
+  // Only the editor view is gated; exportDOM keeps the source for the recipient.
+  const kind = classifyImageSource(src);
+  if (kind !== "local" && !(kind === "remote" && remoteImages.allowed)) {
+    return (
+      <span contentEditable={false}>
+        <RemoteImagePlaceholder src={src} alt={alt} kind={kind} onLoad={remoteImages.allow} />
+      </span>
+    );
+  }
+
   const renderWidth = dragSize?.width ?? width;
   const renderHeight = dragSize?.height ?? height;
 
@@ -394,6 +408,7 @@ function ImageComponent({
         width={renderWidth}
         height={renderHeight}
         draggable={false}
+        referrerPolicy="no-referrer"
         onDoubleClick={handleReset}
         title={isSelected ? t("resizeHint") : undefined}
         style={{

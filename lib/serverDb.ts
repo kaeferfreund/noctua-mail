@@ -114,6 +114,11 @@ export async function deleteMcpToken(...args: Parameters<ServerDbModule["deleteM
   return db.deleteMcpToken(...args);
 }
 
+export async function removeMcpTokenAccount(...args: Parameters<ServerDbModule["removeMcpTokenAccount"]>) {
+  const db = await loadServerDb();
+  return db.removeMcpTokenAccount(...args);
+}
+
 export async function touchMcpTokenLastUsed(
   ...args: Parameters<ServerDbModule["touchMcpTokenLastUsed"]>
 ) {

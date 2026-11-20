@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getAccountIdFromParams, requireAccountContext, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { TOPIC_SUGGESTION_SIGNALS, type TopicSuggestionSignal } from "@/lib/data";
 import { excludeTopicLearningSignal } from "@/lib/topics";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; topicId?: string }>;
@@ -18,10 +19,12 @@ export async function DELETE(request: Request, { params }: Params) {
   if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
 
-    const body = (await request.json().catch(() => null)) as {
+    const json = await readJsonBody<{
       signalType?: string;
       signalValue?: string;
-    } | null;
+    }>(request);
+    if (!json.ok) return json.response;
+    const body = json.value;
 
     const signalType = (body?.signalType ?? "").trim() as TopicSuggestionSignal;
     const signalValue = (body?.signalValue ?? "").trim();

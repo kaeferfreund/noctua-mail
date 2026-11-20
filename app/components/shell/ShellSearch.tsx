@@ -38,7 +38,8 @@ const CATEGORY_BADGE_OPTIONS = SEARCH_BADGE_OPTIONS.filter(([key]) =>
 
 export type ShellSearchProps = {
   state: {
-    query: string;
+    /** The box text; applied to the query debounced or on Enter (useSearchInput). */
+    searchInput: string;
     searchScope: SearchScope;
     includeSentInEverywhere: boolean;
     sentFolderName: string | null;
@@ -52,7 +53,8 @@ export type ShellSearchProps = {
     searchBadgesLabel: string;
   };
   actions: {
-    setQuery: React.Dispatch<React.SetStateAction<string>>;
+    setSearchInput: (value: string) => void;
+    submitSearchInput: () => void;
     setSearchScope: React.Dispatch<React.SetStateAction<SearchScope>>;
     setIncludeSentInEverywhere: React.Dispatch<React.SetStateAction<boolean>>;
     setSearchFields: React.Dispatch<React.SetStateAction<SearchFieldsState>>;
@@ -113,7 +115,7 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
   const locale = useLocale();
   const t = useTranslations("Search");
   const {
-    query,
+    searchInput,
     searchScope,
     includeSentInEverywhere,
     sentFolderName,
@@ -125,7 +127,8 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
     accountFolders
   } = state;
   const {
-    setQuery,
+    setSearchInput,
+    submitSearchInput,
     setSearchScope,
     setIncludeSentInEverywhere,
     setSearchFields,
@@ -195,11 +198,16 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
           enterKeyHint="search"
           aria-label={placeholder}
           placeholder={placeholder}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          value={searchInput}
+          onChange={(event) => setSearchInput(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+            event.preventDefault();
+            submitSearchInput();
+          }}
           className="bg-background pr-8 pl-8"
         />
-        {query ? (
+        {searchInput ? (
           <Button
             type="button"
             variant="ghost"
@@ -207,7 +215,7 @@ export default function ShellSearch({ state, actions }: ShellSearchProps) {
             className="absolute top-1/2 right-1 -translate-y-1/2"
             aria-label={t("clear")}
             title={t("clear")}
-            onClick={() => (isRelatedSearch ? clearSearch() : setQuery(""))}
+            onClick={() => (isRelatedSearch ? clearSearch() : setSearchInput(""))}
           >
             <X />
           </Button>

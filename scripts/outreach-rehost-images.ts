@@ -329,7 +329,10 @@ export async function rehostImages(db: Database, options: Options) {
         continue;
       }
       if (image) {
-        if (write) await saveOutreachImage(db, accountId, image, null, directory);
+        // An operator migration of existing references is not an editor upload: no mailbox or total
+        // quota. The free-space reserve of the data volume still applies.
+        if (write) await saveOutreachImage(db, accountId, image, null, directory, Number.POSITIVE_INFINITY,
+          { totalBytes: Number.POSITIVE_INFINITY });
         urls.set(url, hosted);
       }
       references++;

@@ -16,6 +16,8 @@ import type { CalendarEvent, CalendarEventSourceType } from "@/lib/data";
 import { toFiniteNumber, toPositiveNumberArray } from "@/app/api/_helpers/numberParsing";
 import { deleteCalendarEventAndRelatedData } from "@/lib/calendarEventDeletion";
 import { buildCalendarEventEmailSnapshotFromMessageId } from "@/lib/calendarEventEmailSnapshot.server";
+import { toCalendarEventResponse } from "@/lib/calendarEventEmailSnapshot";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 function generateId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -45,7 +47,7 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
     try {
       if (eventUid) {
         const event = await getCalendarEventByUid(accountId, eventUid);
-        return NextResponse.json({ ok: true, event });
+        return NextResponse.json({ ok: true, event: event && toCalendarEventResponse(event) });
       }
       const events = await listCalendarEvents(accountId, startMs, endMs);
       return NextResponse.json({ ok: true, items: events });
@@ -58,9 +60,6 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const body = (await request.json().catch(() => null)) as Partial<CalendarEvent> & {
-    accountId?: string;
-  } | null;
   const accountId = await getAccountIdFromParams(params);
   if (!accountId) {
     return NextResponse.json({ ok: false, message: "Missing accountId" }, { status: 400 });
@@ -70,6 +69,11 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  const json = await readJsonBody<Partial<CalendarEvent> & {
+    accountId?: string;
+  }>(request);
+  if (!json.ok) return json.response;
+  const body = json.value;
   return withAuthResponse(accountContext, async () => {
     const summary = String(body?.summary ?? "").trim();
     if (!summary) {
@@ -89,6 +93,12 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     // only ever hit for the edge case of id === eventUid and silently break
     // snapshot-fallback when the POST body updates an existing event.
     const existing = existingId ? await getCalendarEventById(accountId, existingId) : null;
+    // A client-supplied id must name an event of this mailbox. Row ids are
+    // shard-wide, so an unknown id may belong to another mailbox in a legacy
+    // shared shard; new events always get a server-generated id.
+    if (existingId && !existing) {
+      return NextResponse.json({ ok: false, message: "Event not found" }, { status: 404 });
+    }
     const resolvedMessageId = body?.messageId?.trim() || undefined;
     const freshSnapshot =
       isNew && resolvedMessageId
@@ -118,8 +128,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       myPartstatUpdatedAtMs: toFiniteNumber(body?.myPartstatUpdatedAtMs) || undefined,
       myAttendeeEmail: body?.myAttendeeEmail?.trim() || undefined,
       replyRequested: body?.replyRequested === undefined ? undefined : Boolean(body.replyRequested),
-      remoteEtag: body?.remoteEtag?.trim() || undefined,
-      remoteHref: body?.remoteHref?.trim() || undefined,
+      // Server-owned CalDAV linkage (set only by sync), never taken from the request.
+      remoteEtag: existing?.remoteEtag,
+      remoteHref: existing?.remoteHref,
       rawIcs: body?.rawIcs ?? undefined,
       sourceType: (body?.sourceType as CalendarEventSourceType) ?? "local",
       messageId: resolvedMessageId,
@@ -148,20 +159,21 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
 
 export async function DELETE(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const body = (await request.json().catch(() => null)) as {
-    accountId?: string;
-    eventId?: string;
-  } | null;
   const accountId = await getAccountIdFromParams(params);
-  const eventId = body?.eventId?.trim() ?? "";
-  if (!accountId || !eventId) {
-    return NextResponse.json({ ok: false, message: "Missing accountId or eventId" }, { status: 400 });
-  }
   const accountContext = await requireAccountContext(request, accountId, {
     minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  const json = await readJsonBody<{
+    accountId?: string;
+    eventId?: string;
+  }>(request);
+  if (!json.ok) return json.response;
+  const eventId = json.value?.eventId?.trim() ?? "";
+  if (!eventId) {
+    return NextResponse.json({ ok: false, message: "Missing accountId or eventId" }, { status: 400 });
+  }
   return withAuthResponse(accountContext, async () => {
     try {
       const result = await deleteCalendarEventAndRelatedData({ accountId, eventId });

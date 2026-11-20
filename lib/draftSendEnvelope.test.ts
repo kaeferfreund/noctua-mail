@@ -58,6 +58,18 @@ describe("buildDraftSendEnvelopeRecipients", () => {
     ).toEqual(["x@y.com"]);
   });
 
+  test("address-shaped text inside quoted display names never becomes a recipient", () => {
+    expect(buildDraftSendEnvelopeRecipients({
+      to: '"Eve, eve@evil.example" <alice@example.test>',
+      cc: '"Eve <mallory@evil.example>" <bob@example.test>',
+      bcc: '"A \\"q\\", carol@evil.example" <Carol@Example.test>, (comment dave@evil.example) dan@example.test'
+    })).toEqual(["alice@example.test", "bob@example.test", "Carol@Example.test", "dan@example.test"]);
+  });
+
+  test("a quoted display name or comment alone is not a mailbox", () => {
+    expect(buildDraftSendEnvelopeRecipients({ to: '"eve@evil.example"', cc: "(eve@evil.example)" })).toEqual([]);
+  });
+
   test("unparseable fields contribute nothing", () => {
     expect(
       buildDraftSendEnvelopeRecipients({ to: "not an email" })

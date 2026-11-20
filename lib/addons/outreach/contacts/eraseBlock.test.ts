@@ -70,7 +70,7 @@ test("AA: the subscribe API brings an erased address back only with a consent la
   // Nothing was mailable meanwhile.
   expect(await listSendableRecipients(accountId, { listIds: [list.id] })).toEqual([]);
   const accepted = await subscribeWithApiToken(auth, { email: "api@example.test", listId: list.id, consentAt: laterConsent }, now);
-  expect(accepted).toMatchObject({ ok: true, status: "subscribed", created: true });
+  expect(accepted).toEqual({ ok: true, contactId: expect.any(String), status: "subscribed" });
   expect(findContactByEmail(db, accountId, "api@example.test")).toMatchObject({ emailConsent: "subscribed", consentAt: laterConsent, unsubscribedAt: erasedAt });
   expect(await getSendableRecipient(accountId, accepted.contactId, { listId: list.id })).toMatchObject({ email: "api@example.test" });
 });
@@ -199,6 +199,6 @@ test("a consent stamped by a clock that runs ahead cannot outrun a later unsubsc
   await expect(subscribeWithApiToken(auth, { email: "list@example.test", listId: list.id, consentAt: barrier + CONSENT_CLOCK_SKEW_MS }, now + day))
     .rejects.toMatchObject({ code: "new_consent_required" });
   expect(await subscribeWithApiToken(auth, { email: "list@example.test", listId: list.id, consentAt: barrier + CONSENT_CLOCK_SKEW_MS + 1 }, now + day))
-    .toMatchObject({ ok: true, status: "subscribed", created: false });
+    .toEqual({ ok: true, contactId: expect.any(String), status: "subscribed" });
   expect(findContactByEmail(db, accountId, "list@example.test")).toMatchObject({ emailConsent: "subscribed", consentAt: barrier + CONSENT_CLOCK_SKEW_MS + 1 });
 });

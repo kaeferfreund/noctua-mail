@@ -18,10 +18,10 @@ describe("Noctua auth client boundary", () => {
     expect(calls[3].init?.method).toBe("POST"); expect(calls[3].init?.body).toBeUndefined();
     expect(new Headers(calls[3].init?.headers).has("content-type")).toBe(false);
   });
-  it("removes this browser's push device on the server before logout, best effort, and keeps the browser subscription", async () => {
+  it("removes this browser's push device on the server before logout and drops the browser subscription, even when the server request fails", async () => {
     const endpoint = "https://push.example.test/send/synthetic-logout";
-    let unsubscribed = false;
-    const subscription = { endpoint, unsubscribe: async () => { unsubscribed = true; return true; } };
+    let unsubscribed = 0;
+    const subscription = { endpoint, unsubscribe: async () => { unsubscribed++; return true; } };
     const registration = { pushManager: { getSubscription: async () => subscription } };
     const hadWindow = "window" in globalThis;
     const serviceWorker = Object.getOwnPropertyDescriptor(navigator, "serviceWorker");
@@ -39,7 +39,7 @@ describe("Noctua auth client boundary", () => {
         expect(calls.map(call => `${call.init?.method} ${call.path}`)).toEqual(["DELETE /api/push/subscriptions", "POST /api/auth/logout"]);
         expect(JSON.parse(String(calls[0].init?.body))).toEqual({ endpoint });
       }
-      expect(unsubscribed).toBe(false);
+      expect(unsubscribed).toBe(4);
     } finally {
       if (serviceWorker) Object.defineProperty(navigator, "serviceWorker", serviceWorker); else Reflect.deleteProperty(navigator, "serviceWorker");
       if (!hadWindow) Reflect.deleteProperty(globalThis, "window");

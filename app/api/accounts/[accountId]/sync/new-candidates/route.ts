@@ -10,6 +10,7 @@ import {
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
 import { imapUpstreamErrorResponse } from "@/app/api/_helpers/imapUpstreamError";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 type NewSyncCandidatesPayload = {
   accountId?: string;
@@ -18,13 +19,15 @@ type NewSyncCandidatesPayload = {
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const payload = (await request.json()) as NewSyncCandidatesPayload;
   const accountId = await getAccountIdFromParams(params);
   const accountContext = await requireAccountContext(request, accountId, {
     minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  const body = await readJsonBody<NewSyncCandidatesPayload>(request);
+  if (!body.ok) return body.response;
+  const payload = body.value ?? ({} as NonNullable<typeof body.value>);
   return withAuthResponse(accountContext, async () => {
     const { accountId: resolvedAccountId, account, clientId } = accountContext;
 

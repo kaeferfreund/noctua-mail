@@ -36,6 +36,54 @@ test("storage deduplicates concurrent uploads across mailboxes and retains the f
   }
 });
 
+test("a mailbox's new images must fit its storage quota; known images and other mailboxes are not affected", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "outreach-images-"));
+  try {
+    const variant = (marker: number) => prepareImage(Buffer.concat([gif, Buffer.from([marker])]), `v${marker}.gif`);
+    const quota = (gif.length + 1) * 2;
+    await saveOutreachImage(db, "a", variant(1), "user-a", dir, quota);
+    await saveOutreachImage(db, "a", variant(2), "user-a", dir, quota);
+    const files = readdirSync(dir).length;
+    await expect(saveOutreachImage(db, "a", variant(3), "user-a", dir, quota))
+      .rejects.toMatchObject({ status: 413, code: "image_quota_exceeded" });
+    // Refused before anything is written.
+    expect(readdirSync(dir).length).toBe(files);
+    expect(listOutreachImages(db, "a")).toHaveLength(2);
+    expect(await saveOutreachImage(db, "a", variant(1), "user-a", dir, quota)).toMatchObject({ ok: true, created: false });
+    expect(await saveOutreachImage(db, "b", variant(3), "user-b", dir, quota)).toMatchObject({ ok: true, created: true });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("new image files must fit the limit for all mailboxes and leave the data volume's free-space reserve", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "outreach-images-"));
+  try {
+    const variant = (marker: number) => prepareImage(Buffer.concat([gif, Buffer.from([marker])]), `v${marker}.gif`);
+    const size = gif.length + 1;
+    const total = { totalBytes: size * 2, reserveBytes: 0 };
+    await saveOutreachImage(db, "a", variant(1), "user-a", dir, Number.POSITIVE_INFINITY, total);
+    await saveOutreachImage(db, "b", variant(2), "user-b", dir, Number.POSITIVE_INFINITY, total);
+    const files = readdirSync(dir).length;
+    // Each mailbox is under its own quota, but together they would exceed the total.
+    await expect(saveOutreachImage(db, "c", variant(3), "user-c", dir, Number.POSITIVE_INFINITY, total))
+      .rejects.toMatchObject({ status: 413, code: "image_storage_full" });
+    expect(readdirSync(dir).length).toBe(files);
+    // A file that is already stored costs no further space.
+    expect(await saveOutreachImage(db, "c", variant(1), "user-c", dir, Number.POSITIVE_INFINITY, total))
+      .toMatchObject({ ok: true, created: true });
+
+    const reserve = { reserveBytes: 1024, freeBytes: async () => 1024 + size - 1 };
+    await expect(saveOutreachImage(db, "a", variant(4), "user-a", dir, Number.POSITIVE_INFINITY, reserve))
+      .rejects.toMatchObject({ status: 413, code: "image_storage_full" });
+    expect(readdirSync(dir).length).toBe(files);
+    expect(await saveOutreachImage(db, "a", variant(4), "user-a", dir, Number.POSITIVE_INFINITY,
+      { ...reserve, freeBytes: async () => 1024 + size })).toMatchObject({ ok: true, created: true });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("v4 upgrades add image storage and preserve existing template and send data", () => {
   removeHistorySchema(db);
   db.exec("DROP TABLE images; PRAGMA user_version = 4");

@@ -165,9 +165,56 @@ const applyRemoteRewrite: RemoteRewriteGate = (rewrite) => rewrite();
 const keepRemoteSource: RemoteRewriteGate = () => {};
 const remoteRewriteGate = (mode: RemoteContentMode) => mode === "block" ? applyRemoteRewrite : keepRemoteSource;
 
-function sanitizeNormalized(normalized: string, blockRemote: RemoteRewriteGate, css: CssFilter) {
+/**
+ * A style element is the only element whose text sanitize-html re-emits raw.
+ * In foreign content (`<svg><style>`) htmlparser2 decodes that text, so
+ * `&lt;/style&gt;&lt;img onerror…&gt;` would come out as live markup once the
+ * svg wrapper is dropped. Style text that could end the element early is
+ * discarded together with the element.
+ */
+const STYLE_END_TAG = /<\/style/i;
+
+/**
+ * Links in sanitized HTML open in a new browsing context without opener or
+ * referrer. With `forceBlank` (HTML inside the app document) a sender
+ * `target` (`_top`, `_parent`, `_self`, a named frame) is replaced too, so a
+ * click never navigates the Noctua tab itself. Set on the element here, not
+ * by rewriting the serialized markup, so attribute values stay attribute
+ * values.
+ */
+function applySafeLinkAttributes(attribs: sanitizeHtml.Attributes, forceBlank: boolean) {
+  if (forceBlank || attribs.target === undefined) attribs.target = "_blank";
+  const tokens = (attribs.rel ?? "").split(/\s+/).filter(Boolean);
+  if (!tokens.length) {
+    attribs.rel = "noreferrer noopener";
+    return;
+  }
+  if (!tokens.includes("noopener")) tokens.push("noopener");
+  if (!tokens.includes("noreferrer")) tokens.push("noreferrer");
+  attribs.rel = tokens.join(" ");
+}
+
+/**
+ * Sanitizer profile. `styleElements: false` drops `<style>` blocks with their
+ * text and the document-level tags (`html`, `head`, `meta`, `body`, `title`;
+ * the title text too): HTML rendered inside the app document, where a sender
+ * stylesheet or `<meta name="viewport|theme-color">` would change the app.
+ * `safeLinks` applies applySafeLinkAttributes.
+ */
+type SanitizeProfile = { styleElements: boolean; safeLinks: boolean };
+const MESSAGE_FRAME_PROFILE: SanitizeProfile = { styleElements: true, safeLinks: false };
+const APP_DOCUMENT_DROPPED_TAGS = new Set(["style", "html", "head", "meta", "body", "title"]);
+const APP_DOCUMENT_ALLOWED_TAGS = (SANITIZE_HTML_OPTIONS.allowedTags as string[]).filter(
+  (tag) => !APP_DOCUMENT_DROPPED_TAGS.has(tag)
+);
+
+function sanitizeNormalized(normalized: string, blockRemote: RemoteRewriteGate, css: CssFilter, profile = MESSAGE_FRAME_PROFILE) {
   const sanitized = sanitizeHtml(normalized, {
     ...SANITIZE_HTML_OPTIONS,
+    allowedTags: profile.styleElements ? SANITIZE_HTML_OPTIONS.allowedTags : APP_DOCUMENT_ALLOWED_TAGS,
+    // sanitize-html's own list plus title, whose text is not page content.
+    ...(profile.styleElements ? {} : { nonTextTags: ["script", "style", "textarea", "option", "xmp", "title"] }),
+    exclusiveFilter: (frame) => frame.tag === "style" && STYLE_END_TAG.test(frame.text),
     transformTags: {
       "*": (tagName, original) => {
         const attribs = { ...original };
@@ -178,7 +225,17 @@ function sanitizeNormalized(normalized: string, blockRemote: RemoteRewriteGate, 
           delete attribs.content;
         }
         if (attribs.style) attribs.style = css(attribs.style, true);
+        // Inside the app document sender classes would pick up app styles
+        // (look like app controls) and ids/names would clobber document
+        // globals or collide with app anchors (SD20). Neither is needed
+        // without the sender's own stylesheet.
+        if (!profile.styleElements) {
+          delete attribs.class;
+          delete attribs.id;
+          delete attribs.name;
+        }
         if (tagName === "img") attribs.referrerpolicy = "no-referrer";
+        if (tagName === "a" && profile.safeLinks) applySafeLinkAttributes(attribs, !profile.styleElements);
         // The only mode-dependent code, and it runs only through the gate.
         if (tagName === "img" || tagName === "source") {
           if (attribs.src && !isLocalMailResource(attribs.src)) blockRemote(() => {
@@ -196,15 +253,65 @@ function sanitizeNormalized(normalized: string, blockRemote: RemoteRewriteGate, 
       }
     }
   });
+  if (!profile.styleElements) return sanitized;
   // sanitize-html deliberately bypasses textFilter for raw style text. Filter
-  // canonical style elements after the HTML allowlist has run instead.
+  // canonical style elements after the HTML allowlist has run instead. The
+  // exclusiveFilter above guarantees that no style text contains `</style`, so
+  // each match is exactly one element. `<` is then written as the CSS escape
+  // `\3c `: style text carries no markup at all, and later string steps
+  // (document title, body extraction, linkify) cannot mistake it for tags.
   return sanitized.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi,
-    (_match, open, cssText, close) => `${open}${css(cssText)}${close}`);
+    (_match, open, cssText, close) => `${open}${css(cssText).replace(/</g, "\\3c ")}${close}`);
 }
 
-export function sanitizeHtmlForDisplay(input: string, mode: RemoteContentMode = "block") {
+export type SanitizeDisplayOptions = { safeLinks?: boolean };
+
+export function sanitizeHtmlForDisplay(input: string, mode: RemoteContentMode = "block", options: SanitizeDisplayOptions = {}) {
   if (!input) return input;
-  return sanitizeNormalized(normalizeHtmlStructure(input), remoteRewriteGate(mode), memoizedPrivateCss());
+  const profile = options.safeLinks ? { ...MESSAGE_FRAME_PROFILE, safeLinks: true } : MESSAGE_FRAME_PROFILE;
+  return sanitizeNormalized(normalizeHtmlStructure(input), remoteRewriteGate(mode), memoizedPrivateCss(), profile);
+}
+
+/**
+ * Sender HTML that is inserted into the app document itself (calendar event
+ * descriptions and source-mail snapshots) instead of the sandboxed message
+ * frame: no `<style>` elements (a sender stylesheet would apply to the whole
+ * app), no class/id/name attributes, safe link attributes, remote images
+ * blocked. Inline styles stay for
+ * formatting; the container must confine them (`contain: paint`, see
+ * app/components/calendar/SenderHtml.module.css) so positioned content cannot cover
+ * app controls.
+ */
+export function sanitizeHtmlForAppDocument(input: string) {
+  if (!input) return input;
+  return sanitizeNormalized(normalizeHtmlStructure(input), applyRemoteRewrite, memoizedPrivateCss(),
+    { styleElements: false, safeLinks: true });
+}
+
+/**
+ * Declarations that take an element out of the normal flow or move it over
+ * other content. Mail HTML that the rich compose editor mounts in the app
+ * document must not lay itself over the toolbar or other app controls.
+ */
+const POSITIONING_PROPERTY = /^(?:position|z-index|inset(?:-.*)?|top|right|bottom|left|translate|transform|float)$/i;
+
+/**
+ * One sender `style` attribute for an element inside the app document: the
+ * viewer's inline-CSS filter (no URLs, imports or escapes) plus, with
+ * `dropPositioning`, no positioning or stacking declarations.
+ */
+export function sanitizeInlineStyle(style: string, options: { dropPositioning?: boolean } = {}) {
+  const filtered = privateCss(style, true);
+  if (!options.dropPositioning || !filtered.trim()) return filtered.trim();
+  try {
+    const root = postcss.parse(`x{${filtered}}`);
+    root.walkDecls((decl) => {
+      if (POSITIONING_PROPERTY.test(decl.prop.trim())) decl.remove();
+    });
+    return root.toString().slice(2, -1).trim();
+  } catch {
+    return "";
+  }
 }
 
 export type SanitizedHtmlPair = { block: string; allow: string };

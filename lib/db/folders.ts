@@ -1,5 +1,6 @@
 import type { Folder, MailboxState } from "../data";
 import { withDbWriteRetry } from "../dbWriteRetry";
+import { FolderAccountMismatchError } from "../folderAccount";
 import { getAccountDb, getDb } from "./connection";
 import { deleteMessagesWithFilesByIds } from "./messages/delete";
 
@@ -75,14 +76,21 @@ export async function getFolders(accountId?: string) {
 export async function saveFoldersForAccount(accountId: string, nextFolders: Folder[]) {
   return withDbWriteRetry("saveFoldersForAccount", async () => {
     const db = await getAccountDb(accountId);
+    // `folders.id` is the primary key of the whole shard. A legacy shared shard
+    // holds several mailboxes, so a conflicting id of another mailbox must never
+    // be replaced or re-owned: the conditional upsert changes nothing and the
+    // whole write is rolled back.
     const insert = db.prepare(
-      `INSERT OR REPLACE INTO folders (id, name, parentId, accountId, count, specialUse, flags, delimiter) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO folders (id, name, parentId, accountId, count, specialUse, flags, delimiter) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET name = excluded.name, parentId = excluded.parentId, count = excluded.count,
+         specialUse = excluded.specialUse, flags = excluded.flags, delimiter = excluded.delimiter
+       WHERE folders.accountId = excluded.accountId`
     );
     const deleteForAccount = db.prepare(`DELETE FROM folders WHERE accountId = ?`);
     db.transaction(() => {
       deleteForAccount.run(accountId);
       nextFolders.forEach((folder) => {
-        insert.run(
+        const result = insert.run(
           folder.id,
           folder.name,
           folder.parentId ?? null,
@@ -92,6 +100,7 @@ export async function saveFoldersForAccount(accountId: string, nextFolders: Fold
           folder.flags ? JSON.stringify(folder.flags) : null,
           folder.delimiter ?? null
         );
+        if (result.changes === 0) throw new FolderAccountMismatchError();
       });
     })();
   });

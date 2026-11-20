@@ -79,13 +79,15 @@ async function fixture() {
   const id = `stream-${crypto.randomUUID()}`;
   await db.upsertAccount({ id, name: "Synthetic stream", email: "stream@example.test", avatar: "",
     imap: { host: "imap.example.test", port: 993, secure: true, user: "stream@example.test", password: "synthetic" },
-    smtp: { host: "smtp.example.test", port: 465, secure: true, user: "stream@example.test", password: "synthetic" } } satisfies Account);
+    smtp: { host: "smtp.example.test", port: 465, secure: true, user: "stream@example.test", password: "synthetic" },
+    // The poll interval is server-owned; tests find the poll timer by this value.
+    settings: { sync: { backgroundPollIntervalMs: 123456 } } } satisfies Account);
   await db.saveFoldersForAccount(id, ["INBOX", "Archive"].map(name => ({ id: `${id}:${name}`, name, count: 0, accountId: id })));
   return { id, db, ...await createAuthenticatedTestSession(id) };
 }
 async function open(f: Awaited<ReturnType<typeof fixture>>, jar = f.jar, query = "") {
   const abort = new AbortController();
-  const response = await GET(new Request(`http://localhost:3000/api/accounts/${f.id}/imap/stream?pollIntervalMs=123456${query}`, { headers: jar.headers(), signal: abort.signal }), { params: Promise.resolve({ accountId: f.id }) });
+  const response = await GET(new Request(`http://localhost:3000/api/accounts/${f.id}/imap/stream?${query.replace(/^&/, "")}`, { headers: jar.headers(), signal: abort.signal }), { params: Promise.resolve({ accountId: f.id }) });
   expect(response.status).toBe(200);
   opened.push({ response, abort });
   return { response, abort, reader: response.body!.getReader() };
@@ -222,6 +224,42 @@ describe("production IMAP stream acceptance", () => {
     await stream.reader.cancel();
     expect(clients.every(c => c.closed && c.logouts === 1)).toBe(true);
     expect(await postSwitch(f, { streamKey, folderId: `${f.id}:INBOX`, seq: 7 })).toBe(404);
+  });
+
+  test("request parameters cannot override the server-owned session and poll budget", async () => {
+    const f = await fixture();
+    await f.db.saveFoldersForAccount(f.id, ["INBOX", "Archive", "Sent", "Drafts"].map(name => ({ id: `${f.id}:${name}`, name, count: 0, accountId: f.id })));
+    const streamKey = "synthetic-stream-key-0009";
+    await initial(await open(f, f.jar, `&streamKey=${streamKey}&maxIdleSessions=999&pollIntervalMs=1&backgroundPollIntervalMs=1`));
+    expect([...timers.values()].some(t => t.ms === 1)).toBe(false);
+    await until(() => clients.length === 1);
+    for (const [seq, name] of ["Archive", "Sent", "Drafts"].entries()) {
+      expect(await postSwitch(f, { streamKey, folderId: `${f.id}:${name}`, seq: seq + 1 })).toBe(200);
+      await sleep(20);
+    }
+    // The default budget of three sessions holds: the oldest non-active folder was closed.
+    expect(clients).toHaveLength(4);
+    expect(clients.filter(client => !client.closed)).toHaveLength(3);
+  });
+
+  test("live streams of one user and mailbox are capped before any IMAP connection and freed on close", async () => {
+    const f = await fixture();
+    const streams = [];
+    for (let i = 0; i < 3; i++) {
+      const stream = await open(f);
+      await initial(stream);
+      streams.push(stream);
+    }
+    const connections = clients.length;
+    const request = () => GET(new Request(`http://localhost:3000/api/accounts/${f.id}/imap/stream`, { headers: f.jar.headers() }),
+      { params: Promise.resolve({ accountId: f.id }) });
+    const refused = await request();
+    expect(refused.status).toBe(429);
+    expect(refused.headers.get("retry-after")).toBe("30");
+    expect(clients).toHaveLength(connections);
+    streams[0].abort.abort();
+    await until(() => clients.filter(client => !client.closed).length < connections);
+    await initial(await open(f));
   });
 
   test("folder switch is bound to the stream key, session and account", async () => {

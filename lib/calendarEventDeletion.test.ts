@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { CalendarEvent } from "@/lib/data";
 
 const getCalendarEventById = mock(() => Promise.resolve<CalendarEvent | null>(null));
@@ -9,6 +9,18 @@ const clearMessageCalendarInviteStatesProcessedByEventUid = mock(() => Promise.r
 const addCalendarEventSuppression = mock(() => Promise.resolve(true));
 
 const actualDb = await import("./db");
+// `mock.module()` stays active for the whole test process. Capture the real
+// functions now (the namespace is mutated in place once mocked) and hand them
+// back after this file, so later route tests that import `@/lib/db` do not see
+// this file's stubs (e.g. `getCalendarEventById` resolving to null).
+const realDb = {
+  getCalendarEventById: actualDb.getCalendarEventById,
+  softDeleteCalendarEvent: actualDb.softDeleteCalendarEvent,
+  deleteCalendarEvent: actualDb.deleteCalendarEvent,
+  cancelCalendarRemindersByEventUid: actualDb.cancelCalendarRemindersByEventUid,
+  clearMessageCalendarInviteStatesProcessedByEventUid: actualDb.clearMessageCalendarInviteStatesProcessedByEventUid,
+  addCalendarEventSuppression: actualDb.addCalendarEventSuppression
+};
 mock.module("@/lib/db", () => ({
   ...actualDb,
   getCalendarEventById,
@@ -39,6 +51,15 @@ function buildEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
     ...overrides
   };
 }
+
+afterAll(() => {
+  getCalendarEventById.mockImplementation(realDb.getCalendarEventById as never);
+  softDeleteCalendarEvent.mockImplementation(realDb.softDeleteCalendarEvent as never);
+  deleteCalendarEvent.mockImplementation(realDb.deleteCalendarEvent as never);
+  cancelCalendarRemindersByEventUid.mockImplementation(realDb.cancelCalendarRemindersByEventUid as never);
+  clearMessageCalendarInviteStatesProcessedByEventUid.mockImplementation(realDb.clearMessageCalendarInviteStatesProcessedByEventUid as never);
+  addCalendarEventSuppression.mockImplementation(realDb.addCalendarEventSuppression as never);
+});
 
 describe("deleteCalendarEventAndRelatedData", () => {
   beforeEach(() => {

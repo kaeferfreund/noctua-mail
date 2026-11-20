@@ -79,9 +79,10 @@ test("subscribe retries preserve consent and an opt-out requires a newer explici
   const first = await subscribe(secret, { ...body, email: email.toUpperCase() });
   expect(first.status).toBe(200);
   const created = await first.json();
-  expect(created).toMatchObject({ ok: true, created: true, status: "subscribed" });
+  expect(created).toEqual({ ok: true, contactId: expect.any(String), status: "subscribed" });
   const duplicate = await subscribe(secret, { ...body, consentAt: 150 });
-  expect(await duplicate.json()).toEqual({ ...created, created: false });
+  // The same answer for a known address: a token does not learn whether a contact existed.
+  expect(await duplicate.json()).toEqual(created);
   expect(await getContactDetail(accountId, created.contactId)).toMatchObject({
     email, consentAt: 100, consentSource: "synthetic_signup", lists: [{ subscribedAt: 100 }]
   });

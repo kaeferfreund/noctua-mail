@@ -3,6 +3,7 @@ let startupInitialized = false;
 export async function register() {
   if (process.env.NEXT_RUNTIME === "edge") return;
   if (startupInitialized) return;
+  (await import("@/lib/server/privateFileModes")).restrictNewFileModes();
   const { installShutdownCoordinator } = await import("@/lib/server/shutdown");
   // Without HTTP lifecycle hooks this participates in Next-owned cleanup only.
   installShutdownCoordinator();

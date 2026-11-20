@@ -4,7 +4,11 @@ import {
   toCalendarTimeZoneWallDate
 } from "./calendarTimezones";
 import { normalizeReminderDateList } from "./reminderDates";
-import { buildCalendarRecurrenceOptions } from "./calendarRecurrence";
+import {
+  buildCalendarRecurrenceOptions,
+  createBoundedRecurrenceQuery,
+  type BoundedRecurrenceQuery
+} from "./calendarRecurrence";
 
 // Re-exported so existing (server-side) importers keep resolving it from
 // here; the implementation lives in the rrule-free `reminderDates` module.
@@ -36,47 +40,52 @@ function normalizeRecurrenceRule(rule?: string) {
   return value;
 }
 
-type RecurrenceQuery = {
-  after: (date: Date, inc?: boolean) => Date | null;
-  before: (date: Date, inc?: boolean) => Date | null;
-};
+type RecurrenceQuery = Pick<BoundedRecurrenceQuery, "after" | "before" | "between">;
 
-function buildRecurrenceQuery(reminder: RecurrenceRuleLike): RecurrenceQuery | null {
+/** `nearMs`: the instant the queries are about (rebaseDtstartNear in calendarRecurrence.ts). */
+function buildRecurrenceQuery(reminder: RecurrenceRuleLike, nearMs: number): RecurrenceQuery | null {
   const normalizedRule = normalizeRecurrenceRule(reminder.recurrenceRule);
   if (!normalizedRule) return null;
   const startAtMs = Number(reminder.eventStartAtMs);
   if (!Number.isFinite(startAtMs) || startAtMs <= 0) return null;
   try {
     const { options, timeZone: ruleTimeZone, toRuleDate, fromRuleDate } =
-      buildCalendarRecurrenceOptions(normalizedRule, startAtMs, reminder.startTimezone);
+      buildCalendarRecurrenceOptions(normalizedRule, startAtMs, reminder.startTimezone, { nearMs });
     const rule = new RRule(options);
     const recurrenceDates = normalizeReminderDateList(reminder.recurrenceDates);
     const excludedDates = normalizeReminderDateList(reminder.excludedDates);
-    const recurrenceSource: RecurrenceQuery = (() => {
-      if (!recurrenceDates?.length && !excludedDates?.length) {
-        return rule;
-      }
-      const ruleSet = new RRuleSet();
-      ruleSet.rrule(rule);
-      recurrenceDates?.forEach((value) => {
-        ruleSet.rdate(toRuleDate(value));
-      });
-      excludedDates?.forEach((value) => {
-        ruleSet.exdate(toRuleDate(value));
-      });
-      return ruleSet;
-    })();
+    // Every query walks the occurrences once from DTSTART within the shared
+    // work limits (see calendarRecurrence.ts).
+    const recurrenceSource = createBoundedRecurrenceQuery(
+      !recurrenceDates?.length && !excludedDates?.length
+        ? rule
+        : (() => {
+            const ruleSet = new RRuleSet();
+            ruleSet.rrule(rule);
+            recurrenceDates?.forEach((value) => {
+              ruleSet.rdate(toRuleDate(value));
+            });
+            excludedDates?.forEach((value) => {
+              ruleSet.exdate(toRuleDate(value));
+            });
+            return ruleSet;
+          })()
+    );
     if (!ruleTimeZone) {
       return recurrenceSource;
     }
+    const toWall = (date: Date) => toCalendarTimeZoneWallDate(date, ruleTimeZone);
     return {
       after(date: Date, inc?: boolean) {
-        const next = recurrenceSource.after(toCalendarTimeZoneWallDate(date, ruleTimeZone), inc);
+        const next = recurrenceSource.after(toWall(date), inc);
         return next ? fromRuleDate(next) : null;
       },
       before(date: Date, inc?: boolean) {
-        const previous = recurrenceSource.before(toCalendarTimeZoneWallDate(date, ruleTimeZone), inc);
+        const previous = recurrenceSource.before(toWall(date), inc);
         return previous ? fromRuleDate(previous) : null;
+      },
+      between(start: Date, end: Date, limit: number) {
+        return recurrenceSource.between(toWall(start), toWall(end), limit)?.map(fromRuleDate) ?? null;
       }
     };
   } catch {
@@ -108,7 +117,7 @@ export function listRecurrenceOccurrenceStartsInRange(
   const recurrence = buildRecurrenceQuery({
     ...reminder,
     leadMinutes: 0
-  });
+  }, rangeStartMs);
   if (!recurrence) {
     if (eventStartAtMs >= rangeStartMs && eventStartAtMs < rangeEndMs) {
       return [eventStartAtMs];
@@ -145,13 +154,9 @@ export function listRecurrenceOccurrenceStartsInRange(
     pushOccurrence(recurrence.before(new Date(rangeStartMs), true));
   }
 
-  let cursor = recurrence.after(new Date(rangeStartMs), true);
-  let iterations = 0;
-  while (cursor && cursor.getTime() < rangeEndMs && iterations < 4096) {
-    pushOccurrence(cursor);
-    cursor = recurrence.after(cursor, false);
-    iterations += 1;
-  }
+  // One walk for the whole range instead of one `after` per occurrence: each
+  // rrule query restarts at DTSTART.
+  recurrence.between(new Date(rangeStartMs), new Date(rangeEndMs), 4096)?.forEach(pushOccurrence);
 
   occurrenceStarts.sort((a, b) => a - b);
   return occurrenceStarts;
@@ -174,7 +179,7 @@ export function getEventOccurrenceInfo(
     Number.isFinite(endMsRaw) && endMsRaw > startMs ? endMsRaw - startMs : 0;
   const endOf = (s: number) => (durationMs > 0 ? s + durationMs : undefined);
 
-  const recurrence = buildRecurrenceQuery({ ...event, leadMinutes: 0 });
+  const recurrence = buildRecurrenceQuery({ ...event, leadMinutes: 0 }, nowMs);
   if (!recurrence) {
     const endOrStart = durationMs > 0 ? startMs + durationMs : startMs;
     return { isFuture: endOrStart > nowMs, startAtMs: startMs, endAtMs: endOf(startMs) };
@@ -219,7 +224,7 @@ export function resolveNextReminderOccurrence(
     return null;
   }
   const leadMs = leadMinutes * 60 * 1000;
-  const recurrence = buildRecurrenceQuery(reminder);
+  const recurrence = buildRecurrenceQuery(reminder, nowMs);
   if (!recurrence) {
     const triggerAtMs = eventStartAtMs - leadMs;
     if (triggerAtMs >= nowMs) {
@@ -274,14 +279,10 @@ export function resolveNextReminderOccurrence(
   }
 
   const earliestRelevantStartMs = nowMs - REMINDER_DUE_LOOKBACK_MS + leadMs;
-  let cursor = recurrence.after(new Date(earliestRelevantStartMs), true);
-  let latestInLookback = cursor;
-  let iterations = 0;
-  while (cursor && cursor.getTime() - leadMs <= nowMs && iterations < 2048) {
-    latestInLookback = cursor;
-    cursor = recurrence.after(cursor, false);
-    iterations += 1;
-  }
+  // Latest occurrence whose trigger time is already due, in one walk.
+  const latestInLookback = recurrence
+    .between(new Date(earliestRelevantStartMs), new Date(nowMs + leadMs + 1), 2048)
+    ?.at(-1);
   if (!latestInLookback) return null;
   const nextEventStartAtMs = latestInLookback.getTime();
   if (!Number.isFinite(nextEventStartAtMs) || nextEventStartAtMs <= 0) {
@@ -310,7 +311,7 @@ export function resolveCurrentOrNextOccurrence(
   const recurrence = buildRecurrenceQuery({
     ...reminder,
     leadMinutes: 0
-  });
+  }, nowMs);
   if (!recurrence) {
     if (
       Number.isFinite(durationMs) &&

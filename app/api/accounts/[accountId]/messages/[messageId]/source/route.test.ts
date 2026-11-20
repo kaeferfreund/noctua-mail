@@ -150,4 +150,38 @@ describe("handleGetMessageSourceRequest", () => {
     expect(missing.headers.get("cache-control")).not.toBe(MESSAGE_SOURCE_CACHE_CONTROL);
     expect(missing.headers.get("etag")).toBeNull();
   });
+
+  test("format=eml returns the stored 8bit bytes unchanged as a download", async () => {
+    const accountId = `acc-source-eml-${Date.now()}`;
+    const folder = buildFolder(accountId);
+    const message = buildMessage(accountId, folder.id);
+    await upsertAccount(buildAccount(accountId));
+    await saveFoldersForAccount(accountId, [folder]);
+    await upsertMessages(accountId, folder.id, [message]);
+    const raw = Buffer.concat([
+      Buffer.from("Subject: Synthetic\r\nContent-Type: text/plain; charset=iso-8859-1\r\nContent-Transfer-Encoding: 8bit\r\n\r\n"),
+      Buffer.from("Gr\u00fc\u00dfe\r\n", "latin1"),
+      Buffer.from(`${"QUJD".repeat(80)}\r\n`)
+    ]);
+    await saveMessageSource(accountId, message.id, raw);
+    const cookie = await buildCookieHeader(accountId);
+    const request = (url: string) => handleGetMessageSourceRequest(
+      new Request(url, { headers: { cookie } }),
+      { accountId, messageId: message.id }
+    );
+
+    const response = await request("http://localhost/api/source?format=eml");
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("message/rfc822");
+    expect(response.headers.get("content-disposition")).toStartWith("attachment;");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("content-security-policy")).toContain("sandbox");
+    expect(response.headers.get("cache-control")).toBe(MESSAGE_SOURCE_CACHE_CONTROL);
+    // No UTF-8 decoding, no base64 scrubbing, no truncation.
+    expect(Buffer.from(await response.arrayBuffer()).equals(raw)).toBe(true);
+
+    // The JSON view for display keeps scrubbing long base64 runs.
+    const view = (await (await request("http://localhost/api/source")).json()) as { source?: string };
+    expect(view.source).toContain("[base64 omitted]");
+  });
 });

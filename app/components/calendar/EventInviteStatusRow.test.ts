@@ -11,4 +11,12 @@ describe("buildInviteStatusText", () => {
       })
     ).toBe("Update not processed (event series not found)");
   });
+
+  test("explains an invite that was kept because its sender is not the organizer", () => {
+    const state = { actionType: "cancellation", processed: false, unprocessedReason: "organizer_mismatch" } as const;
+    expect(buildInviteStatusText(state)).toBe("Cancellation not processed (sender is not the event organizer)");
+    expect(buildInviteStatusText(state, undefined, { organizerMismatch: "Absender ist nicht der Organisator des Termins" })).toBe(
+      "Cancellation not processed (Absender ist nicht der Organisator des Termins)"
+    );
+  });
 });

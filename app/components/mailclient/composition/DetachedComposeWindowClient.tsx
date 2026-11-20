@@ -34,6 +34,7 @@ import ComposeOrchestrator, { ComposeInlineHost,
   type ComposeOrchestratorHandle
 } from "./ComposeOrchestrator";
 import { useDarkMode } from "@/app/hooks/useDarkMode";
+import { requestBodyErrorKey } from "@/lib/requestBodyErrors";
 
 type ReadyHandoff = Extract<DetachedComposeHandoff, { status: "ready" }>;
 
@@ -126,13 +127,15 @@ export default function DetachedComposeWindowClient({
 
   const readErrorMessage = useCallback(async (response: Response) => {
     const body = (await response.clone().json().catch(() => null)) as
-      | { message?: string; error?: string; details?: string }
+      | { message?: string; error?: string; details?: string; code?: string }
       | null;
+    const bodyErrorKey = requestBodyErrorKey(response.status, body?.code);
+    if (bodyErrorKey) return tn(bodyErrorKey);
     const message = body?.message || body?.error || body?.details;
     if (message?.trim()) return message;
     const text = await response.text().catch(() => "");
     return text.trim() || t("requestFailed", { status: response.status });
-  }, [t]);
+  }, [t, tn]);
 
   const pushNotice = useCallback((input: {
     type: "info" | "success" | "warning" | "error";

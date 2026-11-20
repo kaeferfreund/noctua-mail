@@ -8,7 +8,8 @@ import { getAccountOwnAddresses, getAccountById } from "@/lib/serverDb";
 import { accountIdFromEmail } from "@/lib/accountId";
 import { updateMailboxCredentials, MailboxCredentialError, type MailboxPatch, type CredentialVerification } from "@/lib/mailboxCredentials";
 import { sanitizeAccountForClient } from "@/lib/accountPresentation";
-import { listAccountMembers } from "@/lib/accountAccess";
+import { listAccountMembers, resolveAccountRole } from "@/lib/accountAccess";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 export async function applyMailboxPatch(context: AccountContext, patch: MailboxPatch, verification?: CredentialVerification) {
   if (!patch || typeof patch !== "object" || Array.isArray(patch)) return NextResponse.json({ ok: false, message: "Invalid body" }, { status: 400 });
   try {
@@ -32,13 +33,18 @@ export async function handleMailboxCredentialMutation(
   if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
     const origin = requireJsonSameOrigin(request); if (origin) return origin;
-    const payload = await request.json().catch(() => null);
+    const json = await readJsonBody<any>(request);
+    if (!json.ok) return json.response;
+    const payload = json.value;
     if (!payload || typeof payload !== "object" || Array.isArray(payload)) return NextResponse.json({ ok: false, message: "Invalid body" }, { status: 400 });
     let accountId: string;
     if (mode === "post-existing") {
       if (typeof payload.email !== "string" || !payload.email.trim()) return NextResponse.json({ ok: false, message: "Email address is required" }, { status: 400 });
       accountId = typeof payload.id === "string" ? payload.id : accountIdFromEmail(payload.email);
-      if (!await getAccountById(accountId)) return NextResponse.json({ ok: false, code: "account_not_found" }, { status: 404 });
+      // A mailbox the caller is not a member of answers like one that does not exist.
+      if (!await resolveAccountRole(session.userId, accountId) || !await getAccountById(accountId)) {
+        return NextResponse.json({ ok: false, code: "account_not_found" }, { status: 404 });
+      }
     } else accountId = params ? await getAccountIdFromParams(params) : "";
     const context = await requireAccountContext(request, accountId, { minRole: "manager" });
     if (context instanceof NextResponse) return context;

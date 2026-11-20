@@ -33,14 +33,14 @@ async function enrolled(f:TestAuthHarness,role:'admin'|'user'='admin'){const use
 function invite(f:TestAuthHarness,role='admin'){const code=crypto.randomUUID();f.master.prepare("INSERT INTO invite_codes(code,role,maxUses,uses,expiresAt,createdAt) VALUES(?,?,1,0,?,?)").run(code,role,Date.now()+60000,Date.now());return code;}
 function body(code:string,address=email(),account?:unknown){return {inviteCode:code,email:address,password,name:'Synthetic Review',...(account?{account}:{})};}
 function box(address=email()){return {name:'Synthetic Box',email:address,avatar:'',imap:{host:'imap.example.test',port:993,secure:true,user:address,password:'synthetic-imap'},smtp:{host:'smtp.example.test',port:465,secure:true,user:address,password:'synthetic-smtp'}};}
-const verified={imap:async()=>true,smtp:async()=>true};
+const verified={imap:async()=>"ok" as const,smtp:async()=>true};
 async function proof(f:TestAuthHarness,a:Awaited<ReturnType<typeof enrolled>>,purpose='admin.recovery'){const request=req(a.jar),grant=await reauthenticate(f.auth,f.master,a.source,request,{purpose,currentPassword:password,totpCode:totpFromUri(a.factor.totpURI)},createRateLimiter({max:100}));request.headers.set('x-noctua-reauth',grant.grant);return request;}
 
 for(const change of ['demoted','banned'] as const)test(`F1 fixed: ${change} issuer invite rejects before network and reservation`,async()=>{
  const f=await setup(),issuer=await enrolled(f),other=await enrolled(f),address=email();
- const {invite:i}=await issueOnboardingInvite(f.master,issuer.source,{email:address,name:'Synthetic Invitee',role:'admin'});
+ const {invite:i}=await issueOnboardingInvite(f.master,issuer.source,{email:address,name:'Synthetic Invitee',role:'admin'},await proof(f,issuer,'admin.grant'));
  await updateUserLifecycle(f.auth,f.master,other.source,req(other.jar),issuer.user.id,change==='demoted'?{role:'user'}:{disabled:true});
- let calls=0;await expect(provisionUser(f.auth,f.master,body(i.code,address,box()),{imap:async()=>{calls++;return true},smtp:async()=>{calls++;return true}})).rejects.toMatchObject({status:403,code:'invalid_invite'});
+ let calls=0;await expect(provisionUser(f.auth,f.master,body(i.code,address,box()),{imap:async()=>{calls++;return "ok" as const},smtp:async()=>{calls++;return true}})).rejects.toMatchObject({status:403,code:'invalid_invite'});
  expect(calls).toBe(0);expect(f.master.prepare('SELECT 1 FROM auth_user WHERE email=?').get(address)).toBeNull();
  expect(f.master.prepare('SELECT 1 FROM user_provisioning WHERE inviteCode=?').get(i.code)).toBeNull();
  expect(f.master.prepare('SELECT revokedAt FROM invite_codes WHERE code=?').get(i.code).revokedAt).not.toBeNull();
@@ -48,7 +48,7 @@ for(const change of ['demoted','banned'] as const)test(`F1 fixed: ${change} issu
 });
 for(const state of ['reserved','auth_created','cleanup_required'])test(`bootstrap stale ${state} journal prevents network and reservation`,async()=>{
  const f=await setup();f.master.prepare("INSERT INTO user_provisioning(id,userId,normalizedEmail,kind,state,createdAt,updatedAt) VALUES('stale-op','stale-user','stale@example.test','signup',?,1,1)").run(state);
- let calls=0;await expect(provisionUser(f.auth,f.master,body(invite(f),'new@example.test',box()),{imap:async()=>{calls++;return true},smtp:async()=>{calls++;return true}})).rejects.toThrow('bootstrap_pending');expect(calls).toBe(0);expect(f.master.prepare('SELECT count(*) n FROM user_provisioning').get().n).toBe(1);
+ let calls=0;await expect(provisionUser(f.auth,f.master,body(invite(f),'new@example.test',box()),{imap:async()=>{calls++;return "ok" as const},smtp:async()=>{calls++;return true}})).rejects.toThrow('bootstrap_pending');expect(calls).toBe(0);expect(f.master.prepare('SELECT count(*) n FROM user_provisioning').get().n).toBe(1);
 });
 test('desktop tag has no invitation exemption',async()=>{const f=await setup(),before=process.env.NOCTUA_DESKTOP_MODE;try{process.env.NOCTUA_DESKTOP_MODE='true';await expect(provisionUser(f.auth,f.master,body('missing'),verified)).rejects.toThrow('invalid_invite');}finally{process.env.NOCTUA_DESKTOP_MODE=before;}});
 test('incomplete identity rejects an already-issued session and login',async()=>{

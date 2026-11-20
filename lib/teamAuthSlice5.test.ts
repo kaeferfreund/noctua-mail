@@ -24,7 +24,7 @@ function invite(f:TestAuthHarness,changes:Record<string,unknown>={}) {
 }
 function input(code:string,address=email(),account?:unknown){return {inviteCode:code,email:address,password,name:"Synthetic Person",...(account?{account}:{})};}
 function mailbox(address=email()) {return {name:"Synthetic Mailbox",email:address,avatar:"",imap:{host:"imap.example.test",port:993,secure:true,user:address,password:"synthetic-imap-secret"},smtp:{host:"smtp.example.test",port:465,secure:true,user:address,password:"synthetic-smtp-secret"}};}
-const verified={imap:async()=>true,smtp:async()=>true};
+const verified={imap:async()=>"ok" as const,smtp:async()=>true};
 function request(jar=new CookieJar(),body:unknown={},path="/api/auth/reauth") {return new Request(`${TEST_BASE_URL}${path}`,{method:"POST",headers:jar.headers({origin:TEST_BASE_URL,"content-type":"application/json"}),body:JSON.stringify(body)});}
 async function http(f:TestAuthHarness,path:string,body?:unknown,jar=new CookieJar()) {
   const req=body===undefined?new Request(`${TEST_BASE_URL}/api/ba${path}`,{headers:jar.headers()}):request(jar,body,`/api/ba${path}`);
@@ -37,9 +37,9 @@ async function enrolled(f:TestAuthHarness,role:"admin"|"user"="admin") {
   const source=readSessionSecurity(f.master,session!.session.id);
   return {user,jar,factor,source};
 }
-async function adminProof(f:TestAuthHarness,actor:Awaited<ReturnType<typeof enrolled>>) {
+async function adminProof(f:TestAuthHarness,actor:Awaited<ReturnType<typeof enrolled>>,purpose:"admin.recovery"|"admin.grant"="admin.recovery") {
   const req=request(actor.jar);
-  const grant=await reauthenticate(f.auth,f.master,actor.source,req,{purpose:"admin.recovery",currentPassword:password,totpCode:totpFromUri(actor.factor.totpURI)},createRateLimiter({max:50}));
+  const grant=await reauthenticate(f.auth,f.master,actor.source,req,{purpose,currentPassword:password,totpCode:totpFromUri(actor.factor.totpURI)},createRateLimiter({max:50}));
   req.headers.set("x-noctua-reauth",grant.grant);return req;
 }
 async function recovery(f:TestAuthHarness,userId:string) {return issueRecovery(f.auth,f.master,"operator",null,userId,{confirmedTarget:true});}
@@ -49,7 +49,7 @@ describe("slice 5 provisioning",()=>{
   for(const mode of ["missing","expired","exhausted","wrong-person","non-admin-bootstrap"])test(`${mode} invite has zero IMAP/SMTP calls and zero reservations`,async()=>{
     const f=await setup(),address=email();let calls=0;
     const code=mode==="missing"?"invalid":invite(f,{role:mode==="non-admin-bootstrap"?"user":"admin",...(mode==="expired"?{expiresAt:0}:mode==="exhausted"?{uses:1}:mode==="wrong-person"?{email:email()}:{})});
-    await expect(provisionUser(f.auth,f.master,input(code,address,mailbox()),{imap:async()=>{calls++;return true;},smtp:async()=>{calls++;return true;}})).rejects.toMatchObject({status:mode==="exhausted"?409:403,code:mode==="exhausted"?"invite_exhausted":mode==="non-admin-bootstrap"?"bootstrap_invite_required":"invalid_invite"});
+    await expect(provisionUser(f.auth,f.master,input(code,address,mailbox()),{imap:async()=>{calls++;return "ok" as const;},smtp:async()=>{calls++;return true;}})).rejects.toMatchObject({status:mode==="exhausted"?409:403,code:mode==="exhausted"?"invite_exhausted":mode==="non-admin-bootstrap"?"bootstrap_invite_required":"invalid_invite"});
     expect(calls).toBe(0);expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning`).get().n).toBe(0);
   });
   test("all signups require a valid invite; app password has an explicit minimum and no mailbox fallback",async()=>{
@@ -65,9 +65,21 @@ describe("slice 5 provisioning",()=>{
     persistAccountRow(f.master,{...box,id:"synthetic-existing"});let calls=0;
     const shared=mailbox(),member=await f.createUser(email());
     persistAccountRow(f.master,{...shared,id:"synthetic-owned-shared",ownerUserId:user.id});await f.addMembership(member.id,"synthetic-owned-shared");
-    const verify={imap:async()=>{calls++;return true;},smtp:async()=>{calls++;return true;}};
+    const verify={imap:async()=>{calls++;return "ok" as const;},smtp:async()=>{calls++;return true;}};
     for(const [body,code] of [[input(invite(f),user.email,mailbox()),"user_exists"],[input(invite(f),legacy,mailbox()),"user_exists"],[input(invite(f),email(),box),"mailbox_exists"],[input(invite(f),shared.email),"mailbox_exists"]] as const)await expect(provisionUser(f.auth,f.master,body,verify)).rejects.toMatchObject({status:409,code});
     expect(calls).toBe(0);expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning`).get().n).toBe(0);
+  });
+  test("without a valid invite, existing users and mailboxes answer exactly like unknown addresses",async()=>{
+    const f=await setup(),user=await f.createUser(email()),box=mailbox();
+    persistAccountRow(f.master,{...box,id:"synthetic-existing-probe"});
+    const bound=invite(f,{email:email()}),expired=invite(f,{expiresAt:0});
+    for(const code of ["invalid",bound,expired]){
+      const answers=[];
+      for(const body of [input(code,user.email),input(code,email(),box),input(code,email(),mailbox())])
+        answers.push(await provisionUser(f.auth,f.master,body,verified).then(()=>null,(error:{status:number;code:string})=>({status:error.status,code:error.code})));
+      expect(answers).toEqual(Array(3).fill({status:403,code:"invalid_invite"}));
+    }
+    expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning`).get().n).toBe(0);
   });
   test("first-admin and last invite use each have one winner across awaits",async()=>{
     const f=await setup();
@@ -81,7 +93,7 @@ describe("slice 5 provisioning",()=>{
   test("reserve rechecks invite and mailbox after network; complete history releases email",async()=>{
     const f=await setup();await f.createUser(email(),password,"admin");
     const code=invite(f),address=email();
-    await expect(provisionUser(f.auth,f.master,input(code,address,mailbox()),{imap:async()=>{f.master.prepare(`UPDATE invite_codes SET expiresAt=0 WHERE code=?`).run(code);return true;},smtp:async()=>true})).rejects.toMatchObject({status:403,code:"invalid_invite"});
+    await expect(provisionUser(f.auth,f.master,input(code,address,mailbox()),{imap:async()=>{f.master.prepare(`UPDATE invite_codes SET expiresAt=0 WHERE code=?`).run(code);return "ok" as const;},smtp:async()=>true})).rejects.toMatchObject({status:403,code:"invalid_invite"});
     expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning`).get().n).toBe(0);
     const complete=await provisionUser(f.auth,f.master,input(invite(f),address),verified);
     f.master.prepare(`DELETE FROM auth_user WHERE id=?`).run(complete.userId);f.master.prepare(`DELETE FROM users WHERE id=?`).run(complete.userId);
@@ -126,6 +138,20 @@ describe("slice 5 provisioning",()=>{
     expect(f.master.prepare(`SELECT 1 FROM auth_user WHERE id=?`).get(op.userId)).toBeNull();
     expect(f.master.prepare(`SELECT state FROM user_provisioning WHERE id=?`).get(live.id).state).toBe("reserved");
   });
+  for(const check of ["invalid","unreachable"] as const)test(`a signup mailbox the IMAP check answers ${check} is refused before any reservation`,async()=>{
+    const f=await setup();await f.createUser(email(),password,"admin");
+    let smtpChecks=0;
+    // "invalid" and "unreachable" are truthy strings: a boolean test of the result would accept them.
+    await expect(provisionUser(f.auth,f.master,input(invite(f),email(),mailbox()),{imap:async()=>check,smtp:async()=>{smtpChecks++;return true;}}))
+      .rejects.toMatchObject(check==="invalid"?{status:400,code:"mailbox_credentials_invalid"}:{status:503,code:"mail_server_unreachable"});
+    expect(smtpChecks).toBe(0);
+    expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning`).get().n).toBe(0);
+  });
+  test("a signup mailbox the IMAP server accepts is provisioned",async()=>{
+    const f=await setup();await f.createUser(email(),password,"admin");
+    const created=await provisionUser(f.auth,f.master,input(invite(f),email(),mailbox()),verified);
+    expect(created.accountId).toBeString();
+  });
 });
 
 describe("slice 5 lifecycle and recovery",()=>{
@@ -134,12 +160,41 @@ describe("slice 5 lifecycle and recovery",()=>{
     const issued=await issueOnboardingInvite(f.master,actor.source,{email:address,name:"Synthetic Invitee",role:"user"});
     expect(issued.invite.email).toBe(address);
     const target=await provisionUser(f.auth,f.master,input(issued.invite.code,address),verified);
-    await updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.userId,{name:"Synthetic Renamed",role:"admin",disabled:true});
+    await updateUserLifecycle(f.auth,f.master,actor.source,await adminProof(f,actor,"admin.grant"),target.userId,{name:"Synthetic Renamed",role:"admin",disabled:true});
     expect(f.master.prepare(`SELECT name,role,banned,banExpires FROM auth_user WHERE id=?`).get(target.userId)).toEqual({name:"Synthetic Renamed",role:"admin",banned:1,banExpires:null});
     expect(f.master.prepare(`SELECT name FROM auth_user WHERE id=?`).get(actor.user.id).name).toBe("Synthetic User");
     await updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.userId,{disabled:false,role:"user"});
     expect(f.master.prepare(`SELECT count(*) n FROM auth_session WHERE userId=?`).get(target.userId).n).toBe(0);
     expect(f.master.prepare(`SELECT count(*) n FROM admin_audit WHERE targetUserId=?`).get(target.userId).n).toBeGreaterThanOrEqual(3);
+  });
+  test("admin invite, promotion and re-enabling an admin need a fresh single-use admin.grant proof",async()=>{
+    const f=await setup(),actor=await enrolled(f),member=await enrolled(f,"user");
+    const admins=()=>f.master.prepare(`SELECT count(*) n FROM auth_user WHERE role='admin'`).get().n;
+    // A live MFA admin session alone cannot mint durable admin authority.
+    await expect(issueOnboardingInvite(f.master,actor.source,{email:email(),name:"Synthetic Admin",role:"admin"},request(actor.jar))).rejects.toThrow("reauth_required");
+    await expect(updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),member.user.id,{role:"admin"})).rejects.toThrow("reauth_required");
+    expect(f.master.prepare(`SELECT count(*) n FROM invite_codes WHERE role='admin' AND issuedByUserId=?`).get(actor.user.id).n).toBe(0);
+    expect(admins()).toBe(1);
+    expect(f.master.prepare(`SELECT 1 FROM admin_lifecycle_operations WHERE slot IS NOT NULL`).get()).toBeNull();
+    // A recovery grant has another purpose.
+    await expect(updateUserLifecycle(f.auth,f.master,actor.source,await adminProof(f,actor),member.user.id,{role:"admin"})).rejects.toThrow("invalid_proof");
+    const invited=await issueOnboardingInvite(f.master,actor.source,{email:email(),name:"Synthetic Admin",role:"admin"},await adminProof(f,actor,"admin.grant"));
+    expect(invited.invite.role).toBe("admin");
+    // The grant is spent once.
+    const proof=await adminProof(f,actor,"admin.grant");
+    await updateUserLifecycle(f.auth,f.master,actor.source,proof,member.user.id,{role:"admin"});
+    expect(admins()).toBe(2);
+    const other=await enrolled(f,"user");
+    await expect(updateUserLifecycle(f.auth,f.master,actor.source,proof,other.user.id,{role:"admin"})).rejects.toThrow("invalid_proof");
+    // Disabling stays a plain admin action; re-enabling an admin restores authority and needs proof.
+    await updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),member.user.id,{disabled:true});
+    await expect(updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),member.user.id,{disabled:false})).rejects.toThrow("reauth_required");
+    await updateUserLifecycle(f.auth,f.master,actor.source,await adminProof(f,actor,"admin.grant"),member.user.id,{disabled:false});
+    // User invites, renames and demotions keep working without proof.
+    await issueOnboardingInvite(f.master,actor.source,{email:email(),name:"Synthetic User",role:"user"});
+    await updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),member.user.id,{name:"Synthetic Renamed"});
+    await updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),member.user.id,{role:"user"});
+    expect(admins()).toBe(1);
   });
   test("last admin and self mutation cannot race; global slot precedes security slots",async()=>{
     const f=await setup(),a=await enrolled(f),b=await enrolled(f);
@@ -277,7 +332,7 @@ describe("slice 5 lifecycle and recovery",()=>{
 
 for(const boundary of ["preflight-reservation","reservation-finalize"] as const)test(`issuer demotion race at ${boundary} cannot create an identity`,async()=>{
   const f=await setup(),issuer=await enrolled(f),other=await enrolled(f),address=email();
-  const issued=await issueOnboardingInvite(f.master,issuer.source,{email:address,name:"Synthetic",role:"admin"});
+  const issued=await issueOnboardingInvite(f.master,issuer.source,{email:address,name:"Synthetic",role:"admin"},await adminProof(f,issuer,"admin.grant"));
   const demote=()=>updateUserLifecycle(f.auth,f.master,other.source,request(other.jar),issuer.user.id,{role:"user"});
   let create:ReturnType<typeof spyOn>|undefined;
   if(boundary==="reservation-finalize") {
@@ -285,7 +340,7 @@ for(const boundary of ["preflight-reservation","reservation-finalize"] as const)
     create=spyOn(f.auth.api,"createUser").mockImplementation(Object.assign(async (args:Parameters<typeof original>[0])=>{const result=await original(args);await demote();return result;}, { options: original.options, path: original.path }) as typeof original);
   }
   try {
-    await expect(provisionUser(f.auth,f.master,input(issued.invite.code,address,mailbox()),{imap:async()=>{if(boundary==="preflight-reservation")await demote();return true;},smtp:async()=>true})).rejects.toMatchObject({status:403,code:"invalid_invite"});
+    await expect(provisionUser(f.auth,f.master,input(issued.invite.code,address,mailbox()),{imap:async()=>{if(boundary==="preflight-reservation")await demote();return "ok" as const;},smtp:async()=>true})).rejects.toMatchObject({status:403,code:"invalid_invite"});
     expect(f.master.prepare(`SELECT 1 FROM auth_user WHERE email=?`).get(address)).toBeNull();
     expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning WHERE normalizedEmail=? AND state IN ('reserved','auth_created','cleanup_required','complete')`).get(address).n).toBe(0);
     expect(f.master.prepare(`SELECT uses FROM invite_codes WHERE code=?`).get(issued.invite.code).uses).toBe(0);
@@ -302,7 +357,7 @@ for(const boundary of ["before-reservation","before-finalize"] as const)test(`la
     create=spyOn(f.auth.api,"createUser").mockImplementation(Object.assign(async (args:Parameters<typeof original>[0])=>{const result=await original(args);collide();return result;}, { options: original.options, path: original.path }) as typeof original);
   }
   try {
-    await expect(provisionUser(f.auth,f.master,body,{imap:async()=>{if(boundary==="before-reservation")collide();return true;},smtp:async()=>true})).rejects.toMatchObject({status:409,code:"mailbox_exists"});
+    await expect(provisionUser(f.auth,f.master,body,{imap:async()=>{if(boundary==="before-reservation")collide();return "ok" as const;},smtp:async()=>true})).rejects.toMatchObject({status:409,code:"mailbox_exists"});
     expect(f.master.prepare(`SELECT 1 FROM auth_user WHERE email=?`).get(address)).toBeNull();
     expect(f.master.prepare(`SELECT id FROM accounts WHERE email=?`).get(box.email).id).toBe("synthetic-collision-owner");
     expect(f.master.prepare(`SELECT uses FROM invite_codes WHERE code=?`).get(body.inviteCode).uses).toBe(0);
@@ -331,7 +386,7 @@ for(const action of ["ban","unban","role","delete","disable-audit"] as const)tes
   if(action==="unban")f.master.prepare(`UPDATE auth_user SET banned=1 WHERE id=?`).run(target.user.id);
   const event=action==="delete"?"BEFORE DELETE ON auth_user":action==="role"?"BEFORE UPDATE OF role ON auth_user":action==="disable-audit"?"BEFORE INSERT ON admin_audit WHEN NEW.action='user.disable'":"BEFORE UPDATE OF banned ON auth_user";
   f.master.exec(`CREATE TRIGGER synthetic_lifecycle_fault ${event} BEGIN SELECT RAISE(ABORT,'synthetic lifecycle fault'); END`);
-  const run=action==="delete"?removeUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.user.id,{},async()=>({status:"not_installed",unassigned:0})):updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.user.id,action==="role"?{role:"admin"}:{disabled:action!=="unban"});
+  const run=action==="delete"?removeUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.user.id,{},async()=>({status:"not_installed",unassigned:0})):updateUserLifecycle(f.auth,f.master,actor.source,action==="role"?await adminProof(f,actor,"admin.grant"):request(actor.jar),target.user.id,action==="role"?{role:"admin"}:{disabled:action!=="unban"});
   await expect(run).rejects.toThrow();
   expect(f.master.prepare(`SELECT 1 FROM admin_lifecycle_operations WHERE slot=?`).get(`security:${target.user.id}`)).not.toBeNull();
   expect((await http(f,"/sign-in/email",{email:target.user.email,password})).status).toBe(["unban","delete","disable-audit"].includes(action)?401:409);

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AccountSettings } from "./data";
+import type { AccountSettings, UserAccountPrefs } from "./data";
 import { canonicalizeMailboxAddress } from "./senderIdentity";
 import { AUTO_MARK_READ_MODES } from "./autoMarkRead";
 const nullable = <T extends z.ZodType>(schema: T) => schema.nullable().optional();
@@ -30,4 +30,14 @@ export function stripPersonalSettings(settings: AccountSettings | undefined, tea
   const { layout: _l, appearance: _a, calendar: _c, threading: _t, reading: _r, defaultSignatureId: _s, notifications: _n, ...team } = sharedSettings;
   void _l; void _a; void _c; void _t; void _r; void _s; void _n;
   return team;
+}
+
+/**
+ * Whether sender icons are fetched from external providers for this user and
+ * mailbox: the user's own choice wins over the mailbox default (SD46).
+ */
+export function senderIconsEnabled(settings: AccountSettings | undefined, prefs?: Pick<UserAccountPrefs, "appearance">): boolean {
+  const personal = prefs?.appearance?.senderIcons;
+  if (typeof personal === "boolean") return personal;
+  return settings?.appearance?.senderIcons ?? true;
 }

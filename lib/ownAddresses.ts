@@ -64,6 +64,24 @@ export function parseAddressEmails(value?: string | null): string[] {
 }
 
 function computeAddressEmails(value: string): readonly string[] {
+  return parseMailboxAddresses(value).flatMap(address => {
+    const email = normalizeIdentityEmail(address);
+    return email ? [email] : [];
+  });
+}
+
+/**
+ * Valid addr-specs of an address list in their original spelling (local-part
+ * case kept, as RFC 5321 delivery needs it). Display names, comments and group
+ * labels never contribute an address. SMTP envelopes built from stored header
+ * strings must use this, never a substring search.
+ */
+export function parseEnvelopeAddresses(value?: string | null): string[] {
+  if (!value) return [];
+  return parseMailboxAddresses(value).filter(address => normalizeIdentityEmail(address) !== null);
+}
+
+function parseMailboxAddresses(value: string): string[] {
   // HTAB is legal observed folding whitespace; configuration remains strict.
   if (/[\x00-\x08\x0a-\x1f\x7f]/.test(value)) return [];
   // This dependency-free Nodemailer submodule also runs in the browser. Its
@@ -86,8 +104,8 @@ function computeAddressEmails(value: string): readonly string[] {
   }
   if (commentDepth || quoted) return [];
   return addressParser(mailboxSyntax, { flatten: true }).flatMap(entry => {
-    const email = normalizeIdentityEmail(entry.address);
-    return email ? [email] : [];
+    const address = entry.address?.trim();
+    return address ? [address] : [];
   });
 }
 

@@ -5,6 +5,8 @@ import type { EmailConsent, ListMemberStatus, SuppressionReason } from "../types
 import { changeContactSubscription, changeManualSuppression, eraseContact, getMembership, subscriptionDecision, unsubscribeGlobally } from "./consent";
 import { getSendableRecipient, listSendableRecipients, suppressContact } from "./index";
 import { archiveContactList, createContactList, findContact, getContactDetail, patchContact, searchContacts, upsertContact } from "./records";
+import { createApiToken, subscribeWithApiToken } from "./apiTokens";
+import { saveOutreachSettings } from "../settings";
 
 type ConsentCase = [EmailConsent, number | null, SuppressionReason | null, ListMemberStatus | null, number | null, number, boolean, string];
 test.each<ConsentCase>([
@@ -188,4 +190,19 @@ test("erasing a contact removes dependent data and keeps only scrubbed sends in 
   ]);
   expect(db.query("SELECT contactId FROM sends WHERE accountId = ?").get(foreign)).toEqual({ contactId: contact.id });
   expect(db.query("SELECT * FROM tracking_events WHERE accountId = ?").all(foreign)).toHaveLength(1);
+});
+
+test("a list token subscribes a known address without editing its profile or revealing that it existed", async () => {
+  const accountId = crypto.randomUUID();
+  await saveOutreachSettings(accountId, { enabled: true }, "manager-1");
+  const signup = await createContactList(accountId, { name: "Signup" });
+  const { contact } = await upsertContact(accountId, { email: "known@example.test", firstName: "Kim", lastName: "Known", properties: { plan: "pro" } });
+  const { token } = await createApiToken(accountId, "manager-1", { name: "Website", listIds: [signup.id] });
+  const known = await subscribeWithApiToken({ accountId, id: token.id },
+    { email: "Known@Example.test", firstName: "Mallory", lastName: "Changed", properties: { plan: "free" }, listId: signup.id });
+  const fresh = await subscribeWithApiToken({ accountId, id: token.id }, { email: "new@example.test", firstName: "Nia", listId: signup.id });
+  expect(known).toEqual({ ok: true, contactId: contact.id, status: "subscribed" });
+  expect(Object.keys(fresh).sort()).toEqual(Object.keys(known).sort());
+  expect(await getContactDetail(accountId, contact.id)).toMatchObject({ firstName: "Kim", lastName: "Known", properties: { plan: "pro" } });
+  expect(await getContactDetail(accountId, fresh.contactId)).toMatchObject({ email: "new@example.test", firstName: "Nia" });
 });
