@@ -17,7 +17,7 @@ const mail = (subject: string, from: string, minutes: number, authenticationResu
   received,
   ...(authenticationResults ? [`Authentication-Results: mx.example.test; ${authenticationResults}`] : []),
   `From: ${from}`,
-  "To: demo@monkeydent.test",
+  "To: demo@demo-praxis.test",
   `Message-ID: <qa-sender-badge-${minutes}@example.test>`,
   `Date: ${new Date(Date.now() + minutes * 60_000).toUTCString()}`,
   `Subject: =?UTF-8?B?${Buffer.from(subject).toString("base64")}?=`,
