@@ -3,7 +3,7 @@ import {twoFactor} from "better-auth/plugins";
 import {betterAuth} from "better-auth";
 import {imapSignIn} from "./betterAuthImapSignIn";
 import {noctuaAuthOptions} from "./betterAuth";
-import {eligibleImapLoginMailbox,imapLoginAvailable,verifyEligibleImap} from "./imapLoginPolicy";
+import {eligibleImapLoginMailbox,imapLoginAvailable,loginSourceBucket,verifyEligibleImap} from "./imapLoginPolicy";
 import {CookieJar,createTestAuthHarness,TEST_BASE_URL,TEST_SECRET,totpFromUri,type TestAuthHarness} from "./testAuthHarness";
 import {persistAccountRow,mapAccountRow} from "./db/rowParsers";
 import * as imapAuth from "./mail/imapAuth";
@@ -126,6 +126,37 @@ describe("strict IMAP first-factor gate",()=>{
     expect(attempts).toBe(50);
     expect(await verifyEligibleImap(f.master,f.user.id,"synthetic-secret",from(),false,async()=>{attempts++;return true;},"reauth")).toBe(true);
     expect(attempts).toBe(51);
+  });
+  test("IPv6 sources are braked per /64, IPv4-mapped addresses as IPv4 (CF-12)",async()=>{
+    expect(loginSourceBucket("2001:db8:1:2:aaaa::1")).toBe("2001:db8:1:2::/64");
+    expect(loginSourceBucket("[2001:DB8:1:2:bbbb::2]")).toBe("2001:db8:1:2::/64");
+    expect(loginSourceBucket("::ffff:192.0.2.7")).toBe("192.0.2.7");
+    expect(loginSourceBucket("192.0.2.7")).toBe("192.0.2.7");
+    const f=await setup();process.env.NOCTUA_IMAP_LOGIN_HOSTS="imap.example.test";
+    const prefix=`2001:db8:${(Math.random()*0xffff|0).toString(16)}:7`;
+    const from=(ip:string)=>new Request(TEST_BASE_URL,{headers:{"x-forwarded-for":ip}});
+    let attempts=0;
+    const wrong=async()=>{attempts++;return false;};
+    for(let index=1;index<=5;index++)await expect(verifyEligibleImap(f.master,f.user.id,"wrong",from(`${prefix}::${index}`),false,wrong)).rejects.toThrow();
+    // A fresh address in the same /64 is braked before the network.
+    await expect(verifyEligibleImap(f.master,f.user.id,"wrong",from(`${prefix}:1234::99`),false,wrong)).rejects.toThrow();
+    expect(attempts).toBe(5);
+  });
+  test("the user-wide brake never blocks a source that already signed in as this user (CF-12)",async()=>{
+    const f=await setup();process.env.NOCTUA_IMAP_LOGIN_HOSTS="imap.example.test";
+    const from=(ip:string)=>new Request(TEST_BASE_URL,{headers:{"x-forwarded-for":ip}});
+    const home=`2001:db8:${(Math.random()*0xffff|0).toString(16)}:1`;
+    let good=0;
+    const right=async()=>{good++;return true;};
+    expect(await verifyEligibleImap(f.master,f.user.id,"synthetic-secret",from(`${home}::10`),false,right)).toBe(true);
+    // Anonymous failures from many sources fill the user-wide budget...
+    for(let index=0;index<50;index++)await expect(verifyEligibleImap(f.master,f.user.id,"wrong",from(`synthetic-${crypto.randomUUID()}`),false,async()=>false)).rejects.toThrow();
+    // ...an unknown source is held back (brute-force protection stays)...
+    await expect(verifyEligibleImap(f.master,f.user.id,"synthetic-secret",from(`synthetic-${crypto.randomUUID()}`),false,right)).rejects.toThrow();
+    expect(good).toBe(1);
+    // ...but the real user's network (new address in the same /64) still signs in.
+    expect(await verifyEligibleImap(f.master,f.user.id,"synthetic-secret",from(`${home}::20`),false,right)).toBe(true);
+    expect(good).toBe(2);
   });
   test("a known user without IMAP login costs the same password hash as an unknown one (DS-18)",async()=>{
     const f=await setup();process.env.NOCTUA_IMAP_LOGIN_HOSTS="imap.example.test";

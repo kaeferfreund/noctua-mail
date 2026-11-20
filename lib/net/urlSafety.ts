@@ -108,7 +108,7 @@ function parseIpv4(addr: string): number[] | null {
  * Parses an IPv6 literal (compressed `::`, optional dotted IPv4 tail,
  * optional `%zone`) into its 16 bytes. Returns `null` if malformed.
  */
-function parseIpv6(input: string): number[] | null {
+export function parseIpv6(input: string): number[] | null {
   let addr = input.toLowerCase();
   const zone = addr.indexOf("%");
   if (zone >= 0) addr = addr.slice(0, zone);

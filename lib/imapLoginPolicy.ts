@@ -6,15 +6,58 @@ import { verifyImapCredentials } from "./mail/imapAuth";
 import { updateMailboxCredentials } from "./mailboxCredentials";
 import { createFailureLimiter, getRequestIp } from "./rateLimit";
 import { getRequestClientId } from "../app/api/_helpers/clientId";
+import { parseIpv6 } from "./net/urlSafety";
 
 /**
- * Only failed IMAP verifications count. Per source address they stop password
- * guessing from one client; the user-wide budget is a high emergency brake so
- * anonymous failures cannot lock the real user out (CF-12). Sign-in and
- * re-authentication of a signed-in session use separate buckets.
+ * Only failed IMAP verifications count. Per source (IPv4 address, IPv6 /64)
+ * they stop password guessing from one client; the user-wide budget is a high
+ * emergency brake against guessing spread over many sources. The emergency
+ * brake never applies to a source that already signed in successfully as this
+ * user, so anonymous failures cannot lock the real user out of a known device
+ * or network (CF-12). Sign-in and re-authentication of a signed-in session use
+ * separate buckets.
  */
 const sourceFailures = createFailureLimiter({ windowMs: 60_000, max: 5 });
 const userFailures = createFailureLimiter({ windowMs: 15 * 60_000, max: 50 });
+
+/**
+ * Rate-limit bucket of a client address: one IPv6 /64 (a client usually holds
+ * the whole prefix and can rotate addresses in it), IPv4-mapped IPv6 as IPv4,
+ * anything else as given.
+ */
+export function loginSourceBucket(ip: string): string {
+  const value = ip.trim().replace(/^\[(.*)\]$/, "$1");
+  if (!value.includes(":")) return value;
+  const bytes = parseIpv6(value);
+  if (!bytes) return value;
+  if (bytes.slice(0, 10).every((byte) => byte === 0) && bytes[10] === 0xff && bytes[11] === 0xff) {
+    return bytes.slice(12).join(".");
+  }
+  const prefix = [0, 2, 4, 6].map((index) => ((bytes[index] << 8) | bytes[index + 1]).toString(16));
+  return `${prefix.join(":")}::/64`;
+}
+
+const KNOWN_SOURCE_TTL_MS = 30 * 24 * 60 * 60_000;
+const KNOWN_SOURCES_PER_USER = 16;
+const KNOWN_SOURCE_USERS = 10_000;
+/** userId → source bucket → expiry. Only a correct password adds entries. */
+const knownSources = new Map<string, Map<string, number>>();
+
+function isKnownSource(userId: string, bucket: string, now = Date.now()) {
+  const expiresAt = knownSources.get(userId)?.get(bucket);
+  return expiresAt !== undefined && expiresAt > now;
+}
+
+function rememberSource(userId: string, bucket: string, now = Date.now()) {
+  const sources = knownSources.get(userId) ?? new Map<string, number>();
+  knownSources.delete(userId);
+  sources.delete(bucket);
+  for (const [key, expiresAt] of sources) if (expiresAt <= now) sources.delete(key);
+  while (sources.size >= KNOWN_SOURCES_PER_USER) sources.delete(sources.keys().next().value!);
+  sources.set(bucket, now + KNOWN_SOURCE_TTL_MS);
+  knownSources.set(userId, sources);
+  while (knownSources.size > KNOWN_SOURCE_USERS) knownSources.delete(knownSources.keys().next().value!);
+}
 export type ImapVerificationScope = "sign-in" | "reauth";
 export function imapLoginAvailable(env: NodeJS.ProcessEnv = process.env) {
   return (env.NOCTUA_IMAP_LOGIN_HOSTS ?? "").split(",").some(host => host.trim());
@@ -46,16 +89,19 @@ export async function verifyEligibleImap(db: Database, userId: string, password:
   const checkSnapshot = () => {
     if (JSON.stringify(eligibleImapLoginMailbox(db, userId)) !== JSON.stringify(account)) throw new AuthPolicyError("invalid_credentials", 401);
   };
-  const sourceKey = `${scope}:ip:${ip}`;
+  const source = loginSourceBucket(ip);
+  const sourceKey = `${scope}:ip:${source}`;
   const userKey = `${scope}:user:${userId}`;
   const limitedVerify: typeof verify = async (...args) => {
-    if (sourceFailures.isBlocked(sourceKey) || userFailures.isBlocked(userKey)) throw new AuthPolicyError("invalid_credentials", 401);
+    if (sourceFailures.isBlocked(sourceKey)) throw new AuthPolicyError("invalid_credentials", 401);
+    if (userFailures.isBlocked(userKey) && !isKnownSource(userId, source)) throw new AuthPolicyError("invalid_credentials", 401);
     if (!await verify(...args)) {
       sourceFailures.recordFailure(sourceKey);
       userFailures.recordFailure(userKey);
       throw new AuthPolicyError("invalid_credentials", 401);
     }
     checkSnapshot();
+    rememberSource(userId, source);
     return true;
   };
   if (writeBack) await updateMailboxCredentials(account.id, { imap: { password } },
