@@ -1,6 +1,6 @@
 import { RRule, RRuleSet } from "rrule";
 import type { CalendarInviteMutationGroup } from "./calendarInviteProcessing";
-import { buildCalendarRecurrenceOptions } from "./calendarRecurrence";
+import { buildCalendarRecurrenceOptions, createBoundedRecurrenceQuery } from "./calendarRecurrence";
 
 export type InviteDeckEventBounds = {
   eventFirstStartAtMs?: number;
@@ -55,7 +55,7 @@ function buildRecurrenceTimeline(params: {
   if (!Number.isFinite(eventStartAtMs) || eventStartAtMs <= 0) return null;
 
   try {
-    const { options, toRuleDate, fromRuleDate } = buildCalendarRecurrenceOptions(
+    const { options, ruleUntil, windowed, toRuleDate, fromRuleDate } = buildCalendarRecurrenceOptions(
       normalizedRule,
       eventStartAtMs,
       params.startTimezone
@@ -63,7 +63,7 @@ function buildRecurrenceTimeline(params: {
     const rule = new RRule(options);
     const recurrenceDates = normalizeDateList(params.recurrenceDates);
     const excludedDates = normalizeDateList(params.excludedDates);
-    const recurrenceSource =
+    const recurrenceSource = createBoundedRecurrenceQuery(
       recurrenceDates.length === 0 && excludedDates.length === 0
         ? rule
         : (() => {
@@ -76,10 +76,11 @@ function buildRecurrenceTimeline(params: {
               ruleSet.exdate(toRuleDate(value));
             });
             return ruleSet;
-          })();
-    const isBounded =
-      (typeof options.count === "number" && options.count > 0) ||
-      options.until instanceof Date;
+          })()
+    );
+    const count = typeof options.count === "number" && options.count > 0 ? options.count : null;
+    // Bounded by the rule itself, not by the work window.
+    const isBounded = count !== null || ruleUntil instanceof Date;
 
     return {
       firstOnOrAfter(timestampMs: number) {
@@ -92,12 +93,19 @@ function buildRecurrenceTimeline(params: {
       },
       lastBoundedOccurrence() {
         if (!isBounded) return null;
+        if (windowed) {
+          // The work window ends before the rule's UNTIL, or possibly before
+          // its COUNT is used up: the series end is only known when the
+          // window still held every counted occurrence.
+          if (count === null) return null;
+          const emitted = createBoundedRecurrenceQuery(rule).count();
+          if (emitted === null || emitted < count) return null;
+        }
         if (options.until instanceof Date) {
           const previous = recurrenceSource.before(options.until, true);
           return previous ? fromRuleDate(previous) : null;
         }
-        const occurrences = recurrenceSource.all();
-        const last = occurrences[occurrences.length - 1];
+        const last = recurrenceSource.last();
         return last ? fromRuleDate(last) : null;
       },
       isBounded
