@@ -188,7 +188,8 @@ export default function AccountSettingsModal({
       const response = await fetchFn("/api/probe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ protocol, host: config.host, port: config.port }),
+        // Non-admin probes are limited to mailboxes the caller manages (see /api/probe).
+        body: JSON.stringify({ protocol, host: config.host, port: config.port, ...(isExistingAccount ? { accountId: localAccount.id } : {}) }),
         signal: controller.signal
       });
       if (!response.ok) return;
