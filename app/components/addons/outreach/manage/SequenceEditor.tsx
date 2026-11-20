@@ -81,8 +81,10 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
 
   const persist = async (): Promise<Sequence> => {
     const sent = form;
+    // The version loaded here: a sequence changed elsewhere since (another user, an MCP client) answers 409
+    // `sequence_changed` instead of being overwritten.
     const result = current
-      ? await api.send<{ sequence: Sequence }>("PATCH", `sequences/${encodeURIComponent(current.id)}`, inputOf(sent))
+      ? await api.send<{ sequence: Sequence }>("PATCH", `sequences/${encodeURIComponent(current.id)}`, { ...inputOf(sent), expectedUpdatedAt: current.updatedAt })
       : await api.send<{ sequence: Sequence }>("POST", "sequences", inputOf(sent));
     const stored = formOf(result.sequence);
     // The server keeps the step order; keeping the UI keys keeps the open step open.

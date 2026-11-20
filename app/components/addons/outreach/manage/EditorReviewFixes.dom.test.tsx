@@ -281,3 +281,59 @@ describe("browser Back with unsaved changes (S)", () => {
     expect(window.location.search).not.toContain("id=");
   });
 });
+
+describe("a sequence save names the version it loaded (B)", () => {
+  it("sends the loaded updatedAt, then the answered one, also after pausing and resuming", async () => {
+    let stored: Sequence = SEQUENCE;
+    const answer = (next: Partial<Sequence>) => { stored = { ...stored, ...next, updatedAt: stored.updatedAt + 10 }; return json({ ok: true, sequence: stored }); };
+    const { page, calls } = mount({ section: "sequences", id: SEQUENCE.id }, [
+      call => call.method === "PATCH" && call.path === `sequences/${SEQUENCE.id}` ? answer({ name: (call.body as { name: string }).name }) : undefined,
+      call => call.method === "POST" && call.path === `sequences/${SEQUENCE.id}/status` ? answer({ status: (call.body as { status: Sequence["status"] }).status }) : undefined
+    ]);
+    const versions = () => bodies(calls, "PATCH", `sequences/${SEQUENCE.id}`).map(body => body.expectedUpdatedAt);
+    const save = async (name: string, count: number) => {
+      fireEvent.change(page.getByLabelText("Name"), { target: { value: name } });
+      const button = page.getByRole("button", { name: "Save" }) as HTMLButtonElement;
+      await waitFor(() => expect(button.disabled).toBe(false));
+      fireEvent.click(button);
+      await waitFor(() => expect(versions().length).toBe(count));
+      await page.findByText("Sequence saved.");
+    };
+    await page.findByLabelText("Name");
+
+    await save("Willkommen eins", 1);
+    await save("Willkommen zwei", 2);
+    expect(versions()).toEqual([SEQUENCE.updatedAt, SEQUENCE.updatedAt + 10]);
+    // Role queries over the whole live page (report included) are slow; the dialog is looked up directly.
+    const dialog = () => document.querySelector<HTMLElement>("[role=dialog]");
+    const setStatus = async (label: string, notice: string) => {
+      fireEvent.click(page.getByRole("button", { name: label }));
+      await waitFor(() => expect(dialog()).not.toBeNull());
+      fireEvent.click(within(dialog()!).getByRole("button", { name: label }));
+      await page.findByText(notice);
+    };
+    await setStatus("Pause", "The sequence is paused.");
+    await save("Willkommen drei", 3);
+    await setStatus("Resume", "The sequence is live.");
+    await save("Willkommen vier", 4);
+    const start = SEQUENCE.updatedAt;
+    expect(versions()).toEqual([start, start + 10, start + 30, start + 50]);
+    expect(bodies(calls, "POST", `sequences/${SEQUENCE.id}/status`)).toEqual([{ status: "paused" }, { status: "live", expectedUpdatedAt: start + 40 }]);
+    // A new sequence has no version yet.
+    expect(calls.filter(call => call.method === "POST" && call.path === "sequences")).toEqual([]);
+  });
+
+  it("shows the refusal of a sequence changed elsewhere and keeps the typed form", async () => {
+    const { page, calls } = mount({ section: "sequences", id: SEQUENCE.id }, [
+      call => call.method === "PATCH" ? json({ ok: false, message: "Die Sequenz wurde inzwischen geändert. Prüfe sie erneut.", code: "sequence_changed" }, 409) : undefined
+    ]);
+    fireEvent.change(await page.findByLabelText("Name"), { target: { value: "Neu getippt" } });
+    fireEvent.click(page.getByRole("button", { name: "Save" }));
+    const alert = await page.findByRole("alert");
+    expect(alert.textContent).toContain("something has probably changed");
+    expect(alert.textContent).toContain("Die Sequenz wurde inzwischen geändert.");
+    expect(bodies(calls, "PATCH", `sequences/${SEQUENCE.id}`)).toMatchObject([{ name: "Neu getippt", expectedUpdatedAt: SEQUENCE.updatedAt }]);
+    expect((page.getByLabelText("Name") as HTMLInputElement).value).toBe("Neu getippt");
+    expect((page.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+});

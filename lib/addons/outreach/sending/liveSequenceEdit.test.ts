@@ -51,7 +51,8 @@ async function liveSequence() {
   expect(live.status).toBe(200);
   const sequence = getSequence(db, accountId, draft.id);
   expect(sequence).toMatchObject({ status: "live", statusChangedByUserId: approver.user.id, statusChangedVia: "app" });
-  const edit = (who: typeof editor, body: unknown) => editSequenceRoute(request(who, `sequences/${draft.id}`, "PATCH", body), at);
+  const edit = (who: typeof editor, body: unknown, sequenceId = draft.id) => editSequenceRoute(request(who, `sequences/${sequenceId}`, "PATCH", body),
+    { params: Promise.resolve({ accountId, sequenceId }) });
   return { accountId, db, listId, approver, editor, viewer, sequence, edit };
 }
 
@@ -70,6 +71,29 @@ test("an editor's edit of a live sequence records the editor as approver; a view
     status: "live", statusChangedByUserId: editor.user.id, statusChangedVia: "app",
     steps: [{ subject: "Geändert", text: "Neuer Inhalt" }]
   });
+}));
+
+test("the REST PATCH takes the version the caller loaded: a stale one is refused and writes nothing, the current one or none saves", () => withFlag(async () => {
+  const { db, accountId, listId, editor, sequence: live, edit } = await liveSequence();
+  const draft = saveSequence(db, accountId, { name: "Entwurf", triggerListId: listId, steps: [{ subject: "Hallo", text: "Entwurf" }] });
+  for (const loaded of [live, draft]) {
+    const read = () => getSequence(db, accountId, loaded.id);
+    const refused = await edit(editor, { ...changedSteps(loaded), expectedUpdatedAt: loaded.updatedAt - 1 }, loaded.id);
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ ok: false, code: "sequence_changed" });
+    expect(read()).toEqual(loaded);
+
+    const saved = await edit(editor, { ...changedSteps(loaded), expectedUpdatedAt: loaded.updatedAt }, loaded.id);
+    expect(saved.status).toBe(200);
+    const after = read();
+    expect(after).toMatchObject({ status: loaded.status, steps: [{ subject: "Geändert", text: "Neuer Inhalt" }] });
+    expect(after.updatedAt).toBeGreaterThan(loaded.updatedAt);
+    expect(((await saved.json()) as { sequence: Sequence }).sequence.updatedAt).toBe(after.updatedAt);
+
+    // Without a version the PATCH saves as before.
+    expect((await edit(editor, { name: `${loaded.name} neu` }, loaded.id)).status).toBe(200);
+    expect(read()).toMatchObject({ name: `${loaded.name} neu`, steps: [{ subject: "Geändert" }] });
+  }
 }));
 
 test("an MCP token without the send scope cannot edit a live sequence but can still edit a draft", () => withFlag(async () => {
