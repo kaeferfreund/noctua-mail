@@ -26,3 +26,21 @@ test("a body inside the limit reaches the library unchanged", async () => {
   await wrapped(post("/sign-in/email", body));
   expect(seen).toBe(body);
 });
+
+// Under `next start` the route receives Next's own request object, which is not a
+// native Request of the runtime. Rebuilding it with `new Request(request, init)` lost
+// method and URL there, so every POST to /api/ba/* answered 404. The wrapper must hand
+// the library the same method, URL and headers for any Request-shaped object.
+test("the bounded body keeps method, URL and headers of a non-native request object", async () => {
+  let seen: Record<string, string | null> = {};
+  const wrapped = wrapAuthPolicyHandler(async request => {
+    seen = { method: request.method, url: request.url, type: request.headers.get("content-type"), body: await request.text() };
+    return Response.json({ ok: false }, { status: 401 });
+  }, getDb);
+  const body = JSON.stringify({ email: "user@example.test", password: "synthetic" });
+  const native = post("/sign-in/email", body);
+  const foreign = { url: native.url, method: native.method, headers: native.headers, body: native.body, signal: native.signal,
+    clone: () => native.clone(), json: () => native.clone().json(), text: () => native.clone().text() } as unknown as Request;
+  await wrapped(foreign);
+  expect(seen).toEqual({ method: "POST", url: "http://localhost:3000/api/ba/sign-in/email", type: "application/json", body });
+});

@@ -393,7 +393,15 @@ async function boundAuthRequestBody(request: Request): Promise<Request | Respons
     return Response.json({ ok: false, code: "invalid_request" }, { status: 400, headers: noStore });
   }
   if (!bytes) return Response.json({ ok: false, code: "payload_too_large" }, { status: 413, headers: noStore });
-  return new Request(request, { body: bytes as Uint8Array<ArrayBuffer> });
+  // Build from explicit fields: under `next start` the incoming object is Next's own
+  // request class, and `new Request(thatObject, init)` does not carry its URL and
+  // method over (the auth router then saw a GET and answered 404 for every POST).
+  return new Request(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: bytes as Uint8Array<ArrayBuffer>,
+    signal: request.signal
+  });
 }
 
 export function wrapAuthPolicyHandler(handler: (request: Request) => Promise<Response>, database: () => Promise<Database>) {
