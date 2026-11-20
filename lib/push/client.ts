@@ -174,16 +174,24 @@ export async function disablePushSubscription(apiFetch: AdminFetch = fetch): Pro
 }
 
 /**
- * Sign-out: the server forgets this browser so a shared device stops showing
- * the signed-out user's mail. Best effort — errors are ignored and the browser
- * subscription stays, so the next sign-in can register it again.
+ * Sign-out: the server forgets this browser and the browser drops its push
+ * subscription, so a shared device stops showing the signed-out user's mail even
+ * when the server request fails (the dead endpoint then answers 404/410 to the
+ * next delivery and the server removes the row). Best effort — signing out must
+ * still work offline; the next user switches notifications on again.
  */
-export async function forgetPushSubscriptionOnServer(apiFetch: AdminFetch = fetch): Promise<void> {
+export async function forgetPushSubscriptionOnSignOut(apiFetch: AdminFetch = fetch): Promise<void> {
+  let subscription: PushSubscription | null = null;
   try {
-    const subscription = await currentPushSubscription();
+    subscription = await currentPushSubscription();
     if (subscription) await adminRequest(apiFetch, SUBSCRIPTIONS_URL, jsonMutation("DELETE", { endpoint: subscription.endpoint }));
   } catch {
     // Offline, already removed or no service worker: signing out must still work.
+  }
+  try {
+    await subscription?.unsubscribe();
+  } catch {
+    // The browser could not drop it; the server row is gone or fails on delivery.
   }
 }
 

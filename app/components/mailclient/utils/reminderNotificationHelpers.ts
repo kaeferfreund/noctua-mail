@@ -56,6 +56,8 @@ export function buildReminderNotificationBody(
 
 export type ReminderServiceWorkerPayload = {
   type: "noctua:reminder-state";
+  /** Signed-in user the state belongs to; the worker replaces another user's state. */
+  principal: string | null;
   accountIds: string[];
   deliveredByAccount: Record<string, Record<string, number>>;
   activeAccountId: string | null;
@@ -71,7 +73,8 @@ export function buildReminderServiceWorkerPayload(
   accountIds: string[],
   activeAccountId: string,
   reminders: CalendarReminder[],
-  readDeliveredMap: (accountId: string) => Record<string, number>
+  readDeliveredMap: (accountId: string) => Record<string, number>,
+  principal: string | null
 ): ReminderServiceWorkerPayload {
   const deliveredByAccount: Record<string, Record<string, number>> = {};
   accountIds.forEach((accountId) => {
@@ -82,6 +85,7 @@ export function buildReminderServiceWorkerPayload(
   });
   return {
     type: "noctua:reminder-state",
+    principal,
     accountIds,
     deliveredByAccount,
     activeAccountId: activeAccountId || null,

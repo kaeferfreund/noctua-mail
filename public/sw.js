@@ -1,6 +1,8 @@
 const REMINDER_SYNC_TAG = "noctua-reminders";
 const REMINDER_META_CACHE = "noctua-reminder-meta-v1";
 const REMINDER_META_URL = "/__noctua/reminder-meta";
+// REMINDER_META_CACHE must equal lib/browserUserState.ts (serviceWorker.test.ts checks it):
+// the page deletes it on sign-out.
 
 // Icon files keep their names and are cached for a day, so the URLs carry the
 // art version. Must equal APP_ICON_VERSION in lib/appBranding.ts
@@ -26,8 +28,11 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-function defaultReminderMeta() {
+// The reminder state belongs to one signed-in user (`principal`); another user's
+// state replaces it instead of being merged into it.
+function defaultReminderMeta(principal = null) {
   return {
+    principal,
     accountIds: [],
     deliveredByAccount: {}
   };
@@ -47,7 +52,8 @@ async function readReminderMeta() {
       parsed.deliveredByAccount && typeof parsed.deliveredByAccount === "object"
         ? parsed.deliveredByAccount
         : {};
-    return { accountIds, deliveredByAccount };
+    const principal = typeof parsed.principal === "string" && parsed.principal ? parsed.principal : null;
+    return { principal, accountIds, deliveredByAccount };
   } catch {
     return defaultReminderMeta();
   }
@@ -198,7 +204,15 @@ self.addEventListener("message", (event) => {
   if (payload.type === "noctua:reminder-state") {
     event.waitUntil(
       (async () => {
-        const meta = await readReminderMeta();
+        const principal =
+          typeof payload.principal === "string" && payload.principal ? payload.principal : null;
+        // Without a known user nothing is kept; a different user starts empty.
+        if (!principal) {
+          await writeReminderMeta(defaultReminderMeta());
+          return;
+        }
+        const stored = await readReminderMeta();
+        const meta = stored.principal === principal ? stored : defaultReminderMeta(principal);
         const incomingAccountIds = Array.isArray(payload.accountIds)
           ? payload.accountIds.filter((value) => typeof value === "string" && value.trim())
           : [];
@@ -222,7 +236,7 @@ self.addEventListener("message", (event) => {
             ...value
           };
         }
-        await writeReminderMeta({ accountIds, deliveredByAccount });
+        await writeReminderMeta({ principal, accountIds, deliveredByAccount });
       })()
     );
     return;

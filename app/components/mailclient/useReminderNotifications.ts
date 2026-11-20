@@ -13,6 +13,7 @@ import {
   CALENDAR_REMINDERS_UPDATED_EVENT,
   type CalendarReminder,
   fetchCalendarReminders,
+  getCalendarReminderStoragePrincipal,
   hasReminderBeenDeliveredOnClient,
   markReminderDeliveredOnClient,
   readDeliveredReminderMap,
@@ -218,7 +219,8 @@ export function useReminderNotifications({
         accountIds,
         activeAccountId,
         reminders,
-        (accountId) => readDeliveredReminderMap(accountId, clientId)
+        (accountId) => readDeliveredReminderMap(accountId, clientId),
+        getCalendarReminderStoragePrincipal()
       );
       try {
         const registration =
