@@ -21,7 +21,7 @@ import {
 } from "./schema";
 import { ensureTopicLearningRuntimeData } from "./topics";
 import { withDbWriteRetry } from "../dbWriteRetry";
-import { ACCOUNT_SHARD_TABLES, prepareAccountShardConnection, SHARD_FTS_TABLE } from "./shardFormat";
+import { ACCOUNT_SHARD_RUNTIME_TABLES, ACCOUNT_SHARD_TABLES, prepareAccountShardConnection, SHARD_FTS_TABLE } from "./shardFormat";
 
 const sqliteModulePromise = () => import("bun:sqlite" /* webpackIgnore: true */);
 let DatabaseCtor: any | null = null;
@@ -234,14 +234,17 @@ export async function areEquivalentDbPaths(leftPath: string, rightPath: string) 
  * A deleted mailbox's shard is kept while another mailbox (or the main
  * database) still uses the same file. Its rows are removed from that file so a
  * mailbox created later with the same id cannot inherit them. Only the audited
- * account-scoped shard tables are touched.
+ * account-scoped shard tables are touched, including the runtime-added ones
+ * (spam examples hold subjects and snippets) where the shard already has them.
  */
 export async function purgeAccountRowsFromRetainedShard(db: any, accountId: string) {
   await withDbWriteRetry("purgeAccountRowsFromRetainedShard", () => db.transaction(() => {
     db.prepare(`DELETE FROM ${SHARD_FTS_TABLE}
       WHERE rowid IN (SELECT ftsRowid FROM message_fts_identity WHERE accountId = ?)`).run(accountId);
+    const runtimeTables = ACCOUNT_SHARD_RUNTIME_TABLES.filter(table => db.prepare(
+      `SELECT 1 FROM pragma_table_list WHERE schema = 'main' AND type = 'table' AND name = ?`).get(table));
     // Messages first: attachments, translations and FTS identities follow by cascade.
-    for (const table of ["messages", ...ACCOUNT_SHARD_TABLES.filter(name => name !== "messages")]) {
+    for (const table of ["messages", ...ACCOUNT_SHARD_TABLES.filter(name => name !== "messages"), ...runtimeTables]) {
       db.prepare(`DELETE FROM "${table}" WHERE accountId = ?`).run(accountId);
     }
   }).immediate());

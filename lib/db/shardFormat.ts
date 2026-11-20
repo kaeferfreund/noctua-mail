@@ -42,6 +42,12 @@ export const ACCOUNT_SHARD_TABLES: readonly string[] = [
   "recipient_aliases", "sent_by", "thread_activity", "thread_collab_state", "thread_comments",
   "thread_signals", "thread_topics", "threads", "topic_learning_signals", "topic_signal_exclusions", "topics"
 ];
+/**
+ * Account-scoped tables that runtime schema adds to a shard later
+ * (ensureSpamRuntimeSchema), so older shards may not have them yet. Together
+ * with ACCOUNT_SHARD_TABLES they are every table that holds a mailbox's rows.
+ */
+export const ACCOUNT_SHARD_RUNTIME_TABLES: readonly string[] = ["spam_examples", "spam_sender_profiles"];
 const quote = (identifier: string) => `"${identifier.replaceAll('"', '""')}"`;
 function guards(db: any) {
   return scopedTables(db).flatMap(table => ["INSERT", "UPDATE", "DELETE"].map(operation => ({

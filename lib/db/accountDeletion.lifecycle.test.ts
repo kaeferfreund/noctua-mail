@@ -4,7 +4,9 @@ import { createCollabFixture } from "../testThreadCollabHarness";
 import { createSharedShardFixture } from "../testSharedShardHarness";
 import { getDefaultAccountDbPath } from "../runtimePaths";
 import { getAccountDb, getDb } from "./connection";
-import { ACCOUNT_SHARD_TABLES } from "./shardFormat";
+import { ACCOUNT_SHARD_RUNTIME_TABLES, ACCOUNT_SHARD_TABLES } from "./shardFormat";
+import { getSenderProfile, recordSenderProfileMail, saveSpamExample } from "./spam";
+import { trustedFacts } from "../mail/spam/testProfiles";
 import { validateFtsIdentity } from "./ftsIdentity";
 import { createApiToken, authenticateSubscribeToken } from "../addons/outreach/contacts/apiTokens";
 import { createContactList, upsertContact } from "../addons/outreach/contacts/records";
@@ -15,7 +17,7 @@ import { createTopic, listTopics } from "../topics";
 const thread = "<lifecycle-root@example.test>";
 
 function rowsOf(db: any, accountId: string) {
-  return Object.fromEntries(ACCOUNT_SHARD_TABLES
+  return Object.fromEntries([...ACCOUNT_SHARD_TABLES, ...ACCOUNT_SHARD_RUNTIME_TABLES]
     .map(table => [table, (db.prepare(`SELECT COUNT(*) AS n FROM "${table}" WHERE accountId = ?`).get(accountId) as { n: number }).n])
     .filter(([, count]) => count));
 }
@@ -41,9 +43,16 @@ describe("mailbox deletion lifecycle", () => {
       attachments: [{ id: "att", filename: "A.pdf", contentType: "application/pdf", size: 1, inline: false }] }));
     await b.seed(b.message(thread, { subject: "B stays", body: "syntheticretainedword" }));
     await createTopic(a.accountId, "A topic", "blue");
+    // Spam learning keeps subjects/snippets and sender trust per mailbox (SD5).
+    await saveSpamExample(a.accountId, { messageId: null, senderEmail: "sender@example.test", senderDomain: "example.test",
+      subject: "Private A subject", snippet: "syntheticdeletedword", label: "ham", source: "user", decidedByUserId: null, createdAt: 1_000 });
+    await recordSenderProfileMail(a.accountId, trustedFacts({ date: 1_000 }), "m1");
+    const senderKey = trustedFacts({ date: 1_000 }).senderKey;
     const before = rowsOf(await getAccountDb(b.accountId), a.accountId);
     expect(before.messages).toBe(1);
     expect(before.folders).toBe(1);
+    expect(before.spam_examples).toBe(1);
+    expect(before.spam_sender_profiles).toBe(1);
 
     expect(await a.api.deleteAccountControlPlane(a.accountId)).toBe(true);
     const file = getDefaultAccountDbPath(a.accountId);
@@ -60,6 +69,17 @@ describe("mailbox deletion lifecycle", () => {
     expect(await a.api.getFolders(a.accountId)).toEqual([]);
     expect((await a.api.listMessages({ accountId: a.accountId, page: 1, pageSize: 30, query: "syntheticdeletedword" })).items).toEqual([]);
     expect(await listTopics(a.accountId)).toEqual([]);
+    expect(await getSenderProfile(a.accountId, senderKey)).toBeNull();
+  });
+
+  test("the purge list covers every account-scoped table of a shard", async () => {
+    const f = await createCollabFixture();
+    const scoped = (f.db.prepare(`SELECT m.name FROM pragma_table_list m
+      WHERE m.schema = 'main' AND m.type = 'table' AND EXISTS (SELECT 1 FROM pragma_table_info(m.name) WHERE name = 'accountId')
+      ORDER BY m.name`).all() as Array<{ name: string }>).map(row => row.name);
+    expect(scoped).toContain("spam_examples");
+    const purged = new Set([...ACCOUNT_SHARD_TABLES, ...ACCOUNT_SHARD_RUNTIME_TABLES]);
+    expect(scoped.filter(table => !purged.has(table))).toEqual([]);
   });
 
   test("scheduled sends and watcher state of the deleted mailbox are removed", async () => {
