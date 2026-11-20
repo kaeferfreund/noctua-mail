@@ -42,14 +42,15 @@ function normalizeRecurrenceRule(rule?: string) {
 
 type RecurrenceQuery = Pick<BoundedRecurrenceQuery, "after" | "before" | "between">;
 
-function buildRecurrenceQuery(reminder: RecurrenceRuleLike): RecurrenceQuery | null {
+/** `nearMs`: the instant the queries are about (rebaseDtstartNear in calendarRecurrence.ts). */
+function buildRecurrenceQuery(reminder: RecurrenceRuleLike, nearMs: number): RecurrenceQuery | null {
   const normalizedRule = normalizeRecurrenceRule(reminder.recurrenceRule);
   if (!normalizedRule) return null;
   const startAtMs = Number(reminder.eventStartAtMs);
   if (!Number.isFinite(startAtMs) || startAtMs <= 0) return null;
   try {
     const { options, timeZone: ruleTimeZone, toRuleDate, fromRuleDate } =
-      buildCalendarRecurrenceOptions(normalizedRule, startAtMs, reminder.startTimezone);
+      buildCalendarRecurrenceOptions(normalizedRule, startAtMs, reminder.startTimezone, { nearMs });
     const rule = new RRule(options);
     const recurrenceDates = normalizeReminderDateList(reminder.recurrenceDates);
     const excludedDates = normalizeReminderDateList(reminder.excludedDates);
@@ -116,7 +117,7 @@ export function listRecurrenceOccurrenceStartsInRange(
   const recurrence = buildRecurrenceQuery({
     ...reminder,
     leadMinutes: 0
-  });
+  }, rangeStartMs);
   if (!recurrence) {
     if (eventStartAtMs >= rangeStartMs && eventStartAtMs < rangeEndMs) {
       return [eventStartAtMs];
@@ -178,7 +179,7 @@ export function getEventOccurrenceInfo(
     Number.isFinite(endMsRaw) && endMsRaw > startMs ? endMsRaw - startMs : 0;
   const endOf = (s: number) => (durationMs > 0 ? s + durationMs : undefined);
 
-  const recurrence = buildRecurrenceQuery({ ...event, leadMinutes: 0 });
+  const recurrence = buildRecurrenceQuery({ ...event, leadMinutes: 0 }, nowMs);
   if (!recurrence) {
     const endOrStart = durationMs > 0 ? startMs + durationMs : startMs;
     return { isFuture: endOrStart > nowMs, startAtMs: startMs, endAtMs: endOf(startMs) };
@@ -223,7 +224,7 @@ export function resolveNextReminderOccurrence(
     return null;
   }
   const leadMs = leadMinutes * 60 * 1000;
-  const recurrence = buildRecurrenceQuery(reminder);
+  const recurrence = buildRecurrenceQuery(reminder, nowMs);
   if (!recurrence) {
     const triggerAtMs = eventStartAtMs - leadMs;
     if (triggerAtMs >= nowMs) {
@@ -310,7 +311,7 @@ export function resolveCurrentOrNextOccurrence(
   const recurrence = buildRecurrenceQuery({
     ...reminder,
     leadMinutes: 0
-  });
+  }, nowMs);
   if (!recurrence) {
     if (
       Number.isFinite(durationMs) &&

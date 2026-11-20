@@ -174,3 +174,44 @@ describe("rules whose filters never match", () => {
     ).toEqual({ eventStartAtMs: Date.UTC(2026, 10, 26, 9, 0, 0) });
   });
 });
+
+describe("old series inside the work limits", () => {
+  const DAY = 24 * 60 * 60 * 1000;
+
+  test("a daily series that started in 1998 still lists this week's occurrences", () => {
+    const start = Date.UTC(1998, 0, 1, 8, 30, 0);
+    const { value, ms } = timed(() =>
+      listRecurrenceOccurrenceStartsInRange(reminder("FREQ=DAILY", start), NOW, NOW + 7 * DAY)
+    );
+    expect(ms).toBeLessThan(FAST_MS);
+    expect(value).toHaveLength(7);
+    expect(value[0]).toBe(Date.UTC(2026, 10, 21, 8, 30, 0));
+    expect(resolveNextReminderOccurrence(reminder("FREQ=DAILY", start), NOW)?.eventStartAtMs)
+      .toBe(Date.UTC(2026, 10, 21, 8, 30, 0));
+  });
+
+  test("moving the start keeps INTERVAL alignment, weekday filters and the time zone", () => {
+    // Every 3rd day from Thu 1 Jan 1998, 09:00 Berlin, only on weekdays.
+    const start = Date.UTC(1998, 0, 1, 8, 0, 0);
+    const value = listRecurrenceOccurrenceStartsInRange(
+      { ...reminder("FREQ=DAILY;INTERVAL=3;BYDAY=MO,TU,WE,TH,FR", start), startTimezone: "Europe/Berlin" },
+      NOW,
+      NOW + 21 * DAY
+    );
+    expect(value.length).toBeGreaterThan(0);
+    for (const startAtMs of value) {
+      expect(Math.round((startAtMs - start) / DAY) % 3).toBe(0);
+      expect([0, 6]).not.toContain(new Date(startAtMs).getUTCDay());
+      // 09:00 Berlin in winter is 08:00 UTC.
+      expect(new Date(startAtMs).getUTCHours()).toBe(8);
+    }
+  });
+
+  test("COUNT and an UNTIL long past keep the series as it was", () => {
+    const start = Date.UTC(1998, 0, 1, 8, 30, 0);
+    expect(listRecurrenceOccurrenceStartsInRange(reminder("FREQ=DAILY;COUNT=20000", start), NOW, NOW + 7 * DAY)).toEqual([]);
+    expect(
+      listRecurrenceOccurrenceStartsInRange(reminder("FREQ=DAILY;UNTIL=20000105T000000Z", start), Date.UTC(1999, 0, 1), Date.UTC(1999, 0, 3))
+    ).toEqual([Date.UTC(1999, 0, 1, 8, 30, 0), Date.UTC(1999, 0, 2, 8, 30, 0)]);
+  });
+});
