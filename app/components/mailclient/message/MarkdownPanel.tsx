@@ -20,7 +20,7 @@ type MarkdownPanelProps = {
 export default function MarkdownPanel({ body, fontScale = 1, message }: MarkdownPanelProps) {
   const setLinkPreviewUrl = useMessageLinkPreview();
   const source = useMemo(() => normalizeMarkdownBody(body ?? ""), [body]);
-  const remote = useRemoteContent(message?.accountId, message?.senderKey, message?.id ?? source);
+  const remote = useRemoteContent({ accountId: message?.accountId, senderKey: message?.senderKey, messageId: message?.id }, source);
   const hasRemoteImages = useMemo(() => hasRemoteMarkdownImages(source), [source]);
 
   useEffect(() => () => setLinkPreviewUrl(null), [setLinkPreviewUrl]);

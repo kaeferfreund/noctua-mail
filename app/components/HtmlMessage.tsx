@@ -545,7 +545,7 @@ function HtmlMessage({
   const t = useTranslations("Reader");
   const cleanedHtml = stripConditionalComments(html || "");
   const showViewerFrame = shouldShowHtmlViewerFrame(cleanedHtml);
-  const remote = useRemoteContent(accountId, senderKey, messageId ?? html);
+  const remote = useRemoteContent({ accountId, senderKey, messageId }, html);
   const remoteContent = remote.allowed ? "allow" : "block";
   // Theme and zoom only change the wrapper, not the sanitized message.
   const { block: blockedHtml, allow: allowedHtml } = useMemo(

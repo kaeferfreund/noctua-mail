@@ -17,7 +17,7 @@ export default function RemoteContentBanner({ remote }: { remote: RemoteContentS
       <Button variant="ghost" size="sm" aria-label={t("alwaysLoadSender")} disabled={!remote.canAlwaysAllow || remote.saving} onClick={() => void remote.alwaysAllow()}>
         <span className="md:hidden">{t("alwaysLoadSenderShort")}</span><span className="hidden md:inline">{t("alwaysLoadSender")}</span>
       </Button>
-      {!remote.canAlwaysAllow && <span className="max-md:basis-full">{t("unknownSender")}</span>}
+      {!remote.canAlwaysAllow && <span className="max-md:basis-full">{t(remote.senderUnverified ? "unverifiedSender" : "unknownSender")}</span>}
       {remote.error && <span role="alert" className="max-md:basis-full">{remote.error}</span>}
     </div>
   );

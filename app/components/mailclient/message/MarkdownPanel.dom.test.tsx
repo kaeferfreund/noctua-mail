@@ -15,9 +15,8 @@ let allowedSenders: Record<string, boolean> = {};
 
 beforeEach(() => {
   allowedSenders = {};
-  globalThis.fetch = mock(async () => new Response(JSON.stringify({ ok: true, prefs: { remoteContent: { allowedSenders } } }), {
-    headers: { "Content-Type": "application/json" }
-  })) as unknown as typeof fetch;
+  // The server's per-message decision for an authenticated sender.
+  globalThis.fetch = mock(async () => Response.json({ ok: true, senderVerified: true, allowed: allowedSenders["sender@example.test"] === true })) as unknown as typeof fetch;
 });
 
 afterEach(() => {

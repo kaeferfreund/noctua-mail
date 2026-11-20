@@ -23,7 +23,7 @@ export function EditorRemoteImagesProvider({ source, sessionKey, children }: {
   sessionKey?: unknown;
   children: ReactNode;
 }) {
-  const remote = useRemoteContent(source?.accountId, source?.senderKey, source?.id ?? "");
+  const remote = useRemoteContent({ accountId: source?.accountId, senderKey: source?.senderKey, messageId: source?.id });
   const [shownFor, setShownFor] = useState<{ key: unknown } | null>(null);
   const shown = shownFor !== null && shownFor.key === sessionKey;
   const value = useMemo(

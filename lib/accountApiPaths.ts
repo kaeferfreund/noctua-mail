@@ -312,6 +312,13 @@ export function buildAccountMessageHtmlPath(accountId: string, messageId: string
   );
 }
 
+export function buildAccountMessageRemoteContentPath(accountId: string, messageId: string) {
+  return buildAccountApiPath(
+    accountId,
+    `/messages/${encodeURIComponent(messageId)}/remote-content`
+  );
+}
+
 export function buildAccountMessageTranslatePath(accountId: string, messageId: string) {
   return buildAccountMessageActionPath(accountId, messageId, "translate");
 }
