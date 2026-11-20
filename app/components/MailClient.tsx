@@ -6108,6 +6108,8 @@ export default function MailClient({
 
       {manageOpen && editingAccount && (
         <UrlHistoryContext.Provider value={true}><AccountSettingsModal
+          // History navigation can switch the mailbox under an open dialog: start over with its data.
+          key={editingAccount.id}
           editingAccount={editingAccount}
           accounts={accounts}
           isOpen={manageOpen}
@@ -6125,7 +6127,7 @@ export default function MailClient({
             notifySenderSettingsChanged(account.id);
             setManageOpen(false);
           } : saveAccountSettings}
-          onDelete={() => deleteAccount(editingAccount.id)}
+          onDelete={deleteAccount}
           isAdminUser={isAdminUser}
           onNotifySuccess={(title, description) => {
             pushNotice({
