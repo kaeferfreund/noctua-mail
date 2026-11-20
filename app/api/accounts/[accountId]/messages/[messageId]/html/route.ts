@@ -3,7 +3,6 @@ import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { type AccountRouteParams, getAccountIdFromParams } from "@/app/api/_helpers/accountContext";
 import { getMessageById, getUserAccountPrefs } from "@/lib/db";
-import { enforceSafeLinks } from "@/lib/html";
 import { messageHtmlCsp, senderAllowsRemoteContent, type RemoteContentMode } from "@/lib/html/remoteContent";
 import { requireActiveUserSession } from "@/lib/auth";
 import { formatMessageHtmlPageTitle } from "@/lib/appBranding";
@@ -46,7 +45,7 @@ function postprocessHtml(
   nextHtml = stripRedundantInlineImageFallbacks(nextHtml, attachments);
   nextHtml = appendUnreferencedInlineImages(nextHtml, attachments);
   nextHtml = stripRemovedInlineImages(nextHtml, attachments);
-  return enforceSafeLinks(sanitizeHtmlForDisplay(stripConditionalComments(nextHtml), mode)).replace(
+  return sanitizeHtmlForDisplay(stripConditionalComments(nextHtml), mode, { safeLinks: true }).replace(
     /data:(?!image\/)[^'")\s]+/gi,
     "about:blank"
   );

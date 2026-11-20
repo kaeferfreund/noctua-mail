@@ -1,12 +1,8 @@
 "use client";
 
 import { linkifyText } from "@/app/components/LinkifiedText";
-import {
-  enforceSafeLinks,
-  linkifyHtmlTextNodes,
-  sanitizeHtmlForDisplay,
-  stripStyleTags
-} from "@/lib/html";
+import { linkifyHtmlTextNodes, sanitizeHtmlForAppDocument } from "@/lib/html";
+import senderHtmlStyles from "./SenderHtml.module.css";
 import styles from "./EventDetailView.module.css";
 
 export type EventDetailDescriptionProps = {
@@ -18,13 +14,14 @@ function looksLikeHtml(value: string) {
 }
 
 function sanitizeDescriptionHtml(value: string) {
-  return enforceSafeLinks(linkifyHtmlTextNodes(sanitizeHtmlForDisplay(stripStyleTags(value))));
+  return linkifyHtmlTextNodes(sanitizeHtmlForAppDocument(value));
 }
 
 /**
- * Renders the event description. HTML content is sanitized and safe-linked
- * before being inserted via dangerouslySetInnerHTML; plain-text content is
- * linkified so URLs become clickable.
+ * Renders the event description. HTML content goes through the app-document
+ * sanitizer (no sender stylesheets, safe links) before being inserted via
+ * dangerouslySetInnerHTML; the container confines inline styles. Plain-text
+ * content is linkified so URLs become clickable.
  */
 export default function EventDetailDescription({ description }: EventDetailDescriptionProps) {
   const trimmed = description?.trim() ?? "";
@@ -37,7 +34,7 @@ export default function EventDetailDescription({ description }: EventDetailDescr
     <div className={styles.description}>
       <span className={styles.descriptionLabel}>Description</span>
       {useHtml ? (
-        <div className={styles.descriptionText} dangerouslySetInnerHTML={{ __html: descriptionHtml }} />
+        <div className={`${styles.descriptionText} ${senderHtmlStyles.senderHtml}`} dangerouslySetInnerHTML={{ __html: descriptionHtml }} />
       ) : (
         <span className={styles.descriptionText}>
           {linkifyText(trimmed, styles.descriptionLink)}
