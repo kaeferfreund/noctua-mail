@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getAccountIdFromParams, requireAccountContext, requireAccountContextFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { requireBodylessSameOrigin, requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { listMcpTokens } from "@/lib/serverDb";
-import { deleteMcpToken } from "@/lib/serverDb";
+import { deleteMcpToken, removeMcpTokenAccount } from "@/lib/serverDb";
 import { updateMcpTokenAccounts } from "@/lib/mcpAuth";
 import { isMcpAccountIdList } from "@/lib/mcpPermissions";
 import { requireMcpGrant } from "../mcpGrant";
@@ -29,7 +29,11 @@ export async function DELETE(request: Request, { params }: Params) {
 
     const token = (await listMcpTokens(context.accountId)).find(t => t.id === tokenId);
     if (!token || (context.role !== "manager" && token.createdByUserId !== context.userId)) return NextResponse.json({ ok: false, message: "Token not found" }, { status: 404 });
-    const deleted = await deleteMcpToken(context.accountId, tokenId);
+    // The creator revokes the whole token. A manager of this mailbox only removes this
+    // mailbox from it; the creator's access to other mailboxes is not theirs to revoke.
+    const deleted = token.createdByUserId === context.userId
+      ? await deleteMcpToken(context.accountId, tokenId)
+      : await removeMcpTokenAccount(context.accountId, tokenId);
     if (!deleted) {
       return NextResponse.json({ ok: false, message: "Token not found" }, { status: 404 });
     }

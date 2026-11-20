@@ -122,6 +122,35 @@ export async function deleteMcpToken(accountId: string, tokenId: string) {
 }
 
 /**
+ * Removes one mailbox from a token, as a mailbox manager who is not the
+ * creator may: the token keeps working for its other mailboxes (which that
+ * manager may not be able to access). The token is deleted when this was its
+ * only mailbox; a removed primary is re-picked like on a membership revoke.
+ */
+export async function removeMcpTokenAccount(accountId: string, tokenId: string) {
+  return withDbWriteRetry("removeMcpTokenAccount", async () => {
+    const db = await getDb();
+    return db.transaction(() => {
+      const token = db.prepare("SELECT id, accountId, createdByUserId FROM mcp_tokens WHERE id=?").get(tokenId) as
+        { id: string; accountId: string; createdByUserId: string } | null;
+      if (!token) return false;
+      const accountIds = mcpTokenAccountIds(db, token);
+      if (!accountIds.includes(accountId)) return false;
+      const remaining = accountIds.filter(id => id !== accountId);
+      if (remaining.length === 0) {
+        db.prepare("DELETE FROM mcp_tokens WHERE id=?").run(tokenId);
+        return true;
+      }
+      db.prepare("DELETE FROM mcp_token_accounts WHERE tokenId=? AND accountId=?").run(tokenId, accountId);
+      if (token.accountId === accountId) {
+        db.prepare("UPDATE mcp_tokens SET accountId=? WHERE id=?").run(pickMcpTokenPrimary(db, token.createdByUserId, remaining), tokenId);
+      }
+      return true;
+    }).immediate();
+  });
+}
+
+/**
  * Deletes every MCP token created by `userId`, across all mailboxes. Runs on
  * the caller's connection so it can join a larger transaction (user delete).
  */
