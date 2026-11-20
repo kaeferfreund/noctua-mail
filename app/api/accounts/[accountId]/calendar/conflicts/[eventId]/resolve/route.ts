@@ -15,7 +15,7 @@ import {
   type CalendarEventConflict
 } from "@/lib/db";
 import type { Account, CalendarEvent } from "@/lib/data";
-import { createCaldavClient, updateRemoteEvent } from "@/lib/caldav/client";
+import { createCaldavClient, isHrefInCalendarCollection, updateRemoteEvent } from "@/lib/caldav/client";
 import { mergeRemoteIcsIntoEvent } from "@/lib/caldav/remoteMerge";
 import { patchIcsForEvent } from "@/lib/caldav/icsSerializer";
 
@@ -54,6 +54,10 @@ export async function applyConflictResolution(
   if (resolution === "local") {
     if (!account?.caldav?.url || !event.remoteHref) {
       return { ok: false, status: 400, message: "No remote target" };
+    }
+    if (!isHrefInCalendarCollection(event.remoteHref, event.calendarId)) {
+      // Only overwrite a resource inside the event's own calendar collection.
+      return { ok: false, status: 400, message: "Remote target is outside the event's calendar" };
     }
     if (!conflict.remoteEtag) {
       // Without the server's current revision an If-Match PUT would blindly

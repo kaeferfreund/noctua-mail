@@ -117,8 +117,10 @@ export async function PUT(request: Request, { params }: Params) {
         body?.myAttendeeEmail !== undefined ? body.myAttendeeEmail?.trim() || undefined : existing.myAttendeeEmail,
       replyRequested:
         body?.replyRequested !== undefined ? Boolean(body.replyRequested) : existing.replyRequested,
-      remoteEtag: body?.remoteEtag !== undefined ? body.remoteEtag?.trim() || undefined : existing.remoteEtag,
-      remoteHref: body?.remoteHref !== undefined ? body.remoteHref?.trim() || undefined : existing.remoteHref,
+      // The CalDAV linkage is server-owned (set only by sync): a client-chosen href would
+      // direct the authenticated write-back to another resource.
+      remoteEtag: existing.remoteEtag,
+      remoteHref: existing.remoteHref,
       rawIcs: body?.rawIcs !== undefined ? body.rawIcs ?? undefined : existing.rawIcs,
       // Flag CalDAV-sourced edits for write-back; the next sync pushes and clears it.
       pendingRemoteSync: resolvePendingRemoteSync(existing, Date.now()),
