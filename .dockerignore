@@ -8,9 +8,9 @@ node_modules
 out
 dist
 
-# Development files
-.env*.local
-.env.development
+# Development files and secrets (never part of the image)
+.env
+.env*
 .data
 ../noctua-data
 
