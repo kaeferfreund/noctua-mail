@@ -50,6 +50,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
       icsSource,
       process: true,
       accountEmail: getOwnAddresses(accountContext.account),
+      senderAddress: message.from,
       reminderUserId: accountContext.session.userId,
       processedByUserId: accountContext.session.userId,
       processedAutomatically: false

@@ -777,6 +777,9 @@
       "saving": "Wird gespeichert …",
       "submitAndSend": "{status, select, ACCEPTED {Zusagen und Antwort senden} DECLINED {Absagen und Antwort senden} TENTATIVE {Mit Vorbehalt zusagen und Antwort senden} other {Antwort senden}}",
       "submitWithoutSending": "{status, select, ACCEPTED {Zusagen, ohne Antwort zu senden} DECLINED {Absagen, ohne Antwort zu senden} TENTATIVE {Mit Vorbehalt zusagen, ohne Antwort zu senden} other {Speichern, ohne Antwort zu senden}}"
+    },
+    "inviteStatus": {
+      "organizerMismatch": "Absender ist nicht der Organisator des Termins"
     }
   },
   "Search": {

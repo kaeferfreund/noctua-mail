@@ -14,6 +14,7 @@ import {
 import type { CalendarEvent } from "@/lib/data";
 import { toFiniteNumber, toPositiveNumberArray } from "@/app/api/_helpers/numberParsing";
 import { deleteCalendarEventAndRelatedData } from "@/lib/calendarEventDeletion";
+import { toCalendarEventResponse } from "@/lib/calendarEventEmailSnapshot";
 
 /**
  * Compute the write-back dirty flag after a local edit: stamp the change time
@@ -51,7 +52,7 @@ export async function GET(request: Request, { params }: Params) {
       if (!event) {
         return NextResponse.json({ ok: false, message: "Event not found" }, { status: 404 });
       }
-      return NextResponse.json({ ok: true, event });
+      return NextResponse.json({ ok: true, event: event && toCalendarEventResponse(event) });
     } catch (err) {
       console.error("[calendar/events/[eventId]] GET error:", err);
       return NextResponse.json({ ok: false, message: "Failed to load event" }, { status: 500 });
@@ -144,7 +145,7 @@ export async function PUT(request: Request, { params }: Params) {
           messageId: updated.messageId
         });
       }
-      return NextResponse.json({ ok: true, event: updated });
+      return NextResponse.json({ ok: true, event: toCalendarEventResponse(updated) });
     } catch (err) {
       console.error("[calendar/events/[eventId]] PUT error:", err);
       return NextResponse.json({ ok: false, message: "Failed to update event" }, { status: 500 });

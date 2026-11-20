@@ -59,7 +59,6 @@ export async function upsertCalendarEventConflict(
         localChangedAtMs, remoteChangedAtMs, detectedAtMs
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(eventId) DO UPDATE SET
-        accountId = excluded.accountId,
         eventUid = excluded.eventUid,
         summary = excluded.summary,
         timeZone = excluded.timeZone,
@@ -69,7 +68,10 @@ export async function upsertCalendarEventConflict(
         remoteIcs = excluded.remoteIcs,
         remoteEtag = excluded.remoteEtag,
         localChangedAtMs = excluded.localChangedAtMs,
-        remoteChangedAtMs = excluded.remoteChangedAtMs`
+        remoteChangedAtMs = excluded.remoteChangedAtMs
+      -- eventId is shard-wide; never move or overwrite another mailbox's
+      -- conflict row in a legacy shared shard.
+      WHERE calendar_event_conflicts.accountId = excluded.accountId`
     ).run(
       conflict.eventId,
       // Scope to the DB we opened, not the caller-supplied field, so a row can

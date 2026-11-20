@@ -188,6 +188,7 @@ export function planTwoPhaseNewBackfill(
 type CalendarInviteImport = {
   messageId: string;
   icsSource: string;
+  senderAddress?: string;
   dateValue: number;
   imapUid?: number;
   process: boolean;
@@ -818,6 +819,7 @@ export async function runSyncOperationBatched(
           calendarInviteImports.push({
             messageId: message.id,
             icsSource,
+            senderAddress: message.from,
             dateValue: message.dateValue,
             imapUid: typeof message.imapUid === "number" ? message.imapUid : undefined,
             process: shouldProcessInvite,
@@ -889,6 +891,7 @@ export async function runSyncOperationBatched(
       icsSource: invite.icsSource,
       process: invite.process && !fullyProcessedInviteMessageIds.has(invite.messageId),
       accountEmail: getOwnAddresses(account),
+      senderAddress: invite.senderAddress,
       reminderUserId: autoProcessCalendarInvites ? account.ownerUserId : undefined,
       processedByUserId: autoProcessCalendarInvites ? account.ownerUserId : undefined,
       processedAutomatically: autoProcessCalendarInvites ? true : undefined

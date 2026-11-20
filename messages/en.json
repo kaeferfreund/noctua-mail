@@ -777,6 +777,9 @@
       "saving": "Saving...",
       "submitAndSend": "{status, select, ACCEPTED {Accept and send response} DECLINED {Decline and send response} TENTATIVE {Mark tentative and send response} other {Respond and send response}}",
       "submitWithoutSending": "{status, select, ACCEPTED {Accept and save without sending response} DECLINED {Decline and save without sending response} TENTATIVE {Mark tentative and save without sending response} other {Respond and save without sending response}}"
+    },
+    "inviteStatus": {
+      "organizerMismatch": "sender is not the event organizer"
     }
   },
   "Search": {
