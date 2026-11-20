@@ -476,6 +476,25 @@ tar xzf /path/to/noctua-backup-YYYYMMDD.tar.gz -C /path/to/noctua/data/
 - **Space savings:** Database-only backups are much smaller (excludes potentially large attachment cache).
 - **IMAP requirement:** Cache regeneration requires IMAP access. Ensure credentials are valid before restoring database-only backups.
 
+### One-time clean-up of deleted mailboxes' leftovers
+
+Before the 2026-11 security fix, deleting a mailbox left rows behind in a shard that another
+mailbox (or the master DB) kept using, in the master tables `scheduled_sends`, `mailbox_watcher_auth`
+and others, and in the newsletter add-on database. Mailbox ids are derived from the address, so a
+mailbox recreated for the same address would inherit them. Remove them once after upgrading:
+
+1. Stop the service (all writers, including workers).
+2. Back up the data directory as in [Full Backup](#full-backup-including-cache).
+3. Dry run from the application directory (reads `NOCTUA_DATA_DIR` like the app, or pass the path):
+   `bun scripts/purge-orphan-account-rows.ts --data-dir /path/to/noctua/data`.
+   It lists, per database, mailbox id and table, how many rows belong to mailboxes that no longer
+   exist, plus shard files in `db/accounts/` that no mailbox uses. It prints ids and counts only.
+4. Apply: the same command with `--apply`. It removes those rows (one transaction per database),
+   deletes the unused shard files and scans again; a non-zero exit code means something is left.
+   A shard file that no mailbox uses but that still holds rows of an existing mailbox is kept and
+   listed for manual review.
+5. Start the service.
+
 ## Background mailbox watcher (team deployments)
 
 The sync worker admission cap (default **2**) and SPECIAL-USE Sent detection apply universally,

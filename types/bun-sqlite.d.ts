@@ -13,6 +13,8 @@ declare module "bun:sqlite" {
   export class Database {
     /** A number is a set of SQLITE_OPEN_* flags (e.g. READONLY | URI for `file:…?immutable=1`). */
     constructor(path: string, options?: number | { create?: boolean; readwrite?: boolean; readonly?: boolean });
+    /** Whether a transaction (or savepoint) is open on this connection. */
+    readonly inTransaction: boolean;
     exec(sql: string): void;
     close(): void;
     prepare(sql: string): {
