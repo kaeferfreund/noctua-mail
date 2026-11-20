@@ -299,6 +299,10 @@ function MessageViewOrchestratorImpl(
   // overwrite state from a newer request (or one issued after the map was
   // cleared on account change). Only the latest request per message commits.
   const translationRequestSeqRef = useRef<Record<string, number>>({});
+  // Bumped on every mailbox change. Message ids are only unique within a
+  // mailbox, so a response that started before the change is dropped, even a
+  // successful one, instead of landing on another mailbox's message.
+  const translationScopeRef = useRef(0);
   // Ref mirror of `messageTabs` so the stable `getMessageTab` handle
   // method (created with empty deps) reads the latest map without
   // rebuilding the handle object on every tab change.
@@ -526,6 +530,8 @@ function MessageViewOrchestratorImpl(
       // True only while this is still the newest request for the message; a
       // later request (or an account-change reset) makes stale responses drop.
       const isCurrentRequest = () => translationRequestSeqRef.current[messageId] === requestSeq;
+      const scope = translationScopeRef.current;
+      const isInScope = () => translationScopeRef.current === scope;
       setMessageTranslations((prev) => {
         const entry = prev[messageId] ?? { showing: true, targetLang, results: {} };
         return {
@@ -557,6 +563,7 @@ function MessageViewOrchestratorImpl(
           translatedText?: string;
           detectedSourceLang?: string;
         } | null;
+        if (!isInScope()) return;
         if (res.ok && data?.ok && typeof data.translatedText === "string") {
           const translatedText = data.translatedText;
           const detectedSourceLang = data.detectedSourceLang ?? "";
@@ -584,7 +591,7 @@ function MessageViewOrchestratorImpl(
       } catch (error) {
         // Ignore a stale error so a superseded request can't flip a newer view
         // into an error state.
-        if (!isCurrentRequest()) return;
+        if (!isCurrentRequest() || !isInScope()) return;
         const messageText = error instanceof Error ? error.message : t("translationFailed");
         setMessageTranslations((prev) => {
           const entry = prev[messageId];
@@ -649,7 +656,10 @@ function MessageViewOrchestratorImpl(
     // Drop any in-flight translate requests so a late response can't
     // re-introduce a translation for the previous account's message id.
   }
-  useLayoutEffect(() => { translationRequestSeqRef.current = {}; }, [activeAccountId]);
+  useLayoutEffect(() => {
+    translationRequestSeqRef.current = {};
+    translationScopeRef.current += 1;
+  }, [activeAccountId]);
 
   // Collapse all messages in the active thread except the selected one when
   // that selection was triggered explicitly by the user. Skip when threads
