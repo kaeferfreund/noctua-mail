@@ -25,7 +25,7 @@ test.beforeAll(async () => {
   for (const [index, mail] of mails.entries()) {
     const source = [
       `From: ${mail.from}`,
-      "To: demo@monkeydent.test",
+      "To: demo@demo-praxis.test",
       `Message-ID: <qa-mobile-swipe-${index}@example.test>`,
       `Date: ${new Date(Date.now() + 3_600_000 - index * 60_000).toUTCString()}`,
       `Subject: =?UTF-8?B?${Buffer.from(mail.subject).toString("base64")}?=`,

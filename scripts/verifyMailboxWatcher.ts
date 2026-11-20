@@ -105,7 +105,7 @@ try {
   // Use production startup before fixture writes or watcher activity.
   await getAuth();
   fixture = spawn(process.execPath, [fixturePath, "--host", "127.0.0.1", "--port", process.env.NOCTUA_TEST_IMAP_PORT ?? "0",
-    "--control-port", process.env.NOCTUA_TEST_CONTROL_PORT ?? "0", "--user", "demo@monkeydent.test", "--pass", "demo", "--seed", "monkeydent"],
+    "--control-port", process.env.NOCTUA_TEST_CONTROL_PORT ?? "0", "--user", "demo@demo-praxis.test", "--pass", "demo", "--seed", "demo-praxis"],
   { cwd: path.resolve(fixturePath, "../../.."), stdio: ["ignore", "pipe", "pipe"], env: process.env });
   fixture.stdout?.on("data", (chunk) => { fixtureLog += chunk; });
   fixture.stderr?.on("data", (chunk) => { fixtureLog += chunk; });
@@ -120,8 +120,8 @@ try {
   proxy.listen(0, "127.0.0.1");
   await once(proxy, "listening");
   const proxyPort = (proxy.address() as { port: number }).port;
-  const endpoint = { host: "127.0.0.1", port: proxyPort, secure: false, user: "demo@monkeydent.test", password: "demo" };
-  const account: Account = { id: accountId, name: "Synthetic watcher", email: "demo@monkeydent.test", avatar: "S", imap: endpoint, smtp: endpoint };
+  const endpoint = { host: "127.0.0.1", port: proxyPort, secure: false, user: "demo@demo-praxis.test", password: "demo" };
+  const account: Account = { id: accountId, name: "Synthetic watcher", email: "demo@demo-praxis.test", avatar: "S", imap: endpoint, smtp: endpoint };
   await upsertAccount(account);
   assert.equal((await getStoredAccounts()).find((entry) => entry.id === accountId)?.imap.password, "demo");
   delete process.env.NOCTUA_MAILBOX_WATCHER;

@@ -1,13 +1,13 @@
 /** Entirely invented demo correspondence; no real patients or suppliers. */
 export type SeedMessage = { folder: string; source: Buffer; flags: string[]; date: Date };
-export const demoUser = "demo@monkeydent.test";
+export const demoUser = "demo@demo-praxis.test";
 export const demoPass = "demo";
 const encoded = (text: string) => `=?UTF-8?B?${Buffer.from(text).toString("base64")}?=`;
 const base64 = (text: string | Buffer) => Buffer.from(text).toString("base64").match(/.{1,76}/g)?.join("\r\n") ?? "";
 
 // A tiny valid one-page PDF, with byte offsets computed rather than a fake .pdf blob.
 function invoicePdf() {
-  const stream = "BT /F1 18 Tf 40 550 Td (MonkeyDent - SYNTHETIC invoice EUR 128.00) Tj " + Array.from({ length: 12 }, (_, i) => `0 -24 Td (Demo item ${i + 1}: practice materials - synthetic example only) Tj `).join("") + "ET";
+  const stream = "BT /F1 18 Tf 40 550 Td (Demo-Praxis - SYNTHETIC invoice EUR 128.00) Tj " + Array.from({ length: 12 }, (_, i) => `0 -24 Td (Demo item ${i + 1}: practice materials - synthetic example only) Tj `).join("") + "ET";
   const objects = ["<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Kids [3 0 R] /Count 1 >>", "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 700 600] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>", "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>", `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`];
   let pdf = "%PDF-1.4\n";
   const offsets = [0];
@@ -22,11 +22,11 @@ export function makeMessage(input: MessageInput): Buffer {
   const boundary = `fixture-${input.id.replace(/[^a-z0-9]/gi, "-")}`;
   const refs = input.references ?? [];
   const headers = [
-    `Date: ${date.toUTCString()}`, `Message-ID: <${input.id}@monkeydent.test>`,
+    `Date: ${date.toUTCString()}`, `Message-ID: <${input.id}@demo-praxis.test>`,
     `From: ${input.from ?? '"Mira Beispiel" <mira.beispiel@example.test>'}`,
-    `To: ${input.to ?? '"MonkeyDent Team" <demo@monkeydent.test>'}`,
+    `To: ${input.to ?? '"Demo-Praxis Team" <demo@demo-praxis.test>'}`,
     `Subject: ${encoded(input.subject)}`, "MIME-Version: 1.0", "X-Fixture: synthetic",
-    ...(refs.length ? [`In-Reply-To: <${refs.at(-1)}@monkeydent.test>`, `References: ${refs.map(id => `<${id}@monkeydent.test>`).join(" ")}`] : [])
+    ...(refs.length ? [`In-Reply-To: <${refs.at(-1)}@demo-praxis.test>`, `References: ${refs.map(id => `<${id}@demo-praxis.test>`).join(" ")}`] : [])
   ];
   const text = input.text ?? "Guten Tag,\n\nwir möchten einen Termin zur Kontrolle vereinbaren. Passt Dienstag um 10 Uhr?\n\nViele Grüße\nMira Beispiel\n\n[Synthetische Demo-Nachricht]";
   const plain = `Content-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${base64(text)}\r\n`;
@@ -37,21 +37,21 @@ export function makeMessage(input: MessageInput): Buffer {
   if (input.kind === "newsletter") {
     const alternative = `${boundary}-alt`;
     // Nested 1.1 / 1.2 sections exercise the same part addressing as real mail.
-    body = part(`Content-Type: multipart/alternative; boundary="${alternative}"\r\n\r\n--${alternative}\r\n${plain}--${alternative}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${base64('<html><body style="font-family:sans-serif"><h1>MonkeyDent Praxispost</h1><img src="cid:demo-logo" alt="Demo Logo"><p>Neue Ideen für einen entspannten Praxisalltag.</p><p>Alle Inhalte sind synthetisch.</p></body></html>')}\r\n--${alternative}--\r\n`);
+    body = part(`Content-Type: multipart/alternative; boundary="${alternative}"\r\n\r\n--${alternative}\r\n${plain}--${alternative}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n${base64('<html><body style="font-family:sans-serif"><h1>Demo-Praxis Praxispost</h1><img src="cid:demo-logo" alt="Demo Logo"><p>Neue Ideen für einen entspannten Praxisalltag.</p><p>Alle Inhalte sind synthetisch.</p></body></html>')}\r\n--${alternative}--\r\n`);
     body += part("Content-Type: image/png; name=demo-logo.png\r\nContent-Disposition: inline; filename=demo-logo.png\r\nContent-ID: <demo-logo>\r\nContent-Transfer-Encoding: base64\r\n\r\niVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=\r\n");
     headers.push("List-Unsubscribe: <mailto:unsubscribe@praxispost.example.test>");
   }
   if (input.kind === "calendar") {
     const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
     const start = new Date(date.getTime() + 7 * 86400000);
-    const calendar = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//MonkeyDent//Synthetic Fixture//DE", "METHOD:REQUEST", "BEGIN:VEVENT", `UID:${input.id}@monkeydent.test`, `DTSTAMP:${stamp(date)}`, `DTSTART:${stamp(start)}`, `DTEND:${stamp(new Date(start.getTime() + 1800000))}`, "SUMMARY:MonkeyDent Demo-Termin", "ORGANIZER:mailto:mira.beispiel@example.test", "ATTENDEE;RSVP=TRUE:mailto:demo@monkeydent.test", "END:VEVENT", "END:VCALENDAR", ""].join("\r\n");
+    const calendar = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Demo-Praxis//Synthetic Fixture//DE", "METHOD:REQUEST", "BEGIN:VEVENT", `UID:${input.id}@demo-praxis.test`, `DTSTAMP:${stamp(date)}`, `DTSTART:${stamp(start)}`, `DTEND:${stamp(new Date(start.getTime() + 1800000))}`, "SUMMARY:Demo-Praxis Demo-Termin", "ORGANIZER:mailto:mira.beispiel@example.test", "ATTENDEE;RSVP=TRUE:mailto:demo@demo-praxis.test", "END:VEVENT", "END:VCALENDAR", ""].join("\r\n");
     body += part(`Content-Type: text/calendar; charset=utf-8; method=REQUEST; name="termin.ics"\r\nContent-Disposition: attachment; filename="termin.ics"\r\nContent-Transfer-Encoding: base64\r\n\r\n${base64(calendar)}\r\n`);
   }
   return Buffer.from([...headers, `Content-Type: multipart/${input.kind === "newsletter" ? "related" : "mixed"}; boundary="${boundary}"`, "", body + `--${boundary}--\r\n`].join("\r\n"));
 }
 
 /** Stable bytes for a seed and anchor day. Pass --date YYYY-MM-DD to freeze screenshots. */
-export function createSeed(name = "monkeydent", anchor = new Date()): SeedMessage[] {
+export function createSeed(name = "demo-praxis", anchor = new Date()): SeedMessage[] {
   let state = [...name].reduce((hash, char) => (hash * 31 + char.charCodeAt(0)) >>> 0, 17);
   const random = () => { state = (Math.imul(state, 1664525) + 1013904223) >>> 0; return state / 4294967296; };
   const today = new Date(`${anchor.toISOString().slice(0, 10)}T09:00:00.000Z`).getTime();
@@ -77,7 +77,7 @@ export function createSeed(name = "monkeydent", anchor = new Date()): SeedMessag
     "Ich möchte einen Prophylaxetermin vereinbaren. Bevorzugt freitags am frühen Nachmittag.",
     "Das neue Kontaktformular ist im Demo-Entwurf fertig. Bitte Betreffauswahl und Bestätigungstext gegenlesen.",
     "SYNTHETISCHE WERBUNG: Ihr Demo-Gewinn wartet! Keine echten Links oder Angebote.",
-    "Ich bin neu bei MonkeyDent und möchte einen Termin für ein Erstgespräch. Was soll ich mitbringen?",
+    "Ich bin neu bei Demo-Praxis und möchte einen Termin für ein Erstgespräch. Was soll ich mitbringen?",
     "Der interne Demo-Hygieneplan wurde überarbeitet. Bitte die Materialliste vor unserer Besprechung prüfen.",
     "Hello team, thank you for confirming. Could you send me the appointment time once more?",
     "Bitte die geplanten Urlaubstage für die synthetische Praxisübersicht ergänzen. Wir stimmen die Vertretung morgen ab.",
@@ -97,20 +97,20 @@ export function createSeed(name = "monkeydent", anchor = new Date()): SeedMessag
       const id = `${name}-t${thread}-m${n}`;
       const date = new Date(today - Math.max(0, baseDay - n) * 86400000 + n * 600000 + Math.floor(random() * 300000));
       const kind = n === 0 ? thread === 1 || thread === 9 ? "invoice" : thread === 5 ? "newsletter" : thread === 6 ? "calendar" : undefined : undefined;
-      const text = n ? `Guten Tag,\n\nvielen Dank für die Rückmeldung zu „${topic}“. Der vorgeschlagene Ablauf passt gut. Bitte kurz bestätigen.\n\nViele Grüße\n${senderName}\n[Synthetische Demo]` : `Guten Tag MonkeyDent,\n\n${requests[thread]}\n\nViele Grüße\n${senderName}\n[Synthetische Demo-Nachricht]`;
+      const text = n ? `Guten Tag,\n\nvielen Dank für die Rückmeldung zu „${topic}“. Der vorgeschlagene Ablauf passt gut. Bitte kurz bestätigen.\n\nViele Grüße\n${senderName}\n[Synthetische Demo]` : `Guten Tag Demo-Praxis,\n\n${requests[thread]}\n\nViele Grüße\n${senderName}\n[Synthetische Demo-Nachricht]`;
       result.push({ folder: "INBOX", date, flags: [(thread + n) % 3 ? "\\Seen" : "", (thread + n) % 7 === 0 ? "\\Flagged" : ""].filter(Boolean), source: makeMessage({ id, subject: `${n ? "Re: " : ""}${topic}`, from: correspondent, date, references: [...references], kind, text }) });
       references.push(id);
     }
     if (thread < 15) {
       const date = new Date(today - Math.max(0, baseDay - counts[thread]) * 86400000 + counts[thread] * 600000);
       const member = thread % 2 ? "Toni Muster" : "Alex Beispiel";
-      result.push({ folder: "Sent", date, flags: ["\\Seen"], source: makeMessage({ id: `${name}-sent${thread}`, subject: `Re: ${topic}`, from: `"${member} | MonkeyDent" <demo@monkeydent.test>`, to: correspondent, date, references: [...references], text: `Hallo,\n\n${member} hier. Wir haben Ihre Anfrage aufgenommen. Dienstag um 10 Uhr ist reserviert.\n\nBeste Grüße\n${member}\nMonkeyDent – synthetische Zweierpraxis` }) });
+      result.push({ folder: "Sent", date, flags: ["\\Seen"], source: makeMessage({ id: `${name}-sent${thread}`, subject: `Re: ${topic}`, from: `"${member} | Demo-Praxis" <demo@demo-praxis.test>`, to: correspondent, date, references: [...references], text: `Hallo,\n\n${member} hier. Wir haben Ihre Anfrage aufgenommen. Dienstag um 10 Uhr ist reserviert.\n\nBeste Grüße\n${member}\nDemo-Praxis – synthetische Zweierpraxis` }) });
     }
   });
   for (const [folder, count] of [["Drafts", 3], ["Archive", 4], ["Trash", 3], ["Junk", 2], ["Projekte/Website", 3]] as const) {
     for (let n = 0; n < count; n++) {
       const date = new Date(today - (n + 1) * 86400000);
-      result.push({ folder, date, flags: [folder === "Drafts" ? "\\Draft" : "\\Seen"], source: makeMessage({ id: `${name}-${folder}-${n}`, date, subject: `${folder === "Drafts" ? "Entwurf" : folder === "Projekte/Website" ? "Website-Abstimmung" : "Praxisnotiz"}: ${["Angebot prüfen", "Nächste Schritte", "Freigabe erbeten", "Ablage"][n]}`, from: '"Alex Beispiel | MonkeyDent" <demo@monkeydent.test>', text: "Hallo Toni,\n\nbitte prüfe diese synthetische Praxisnotiz. Die nächsten Schritte besprechen wir morgen.\n\nAlex" }) });
+      result.push({ folder, date, flags: [folder === "Drafts" ? "\\Draft" : "\\Seen"], source: makeMessage({ id: `${name}-${folder}-${n}`, date, subject: `${folder === "Drafts" ? "Entwurf" : folder === "Projekte/Website" ? "Website-Abstimmung" : "Praxisnotiz"}: ${["Angebot prüfen", "Nächste Schritte", "Freigabe erbeten", "Ablage"][n]}`, from: '"Alex Beispiel | Demo-Praxis" <demo@demo-praxis.test>', text: "Hallo Toni,\n\nbitte prüfe diese synthetische Praxisnotiz. Die nächsten Schritte besprechen wir morgen.\n\nAlex" }) });
     }
   }
   return result.sort((a, b) => a.date.getTime() - b.date.getTime());

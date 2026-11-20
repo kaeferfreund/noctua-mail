@@ -68,9 +68,9 @@ const fixture=Bun.spawn([process.execPath,'scripts/dev-fixture/imap-server.ts','
 let fixtureText=''; const reader=fixture.stdout.getReader();
 while(!/IMAP fixture: 127\.0\.0\.1:(\d+); control: (\d+)/.test(fixtureText)) { const v=await reader.read(); if(v.done)throw Error('fixture exited'); fixtureText+=new TextDecoder().decode(v.value); }
 const ports=fixtureText.match(/IMAP fixture: 127\.0\.0\.1:(\d+); control: (\d+)/)!;
-const endpoint={host:'127.0.0.1',port:Number(ports[1]),secure:false,user:'demo@monkeydent.test',password:'demo'};
+const endpoint={host:'127.0.0.1',port:Number(ports[1]),secure:false,user:'demo@demo-praxis.test',password:'demo'};
 const control=`http://127.0.0.1:${ports[2]}`;
-const accounts=['synthetic-a','synthetic-b'].map(id=>({id,name:'Synthetic load',email:'demo@monkeydent.test',avatar:'S',imap:endpoint,smtp:endpoint}));
+const accounts=['synthetic-a','synthetic-b'].map(id=>({id,name:'Synthetic load',email:'demo@demo-praxis.test',avatar:'S',imap:endpoint,smtp:endpoint}));
 const account=accounts[0];
 for(const a of accounts) {
   await api.upsertAccount(a);

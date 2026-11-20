@@ -142,7 +142,7 @@ export async function startImapServer(config: ImapOptions = {}) {
         if (cmd === "CAPABILITY") { send(`* CAPABILITY ${capabilities}`); ok(); return; }
         if (cmd === "LOGOUT") { send("* BYE Fixture logging out"); ok(); socket.end(); return; }
         if (cmd === "NOOP") { ok(); return; }
-        if (cmd === "ID") { send('* ID ("name" "MonkeyDent fixture" "version" "1")'); ok(); return; }
+        if (cmd === "ID") { send('* ID ("name" "Demo-Praxis fixture" "version" "1")'); ok(); return; }
         if (cmd === "LOGIN") { authenticate(tag, args[0], args[1]); return; }
         if (cmd === "AUTHENTICATE") {
           if (args[0]?.toUpperCase() !== "PLAIN") throw new Error("Only AUTHENTICATE PLAIN supported");
@@ -324,7 +324,7 @@ export async function startImapServer(config: ImapOptions = {}) {
         catch { send("* BAD Malformed command"); }
       }
     });
-    send(`* OK [CAPABILITY ${capabilities}] MonkeyDent synthetic mailbox`);
+    send(`* OK [CAPABILITY ${capabilities}] Demo-Praxis synthetic mailbox`);
   });
   store.setMaxListeners(100);
   server.listen(config.port ?? 3789, host);

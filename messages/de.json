@@ -1768,6 +1768,8 @@
     "alwaysLoadSenderShort": "Immer laden",
     "unknownSender": "Absender unbekannt",
     "unverifiedSender": "Absender nicht bestätigt",
+    "unverifiedSenderBadge": "Nicht bestätigt",
+    "unverifiedSenderTitle": "Der Absender ist nicht bestätigt: Der empfangende Mailserver konnte weder SPF noch DKIM für die Absenderdomain bestätigen. Die Adresse könnte gefälscht sein.",
     "checkingSender": "Absender wird geprüft …",
     "remoteImage": "Externes Bild: {label}",
     "blockedImage": "Bild nicht geladen: {label}",

@@ -21,11 +21,11 @@ const fixtureTest = (name: string, run: () => Promise<void>) =>
 type ToolResult = { isError?: boolean; content: Array<{ text: string }>; structuredContent: Record<string, any> };
 
 fixtureTest("MCP drafts over the HTTP route against the dev fixture: create, get, update in place, edit a synced draft", async () => {
-  const server = await startImapServer({ port: 0, user: demoUser, pass: demoPass, seed: "monkeydent", date: new Date("2026-10-22T08:00:00Z") });
+  const server = await startImapServer({ port: 0, user: demoUser, pass: demoPass, seed: "demo-praxis", date: new Date("2026-10-22T08:00:00Z") });
   try {
     const db = await dbModulePromise;
     const accountId = `mcp-draft-fixture-${randomUUID()}`;
-    const account: Account = { id: accountId, name: "MonkeyDent", email: demoUser, avatar: "MD",
+    const account: Account = { id: accountId, name: "Demo-Praxis", email: demoUser, avatar: "MD",
       imap: { host: "127.0.0.1", port: server.port, secure: false, user: demoUser, password: demoPass },
       smtp: { host: "127.0.0.1", port: 9, secure: false, user: demoUser, password: demoPass } };
     await db.upsertAccount(account);

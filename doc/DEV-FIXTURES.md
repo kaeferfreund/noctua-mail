@@ -5,7 +5,7 @@ Run from the repository root with Bun and dependencies installed (`bun install -
 ```sh
 bun run dev:fixture
 # Optional: freeze dates and select a reproducible seed:
-bun run dev:fixture --seed monkeydent --date 2026-10-22
+bun run dev:fixture --seed demo-praxis --date 2026-10-22
 ```
 
 In another terminal:
@@ -25,9 +25,9 @@ With the app stopped, retrieve the bootstrap invite using `scripts/recoverTeamAu
 a synthetic personal identity and a separate app password, then complete mandatory TOTP enrollment.
 Bootstrap codes are no longer printed to startup logs. In Admin create the synthetic mailbox:
 
-- Name `MonkeyDent`; email `demo@monkeydent.test`.
+- Name `Demo-Praxis`; email `demo@demo-praxis.test`.
 - IMAP `127.0.0.1:3789`, SMTP `127.0.0.1:3787`, security **None**.
-- Both usernames `demo@monkeydent.test`, passwords `demo`.
+- Both usernames `demo@demo-praxis.test`, passwords `demo`.
 
 Creation is admin-only; the creating admin becomes the owner and sees the mailbox in the sidebar.
 Grant other synthetic identities membership in Admin → Mailboxes. The API derives its ID from email.
@@ -62,7 +62,7 @@ SMTP accepts authenticated mail for any recipient, captures it in memory and wri
 Standalone processes and overrides:
 
 ```sh
-bun scripts/dev-fixture/imap-server.ts --host 127.0.0.1 --port 3789 --control-port 3788 --user demo@monkeydent.test --pass demo --seed monkeydent
+bun scripts/dev-fixture/imap-server.ts --host 127.0.0.1 --port 3789 --control-port 3788 --user demo@demo-praxis.test --pass demo --seed demo-praxis
 bun --env-file=.env.local scripts/dev-fixture/smtp-sink.ts --port 3787 --imap-control http://127.0.0.1:3788
 # Combined runner overrides: --out /absolute/outbox --smtp-port 3787 --control-port 3788
 ```
