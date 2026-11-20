@@ -26,9 +26,9 @@ function outlookParagraph() {
   return `<p class="MsoNormal"><span style="font-size:11.0pt;font-family:&quot;Calibri&quot;,sans-serif;color:#1F497D;mso-fareast-language:DE">${sentence(14)}<o:p></o:p></span></p>\n`;
 }
 function outlookQuoteHeader(i: number) {
-  return `<div><div style="border:none;border-top:solid #E1E1E1 1.0pt;padding:3.0pt 0cm 0cm 0cm"><p class="MsoNormal"><b><span style="font-size:11.0pt;font-family:&quot;Calibri&quot;,sans-serif">Von:</span></b><span style="font-size:11.0pt;font-family:&quot;Calibri&quot;,sans-serif"> Person ${i} &lt;person${i}@example.test&gt; <br><b>Gesendet:</b> Montag, 19. Oktober 2026 10:${String(i % 60).padStart(2, "0")}<br><b>An:</b> demo@monkeydent.test<br><b>Betreff:</b> AW: Termin<o:p></o:p></span></p></div></div>\n`;
+  return `<div><div style="border:none;border-top:solid #E1E1E1 1.0pt;padding:3.0pt 0cm 0cm 0cm"><p class="MsoNormal"><b><span style="font-size:11.0pt;font-family:&quot;Calibri&quot;,sans-serif">Von:</span></b><span style="font-size:11.0pt;font-family:&quot;Calibri&quot;,sans-serif"> Person ${i} &lt;person${i}@example.test&gt; <br><b>Gesendet:</b> Montag, 19. Oktober 2026 10:${String(i % 60).padStart(2, "0")}<br><b>An:</b> demo@demo-praxis.test<br><b>Betreff:</b> AW: Termin<o:p></o:p></span></p></div></div>\n`;
 }
-const signature = `<p class="MsoNormal"><span style="font-size:9.0pt;color:gray">MonkeyDent Praxis · Musterstraße 1 · 12345 Musterstadt</span></p><p class="MsoNormal"><img width="120" height="40" style="width:1.25in;height:.4166in" id="Bild_x0020_1" src="https://cdn.example.test/signature/logo.png" alt="Logo"></p>`;
+const signature = `<p class="MsoNormal"><span style="font-size:9.0pt;color:gray">Demo-Praxis · Musterstraße 1 · 12345 Musterstadt</span></p><p class="MsoNormal"><img width="120" height="40" style="width:1.25in;height:.4166in" id="Bild_x0020_1" src="https://cdn.example.test/signature/logo.png" alt="Logo"></p>`;
 
 function outlookMail(targetBytes: number) {
   let body = `<body lang="DE" link="#0563C1" vlink="#954F72" style="word-wrap:break-word"><div class="WordSection1">`;
@@ -81,7 +81,7 @@ function newsletterBlock(i: number) {
 }
 
 function newsletter(targetBytes: number) {
-  const head = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="x-apple-disable-message-reformatting"><title>MonkeyDent Praxispost</title><!--[if mso]><style>*{font-family:Arial,sans-serif!important}</style><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->${newsletterStyle}</head>`;
+  const head = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd"><html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="x-apple-disable-message-reformatting"><title>Demo-Praxis Praxispost</title><!--[if mso]><style>*{font-family:Arial,sans-serif!important}</style><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->${newsletterStyle}</head>`;
   let rows = "";
   let i = 0;
   while ((head.length + rows.length) < targetBytes - 2500) rows += newsletterBlock(i++);
@@ -90,7 +90,7 @@ function newsletter(targetBytes: number) {
 <!--[if mso | IE]><table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" align="center"><tr><td><![endif]-->
 <div style="max-width:600px;margin:0 auto" class="email-container">
 <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin:auto">
-<tr><td class="hero" style="padding:40px 30px;text-align:center;background-image:url(https://cdn.example.test/hero.jpg)" background="https://cdn.example.test/hero.jpg"><img src="https://cdn.example.test/logo.png" width="180" height="50" alt="MonkeyDent" style="height:auto;display:block;margin:0 auto"></td></tr>
+<tr><td class="hero" style="padding:40px 30px;text-align:center;background-image:url(https://cdn.example.test/hero.jpg)" background="https://cdn.example.test/hero.jpg"><img src="https://cdn.example.test/logo.png" width="180" height="50" alt="Demo-Praxis" style="height:auto;display:block;margin:0 auto"></td></tr>
 ${rows}
 <tr><td style="padding:20px;font-family:sans-serif;font-size:12px;line-height:18px;text-align:center;color:#888888"><p>Sie erhalten diese E-Mail, weil Sie sich angemeldet haben. <a href="https://click.example.test/unsubscribe?u=1" style="color:#888888;text-decoration:underline">Abmelden</a></p><img src="https://open.example.test/pixel.gif?u=1" width="1" height="1" alt="" style="display:block;border:0"></td></tr>
 </table></div>

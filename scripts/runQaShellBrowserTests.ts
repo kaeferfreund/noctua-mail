@@ -33,7 +33,7 @@ try {
   if (process.env.QA_SHELL_USE_BUILD !== "1") await run(["run", "build"]);
   const { startImapServer } = await import("./dev-fixture/imap-server");
   const { startSmtpSink } = await import("./dev-fixture/smtp-sink");
-  imap = await startImapServer({ host: "127.0.0.1", port: Number(process.env.QA_SHELL_FIXTURE_IMAP_PORT ?? 0), controlPort: Number(process.env.QA_SHELL_FIXTURE_CONTROL_PORT ?? 0), user: "demo@monkeydent.test", pass: "demo", seed: "qa-shell" });
+  imap = await startImapServer({ host: "127.0.0.1", port: Number(process.env.QA_SHELL_FIXTURE_IMAP_PORT ?? 0), controlPort: Number(process.env.QA_SHELL_FIXTURE_CONTROL_PORT ?? 0), user: "demo@demo-praxis.test", pass: "demo", seed: "qa-shell" });
   const longSubject = "QA long subject checks wrapping and leaves room for reading the synthetic message on a narrow phone. ".repeat(4).trim();
   if (process.env.QA_ROUND2_FIXTURE === "1") {
     // The unread regression uses the reviewed 300-message / 110-unread fixture.
@@ -52,9 +52,9 @@ try {
       throw new Error("Invalid round-two QA fixture counts");
     }
   } else {
-    imap.store.append("INBOX", Buffer.from(`From: Synthetic Reader <reader@example.test>\r\nTo: demo@monkeydent.test\r\nMessage-ID: <qa-shell-long@example.test>\r\nDate: ${new Date().toUTCString()}\r\nSubject: ${longSubject}\r\n\r\nSynthetic reader body for QA shell regressions.\r\n`));
+    imap.store.append("INBOX", Buffer.from(`From: Synthetic Reader <reader@example.test>\r\nTo: demo@demo-praxis.test\r\nMessage-ID: <qa-shell-long@example.test>\r\nDate: ${new Date().toUTCString()}\r\nSubject: ${longSubject}\r\n\r\nSynthetic reader body for QA shell regressions.\r\n`));
   }
-  smtp = await startSmtpSink({ host: "127.0.0.1", port: Number(process.env.QA_SHELL_FIXTURE_SMTP_PORT ?? 0), user: "demo@monkeydent.test", pass: "demo", out: path.join(scratch, "outbox"), deliver: source => { imap!.store.append("INBOX", source); } });
+  smtp = await startSmtpSink({ host: "127.0.0.1", port: Number(process.env.QA_SHELL_FIXTURE_SMTP_PORT ?? 0), user: "demo@demo-praxis.test", pass: "demo", out: path.join(scratch, "outbox"), deliver: source => { imap!.store.append("INBOX", source); } });
   Object.assign(env, { QA_SHELL_IMAP_PORT: String(imap.port), QA_SHELL_SMTP_PORT: String(smtp.port), QA_SHELL_OUTBOX: path.join(scratch, "outbox"), COMPOSE_QA_OUTBOX: path.join(scratch, "outbox"), QA_SHELL_CONTROL_URL: `http://127.0.0.1:${imap.controlPort}` });
   await run(["tests/browser/ui/seedQaShell.ts"]);
   const [composeUser] = JSON.parse(readFileSync(env.QA_SHELL_SEED_FILE, "utf8"));

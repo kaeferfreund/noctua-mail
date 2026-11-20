@@ -24,7 +24,7 @@ for(const [email,role] of [['alex@example.test','admin'],['jo@example.test','use
  await auth.api.signOut({headers:headers()});
  seeds.push({email,password,totpURI:seed.totpURI,id:result.user.id});
 }
-const account={id:'qa-shared',email:'demo@monkeydent.test',name:'QA Shared',avatar:'',ownerUserId:seeds[0].id,imap:{host:'127.0.0.1',port:imapPort,secure:false,user:'demo@monkeydent.test',password:'demo'},smtp:{host:'127.0.0.1',port:smtpPort,secure:false,user:'demo@monkeydent.test',password:'demo'}};
+const account={id:'qa-shared',email:'demo@demo-praxis.test',name:'QA Shared',avatar:'',ownerUserId:seeds[0].id,imap:{host:'127.0.0.1',port:imapPort,secure:false,user:'demo@demo-praxis.test',password:'demo'},smtp:{host:'127.0.0.1',port:smtpPort,secure:false,user:'demo@demo-praxis.test',password:'demo'}};
 persistAccountRow(db,account);
 insertUserAccountLinkRow(db,seeds[0].id,account.id,'manager');
 if (process.env.QA_DEEP_LINKS_FIXTURE === "1") {

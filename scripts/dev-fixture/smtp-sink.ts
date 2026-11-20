@@ -51,8 +51,8 @@ export async function startSmtpSink(config: SmtpOptions = {}) {
       const space = line.indexOf(" ");
       const command = (space < 0 ? line : line.slice(0, space)).toUpperCase();
       const arg = space < 0 ? "" : line.slice(space + 1);
-      if (command === "EHLO") { send("250-fixture.monkeydent.test\r\n250-AUTH PLAIN LOGIN\r\n250-8BITMIME\r\n250 SIZE 26214400"); return; }
-      if (command === "HELO") { send("250 fixture.monkeydent.test"); return; }
+      if (command === "EHLO") { send("250-fixture.demo-praxis.test\r\n250-AUTH PLAIN LOGIN\r\n250-8BITMIME\r\n250 SIZE 26214400"); return; }
+      if (command === "HELO") { send("250 fixture.demo-praxis.test"); return; }
       if (command === "QUIT") { send("221 2.0.0 Bye"); socket.end(); return; }
       if (command === "NOOP") { send("250 2.0.0 OK"); return; }
       if (command === "RSET") { reset(); send("250 2.0.0 Reset"); return; }
@@ -95,7 +95,7 @@ export async function startSmtpSink(config: SmtpOptions = {}) {
         queue = queue.then(() => lineReceived(line)).catch(error => { reset(); send(`451 4.3.0 ${String(error.message).replace(/[\r\n]/g, " ")}`); });
       }
     });
-    send("220 fixture.monkeydent.test ESMTP synthetic mail sink");
+    send("220 fixture.demo-praxis.test ESMTP synthetic mail sink");
   });
   server.listen(config.port ?? 3787, config.host ?? "127.0.0.1");
   await once(server, "listening");
