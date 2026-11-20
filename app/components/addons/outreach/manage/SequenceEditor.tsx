@@ -7,13 +7,11 @@ import { Button } from "@/app/components/ui/button";
 import { Badge } from "@/app/components/ui/badge";
 import type { Sequence, SequenceInput, SequenceReport, SequenceStatus } from "@/lib/addons/outreach/types";
 import { useOutreachManage, useResource, useUnsavedChanges } from "./manageContext";
-import { ConfirmDialog, ErrorNote, Field, LoadingNote, SectionHeader, SequenceStatusBadge, StatsFigures, TraceLine, nativeControlClass, useOutreachFormat } from "./ui";
+import { AdminApiError } from "./outreachApi";
+import { mergeSequenceForm, type MergeConflict, type SequenceForm as Form, type StepForm } from "./sequenceMerge";
+import { AlertNote, ConfirmDialog, ErrorNote, Field, LoadingNote, SectionHeader, SequenceStatusBadge, StatsFigures, TraceLine, nativeControlClass, useOutreachFormat } from "./ui";
 import { ContentFields, hasContent } from "./HtmlContent";
 import { LabeledSwitch, SenderSelect, TrackingSwitches } from "./SendingFields";
-
-/** A step while it is edited: `key` identifies it in the UI, `id` only once the server stored it. */
-type StepForm = { key: string; id?: string; delayMinutes: number; name: string; subject: string; previewText: string; templateId: string | null; html: string; text: string; enabled: boolean };
-type Form = { name: string; triggerListId: string | null; senderIdentityId: string | null; trackOpens: boolean; trackClicks: boolean; steps: StepForm[] };
 
 const DELAY_UNITS = [
   { unit: "days", minutes: 1440 },
@@ -60,6 +58,19 @@ function inputOf(form: Form): SequenceInput {
   };
 }
 
+/** The server's 409 for a save or a go-live against a version that was changed elsewhere since it was loaded. */
+function isSequenceChanged(error: unknown) {
+  return error instanceof AdminApiError && error.status === 409 && error.code === "sequence_changed";
+}
+
+const FIELD_LABELS = {
+  name: "sequences.name", triggerListId: "sequences.trigger", senderIdentityId: "sending.sender", trackOpens: "sending.trackOpens", trackClicks: "sending.trackClicks"
+} as const;
+const STEP_FIELD_LABELS = {
+  name: "sequences.stepName", delayMinutes: "sequences.delay.label", subject: "content.subject", previewText: "content.previewText",
+  templateId: "content.template", html: "content.html", text: "sequences.conflict.textVersion", enabled: "sequences.stepEnabled"
+} as const;
+
 export default function SequenceEditor({ sequence }: { sequence: Sequence | null }) {
   const t = useTranslations("outreach");
   const { api, canEdit, navigate, lists } = useOutreachManage();
@@ -71,6 +82,10 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
   const [error, setError] = useState<unknown>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [dialog, setDialog] = useState<SequenceStatus | "delete" | null>(null);
+  /** A save or go-live refused because the sequence changed elsewhere; "structure" once its steps turned out rearranged. */
+  const [conflict, setConflict] = useState<"changed" | "structure" | null>(null);
+  /** After loading the newest version into the form: the fields changed on both sides, where the form's value stays. */
+  const [merged, setMerged] = useState<string[] | null>(null);
   /** Bumped by every save and status change, so the report shows the stored state. */
   const [reportVersion, setReportVersion] = useState(0);
   const dirty = comparable(form) !== comparable(saved);
@@ -89,7 +104,7 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
     const stored = formOf(result.sequence);
     // The server keeps the step order; keeping the UI keys keeps the open step open.
     const next = { ...stored, steps: stored.steps.map((step, index) => ({ ...step, key: sent.steps[index]?.key ?? step.key })) };
-    setCurrent(result.sequence); setSaved(next);
+    setCurrent(result.sequence); setSaved(next); setConflict(null);
     // Input typed while the request ran stays and remains unsaved; new steps learn their ids.
     setForm(previous => previous === sent ? next : {
       ...previous,
@@ -99,9 +114,11 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
     return result.sequence;
   };
   const run = async (key: string, action: () => Promise<void>) => {
-    setBusy(key); setError(null); setNotice(null);
-    try { await action(); } catch (caught) { setError(caught); }
-    finally { setBusy(null); }
+    // A refusal for a changed version stays until a save or one of its own actions resolves it.
+    setBusy(key); setError(null); setNotice(null); setMerged(null);
+    try { await action(); } catch (caught) {
+      if (isSequenceChanged(caught)) { setDialog(null); setConflict("changed"); } else setError(caught);
+    } finally { setBusy(null); }
   };
   const save = () => run("save", async () => {
     const stored = await persist();
@@ -120,6 +137,32 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
     setNotice(status === "live" ? t("sequences.nowLive") : t("sequences.nowPaused"));
     if (!current) { markClean(); navigate({ section: "sequences", id: stored.id }); }
   });
+  const loadStored = async () => {
+    const { sequence: stored } = await api.get<{ sequence: Sequence }>(`sequences/${encodeURIComponent(current!.id)}`);
+    setReportVersion(version => version + 1);
+    return { stored, theirs: formOf(stored) };
+  };
+  /** Takes the version stored elsewhere and enters the form's own changes again; nothing is saved. */
+  const keepMine = () => run("keepMine", async () => {
+    const { stored, theirs } = await loadStored();
+    const result = mergeSequenceForm(saved, form, theirs);
+    if (!result.ok) { setConflict("structure"); return; }
+    setCurrent(stored); setSaved(theirs); setConflict(null);
+    // The merge runs again on the latest form, so input typed while the version loaded stays too.
+    setForm(previous => { const latest = mergeSequenceForm(saved, previous, theirs); return latest.ok ? latest.form : previous; });
+    setMerged(result.conflicts.map(entry => conflictLabel(entry, result.form)));
+  });
+  const discardMine = () => run("discardMine", async () => {
+    const { stored, theirs } = await loadStored();
+    setCurrent(stored); setSaved(theirs); setForm(theirs); setConflict(null);
+  });
+  const conflictLabel = (entry: MergeConflict, into: Form) => entry.stepIndex === null
+    ? t("sequences.conflict.field", { place: t("sequences.settings"), field: t(FIELD_LABELS[entry.field]) })
+    : t("sequences.conflict.field", {
+      place: t("sequences.stepTitle", { number: entry.stepIndex + 1, title: into.steps[entry.stepIndex].name || into.steps[entry.stepIndex].subject || t("sequences.untitledStep") }),
+      field: entry.field === "delayMinutes" && entry.stepIndex === 0 ? t("sequences.delay.firstLabel") : t(STEP_FIELD_LABELS[entry.field])
+    });
+
   const remove = () => run("delete", async () => {
     if (current) await api.send("DELETE", `sequences/${encodeURIComponent(current.id)}`);
     markClean();
@@ -168,6 +211,23 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
           </> : null}
         </>} />
       <ErrorNote error={dialog ? null : error} />
+      {conflict ? (
+        <AlertNote actions={
+          <div className="flex flex-wrap gap-2">
+            {conflict === "changed" ? <Button size="sm" disabled={busy !== null} onClick={() => void keepMine()}>{busy === "keepMine" ? t("actions.working") : t("sequences.conflict.keepMine")}</Button> : null}
+            <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void discardMine()}>{busy === "discardMine" ? t("actions.working") : t("sequences.conflict.discardMine")}</Button>
+          </div>
+        }>{conflict === "changed" ? t("sequences.conflict.changed") : t("sequences.conflict.structure")}</AlertNote>
+      ) : null}
+      {merged ? (
+        <div role="status" className="flex flex-col gap-1 text-sm text-muted-foreground">
+          <p>{t("sequences.conflict.merged")}</p>
+          {merged.length > 0 ? <>
+            <p>{t("sequences.conflict.bothChanged")}</p>
+            <ul className="list-disc pl-5">{merged.map(label => <li key={label}>{label}</li>)}</ul>
+          </> : null}
+        </div>
+      ) : null}
       {notice ? <p role="status" className="text-sm text-muted-foreground">{notice}</p> : null}
       {current && status !== "draft" ? <TraceLine action={status} userId={current.statusChangedByUserId} via={current.statusChangedVia} /> : null}
       {status === "live" && canEdit ? <p className="text-xs text-muted-foreground">{t("sequences.liveEditHint")}</p> : null}

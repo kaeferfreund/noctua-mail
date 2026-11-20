@@ -330,8 +330,8 @@ describe("a sequence save names the version it loaded (B)", () => {
     fireEvent.change(await page.findByLabelText("Name"), { target: { value: "Neu getippt" } });
     fireEvent.click(page.getByRole("button", { name: "Save" }));
     const alert = await page.findByRole("alert");
-    expect(alert.textContent).toContain("something has probably changed");
-    expect(alert.textContent).toContain("Die Sequenz wurde inzwischen geändert.");
+    // The choice what to do with the typed changes: SequenceConflict.dom.test.tsx.
+    expect(alert.textContent).toContain("The sequence was changed elsewhere in the meantime");
     expect(bodies(calls, "PATCH", `sequences/${SEQUENCE.id}`)).toMatchObject([{ name: "Neu getippt", expectedUpdatedAt: SEQUENCE.updatedAt }]);
     expect((page.getByLabelText("Name") as HTMLInputElement).value).toBe("Neu getippt");
     expect((page.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false);

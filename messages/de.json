@@ -2807,7 +2807,17 @@
       "deleteDescription": "„{name}“ wird gelöscht. Das lässt sich nicht rückgängig machen.",
       "reportTitle": "Auswertung pro Schritt",
       "enrollments": "{active} laufend · {completed} abgeschlossen · {cancelled} beendet",
-      "stepSent": "{sent} gesendet"
+      "stepSent": "{sent} gesendet",
+      "conflict": {
+        "changed": "Die Serie wurde inzwischen an anderer Stelle geändert, zum Beispiel von jemand anderem oder über einen MCP-Zugang. Deine Änderungen sind noch nicht gespeichert.",
+        "structure": "Die Schritte wurden inzwischen an anderer Stelle hinzugefügt, entfernt oder umgestellt. Deine Änderungen lassen sich deshalb nicht automatisch übernehmen. Kopiere, was du behalten möchtest, und verwirf dann deine Änderungen.",
+        "keepMine": "Neueste Fassung laden und meine Änderungen behalten",
+        "discardMine": "Meine Änderungen verwerfen",
+        "merged": "Die neueste Fassung ist geladen und deine Änderungen sind eingetragen, aber noch nicht gespeichert.",
+        "bothChanged": "Auch an anderer Stelle geändert – beim Speichern gilt deine Fassung:",
+        "field": "{place}: {field}",
+        "textVersion": "Textfassung"
+      }
     },
     "trace": {
       "scheduled": "{who, select, known {Geplant von {name}} other {Geplant}} {via}",

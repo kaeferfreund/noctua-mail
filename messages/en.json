@@ -2807,7 +2807,17 @@
       "deleteDescription": "“{name}” is deleted. This cannot be undone.",
       "reportTitle": "Report per step",
       "enrollments": "{active} running · {completed} completed · {cancelled} ended",
-      "stepSent": "{sent} sent"
+      "stepSent": "{sent} sent",
+      "conflict": {
+        "changed": "The sequence was changed elsewhere in the meantime, for example by someone else or through an MCP connection. Your changes are not saved yet.",
+        "structure": "Steps were added, removed or rearranged elsewhere in the meantime, so your changes cannot be taken over automatically. Copy what you want to keep, then discard your changes.",
+        "keepMine": "Load the newest version and keep my changes",
+        "discardMine": "Discard my changes",
+        "merged": "The newest version is loaded and your changes are entered, but not saved yet.",
+        "bothChanged": "Also changed elsewhere – saving keeps your version:",
+        "field": "{place}: {field}",
+        "textVersion": "Text version"
+      }
     },
     "trace": {
       "scheduled": "{who, select, known {Scheduled by {name}} other {Scheduled}} {via}",
