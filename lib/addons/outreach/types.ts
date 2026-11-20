@@ -196,7 +196,8 @@ export type OutreachApiToken = { id: string; name: string; listIds: string[]; cr
  * sequences triggered by that list). Idempotent per (email, listId).
  */
 export type SubscribeRequest = ContactInput & { listId: string; consentAt?: number; consentSource?: string };
-export type SubscribeResponse = { ok: true; contactId: string; status: ListMemberStatus; created: boolean };
+/** Uniform for new and known addresses: a token must not reveal whether a contact existed. */
+export type SubscribeResponse = { ok: true; contactId: string; status: ListMemberStatus };
 
 // ---------------------------------------------------------------- templates
 

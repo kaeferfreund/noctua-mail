@@ -171,7 +171,9 @@ milliseconds. The caller's clock may differ from this server's by up to 60 secon
 that far ahead is stored as "now", anything further in the future answers 400. Against a recorded
 unsubscribe or erase the claim counts 60 seconds earlier than stated, so the same request never
 becomes "newer" by being sent again; a new consent must therefore be later than the unsubscribe by
-more than 60 seconds, otherwise the answer is 409 `new_consent_required`.
+more than 60 seconds, otherwise the answer is 409 `new_consent_required`. The token only adds the
+address to its list: a known contact keeps its name and properties (they belong to the mailbox and
+are shared by its other lists), and the answer is the same for new and known addresses.
 
 Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 
