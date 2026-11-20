@@ -1,40 +1,55 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { buildAccountApiPath } from "@/lib/accountApiPaths";
-import { senderAllowsRemoteContent } from "@/lib/html/remoteContent";
-import type { UserAccountPrefs } from "@/lib/data";
+import { buildAccountApiPath, buildAccountMessageRemoteContentPath } from "@/lib/accountApiPaths";
 import { hasLoadedRemoteContent, loadRemoteContentOnce, retainRemoteContentDecision, subscribeRemoteContent } from "@/lib/html/remoteContentSession";
 
 const PREFERENCES_CHANGED = "noctua:remote-content-prefs";
 
-export function useRemoteContent(accountId: string | undefined, senderKey: string | null | undefined, messageKey: string) {
-  const preferenceKey = JSON.stringify([accountId, senderKey]);
-  const key = JSON.stringify([preferenceKey, messageKey]);
+/** The stored message whose remote content is shown; all fields absent for content without one. */
+export type RemoteContentSource = { accountId?: string; senderKey?: string | null; messageId?: string };
+
+export type RemoteContentState = ReturnType<typeof useRemoteContent>;
+
+/**
+ * Remote-content consent for one piece of sender content: "load once" for the
+ * message (`messageId`, else `fallbackKey`) and the user's sender permission.
+ * The permission is decided by the server per message
+ * (remoteContentSenderDecision): it applies only when the receiving server
+ * authenticated the From address, so a forged From of an allowed sender stays
+ * blocked (A38, S31).
+ */
+export function useRemoteContent({ accountId, senderKey, messageId }: RemoteContentSource, fallbackKey = "") {
+  const messageKey = messageId ?? fallbackKey;
+  const decisionKey = JSON.stringify([accountId, senderKey, messageId]);
+  const key = JSON.stringify([decisionKey, messageKey]);
   const once = useSyncExternalStore(subscribeRemoteContent, () => hasLoadedRemoteContent(accountId ?? "", messageKey), () => false);
-  const [preference, setPreference] = useState({ key: "", allowed: false });
+  const [decision, setDecision] = useState({ key: "", allowed: false, senderVerified: false });
   const [saveState, setSaveState] = useState({ key: "", pending: false, error: "" });
 
   useEffect(() => retainRemoteContentDecision(accountId ?? "", messageKey), [accountId, messageKey]);
 
   useEffect(() => {
-    if (!accountId || !senderKey) return;
+    if (!accountId || !senderKey || !messageId) return;
     let active = true;
     const refresh = async () => {
       try {
-        const response = await fetch(buildAccountApiPath(accountId, "/prefs"));
+        const response = await fetch(buildAccountMessageRemoteContentPath(accountId, messageId));
         if (!response.ok) return;
-        const { prefs } = await response.json() as { prefs: UserAccountPrefs };
-        if (active) setPreference({ key: preferenceKey, allowed: senderAllowsRemoteContent(prefs, senderKey) });
-      } catch { /* Keep remote content blocked when preferences are unavailable. */ }
+        const result = await response.json() as { allowed?: unknown; senderVerified?: unknown };
+        if (active) setDecision({ key: decisionKey, allowed: result.allowed === true, senderVerified: result.senderVerified === true });
+      } catch { /* Keep remote content blocked when the decision is unavailable. */ }
     };
     void refresh();
     window.addEventListener(PREFERENCES_CHANGED, refresh);
     return () => { active = false; window.removeEventListener(PREFERENCES_CHANGED, refresh); };
-  }, [accountId, preferenceKey, senderKey]);
+  }, [accountId, decisionKey, messageId, senderKey]);
+
+  const current = decision.key === decisionKey ? decision : null;
+  const canAlwaysAllow = !!accountId && !!senderKey && !!current?.senderVerified;
 
   const alwaysAllow = async () => {
-    if (!accountId || !senderKey) return;
+    if (!accountId || !senderKey || !canAlwaysAllow) return;
     setSaveState({ key, pending: true, error: "" });
     try {
       const response = await fetch(buildAccountApiPath(accountId, "/prefs"), {
@@ -42,7 +57,7 @@ export function useRemoteContent(accountId: string | undefined, senderKey: strin
         body: JSON.stringify({ remoteContent: { allowedSenders: { [senderKey]: true } } })
       });
       if (!response.ok) throw new Error("Preferences could not be saved.");
-      setPreference({ key: preferenceKey, allowed: true });
+      setDecision({ key: decisionKey, allowed: true, senderVerified: true });
       setSaveState({ key, pending: false, error: "" });
       window.dispatchEvent(new Event(PREFERENCES_CHANGED));
     } catch {
@@ -51,9 +66,11 @@ export function useRemoteContent(accountId: string | undefined, senderKey: strin
   };
 
   return {
-    allowed: once || (preference.key === preferenceKey && preference.allowed),
+    allowed: once || !!current?.allowed,
     loadOnce: () => loadRemoteContentOnce(accountId ?? "", messageKey), alwaysAllow,
-    canAlwaysAllow: !!accountId && !!senderKey,
+    canAlwaysAllow,
+    /** The sender is known but the receiving server did not authenticate it. */
+    senderUnverified: !!senderKey && !!current && !current.senderVerified,
     saving: saveState.key === key && saveState.pending,
     error: saveState.key === key ? saveState.error : ""
   };

@@ -1494,6 +1494,7 @@ function ComposeOrchestratorImpl(
     <ComposeMessageField
       darkMode={darkMode}
       composeMode={composeMode}
+      composeReplyMessage={composeReplyMessage}
       composeTab={composeTab}
       composeBody={composeBody}
       composeHtml={composeHtml}

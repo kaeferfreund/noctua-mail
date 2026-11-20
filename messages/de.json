@@ -1764,6 +1764,9 @@
     "alwaysLoadSender": "Von diesem Absender immer laden",
     "alwaysLoadSenderShort": "Immer laden",
     "unknownSender": "Absender unbekannt",
+    "unverifiedSender": "Absender nicht bestätigt",
+    "remoteImage": "Externes Bild: {label}",
+    "blockedImage": "Bild nicht geladen: {label}",
     "flags": {
       "forwarded": "Weitergeleitet",
       "calendar": "Kalendereinladung",

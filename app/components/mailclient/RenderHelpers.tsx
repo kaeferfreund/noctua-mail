@@ -145,9 +145,10 @@ export const renderSourcePanel = (
 
 export const renderMarkdownPanel = (
   body: string | undefined,
-  fontScale: number
+  fontScale: number,
+  message: Pick<Message, "accountId" | "id" | "senderKey">
 ) => (
-  <MarkdownPanel body={body} fontScale={fontScale} />
+  <MarkdownPanel body={body} fontScale={fontScale} message={message} />
 );
 
 export const folderSpecialIcon = (folder: Folder) => {
