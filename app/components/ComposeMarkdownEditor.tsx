@@ -1,11 +1,13 @@
 "use client";
 
-import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
+import { cloneElement, isValidElement, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import MDEditor, { commands as markdownCommands, type ICommand } from "@uiw/react-md-editor";
 import { useTranslations } from "next-intl";
 import "@uiw/react-md-editor/markdown-editor.css";
+// Preview typography only (the same stylesheet lib/markdownEmail.ts inlines into
+// sent mail); the preview itself is rendered by MarkdownContent.
 import "@uiw/react-markdown-preview/markdown.css";
-import remarkBreaks from "remark-breaks";
+import MarkdownContent from "@/app/components/mailclient/message/MarkdownContent";
 import styles from "./ComposeMarkdownEditor.module.css";
 
 type ComposeMarkdownEditorProps = {
@@ -102,6 +104,32 @@ function useLocalizedMarkdownCommands() {
   }, [t]);
 }
 
+/**
+ * The live preview. The library's own preview (@uiw/react-markdown-preview)
+ * always loads rehype-raw and renders raw HTML from the draft — an
+ * `<iframe srcdoc>` would run script in the app (CF-01). Noctua's renderer
+ * keeps raw HTML as text. The wrapper classes keep the library's preview
+ * typography, which is also what sent mail carries. Remote images (e.g. from
+ * a quoted original or a draft saved by another member) load only after an
+ * explicit click.
+ */
+function ComposeMarkdownPreview({ source }: { source: string }) {
+  const [remoteImagesAllowed, setRemoteImagesAllowed] = useState(false);
+  // Typing stays responsive on long drafts; the preview follows when idle.
+  const deferredSource = useDeferredValue(source);
+  return (
+    <div className="wmde-markdown wmde-markdown-color">
+      <MarkdownContent
+        source={deferredSource}
+        remoteImagesAllowed={remoteImagesAllowed}
+        onLoadRemoteImages={() => setRemoteImagesAllowed(true)}
+      />
+    </div>
+  );
+}
+
+const renderComposeMarkdownPreview = (source: string) => <ComposeMarkdownPreview source={source} />;
+
 const DEFAULT_EDITOR_HEIGHT = 440;
 const MIN_EDITOR_HEIGHT = 60;
 
@@ -177,13 +205,7 @@ export default function ComposeMarkdownEditor({
         preview="live"
         commands={commands}
         extraCommands={extraCommands}
-        previewOptions={{
-          // Mail compose treats single newlines as intentional line breaks.
-          pluginsFilter(type, plugins) {
-            if (type !== "remark") return plugins;
-            return [...plugins, remarkBreaks];
-          }
-        }}
+        components={{ preview: renderComposeMarkdownPreview }}
         height={editorHeight}
         visibleDragbar={false}
         key={resetKey}

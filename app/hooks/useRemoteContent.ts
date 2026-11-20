@@ -8,6 +8,8 @@ import { hasLoadedRemoteContent, loadRemoteContentOnce, retainRemoteContentDecis
 
 const PREFERENCES_CHANGED = "noctua:remote-content-prefs";
 
+export type RemoteContentState = ReturnType<typeof useRemoteContent>;
+
 export function useRemoteContent(accountId: string | undefined, senderKey: string | null | undefined, messageKey: string) {
   const preferenceKey = JSON.stringify([accountId, senderKey]);
   const key = JSON.stringify([preferenceKey, messageKey]);

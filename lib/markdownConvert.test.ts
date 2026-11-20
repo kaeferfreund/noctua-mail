@@ -152,6 +152,34 @@ describe("markdownToHtml", () => {
       expect(result).toContain('<div class="foo">bar</div>');
     });
 
+    it("removes active content from raw HTML and keeps the rest (CF-01)", () => {
+      const md = [
+        `<div style="color:red" onclick="alert(1)">kept <b>bold</b></div>`,
+        "",
+        `<iframe srcdoc="<script>alert(1)</script>"></iframe><script>alert(2)</script>`,
+        "",
+        `<img src="https://images.example.test/a.png" onerror="alert(3)" alt="a"><img src="data:image/png;base64,AAAA">`,
+        "",
+        `<a href="javascript:alert(4)">js</a> <a href=" java\tscript:alert(5)">tab</a> <a href="https://example.test/">ok</a>`,
+        "",
+        `<form action="https://phish.example.test/"><input name="p"></form><object data="x.swf"></object><embed src="x.swf">`,
+        "",
+        `<meta http-equiv="refresh" content="0;url=https://phish.example.test/"><base href="https://phish.example.test/"><link rel="stylesheet" href="https://example.test/x.css">`,
+        "",
+        `<svg><a href="javascript:alert(6)"><text>t</text></a><animate attributeName="href" to="javascript:alert(7)"/></svg>`,
+        "",
+        `<a href="data:text/html,<script>alert(8)</script>">data</a><button formaction="javascript:alert(9)">b</button>`
+      ].join("\n");
+      const result = markdownToHtml(md);
+      for (const active of ["onclick", "onerror", "<iframe", "srcdoc", "<script", "javascript:", "java", "<form", "<object", "<embed", "<meta", "<base", "<link", "<animate", "data:text", "formaction"]) {
+        expect(result).not.toContain(active);
+      }
+      for (const kept of ['<div style="color:red">kept <b>bold</b></div>', 'src="https://images.example.test/a.png"', 'alt="a"',
+        'src="data:image/png;base64,AAAA"', '<a href="https://example.test/">ok</a>', "<svg>", "<text>t</text>", "<button>b</button>"]) {
+        expect(result).toContain(kept);
+      }
+    });
+
     it("treats two-space line endings as hard breaks", () => {
       const result = markdownToHtml("Line 1  \nLine 2");
       expect(result).toContain("<br>");

@@ -766,6 +766,33 @@ a {
   color: var(--link);
 }
 
+/* Remote or unknown image in rendered Markdown that was not loaded
+   (MarkdownContent): mail Markdown view, notes and the compose preview. */
+.markdown-blocked-image {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  max-width: 100%;
+  padding: 0.15em 0.5em;
+  border: 1px dashed var(--gray-a7);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--gray-11);
+  font: inherit;
+  font-size: 0.875em;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  vertical-align: middle;
+}
+
+button.markdown-blocked-image {
+  cursor: pointer;
+}
+
+button.markdown-blocked-image:hover {
+  background: var(--gray-a3);
+}
+
 .markdown-view code {
   font-family: var(--font-mono);
   font-size: 12px;

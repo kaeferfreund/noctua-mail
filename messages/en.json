@@ -1761,6 +1761,8 @@
     "alwaysLoadSender": "Always load from this sender",
     "alwaysLoadSenderShort": "Always load",
     "unknownSender": "Sender unknown",
+    "remoteImage": "Remote image: {label}",
+    "blockedImage": "Image not loaded: {label}",
     "flags": {
       "forwarded": "Forwarded",
       "calendar": "Calendar Invite",
