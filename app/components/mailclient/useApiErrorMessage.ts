@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { useLatestRef } from "@/app/hooks/useLatestRef";
 import { getExceptionAccountId } from "./utils/clientHelpers";
+import { requestBodyErrorKey } from "@/lib/requestBodyErrors";
 
 type ApiErrorMessageParams = {
   setAuthState: (state: "unauth") => void;
@@ -43,6 +44,8 @@ export function useApiErrorMessage({ setAuthState, setReloginAccountId, setRelog
       }
       return message;
     };
+    // Body limits of the shared reader (413 also when a proxy answered without JSON).
+    if (res.status === 413) return tnRef.current("requestBodyTooLarge");
     try {
       const data = (await res.json()) as {
         message?: string;
@@ -57,6 +60,8 @@ export function useApiErrorMessage({ setAuthState, setReloginAccountId, setRelog
       const resolvedAccountId =
         data?.accountId?.trim() || getExceptionAccountId(responsePath ?? "") || "";
       if (data?.code === "folder_account_mismatch") return tnRef.current("folderAccountMismatch");
+      const bodyErrorKey = requestBodyErrorKey(res.status, data?.code);
+      if (bodyErrorKey) return tnRef.current(bodyErrorKey);
       if (data?.code === "mailbox_credentials_invalid") {
         if (data.repairAllowed && resolvedAccountId) {
           setReloginAccountId(resolvedAccountId); setReloginDescription("Repair the mailbox credentials to restore access.");

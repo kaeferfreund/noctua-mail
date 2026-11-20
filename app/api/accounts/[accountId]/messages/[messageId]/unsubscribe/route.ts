@@ -25,6 +25,7 @@ export type OneClickUnsubscribeResult =
   | { ok: false; status: number; message: string };
 
 const UNSUBSCRIBE_MAX_REDIRECTS = 3;
+/** Only status and headers count; a longer confirmation page is cut, not treated as a failure. */
 const UNSUBSCRIBE_MAX_RESPONSE_BYTES = 64 * 1024;
 /** Failures caused by the remote server (502); every other guard reason is a rejected URL (400). */
 const UPSTREAM_FAILURES = new Set<PublicRequestFailure>(["network-error", "timeout", "response-too-large", "too-many-redirects", "redirect-not-allowed"]);
@@ -46,6 +47,7 @@ export async function performOneClickUnsubscribe(
       transport: options?.transport,
       maxRedirects: UNSUBSCRIBE_MAX_REDIRECTS,
       maxResponseBytes: UNSUBSCRIBE_MAX_RESPONSE_BYTES,
+      truncateResponse: true,
       timeoutMs: options?.timeoutMs ?? 15000
     });
     if (res.status >= 200 && res.status < 300) {

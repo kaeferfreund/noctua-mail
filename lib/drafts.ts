@@ -643,12 +643,6 @@ export async function loadSendableDraft(accountId: string, draftId: string) {
   return { draft, rawSource, messageId, identity };
 }
 
-/**
- * The saved draft a compose send names by `draftId`, if it really is a draft: flagged
- * `\Draft` (compose saves it so) or in the account's Drafts folder (another client may
- * not set the flag). Anything else, e.g. received mail named by a crafted id, is never
- * returned, so a send can't delete it. Best-effort like the cleanup it feeds: null on error.
- */
 /** A message of this mailbox that is a draft (`\\Draft` flag or in the Drafts folder), else null. */
 export async function findComposeDraft(accountId: string, draftId: string): Promise<Message | null> {
   const draft = await getMessageById(accountId, draftId);
@@ -658,6 +652,12 @@ export async function findComposeDraft(accountId: string, draftId: string): Prom
   return draftsFolder && draft.folderId === draftsFolder.id ? draft : null;
 }
 
+/**
+ * The saved draft a compose send names by `draftId`, if it really is a draft: flagged
+ * `\Draft` (compose saves it so) or in the account's Drafts folder (another client may
+ * not set the flag). Anything else, e.g. received mail named by a crafted id, is never
+ * returned, so a send can't delete it. Best-effort like the cleanup it feeds: null on error.
+ */
 export async function findSentComposeDraft(accountId: string, draftId: string): Promise<Message | null> {
   try {
     return await findComposeDraft(accountId, draftId);

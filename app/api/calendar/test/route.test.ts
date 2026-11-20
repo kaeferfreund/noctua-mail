@@ -57,6 +57,27 @@ describe("POST /api/calendar/test", () => {
     expect(body.message).toContain("private-ip");
   });
 
+  test("does not read the body without a session", async () => {
+    let pulled = false;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled = true;
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(probe)));
+        controller.close();
+      }
+    }, { highWaterMark: 0 });
+    const unauthenticated = new Request("http://localhost/api/calendar/test", {
+      method: "POST",
+      headers: { "content-type": "application/json", origin: "http://localhost:3000" },
+      body,
+      duplex: "half"
+    } as RequestInit);
+    const response = await POST(unauthenticated);
+    expect(response.status).toBe(401);
+    expect(unauthenticated.bodyUsed).toBe(false);
+    expect(pulled).toBe(false);
+  });
+
   test("refuses to send a password over plain http://", async () => {
     const accountId = `caldav-test-${randomUUID()}`;
     await upsertAccount(buildAccount(accountId));

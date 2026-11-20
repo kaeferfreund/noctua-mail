@@ -101,6 +101,20 @@ describe("sanitizeHtmlForAppDocument", () => {
     expect(output).not.toMatch(/ src="https:/);
   });
 
+  test("sender targets cannot navigate the app tab (P3-3)", () => {
+    for (const target of ["_top", "_parent", "_self", "noctua"]) {
+      const output = sanitizeHtmlForAppDocument(`<a href="https://phish.example.test/" target="${target}">x</a>`);
+      expect(output).toBe(`<a href="https://phish.example.test/" target="_blank" rel="noreferrer noopener">x</a>`);
+    }
+  });
+
+  test("document-level tags and meta never reach the app DOM (P3-3)", () => {
+    const output = sanitizeHtmlForAppDocument(
+      `<html><head><title>Fake title</title><meta name="viewport" content="width=10"><meta name="theme-color" content="#f00"></head><body><p>x</p></body></html>`
+    );
+    expect(output).toBe("<p>x</p>");
+  });
+
   test("linkify on sanitized output adds links only inside text", () => {
     const output = linkifyHtmlTextNodes(sanitizeHtmlForAppDocument(
       `<p title="https://example.test/&quot; onmouseover=&quot;alert(1)">see https://example.test/a?b=1&c="x"</p>`

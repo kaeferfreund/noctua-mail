@@ -779,7 +779,8 @@
       "submitWithoutSending": "{status, select, ACCEPTED {Accept and save without sending response} DECLINED {Decline and save without sending response} TENTATIVE {Mark tentative and save without sending response} other {Respond and save without sending response}}"
     },
     "inviteStatus": {
-      "organizerMismatch": "sender is not the event organizer"
+      "organizerMismatch": "sender is not the event organizer",
+      "senderUnverified": "sender not confirmed by SPF/DKIM, apply manually"
     }
   },
   "Search": {
@@ -1765,6 +1766,7 @@
     "alwaysLoadSenderShort": "Always load",
     "unknownSender": "Sender unknown",
     "unverifiedSender": "Sender not verified",
+    "checkingSender": "Checking sender…",
     "remoteImage": "Remote image: {label}",
     "blockedImage": "Image not loaded: {label}",
     "flags": {
@@ -1818,6 +1820,8 @@
     "fullSyncCancelled": "Full sync cancelled",
     "syncCancelledSelectionChanged": "Full sync was cancelled before starting because you selected another mailbox.",
     "folderAccountMismatch": "The folder does not belong to this mailbox. Please select the mailbox again.",
+    "requestBodyTooLarge": "The data is too large for the server (for example attachments over 25 MB or a very large image in the signature).",
+    "requestBodyTimeout": "The upload took too long. Please try again.",
     "syncCancelledBeforeStart": "Full sync was cancelled before starting.",
     "region": "Notifications",
     "dismissLabel": "Dismiss notification",

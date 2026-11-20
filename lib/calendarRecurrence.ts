@@ -135,11 +135,47 @@ function assertRecurrenceProducesOccurrences(
   if (empty) throw new UnsupportedRecurrenceRuleError("no occurrences");
 }
 
-/** Build all rule dates in the same wall-clock space used by rrule's comparisons. */
+/**
+ * DTSTART moved forward by whole rule cycles so the work window (which counts
+ * from DTSTART) covers `nearMs`: a DAILY series that started in 1998 would
+ * otherwise end at the window in 2025. Only for rules whose occurrences do not
+ * depend on where the walk starts: fixed-length periods (HOURLY, DAILY,
+ * WEEKLY), no COUNT (counted from the original DTSTART), and not when UNTIL
+ * ends the series before the new start. Moving by a whole number of
+ * INTERVALs (HOURLY: whole days, as emptinessProbeStart) keeps every
+ * candidate date, time of day and weekday. Applies only when DTSTART lies more
+ * than half the window before `nearMs`; the new start is a quarter window
+ * before it, so occurrences older than that are no longer listed.
+ */
+function rebaseDtstartNear(
+  options: Partial<ReturnType<typeof RRule.parseString>>,
+  interval: number,
+  dtstart: Date,
+  nearMs: number,
+  ruleUntil: Date | undefined
+): Date {
+  const freq = options.freq;
+  if (freq !== Frequency.DAILY && freq !== Frequency.WEEKLY && freq !== Frequency.HOURLY) return dtstart;
+  if (typeof options.count === "number") return dtstart;
+  const periodMs = interval * RECURRENCE_PERIOD_MS[freq]!;
+  if (nearMs - dtstart.getTime() <= (MAX_RECURRENCE_PERIODS / 2) * periodMs) return dtstart;
+  const anchorMs = nearMs - (MAX_RECURRENCE_PERIODS / 4) * periodMs;
+  if (ruleUntil && ruleUntil.getTime() <= anchorMs) return dtstart;
+  const unitMs = interval * (freq === Frequency.HOURLY ? DAY_MS : RECURRENCE_PERIOD_MS[freq]!);
+  const cycles = Math.floor((anchorMs - dtstart.getTime()) / unitMs);
+  return cycles > 0 ? new Date(dtstart.getTime() + cycles * unitMs) : dtstart;
+}
+
+/**
+ * Build all rule dates in the same wall-clock space used by rrule's comparisons.
+ * `nearMs` (display and reminders: now) moves an old DTSTART of a simple rule
+ * close to that instant (rebaseDtstartNear), so the work limits still reach it.
+ */
 export function buildCalendarRecurrenceOptions(
   recurrenceRule: string,
   startAtMs: number,
-  startTimezone?: string
+  startTimezone?: string,
+  { nearMs }: { nearMs?: number } = {}
 ) {
   const normalizedRule = recurrenceRule.trim().replace(/^RRULE:\s*/i, "");
   const parsed = RRule.parseString(normalizedRule);
@@ -171,17 +207,20 @@ export function buildCalendarRecurrenceOptions(
   }
 
   assertSupportedRecurrence(parsed);
-  const dtstart = toRuleDate(startAtMs);
+  const ruleStart = toRuleDate(startAtMs);
   const interval =
     typeof parsed.interval === "number" && Number.isFinite(parsed.interval) && parsed.interval > 0
       ? parsed.interval
       : 1;
-  assertRecurrenceProducesOccurrences(normalizedRule, parsed, dtstart, interval);
-  const windowEndMs =
-    dtstart.getTime() + MAX_RECURRENCE_PERIODS * interval * RECURRENCE_PERIOD_MS[parsed.freq!]!;
+  assertRecurrenceProducesOccurrences(normalizedRule, parsed, ruleStart, interval);
   // The rule's own end, before the work window is applied. Callers that report
   // a series end must use this, not the clamped `options.until`.
   const ruleUntil = until instanceof Date ? until : undefined;
+  const dtstart = typeof nearMs === "number" && Number.isFinite(nearMs)
+    ? rebaseDtstartNear(parsed, interval, ruleStart, toRuleDate(nearMs).getTime(), ruleUntil)
+    : ruleStart;
+  const windowEndMs =
+    dtstart.getTime() + MAX_RECURRENCE_PERIODS * interval * RECURRENCE_PERIOD_MS[parsed.freq!]!;
   const windowed =
     Number.isFinite(windowEndMs) &&
     windowEndMs < MAX_RULE_DATE_MS &&

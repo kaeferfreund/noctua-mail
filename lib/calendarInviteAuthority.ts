@@ -2,8 +2,11 @@ import type { CalendarEvent } from "@/lib/data";
 import { parseIcsInvite } from "@/lib/calendar";
 import {
   normalizeCalendarInviteAddress,
-  type CalendarInviteMutationGroup
+  type CalendarInviteMutationGroup,
+  type CalendarInviteUnprocessedReason
 } from "@/lib/calendarInviteProcessing";
+import { senderAuthPassed } from "@/lib/mail/spam/allowlist";
+import { parseHeaderBlock, receivingAuthenticationResults } from "@/lib/mail/spam/input";
 import {
   ownAddressList,
   parseAddressEmails,
@@ -23,8 +26,12 @@ import {
  * ORGANIZER) cannot be changed by mail at all. A user who opens the mail and
  * presses "Process" applies it on purpose; that path skips this check.
  *
- * The From address is not authenticated, so this binds a change to the
- * organizer the event already has; it does not prove who sent the mail.
+ * The From header alone is not authenticated. Automatic processing therefore
+ * also requires the receiving server's Authentication-Results to show SPF or
+ * DKIM passing for the organizer's domain (the strict spam-allowlist rule,
+ * senderAuthPassed). Without that confirmation, including mail without any
+ * Authentication-Results, the invite stays unprocessed ("sender_unverified")
+ * and the user can apply it manually.
  */
 
 /** The organizer address of a stored event, from its ICS or its organizer label. */
@@ -48,19 +55,50 @@ export type CalendarInviteAuthorityInput = {
   existingEvent: Pick<CalendarEvent, "eventUid" | "rawIcs" | "organizer">;
   group: Pick<CalendarInviteMutationGroup, "organizerEmails">;
   senderAddress?: string | null;
+  /**
+   * The receiving server's Authentication-Results of the mail
+   * (inviteSenderAuthenticationResults). Missing or empty means unconfirmed.
+   */
+  senderAuthenticationResults?: readonly string[] | null;
   ownAddresses?: OwnAddressInput;
 };
 
-export function isCalendarInviteFromEventOrganizer({
+/** Why incoming mail may not change `existingEvent` automatically; null when it may. */
+export function calendarInviteAuthorityFailure({
   existingEvent,
   group,
   senderAddress,
+  senderAuthenticationResults,
   ownAddresses
-}: CalendarInviteAuthorityInput): boolean {
+}: CalendarInviteAuthorityInput): CalendarInviteUnprocessedReason | null {
   const organizer = resolveCalendarEventOrganizerEmail(existingEvent);
-  if (!organizer) return false;
-  if (ownAddressList(ownAddresses).includes(organizer)) return false;
-  if (group.organizerEmails.length !== 1 || group.organizerEmails[0] !== organizer) return false;
+  if (!organizer) return "organizer_mismatch";
+  if (ownAddressList(ownAddresses).includes(organizer)) return "organizer_mismatch";
+  if (group.organizerEmails.length !== 1 || group.organizerEmails[0] !== organizer) return "organizer_mismatch";
   const senders = parseAddressEmails(senderAddress);
-  return senders.length === 1 && senders[0] === organizer;
+  if (senders.length !== 1 || senders[0] !== organizer) return "organizer_mismatch";
+  const domain = organizer.slice(organizer.lastIndexOf("@") + 1);
+  if (!senderAuthPassed({ authenticationResults: [...(senderAuthenticationResults ?? [])] }, domain)) {
+    return "sender_unverified";
+  }
+  return null;
+}
+
+export function isCalendarInviteFromEventOrganizer(input: CalendarInviteAuthorityInput): boolean {
+  return calendarInviteAuthorityFailure(input) === null;
+}
+
+const SOURCE_HEAD_LIMIT = 64 * 1024;
+
+/**
+ * The receiving server's Authentication-Results from a raw RFC 822 source
+ * (only its header block is read), as the spam allowlist reads them.
+ */
+export function inviteSenderAuthenticationResults(source: string | Buffer | null | undefined): string[] {
+  if (!source) return [];
+  const head = typeof source === "string"
+    ? source.slice(0, SOURCE_HEAD_LIMIT)
+    : source.subarray(0, SOURCE_HEAD_LIMIT).toString("latin1");
+  const end = head.search(/\r?\n\r?\n/);
+  return receivingAuthenticationResults(parseHeaderBlock(end >= 0 ? head.slice(0, end) : head));
 }

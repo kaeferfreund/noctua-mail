@@ -31,3 +31,21 @@ describe("buildFullCalendarRecurringFields", () => {
     ).toBeNull();
   });
 });
+
+describe("buildFullCalendarRecurringFields for old series", () => {
+  it("a daily series from 1998 reaches today in the calendar view", () => {
+    const recurring = buildFullCalendarRecurringFields({
+      startAtMs: Date.UTC(1998, 0, 1, 8, 30, 0),
+      endAtMs: Date.UTC(1998, 0, 1, 9, 0, 0),
+      recurrenceRule: "FREQ=DAILY"
+    });
+    expect(recurring).not.toBeNull();
+    const now = Date.now();
+    const rule = new RRule({ ...recurring!.rrule, tzid: undefined });
+    const next = rule.after(new Date(now), true);
+    expect(next).not.toBeNull();
+    expect(next!.getTime() - now).toBeLessThanOrEqual(24 * 60 * 60 * 1000);
+    expect(next!.getUTCHours()).toBe(8);
+    expect(next!.getUTCMinutes()).toBe(30);
+  });
+});

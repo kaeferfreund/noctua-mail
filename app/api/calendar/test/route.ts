@@ -1,6 +1,6 @@
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { requireAccountContext } from "@/app/api/_helpers/accountContext";
-import { withAuthResponse } from "@/lib/auth";
+import { requireActiveUserSession, withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { testCaldavConnection } from "@/lib/caldav/client";
 import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
@@ -11,6 +11,9 @@ import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
  */
 export async function POST(request: Request) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
+  // Signed-in users only; the body is not read for anyone else.
+  const session = await requireActiveUserSession(request);
+  if (session instanceof NextResponse) return session;
   // The mailbox id travels in the body, so it is read (size-capped) before the role check.
   const json = await readJsonBody<{
     accountId?: unknown;
@@ -18,7 +21,7 @@ export async function POST(request: Request) {
     user?: unknown;
     password?: unknown;
   }>(request);
-  if (!json.ok) return json.response;
+  if (!json.ok) return withAuthResponse(session, async () => json.response);
   const body = json.value;
   const accountId = typeof body?.accountId === "string" ? body.accountId.trim() : "";
   const accountContext = await requireAccountContext(request, accountId, {

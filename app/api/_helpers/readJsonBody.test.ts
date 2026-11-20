@@ -19,6 +19,7 @@ test("an oversized body answers 413 without reading the rest of the stream", asy
   expect(result.ok).toBe(false);
   if (result.ok) throw new Error("unreachable");
   expect(result.response.status).toBe(413);
+  expect(await result.response.json()).toMatchObject({ code: "request_body_too_large" });
   expect(reads).toBe(3);
   // A declared length above the limit is refused before any read.
   const declared = await readJsonBody(post("{}", { "content-length": String(JSON_BODY_LIMITS.default + 1) }));
@@ -29,6 +30,7 @@ test("a stalled body answers 408 at the deadline", async () => {
   const body = new ReadableStream<Uint8Array>({ pull() { return new Promise(() => {}); } }, { highWaterMark: 0 });
   const result = await readJsonBody(post(body), { timeoutMs: 20 });
   expect(result.ok ? 200 : result.response.status).toBe(408);
+  if (!result.ok) expect(await result.response.json()).toMatchObject({ code: "request_body_timeout" });
 });
 
 test("mailbox routes check the session before reading the body", async () => {

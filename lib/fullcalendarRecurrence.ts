@@ -24,7 +24,10 @@ export function buildFullCalendarRecurringFields(
 
   let recurrence: ReturnType<typeof buildCalendarRecurrenceOptions>;
   try {
-    recurrence = buildCalendarRecurrenceOptions(normalizedRule, event.startAtMs, event.startTimezone);
+    // Anchored at now: an old daily series still shows its current occurrences.
+    recurrence = buildCalendarRecurrenceOptions(normalizedRule, event.startAtMs, event.startTimezone, {
+      nearMs: Date.now()
+    });
   } catch (error) {
     // Rules outside the recurrence work limits are shown as a single event.
     if (error instanceof UnsupportedRecurrenceRuleError) return null;
