@@ -29,6 +29,7 @@ const errorKeys = {
   mailbox_exists: "errors.mailboxExists",
   auth_integration_pending: "errors.unavailable",
   provisioning_failed: "errors.provisioning",
+  mail_server_unreachable: "errors.mailServerUnreachable",
   INVALID_TOKEN: "errors.invalidToken",
   invalid_request: "errors.invalidRequest"
 } satisfies Record<string, MessageKey>;

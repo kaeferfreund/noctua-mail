@@ -79,7 +79,7 @@ function MailboxHarness() {
   const [initialFoldersLoadedAccountId, setInitialFoldersLoadedAccountId] = useState<string | null>(null);
   const [, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
   const reportError = useCallback((message: string) => { throw new Error(`unexpected error: ${message}`); }, []);
-  const readErrorMessage = useApiErrorMessage({ setAuthState, setReloginAccountId: noop, setReloginDescription: noop });
+  const readErrorMessage = useApiErrorMessage({ setAuthState, requestRelogin: noop, closeRelogin: noop, setReloginDescription: noop });
   const refreshFolders = useFolderRefresh({ activeAccountId, apiFetch, reportError, readErrorMessage, setFolders });
   useEffect(() => {
     observed.refreshFolders = refreshFolders;
@@ -146,7 +146,7 @@ describe("UI language switch", () => {
     const resolved: Array<{ locale: string; text: string }> = [];
     function Probe() {
       const locale = useLocale();
-      const readErrorMessage = useApiErrorMessage({ setAuthState: noop, setReloginAccountId: noop, setReloginDescription: noop });
+      const readErrorMessage = useApiErrorMessage({ setAuthState: noop, requestRelogin: noop, closeRelogin: noop, setReloginDescription: noop });
       const first = useRef(true);
       useLayoutEffect(() => {
         if (first.current) { first.current = false; return; }

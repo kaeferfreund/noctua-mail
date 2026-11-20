@@ -78,7 +78,8 @@ for (const locale of ["de", "en"] as const) {
     const sideEffects: string[] = [];
     const { result } = renderHook(() => useApiErrorMessage({
       setAuthState: state => sideEffects.push(state),
-      setReloginAccountId: id => sideEffects.push(id),
+      requestRelogin: id => sideEffects.push(id),
+      closeRelogin: id => sideEffects.push(id),
       setReloginDescription: text => sideEffects.push(text)
     }), { wrapper: ({ children }: { children: ReactNode }) => <I18nTestProvider locale={locale}>{children}</I18nTestProvider> });
     const response = Response.json({ ok: false, code: "folder_account_mismatch", message: "Request failed (400)" }, { status: 400 });

@@ -24,7 +24,7 @@ function invite(f:TestAuthHarness,changes:Record<string,unknown>={}) {
 }
 function input(code:string,address=email(),account?:unknown){return {inviteCode:code,email:address,password,name:"Synthetic Person",...(account?{account}:{})};}
 function mailbox(address=email()) {return {name:"Synthetic Mailbox",email:address,avatar:"",imap:{host:"imap.example.test",port:993,secure:true,user:address,password:"synthetic-imap-secret"},smtp:{host:"smtp.example.test",port:465,secure:true,user:address,password:"synthetic-smtp-secret"}};}
-const verified={imap:async()=>true,smtp:async()=>true};
+const verified={imap:async()=>"ok" as const,smtp:async()=>true};
 function request(jar=new CookieJar(),body:unknown={},path="/api/auth/reauth") {return new Request(`${TEST_BASE_URL}${path}`,{method:"POST",headers:jar.headers({origin:TEST_BASE_URL,"content-type":"application/json"}),body:JSON.stringify(body)});}
 async function http(f:TestAuthHarness,path:string,body?:unknown,jar=new CookieJar()) {
   const req=body===undefined?new Request(`${TEST_BASE_URL}/api/ba${path}`,{headers:jar.headers()}):request(jar,body,`/api/ba${path}`);
@@ -49,7 +49,7 @@ describe("slice 5 provisioning",()=>{
   for(const mode of ["missing","expired","exhausted","wrong-person","non-admin-bootstrap"])test(`${mode} invite has zero IMAP/SMTP calls and zero reservations`,async()=>{
     const f=await setup(),address=email();let calls=0;
     const code=mode==="missing"?"invalid":invite(f,{role:mode==="non-admin-bootstrap"?"user":"admin",...(mode==="expired"?{expiresAt:0}:mode==="exhausted"?{uses:1}:mode==="wrong-person"?{email:email()}:{})});
-    await expect(provisionUser(f.auth,f.master,input(code,address,mailbox()),{imap:async()=>{calls++;return true;},smtp:async()=>{calls++;return true;}})).rejects.toMatchObject({status:mode==="exhausted"?409:403,code:mode==="exhausted"?"invite_exhausted":mode==="non-admin-bootstrap"?"bootstrap_invite_required":"invalid_invite"});
+    await expect(provisionUser(f.auth,f.master,input(code,address,mailbox()),{imap:async()=>{calls++;return "ok" as const;},smtp:async()=>{calls++;return true;}})).rejects.toMatchObject({status:mode==="exhausted"?409:403,code:mode==="exhausted"?"invite_exhausted":mode==="non-admin-bootstrap"?"bootstrap_invite_required":"invalid_invite"});
     expect(calls).toBe(0);expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning`).get().n).toBe(0);
   });
   test("all signups require a valid invite; app password has an explicit minimum and no mailbox fallback",async()=>{
@@ -65,7 +65,7 @@ describe("slice 5 provisioning",()=>{
     persistAccountRow(f.master,{...box,id:"synthetic-existing"});let calls=0;
     const shared=mailbox(),member=await f.createUser(email());
     persistAccountRow(f.master,{...shared,id:"synthetic-owned-shared",ownerUserId:user.id});await f.addMembership(member.id,"synthetic-owned-shared");
-    const verify={imap:async()=>{calls++;return true;},smtp:async()=>{calls++;return true;}};
+    const verify={imap:async()=>{calls++;return "ok" as const;},smtp:async()=>{calls++;return true;}};
     for(const [body,code] of [[input(invite(f),user.email,mailbox()),"user_exists"],[input(invite(f),legacy,mailbox()),"user_exists"],[input(invite(f),email(),box),"mailbox_exists"],[input(invite(f),shared.email),"mailbox_exists"]] as const)await expect(provisionUser(f.auth,f.master,body,verify)).rejects.toMatchObject({status:409,code});
     expect(calls).toBe(0);expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning`).get().n).toBe(0);
   });
@@ -93,7 +93,7 @@ describe("slice 5 provisioning",()=>{
   test("reserve rechecks invite and mailbox after network; complete history releases email",async()=>{
     const f=await setup();await f.createUser(email(),password,"admin");
     const code=invite(f),address=email();
-    await expect(provisionUser(f.auth,f.master,input(code,address,mailbox()),{imap:async()=>{f.master.prepare(`UPDATE invite_codes SET expiresAt=0 WHERE code=?`).run(code);return true;},smtp:async()=>true})).rejects.toMatchObject({status:403,code:"invalid_invite"});
+    await expect(provisionUser(f.auth,f.master,input(code,address,mailbox()),{imap:async()=>{f.master.prepare(`UPDATE invite_codes SET expiresAt=0 WHERE code=?`).run(code);return "ok" as const;},smtp:async()=>true})).rejects.toMatchObject({status:403,code:"invalid_invite"});
     expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning`).get().n).toBe(0);
     const complete=await provisionUser(f.auth,f.master,input(invite(f),address),verified);
     f.master.prepare(`DELETE FROM auth_user WHERE id=?`).run(complete.userId);f.master.prepare(`DELETE FROM users WHERE id=?`).run(complete.userId);
@@ -137,6 +137,20 @@ describe("slice 5 provisioning",()=>{
     await reconcileProvisioning(f.master,2);await reconcileProvisioning(f.master,2);
     expect(f.master.prepare(`SELECT 1 FROM auth_user WHERE id=?`).get(op.userId)).toBeNull();
     expect(f.master.prepare(`SELECT state FROM user_provisioning WHERE id=?`).get(live.id).state).toBe("reserved");
+  });
+  for(const check of ["invalid","unreachable"] as const)test(`a signup mailbox the IMAP check answers ${check} is refused before any reservation`,async()=>{
+    const f=await setup();await f.createUser(email(),password,"admin");
+    let smtpChecks=0;
+    // "invalid" and "unreachable" are truthy strings: a boolean test of the result would accept them.
+    await expect(provisionUser(f.auth,f.master,input(invite(f),email(),mailbox()),{imap:async()=>check,smtp:async()=>{smtpChecks++;return true;}}))
+      .rejects.toMatchObject(check==="invalid"?{status:400,code:"mailbox_credentials_invalid"}:{status:503,code:"mail_server_unreachable"});
+    expect(smtpChecks).toBe(0);
+    expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning`).get().n).toBe(0);
+  });
+  test("a signup mailbox the IMAP server accepts is provisioned",async()=>{
+    const f=await setup();await f.createUser(email(),password,"admin");
+    const created=await provisionUser(f.auth,f.master,input(invite(f),email(),mailbox()),verified);
+    expect(created.accountId).toBeString();
   });
 });
 
@@ -326,7 +340,7 @@ for(const boundary of ["preflight-reservation","reservation-finalize"] as const)
     create=spyOn(f.auth.api,"createUser").mockImplementation(Object.assign(async (args:Parameters<typeof original>[0])=>{const result=await original(args);await demote();return result;}, { options: original.options, path: original.path }) as typeof original);
   }
   try {
-    await expect(provisionUser(f.auth,f.master,input(issued.invite.code,address,mailbox()),{imap:async()=>{if(boundary==="preflight-reservation")await demote();return true;},smtp:async()=>true})).rejects.toMatchObject({status:403,code:"invalid_invite"});
+    await expect(provisionUser(f.auth,f.master,input(issued.invite.code,address,mailbox()),{imap:async()=>{if(boundary==="preflight-reservation")await demote();return "ok" as const;},smtp:async()=>true})).rejects.toMatchObject({status:403,code:"invalid_invite"});
     expect(f.master.prepare(`SELECT 1 FROM auth_user WHERE email=?`).get(address)).toBeNull();
     expect(f.master.prepare(`SELECT count(*) n FROM user_provisioning WHERE normalizedEmail=? AND state IN ('reserved','auth_created','cleanup_required','complete')`).get(address).n).toBe(0);
     expect(f.master.prepare(`SELECT uses FROM invite_codes WHERE code=?`).get(issued.invite.code).uses).toBe(0);
@@ -343,7 +357,7 @@ for(const boundary of ["before-reservation","before-finalize"] as const)test(`la
     create=spyOn(f.auth.api,"createUser").mockImplementation(Object.assign(async (args:Parameters<typeof original>[0])=>{const result=await original(args);collide();return result;}, { options: original.options, path: original.path }) as typeof original);
   }
   try {
-    await expect(provisionUser(f.auth,f.master,body,{imap:async()=>{if(boundary==="before-reservation")collide();return true;},smtp:async()=>true})).rejects.toMatchObject({status:409,code:"mailbox_exists"});
+    await expect(provisionUser(f.auth,f.master,body,{imap:async()=>{if(boundary==="before-reservation")collide();return "ok" as const;},smtp:async()=>true})).rejects.toMatchObject({status:409,code:"mailbox_exists"});
     expect(f.master.prepare(`SELECT 1 FROM auth_user WHERE email=?`).get(address)).toBeNull();
     expect(f.master.prepare(`SELECT id FROM accounts WHERE email=?`).get(box.email).id).toBe("synthetic-collision-owner");
     expect(f.master.prepare(`SELECT uses FROM invite_codes WHERE code=?`).get(body.inviteCode).uses).toBe(0);

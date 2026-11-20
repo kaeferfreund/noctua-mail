@@ -22,7 +22,7 @@ async function setup() {
   let started:()=>void=()=>{};
   const verifying=new Promise<void>(resolve=>{started=resolve;});
   const gate=new Promise<void>(resolve=>{release=resolve;});
-  const f=await createTestAuthHarness(undefined,{imapVerification:async()=>{started();await gate;return true;}});
+  const f=await createTestAuthHarness(undefined,{imapVerification:async()=>{started();await gate;return "ok" as const;}});
   fixtures.push(f);
   const admin=await f.createUser(email(),password,"admin"),signed=await f.signIn(admin.email,password);
   const factor=await f.enrollTotp(signed.jar,password),session=await f.auth.api.getSession({headers:signed.jar.headers()});

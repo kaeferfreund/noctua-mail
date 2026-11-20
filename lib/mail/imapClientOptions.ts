@@ -4,7 +4,7 @@ import tls from "tls";
 
 import type { Account } from "@/lib/data";
 import { isImapDeadlineCancelled } from "./imapCancellation";
-import { markImapConnectFailure } from "./imapError";
+import { describeImapError, isTemporaryImapAuthFailure, markImapConnectFailure } from "./imapError";
 import { getImapLogger, logImapOp } from "./imapLogger";
 
 export type ImapClientLogContext = {
@@ -195,6 +195,10 @@ function isRetryableImapConnectError(error: unknown) {
   const candidate = error as ImapConnectErrorLike | null | undefined;
   const text = collectImapConnectErrorText(error);
   if (!text) return false;
+
+  // The server answered the login with "could not process" (RFC 5530), not a
+  // rejection: an outage like a dropped connection, so retry and count it.
+  if (isTemporaryImapAuthFailure(error)) return true;
 
   if (
     candidate?.authenticationFailed === true ||
@@ -411,10 +415,13 @@ export async function connectImapClientWithRetry(params: {
             host: account.imap.host,
             consecutiveFailures: nextState.consecutiveFailures,
             openedUntil: nextState.openedUntil,
-            error: (error as Error | undefined)?.message ?? String(error ?? "")
+            error: describeImapError(error)
           });
         }
-        throw error;
+        // Retries are used up on a failure of the server or the network:
+        // routes answer "mail server unreachable" (503) right away instead of
+        // a raw 500 until the breaker opens.
+        throw markImapConnectFailure(error);
       }
 
       const delayMs = getImapConnectDelayMs(
@@ -432,7 +439,7 @@ export async function connectImapClientWithRetry(params: {
           attempt,
           maxAttempts,
           delayMs,
-          error: (error as Error | undefined)?.message ?? String(error ?? "")
+          error: describeImapError(error)
         });
       }
       await new Promise<void>((resolve) => setTimeout(resolve, delayMs));

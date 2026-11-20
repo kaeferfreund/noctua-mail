@@ -8,7 +8,8 @@ import { getDb } from "./db/connection";
 import { mapAccountRow, mergeAccount, persistAccountRow } from "./db/rowParsers";
 import { resolveAccountRoleRow } from "./db/accountAccess";
 import { roleAtLeast } from "./accountRole";
-import { verifyImapCredentials } from "./mail/imapAuth";
+import { verifyImapCredentials, type ImapCredentialsCheck } from "./mail/imapAuth";
+import { MAIL_SERVER_UNREACHABLE_MESSAGE } from "./mail/imapError";
 import { verifySmtpCredentials } from "./mail/smtp";
 import { withDbWriteRetry } from "./dbWriteRetry";
 import { revokeAuthStreams } from "./authStreams";
@@ -24,6 +25,14 @@ export type MailboxPatch = Omit<Partial<Account>, "imap" | "smtp"> & {
 };
 export type CredentialActor = { userId: string; clientId?: string };
 export type CredentialVerification = { imap: typeof verifyImapCredentials; smtp: typeof verifySmtpCredentials; authorize?: () => void };
+/**
+ * Only `"ok"` accepts IMAP credentials. An outage is reported as such (503), not as a wrong
+ * password; it is still a rejection, so nothing is stored.
+ */
+export function assertImapCredentialsAccepted(check: ImapCredentialsCheck, invalidMessage = "Invalid IMAP credentials") {
+  if (check === "ok") return;
+  throw check === "unreachable" ? new MailboxCredentialError(MAIL_SERVER_UNREACHABLE_MESSAGE, 503) : new MailboxCredentialError(invalidMessage);
+}
 const defaultVerification: CredentialVerification = { imap: verifyImapCredentials, smtp: verifySmtpCredentials };
 const endpointKeys = ["host", "port", "secure", "requireTls", "user"] as const;
 const normalized = (value: string) => value.trim().toLowerCase();
@@ -90,7 +99,7 @@ export async function updateMailboxCredentials(accountId: string, patchInput: Ma
   const inherited = currentAuthProof()?.op;
   const operation = loginOwner && credentialChanged ? (inherited?.userId === loginOwner ? inherited : await reserveSecurityOperation(db, loginOwner, "security.mailbox.credentials")) : undefined;
   try {
-  if ((imapChanged || !!patch.imap?.password?.trim()) && !await verification.imap(next, next.imap.password, actor.clientId)) throw new MailboxCredentialError("Invalid IMAP credentials");
+  if (imapChanged || !!patch.imap?.password?.trim()) assertImapCredentialsAccepted(await verification.imap(next, next.imap.password, actor.clientId));
   if ((explicitSmtp || !!patch.smtp?.password?.trim()) && !await verification.smtp(next)) throw new MailboxCredentialError("Invalid SMTP credentials");
   await withDbWriteRetry("updateMailboxCredentials", () => db.transaction(() => {
     assertActor(); assertIdentity(); verification.authorize?.();

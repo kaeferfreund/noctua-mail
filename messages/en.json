@@ -988,6 +988,7 @@
       "mailboxExists": "This mailbox already exists. Ask your admin for access.",
       "unavailable": "Sign-in is temporarily unavailable. Please try again later.",
       "provisioning": "Account creation could not finish. Contact your admin before retrying.",
+      "mailServerUnreachable": "The mail server could not be reached or could not check the login. Please try again later.",
       "invalidToken": "This reset link is invalid, expired or already used. Ask your admin for a new link.",
       "invalidRequest": "Check the form fields and try again.",
       "connection": "Unable to connect. Please try again.",

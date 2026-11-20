@@ -1,3 +1,5 @@
+import { describeImapError } from "./imapError";
+
 type LogLevel = "silent" | "error" | "warn" | "info" | "debug";
 
 const LEVELS: Record<LogLevel, number> = {
@@ -80,11 +82,11 @@ export async function logImapOp<T>(
   } catch (error) {
     const ms = Date.now() - start;
     const suffix = meta ? ` ${meta}` : "";
-    const message = (error as Error)?.message ?? String(error);
     if (options.cancelled?.()) {
+      const message = (error as Error)?.message ?? String(error);
       logger.info?.(`[imap] ${op}${suffix} ${ms}ms cancelled=${message}`);
     } else {
-      logger.warn?.(`[imap] ${op}${suffix} ${ms}ms error=${message}`);
+      logger.warn?.(`[imap] ${op}${suffix} ${ms}ms error=${describeImapError(error)}`);
     }
     throw error;
   }

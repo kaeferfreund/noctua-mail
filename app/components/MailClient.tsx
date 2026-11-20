@@ -257,6 +257,7 @@ import {
 import { withLoadedMessageBodyMemo } from "./mailclient/utils/threadContentCache";
 import RecipientAliasDialog from "./mailclient/RecipientAliasDialog";
 import AccountReloginDialog from "./mailclient/AccountReloginDialog";
+import { useReloginPrompt } from "./mailclient/useReloginPrompt";
 import TopicBadge from "./mailclient/TopicBadge";
 import { applyActiveTopicSuggestion } from "./mailclient/topicSuggestionActions";
 import { parseSimpleTopicSearchMode } from "./mailclient/topicSearch";
@@ -523,7 +524,8 @@ export default function MailClient({
   const [enrollmentContinuation, setEnrollmentContinuation] = useState<{ proof: Proof; password: string } | null>(null);
   const [manageTab, setManageTab] = useState<ManageTab>("account");
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-  const [reloginAccountId, setReloginAccountId] = useState("");
+  const { reloginAccountId, requestRelogin, openRelogin, dismissRelogin, completeRelogin, closeRelogin, resetRelogin } =
+    useReloginPrompt();
   const [reloginDescription, setReloginDescription] = useState("");
   const [listWidth, setListWidth] = useState(840);
   const [calendarSidebarOpen, setCalendarSidebarOpen] = useState(false);
@@ -608,7 +610,7 @@ export default function MailClient({
   const activeTopicSuggestionCacheKey =
     activeAccountId && activeTopicId ? `${activeAccountId}:${activeTopicId}` : "";
 
-  const readErrorMessage = useApiErrorMessage({ setAuthState, setReloginAccountId, setReloginDescription });
+  const readErrorMessage = useApiErrorMessage({ setAuthState, requestRelogin, closeRelogin, setReloginDescription });
 
   const {
     exceptionEntries,
@@ -995,6 +997,8 @@ export default function MailClient({
     setDomainView(null);
     setRecipientAliasDialogState(null);
     setMoveToDialogState(null);
+    resetRelogin();
+    setReloginDescription("");
   });
 
   const {
@@ -1915,12 +1919,13 @@ export default function MailClient({
         return;
       }
       setReloginDescription("");
-      setReloginAccountId(targetAccount.id);
+      openRelogin(targetAccount.id);
     },
-    [accounts, activeAccountId, reportError, tn]
+    [accounts, activeAccountId, openRelogin, reportError, tn]
   );
   const handleReloginSuccess = useCallback(
     async (updatedAccount: Account) => {
+      completeRelogin(updatedAccount.id);
       setAccounts((prev) =>
         prev.map((account) =>
           account.id === updatedAccount.id
@@ -1953,7 +1958,7 @@ export default function MailClient({
         });
       }
     },
-    [activeAccountId, activeFolderId, pushNotice, setAccounts, setExceptionEntries, syncAccount, tn]
+    [activeAccountId, activeFolderId, completeRelogin, pushNotice, setAccounts, setExceptionEntries, syncAccount, tn]
   );
   // Phone pull-to-refresh: a "new" sync of the open folder (the whole account in
   // a virtual view), as after a re-login.
@@ -6188,7 +6193,7 @@ export default function MailClient({
         readErrorMessage={readErrorMessage}
         onOpenChange={(open) => {
           if (!open) {
-            setReloginAccountId("");
+            dismissRelogin();
             setReloginDescription("");
           }
         }}
