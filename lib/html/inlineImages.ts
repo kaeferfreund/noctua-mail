@@ -88,7 +88,9 @@ export function replaceInlineImageSources(
     getInlineReferenceCandidates(attachment).forEach((candidate) => {
       nextHtml = nextHtml.replace(
         new RegExp(`cid:${escapeRegExp(candidate)}(?=["')\\s>])`, "g"),
-        attachment.url!
+        // Function replacer: a string replacement would expand $&, $` and $'
+        // sequences inside the (attacker-influenced) URL.
+        () => attachment.url!
       );
     });
   });
@@ -169,7 +171,10 @@ export function appendUnreferencedInlineImages(
   if (snippets.length === 0) return html;
   const block = `<div data-noctua-inline-images="1">${snippets.join("")}</div>`;
   if (/<\/body>/i.test(html)) {
-    return html.replace(/<\/body>/i, `${block}</body>`);
+    // Function replacer: the block embeds attachment filenames from the
+    // sender, and a string replacement would expand $`, $' and $& in
+    // them (each $` copies the whole prefix → memory/disk amplification).
+    return html.replace(/<\/body>/i, (match) => `${block}${match}`);
   }
   return `${html}${block}`;
 }

@@ -1,5 +1,4 @@
-import { deleteMcpTokenAccountRows } from "./mcpTokens";
-import { deleteSpamRescanRowsForAccount } from "./spamRescan";
+import { deleteAccountKeyedMasterRows } from "./accountDeletion";
 import { getOwnAddresses } from "../ownAddresses";
 import { listSenderIdentityRows, listSenderIdentityRowsForAccounts } from "./senderIdentities";
 import { recordAdminAuditRow } from "./adminAudit";
@@ -21,7 +20,6 @@ import {
   persistAccountRow,
   resolveAccountDbPathForPersist
 } from "./rowParsers";
-import { deleteUserAccountPrefRowsForAccount } from "./userAccountPrefs";
 import { resolveAccountRoleRow } from "./accountAccess";
 
 // Category-linear-model seeding is lazy-imported because `./categories`
@@ -180,14 +178,7 @@ export async function deleteAccountControlPlane(accountId: string, actorUserId?:
           .get(actorUserId, accountId);
         if (!allowed || !resolveAccountRoleRow(db, actorUserId, accountId)) throw new AccountDeletionForbiddenError();
       }
-      db.prepare(`DELETE FROM user_accounts WHERE accountId = ?`).run(accountId);
-      deleteUserAccountPrefRowsForAccount(db, accountId);
-      deleteMcpTokenAccountRows(db, accountId);
-      db.prepare(`DELETE FROM sender_identities WHERE accountId = ?`).run(accountId);
-      deleteSpamRescanRowsForAccount(db, accountId);
-      // Control-plane rows keyed by the address-derived id would pass to a mailbox recreated later.
-      db.prepare(`DELETE FROM scheduled_sends WHERE accountId = ?`).run(accountId);
-      db.prepare(`DELETE FROM mailbox_watcher_auth WHERE accountId = ?`).run(accountId);
+      deleteAccountKeyedMasterRows(db, accountId);
       db.prepare(`DELETE FROM accounts WHERE id = ?`).run(accountId);
       if (actorUserId) recordAdminAuditRow(db, { actorUserId, action: "account.delete", targetAccountId: accountId });
     }).immediate();

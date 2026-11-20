@@ -5,6 +5,7 @@ import {
   stripRedundantInlineImageFallbacks,
   stripRemovedInlineImages
 } from "./html";
+import { escapeHtml } from "./html/strip";
 
 describe("appendUnreferencedInlineImages", () => {
   it("appends unreferenced inline raster images into the html body", () => {
@@ -156,6 +157,34 @@ describe("appendUnreferencedInlineImages", () => {
     ]);
 
     expect(output).toBe(input);
+  });
+});
+
+describe("inline image rewriting with replacement patterns in untrusted values", () => {
+  it("keeps $` / $' / $& in an attachment filename literal and bounded", () => {
+    const body = `<html><body><p>${"x".repeat(10_000)}</p></body></html>`;
+    const filename = `${"$`".repeat(100)}$'$&.png`;
+    const output = appendUnreferencedInlineImages(body, [
+      {
+        inline: true,
+        contentType: "image/png",
+        filename,
+        url: "/api/accounts/a/messages/m/attachments/att-1"
+      }
+    ]);
+
+    expect(output).toContain(`alt="${escapeHtml(filename)}"`);
+    // A string replacement would copy the 10 KB prefix once per $` sequence.
+    expect(output.length).toBeLessThan(body.length + 1_000);
+    expect(output.endsWith("</body></html>")).toBe(true);
+  });
+
+  it("inserts the resolved URL literally even when it contains $ patterns", () => {
+    const url = "/api/accounts/a/messages/m/attachments/att-$`$&$'";
+    const output = replaceInlineImageSources('<p>before</p><img src="cid:logo">', [
+      { inline: true, contentType: "image/png", cid: "logo", url }
+    ]);
+    expect(output).toBe(`<p>before</p><img src="${url}">`);
   });
 });
 

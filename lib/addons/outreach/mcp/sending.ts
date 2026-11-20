@@ -82,12 +82,13 @@ export function registerOutreachSendingTools(host: OutreachMcpHost) {
     return result("Sequence", { ok: true, sequence: getSequence(await getOutreachDb(), accountId, args.sequenceId) });
   });
   server.registerTool("save_sequence", {
-    description: "Create or edit an email sequence. A steps array replaces the whole list, in order. Include existing step ids to retain them.",
+    description: "Create or edit an email sequence. A steps array replaces the whole list, in order. Include existing step ids to retain them. Editing a live or paused sequence approves the new content for sending and needs the send permission.",
     inputSchema: sequenceInput.extend({ ...mailbox.shape, sequenceId: itemId.optional() }), annotations: edit
   }, async ({ accountId: requested, sequenceId, ...input }) => {
-    const { accountId } = await outreachAccount(requested, "editor");
+    const ctx = await outreachAccount(requested, "editor");
     const db = await getOutreachDb();
-    const sequence = sequenceId ? await editSequence(db, accountId, sequenceId, input) : saveSequence(db, accountId, input);
+    // Editing a sequence that is not a draft also needs the `send` scope (checked in editSequence).
+    const sequence = sequenceId ? await editSequence(db, actor(ctx), sequenceId, input) : saveSequence(db, ctx.accountId, input);
     return result("Sequence saved", { ok: true, sequence });
   });
   server.registerTool("set_sequence_status", {

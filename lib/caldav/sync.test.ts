@@ -230,6 +230,71 @@ describe("syncCalendarEvents write-back", () => {
   });
 });
 
+describe("syncCalendarEvents collection boundary", () => {
+  beforeEach(() => {
+    updateRemoteEvent.mockClear();
+    deleteRemoteEvent.mockClear();
+    remoteObjects = [];
+  });
+
+  const outside = ["https://caldav.example.test/private/", "https://other.example.test/cal/", "https://caldav.example.test/cal/../private/"];
+
+  test("skips remote objects whose href is outside the configured calendar collection", async () => {
+    const accountId = `acc-sync-boundary-${randomUUID()}`;
+    await upsertAccount(buildAccount(accountId));
+    const inside = `evt-${randomUUID()}@example.test`;
+    remoteObjects = [
+      ...outside.map(base => { const uid = `evt-${randomUUID()}@example.test`; return { url: `${base}${uid}.ics`, etag: "etag-1", data: ics(uid) }; }),
+      { url: `${CALENDAR_URL}${inside}.ics`, etag: "etag-1", data: ics(inside) }
+    ];
+
+    const result = await syncCalendarEvents(accountId, syncDeps);
+
+    expect(result.inserted).toBe(1);
+    expect((await listCalendarEventsBySource(accountId, "caldav")).map(event => event.eventUid)).toEqual([inside]);
+    expect(result.errors.filter(error => error.startsWith("Skip remote object outside calendar"))).toHaveLength(outside.length);
+  });
+
+  test("a listing with objects outside the collection deletes no local events", async () => {
+    const accountId = `acc-sync-boundary-${randomUUID()}`;
+    await upsertAccount(buildAccount(accountId));
+    const kept = buildDirtyEvent(accountId, `evt-${randomUUID()}@example.test`, "etag-1");
+    kept.pendingRemoteSync = undefined;
+    await upsertCalendarEvent(accountId, kept);
+    // A misconfigured server names our object under another collection path.
+    remoteObjects = [{ url: `${outside[0]}${kept.eventUid}.ics`, etag: "etag-1", data: ics(kept.eventUid) }];
+
+    const result = await syncCalendarEvents(accountId, syncDeps);
+
+    expect(result.deleted).toBe(0);
+    expect((await getCalendarEventById(accountId, kept.id))?.deletedAtMs).toBeFalsy();
+    expect(result.errors.join("\n")).toContain("Skip local deletions");
+  });
+
+  test("never PUTs or DELETEs a stored href outside the configured calendar collection", async () => {
+    for (const base of outside) {
+      const accountId = `acc-sync-boundary-${randomUUID()}`;
+      await upsertAccount(buildAccount(accountId));
+      const edited = buildDirtyEvent(accountId, `evt-${randomUUID()}@example.test`, "etag-1");
+      const removed = buildDirtyEvent(accountId, `evt-${randomUUID()}@example.test`, "etag-1");
+      edited.remoteHref = `${base}${edited.eventUid}.ics`;
+      removed.remoteHref = `${base}${removed.eventUid}.ics`;
+      removed.deletedAtMs = Date.UTC(2026, 0, 11, 0, 0, 0);
+      await upsertCalendarEvent(accountId, edited);
+      await upsertCalendarEvent(accountId, removed);
+      // A server listing that names the same out-of-collection hrefs with matching etags.
+      remoteObjects = [edited, removed].map(event => ({ url: event.remoteHref!, etag: "etag-1", data: ics(event.eventUid) }));
+
+      const result = await syncCalendarEvents(accountId, syncDeps);
+
+      expect(updateRemoteEvent).not.toHaveBeenCalled();
+      expect(deleteRemoteEvent).not.toHaveBeenCalled();
+      expect(result.errors.join("\n")).toContain(`Skip push for UID ${edited.eventUid}`);
+      expect(result.errors.join("\n")).toContain(`Skip delete for UID ${removed.eventUid}`);
+    }
+  });
+});
+
 describe("syncCalendarEvents calendar selection", () => {
   const otherCalendar = "https://caldav.example.test/private/";
   const fetchCalendarsFor = (calendarPath: string) =>

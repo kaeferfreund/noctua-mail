@@ -267,6 +267,11 @@ export async function cleanupAccountLifecycleArtifacts(
   ]);
 
   if (!deleteShardFile) return;
+  await removeDbFiles(dbPath);
+}
+
+/** Deletes a closed SQLite database together with its WAL and shared-memory files. */
+export async function removeDbFiles(dbPath: string) {
   await Promise.all([
     unlinkIfExists(dbPath),
     unlinkIfExists(`${dbPath}-wal`),

@@ -120,10 +120,12 @@ test("production shard-opening inventory routes every writable shard connection 
     "lib/db/connection.ts", "lib/db/messages/senderKeyBackfill.ts", "lib/mail/spam/evalData.ts", "lib/membershipCleanup.ts",
     "scripts/checkShardMessageCollisions.ts", "scripts/dev-fixture/store.ts",
     "scripts/outreach-import-klaviyo-contacts.ts", "scripts/outreach-import-klaviyo-content.ts", "scripts/outreach-import-klaviyo-history.ts",
-    "scripts/outreach-rehost-images.ts", "scripts/spam-apply.ts", "scripts/verifyAdmissionCleanup.ts"
+    "scripts/outreach-rehost-images.ts", "scripts/purge-orphan-account-rows.ts", "scripts/spam-apply.ts",
+    "scripts/verifyAdmissionCleanup.ts"
   ]);
   const markerCallers = files.filter(file => /configureAccountDb\(/.test(source(file))).sort();
-  expect(markerCallers).toEqual(["lib/db/connection.ts", "lib/db/messages/senderKeyBackfill.ts", "lib/membershipCleanup.ts"]);
+  expect(markerCallers).toEqual(["lib/db/connection.ts", "lib/db/messages/senderKeyBackfill.ts", "lib/membershipCleanup.ts",
+    "scripts/purge-orphan-account-rows.ts"]);
   // The sender-key backfill reads main + shards read-only; its only writer connection is configured like the app's.
   expect(source("lib/db/messages/senderKeyBackfill.ts").match(/new Database\([^\n]*, \{ readonly: true \}\);/g)).toHaveLength(2);
   expect(source("lib/db/messages/senderKeyBackfill.ts").match(/new Database\(/g)).toHaveLength(3);
@@ -152,6 +154,12 @@ test("production shard-opening inventory routes every writable shard connection 
   }
   expect(source("scripts/outreach-rehost-images.ts")).toContain("new Database(getOutreachDbPath(), { readonly: true })");
   expect(source("scripts/outreach-rehost-images.ts")).not.toMatch(/getMainDbPath|getAccountDb|getDefaultAccountDbPath/);
+  // The orphan purge scans read-only; it writes the master DB and shards configured like the app's connections.
+  const purge = source("scripts/purge-orphan-account-rows.ts");
+  expect(purge.match(/new Database\(/g)).toHaveLength(5);
+  expect(purge.match(/new Database\(\w+, \{ readonly: true \}\);/g)).toHaveLength(3);
+  expect(purge).toContain("const db = new Database(getMainDbPath());\n      try {\n        configureDb(db);");
+  expect(purge).toContain("const db = new Database(shard.path);\n      try {\n        configureAccountDb(db);");
   // Remaining raw constructors open a synthetic UID store or the master DB.
   expect(source("scripts/dev-fixture/store.ts")).toContain("new Database(this.uidValidityPath)");
   expect(source("scripts/verifyAdmissionCleanup.ts")).toContain("new Database(getMainDbPath())");
