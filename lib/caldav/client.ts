@@ -5,7 +5,7 @@ import {
   type AssertPublicUrlRejectionReason,
   type LookupFn
 } from "@/lib/net/urlSafety";
-import { createPublicFetch } from "@/lib/net/publicHttp";
+import { createPublicFetch, type HopTransport } from "@/lib/net/publicHttp";
 
 export type CaldavClient = Awaited<ReturnType<typeof createDAVClient>>;
 
@@ -45,6 +45,30 @@ const CALDAV_PASSWORD_PROTOCOLS = ["https:"] as const;
 
 /** Redirect hops a single CalDAV request may follow (each hop is re-checked). */
 export const MAX_CALDAV_REDIRECTS = 5;
+
+/**
+ * Bounds of one CalDAV exchange. A sync fetches every object of a calendar in
+ * one REPORT, so a calendar that grew over many years (thousands of events
+ * with descriptions) needs far more than the generic 20 MiB / 30 s of
+ * `createPublicFetch`; still bounded so a hostile server cannot exhaust memory.
+ */
+export const CALDAV_MAX_RESPONSE_BYTES = 128 * 1024 * 1024;
+export const CALDAV_REQUEST_TIMEOUT_MS = 180_000;
+
+/** The pinned, per-hop checked transport with CalDAV's own bounds. */
+export function createCaldavPublicFetch(options: {
+  lookup?: LookupFn;
+  requireHttps: boolean;
+  transport?: HopTransport;
+}): typeof fetch {
+  return createPublicFetch({
+    lookup: options.lookup,
+    protocols: options.requireHttps ? CALDAV_PASSWORD_PROTOCOLS : CALDAV_ALLOWED_PROTOCOLS,
+    maxResponseBytes: CALDAV_MAX_RESPONSE_BYTES,
+    timeoutMs: CALDAV_REQUEST_TIMEOUT_MS,
+    transport: options.transport
+  });
+}
 
 type CaldavUrlOptions = { lookup?: LookupFn; requireHttps?: boolean };
 type FetchFn = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -142,10 +166,7 @@ export async function createCaldavClient(
       requireHttps,
       fetch:
         options?.fetch ??
-        createPublicFetch({
-          lookup: options?.lookup,
-          protocols: requireHttps ? CALDAV_PASSWORD_PROTOCOLS : CALDAV_ALLOWED_PROTOCOLS
-        })
+        createCaldavPublicFetch({ lookup: options?.lookup, requireHttps })
     })
   });
   return client;

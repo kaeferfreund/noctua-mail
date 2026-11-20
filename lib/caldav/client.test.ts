@@ -1,6 +1,8 @@
 import { describe, expect, mock, test } from "bun:test";
+import http from "node:http";
+import type { AddressInfo } from "node:net";
 import type { LookupFn } from "@/lib/net/urlSafety";
-import { PublicRequestError } from "@/lib/net/publicHttp";
+import { pinnedHttpTransport, PublicRequestError, type HopTransport } from "@/lib/net/publicHttp";
 
 // We mock `tsdav` before importing the client module so that `createDAVClient`
 // never tries to reach the network. `assertPublicUrl` catches SSRF-ish URLs
@@ -15,7 +17,10 @@ const {
   assertSafeCaldavUrl,
   CaldavCalendarSelectionError,
   CaldavUrlRejectedError,
+  CALDAV_MAX_RESPONSE_BYTES,
+  CALDAV_REQUEST_TIMEOUT_MS,
   createCaldavClient,
+  createCaldavPublicFetch,
   createGuardedCaldavFetch,
   isHrefInCalendarCollection,
   MAX_CALDAV_REDIRECTS,
@@ -386,5 +391,35 @@ describe("isHrefInCalendarCollection", () => {
     expect(isHrefInCalendarCollection("https://caldav.example.com/dav/cal/%2e%2e/other/a.ics", calendar)).toBe(false);
     expect(isHrefInCalendarCollection("https://caldav.example.com/dav/cal/", calendar)).toBe(false);
     expect(isHrefInCalendarCollection("https://caldav.example.com/dav/cal/a.ics", undefined)).toBe(false);
+  });
+});
+
+describe("createCaldavPublicFetch bounds", () => {
+  test("a full-calendar REPORT larger than the generic 20 MiB cap still loads", async () => {
+    const size = 24 * 1024 * 1024;
+    const server = http.createServer((_req, res) => {
+      res.writeHead(207, { "content-type": "application/xml" });
+      res.end(Buffer.alloc(size, 0x61));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const port = (server.address() as AddressInfo).port;
+    // Real pinned transport; the checked public address is served locally.
+    const transport: HopTransport = (hop) =>
+      pinnedHttpTransport({ ...hop, addresses: [{ address: "127.0.0.1", family: 4 }] });
+    try {
+      const caldavFetch = createCaldavPublicFetch({
+        lookup: async () => [{ address: "93.184.216.34", family: 4 }],
+        requireHttps: false,
+        transport
+      });
+      const response = await caldavFetch(`http://caldav.example.com:${port}/dav/cal/`, { method: "REPORT" });
+      expect(response.status).toBe(207);
+      expect((await response.arrayBuffer()).byteLength).toBe(size);
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+    expect(CALDAV_MAX_RESPONSE_BYTES).toBeGreaterThanOrEqual(100 * 1024 * 1024);
+    expect(CALDAV_REQUEST_TIMEOUT_MS).toBeGreaterThanOrEqual(120_000);
   });
 });
