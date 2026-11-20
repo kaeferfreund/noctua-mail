@@ -4,6 +4,7 @@ import { identityTestAccount } from "./testFixtures/senderIdentities";
 import type { CalendarEvent, Message } from "@/lib/data";
 import type { CalendarEventEmailSnapshot } from "@/lib/calendarEventEmailSnapshot";
 import { saveMessageSource } from "@/lib/storage";
+import { parseIcsInvite } from "@/lib/calendar";
 
 const getCalendarEventByUid = mock((): Promise<CalendarEvent | null> => Promise.resolve(null));
 const listSiblingCalendarEventsByUidKey = mock((_acc: string, _uid: string) =>
@@ -1662,5 +1663,126 @@ describe("processCalendarInviteForMessage organizer authority", () => {
     // Only the new anchor is written; the sibling of another organizer is not capped.
     expect(upsertCalendarEventByUid).toHaveBeenCalledTimes(1);
     expect(upsertCalendarEventByUid.mock.calls[0][1].eventUid).toBe("base_R20260403T084500@google.com");
+  });
+});
+
+describe("processCalendarInviteForMessage invites without UID", () => {
+  // A practice appointment system: no UID, floating local times.
+  const appointmentIcs = (
+    method: "REQUEST" | "CANCEL",
+    organizer = "practice@example.test",
+    uidLine?: string
+  ) =>
+    makeIcs([
+      `METHOD:${method}`,
+      "BEGIN:VEVENT",
+      ...(uidLine ? [uidLine] : []),
+      "SUMMARY:Dental check-up",
+      "DTSTART:20261105T083000",
+      "DTEND:20261105T093000",
+      `ORGANIZER;CN=Practice:mailto:${organizer}`,
+      "ATTENDEE;PARTSTAT=NEEDS-ACTION:mailto:paul@example.test",
+      ...(method === "CANCEL" ? ["STATUS:CANCELLED"] : []),
+      "END:VEVENT"
+    ]);
+  const derivedUid = parseIcsInvite(appointmentIcs("REQUEST")).events[0]!.uid!;
+  const storedEvent: CalendarEvent = {
+    id: "cal-appointment",
+    accountId: "acc-1",
+    eventUid: derivedUid,
+    summary: "Dental check-up",
+    startAtMs: Date.UTC(2026, 10, 5, 7, 30, 0),
+    endAtMs: Date.UTC(2026, 10, 5, 8, 30, 0),
+    allDay: false,
+    organizer: "Practice",
+    rawIcs: appointmentIcs("REQUEST"),
+    sourceType: "email",
+    createdAtMs: 1,
+    updatedAtMs: 1
+  };
+  const storedOnlyUnderDerivedUid = () =>
+    getCalendarEventByUid.mockImplementation((...args: unknown[]) =>
+      Promise.resolve(args[1] === derivedUid ? storedEvent : null)
+    );
+  const auto = (
+    icsSource: string,
+    senderAddress: string,
+    senderAuthenticationResults: string[] = ORGANIZER_DKIM_PASS
+  ) =>
+    processCalendarInviteForMessage({
+      accountId: "acc-1",
+      messageId: "msg-appointment",
+      icsSource,
+      process: true,
+      accountEmail: "paul@example.test",
+      senderAddress,
+      senderAuthenticationResults,
+      reminderUserId: "user-1",
+      processedByUserId: "user-1",
+      processedAutomatically: true
+    });
+
+  test("imports the appointment under its derived UID at the Berlin wall time", async () => {
+    const result = await auto(appointmentIcs("REQUEST"), "practice@example.test");
+    expect(result.states).toHaveLength(1);
+    expect(result.states[0]).toMatchObject({ eventUid: derivedUid, processed: true });
+    expect(upsertCalendarEventByUid).toHaveBeenCalledTimes(1);
+    const [, fields] = upsertCalendarEventByUid.mock.calls[0];
+    expect(fields.eventUid).toBe(derivedUid);
+    expect(fields.startAtMs).toBe(Date.UTC(2026, 10, 5, 7, 30, 0));
+    expect(fields.endAtMs).toBe(Date.UTC(2026, 10, 5, 8, 30, 0));
+    expect(fields.startTimezone).toBe("Europe/Berlin");
+  });
+
+  test("the authenticated organizer can cancel the appointment", async () => {
+    storedOnlyUnderDerivedUid();
+    const result = await auto(appointmentIcs("CANCEL"), "Practice <practice@example.test>");
+    expect(result.states[0]).toMatchObject({ eventUid: derivedUid, processed: true });
+    expect(cancelCalendarEventByUid).toHaveBeenCalledWith("acc-1", derivedUid);
+  });
+
+  test("a cancellation without SPF/DKIM for the organizer's domain stays unprocessed", async () => {
+    storedOnlyUnderDerivedUid();
+    const result = await auto(appointmentIcs("CANCEL"), "practice@example.test", []);
+    expect(cancelCalendarEventByUid).not.toHaveBeenCalled();
+    expect(result.states[0]).toMatchObject({ processed: false, unprocessedReason: "sender_unverified" });
+  });
+
+  test("a forged ORGANIZER from another sender cannot cancel or change it", async () => {
+    storedOnlyUnderDerivedUid();
+    const cancel = await auto(appointmentIcs("CANCEL"), "mallory@example.test");
+    const update = await auto(
+      appointmentIcs("REQUEST").replace("ATTENDEE;", "LOCATION:https://phishing.example.test/\r\nATTENDEE;"),
+      "mallory@example.test"
+    );
+    expect(cancelCalendarEventByUid).not.toHaveBeenCalled();
+    expect(upsertCalendarEventByUid).not.toHaveBeenCalled();
+    expect(cancel.states[0]).toMatchObject({ processed: false, unprocessedReason: "organizer_mismatch" });
+    expect(update.states[0]).toMatchObject({ processed: false, unprocessedReason: "organizer_mismatch" });
+  });
+
+  test("the same slot and title from another organizer is a different event", async () => {
+    storedOnlyUnderDerivedUid();
+    const result = await auto(
+      appointmentIcs("CANCEL", "mallory@example.test"),
+      "mallory@example.test"
+    );
+    expect(result.states[0]?.eventUid).not.toBe(derivedUid);
+    expect(getCalendarEventByUid).not.toHaveBeenCalledWith("acc-1", derivedUid);
+    expect(cancelCalendarEventByUid).not.toHaveBeenCalledWith("acc-1", derivedUid);
+  });
+
+  test("an explicit UID equal to the derived one still needs the organizer", async () => {
+    storedOnlyUnderDerivedUid();
+    const result = await auto(
+      appointmentIcs("CANCEL", "mallory@example.test", `UID:${derivedUid}`),
+      "mallory@example.test"
+    );
+    expect(result.states[0]).toMatchObject({
+      eventUid: derivedUid,
+      processed: false,
+      unprocessedReason: "organizer_mismatch"
+    });
+    expect(cancelCalendarEventByUid).not.toHaveBeenCalled();
   });
 });
