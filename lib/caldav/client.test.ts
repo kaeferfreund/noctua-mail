@@ -1,5 +1,6 @@
 import { describe, expect, mock, test } from "bun:test";
 import type { LookupFn } from "@/lib/net/urlSafety";
+import { PublicRequestError } from "@/lib/net/publicHttp";
 
 // We mock `tsdav` before importing the client module so that `createDAVClient`
 // never tries to reach the network. `assertPublicUrl` catches SSRF-ish URLs
@@ -143,6 +144,20 @@ describe("createCaldavClient — SSRF guard", () => {
     // the same value for this input; the point is that tsdav receives a
     // URL-parsed string rather than the unvalidated raw config field.
     expect(arg.serverUrl).toBe("https://caldav.example.com/dav");
+  });
+});
+
+describe("createCaldavClient — every tsdav request is checked and pinned (S21, CF-09)", () => {
+  test("tsdav gets a fetch that refuses server-supplied hrefs and redirects to internal hosts", async () => {
+    const lookup: LookupFn = async (host) => [{ address: host === "caldav.example.com" ? "93.184.216.34" : "10.0.0.5", family: 4 }];
+    await createCaldavClient({ url: "https://caldav.example.com/dav", user: "u", password: "p" }, { lookup });
+    const arg = createDAVClient.mock.calls[createDAVClient.mock.calls.length - 1][0] as { fetch?: typeof fetch };
+    expect(typeof arg.fetch).toBe("function");
+    for (const href of ["http://127.0.0.1:8008/internal-admin/", "https://[::ffff:7f00:1]/", "https://internal.example.test/cal/"]) {
+      const error = await arg.fetch!(href, { method: "PROPFIND" }).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(PublicRequestError);
+      expect((error as PublicRequestError).reason).toBe("private-ip");
+    }
   });
 });
 

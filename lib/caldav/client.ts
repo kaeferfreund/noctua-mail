@@ -5,6 +5,7 @@ import {
   type AssertPublicUrlRejectionReason,
   type LookupFn
 } from "@/lib/net/urlSafety";
+import { createPublicFetch } from "@/lib/net/publicHttp";
 
 export type CaldavClient = Awaited<ReturnType<typeof createDAVClient>>;
 
@@ -37,11 +38,10 @@ const CALDAV_ALLOWED_PROTOCOLS = ["http:", "https:"] as const;
  * before handing the URL to `tsdav`, which otherwise issues requests to
  * any reachable host.
  *
- * Residual risk: `fetchRemoteCalendars` and related read/write helpers
- * receive URLs the *server* returned (e.g. calendar hrefs) and pass them
- * through `tsdav` without re-validation. A malicious CalDAV server could
- * reply with a href pointing at a private IP. Re-validating each server-
- * returned href would require wrapping every `tsdav` call; deferred.
+ * Requests made later by `tsdav` (service discovery, redirects, calendar
+ * hrefs returned by the server) all go through the client's `fetch`, which
+ * `createCaldavClient` sets to `createPublicFetch`: every request URL and
+ * redirect hop is checked again and connects only to the checked address.
  */
 export async function assertSafeCaldavUrl(
   rawUrl: string,
@@ -68,6 +68,7 @@ export async function createCaldavClient(
   const safeUrl = await assertSafeCaldavUrl(config.url, options);
   const client = await createDAVClient({
     serverUrl: safeUrl.toString(),
+    fetch: createPublicFetch({ lookup: options?.lookup, protocols: CALDAV_ALLOWED_PROTOCOLS }),
     credentials: { username: config.user, password: config.password },
     authMethod: "Basic",
     defaultAccountType: "caldav"
