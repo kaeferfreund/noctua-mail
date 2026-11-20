@@ -196,7 +196,7 @@ import {
   buildAccountMessagesActionPath,
   buildAccountMessageHtmlPath,
   buildAccountMessagePath,
-  buildAccountMessageSourcePath,
+  buildAccountMessageEmlPath,
   buildAccountMessagesPath,
   buildAccountTopicSuggestionsPath,
   buildAccountTopicsPath
@@ -5326,15 +5326,15 @@ export default function MailClient({
   const handleDownloadEml = async (message: Message) => {
     try {
       const res = await apiFetch(
-        buildAccountMessageSourcePath(message.accountId || activeAccountId, message.id)
+        buildAccountMessageEmlPath(message.accountId || activeAccountId, message.id)
       );
       if (!res.ok) {
         reportError(await readErrorMessage(res));
         return;
       }
-      const data = (await res.json()) as { source?: string };
-      if (!data?.source) return;
-      const blob = new Blob([data.source], { type: "message/rfc822" });
+      // The exact stored bytes: re-encoding text would alter 8bit parts.
+      const blob = new Blob([await res.arrayBuffer()], { type: "message/rfc822" });
+      if (!blob.size) return;
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;

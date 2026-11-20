@@ -16,6 +16,7 @@ import {
   buildAccountMessageActionPath,
   buildAccountMessageHtmlPath,
   buildAccountMessagePath,
+  buildAccountMessageEmlPath,
   buildAccountMessageSourcePath
 } from "@/lib/accountApiPaths";
 import { normalizeAccountDateFormat } from "@/lib/dateFormatting";
@@ -170,13 +171,13 @@ export default function MessageWindowPage() {
 
   const handleDownloadEml = useCallback(async (target: Message) => {
     try {
-      const res = await fetch(buildAccountMessageSourcePath(target.accountId, target.id), {
+      const res = await fetch(buildAccountMessageEmlPath(target.accountId, target.id), {
         credentials: "include"
       });
       if (!res.ok) return;
-      const data = (await res.json()) as { source?: string };
-      if (!data?.source) return;
-      const blob = new Blob([data.source], { type: "message/rfc822" });
+      // The exact stored bytes: re-encoding text would alter 8bit parts.
+      const blob = new Blob([await res.arrayBuffer()], { type: "message/rfc822" });
+      if (!blob.size) return;
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
