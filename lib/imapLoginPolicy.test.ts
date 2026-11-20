@@ -101,13 +101,48 @@ describe("strict IMAP first-factor gate",()=>{
     const backup=await f.auth.handler(new Request(`${TEST_BASE_URL}/api/ba/two-factor/verify-backup-code`,{method:"POST",headers:second.jar.headers({origin:TEST_BASE_URL,"content-type":"application/json"}),body:JSON.stringify({code:f.factor.backupCodes[0]})}));
     expect(backup.status).toBe(200);
   });
-  test("the personal-identity limiter runs before the sixth network attempt",async()=>{
+  test("anonymous failures cannot lock the real user out; one source is braked after five failures (CF-12)",async()=>{
     const f=await setup();process.env.NOCTUA_IMAP_LOGIN_HOSTS="imap.example.test";
+    const from=(ip:string)=>new Request(TEST_BASE_URL,{headers:{"x-forwarded-for":ip}});
+    const attacker=`synthetic-${crypto.randomUUID()}`;
     let attempts=0;
-    for(let index=0;index<5;index++)await verifyEligibleImap(f.master,f.user.id,"synthetic-secret",
-      new Request(TEST_BASE_URL,{headers:{"x-forwarded-for":`synthetic-${crypto.randomUUID()}`}}),false,async()=>{attempts++;return true;});
-    await expect(verifyEligibleImap(f.master,f.user.id,"synthetic-secret",new Request(TEST_BASE_URL),false,async()=>{attempts++;return true;})).rejects.toThrow();
+    const wrong=async()=>{attempts++;return false;};
+    for(let index=0;index<5;index++)await expect(verifyEligibleImap(f.master,f.user.id,"wrong",from(attacker),false,wrong)).rejects.toThrow();
+    // The attacker's address is braked before the network...
+    await expect(verifyEligibleImap(f.master,f.user.id,"wrong",from(attacker),false,wrong)).rejects.toThrow();
     expect(attempts).toBe(5);
+    // ...while the real user still signs in from elsewhere, and successes never consume budget.
+    let good=0;
+    const right=async()=>{good++;return true;};
+    for(let index=0;index<8;index++)await verifyEligibleImap(f.master,f.user.id,"synthetic-secret",from("synthetic-owner"),false,right);
+    expect(good).toBe(8);
+  });
+  test("the user-wide brake is high, counts only failures and does not cover re-authentication (CF-12)",async()=>{
+    const f=await setup();process.env.NOCTUA_IMAP_LOGIN_HOSTS="imap.example.test";
+    const from=()=>new Request(TEST_BASE_URL,{headers:{"x-forwarded-for":`synthetic-${crypto.randomUUID()}`}});
+    let attempts=0;
+    for(let index=0;index<50;index++)await expect(verifyEligibleImap(f.master,f.user.id,"wrong",from(),false,async()=>{attempts++;return false;})).rejects.toThrow();
+    await expect(verifyEligibleImap(f.master,f.user.id,"synthetic-secret",from(),false,async()=>{attempts++;return true;})).rejects.toThrow();
+    expect(attempts).toBe(50);
+    expect(await verifyEligibleImap(f.master,f.user.id,"synthetic-secret",from(),false,async()=>{attempts++;return true;},"reauth")).toBe(true);
+    expect(attempts).toBe(51);
+  });
+  test("a known user without IMAP login costs the same password hash as an unknown one (DS-18)",async()=>{
+    const f=await setup();process.env.NOCTUA_IMAP_LOGIN_HOSTS="imap.example.test";
+    const options=noctuaAuthOptions({database:f.database,secret:TEST_SECRET,baseURL:TEST_BASE_URL});
+    Object.assign(options.rateLimit!,{enabled:false});
+    const hashed:string[]=[];
+    const password=options.emailAndPassword!.password!;
+    options.emailAndPassword!.password={...password,hash:async(value:string)=>{hashed.push(value);return password.hash!(value);}};
+    // Isolate the endpoint: the policy plugin needs the HTTP proof wrapper; production's verifyImap
+    // answers false for an ineligible user before any network, which the stub reproduces.
+    options.plugins=options.plugins.filter(p=>!["noctua-auth-policy","noctua-imap-sign-in"].includes(p.id)) as typeof options.plugins;
+    options.plugins.push(imapSignIn({verifyImap:async()=>false}) as never);
+    const auth=betterAuth(options);
+    const signIn=(email:string)=>auth.handler(new Request(`${TEST_BASE_URL}/api/ba/sign-in/imap`,{method:"POST",headers:{origin:TEST_BASE_URL,"content-type":"application/json"},body:JSON.stringify({email,password:"synthetic-guess"})}));
+    expect((await signIn(f.user.email)).status).toBe(401);
+    expect((await signIn(`unknown-${crypto.randomUUID()}@example.test`)).status).toBe(401);
+    expect(hashed).toEqual(["synthetic-guess","synthetic-guess"]);
   });
   test("version-coupled hook count/matcher and negative control without the bridge",async()=>{
     const plugin=twoFactor();

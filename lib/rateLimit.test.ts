@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it, mock, test } from "bun:test";
 import {
+  createFailureLimiter,
   createRateLimiter,
   createRequestIpResolver,
   getRequestIp,
@@ -184,3 +185,23 @@ function spyOnDateNow(impl: () => number) {
   (stub as unknown as { mock: boolean }).mock = true;
   Date.now = stub;
 }
+
+describe("createFailureLimiter", () => {
+  test("only recorded failures count; checking never consumes budget", () => {
+    const limiter = createFailureLimiter({ windowMs: 60_000, max: 2 });
+    for (let index = 0; index < 10; index++) expect(limiter.isBlocked("ip:a")).toBe(false);
+    limiter.recordFailure("ip:a");
+    expect(limiter.isBlocked("ip:a")).toBe(false);
+    limiter.recordFailure("ip:a");
+    expect(limiter.isBlocked("ip:a")).toBe(true);
+    expect(limiter.isBlocked("ip:b")).toBe(false);
+  });
+
+  test("failures expire with the window", () => {
+    const limiter = createFailureLimiter({ windowMs: 1, max: 1 });
+    limiter.recordFailure("ip:a");
+    const until = Date.now() + 5;
+    while (Date.now() < until) { /* wait for the 1 ms window */ }
+    expect(limiter.isBlocked("ip:a")).toBe(false);
+  });
+});

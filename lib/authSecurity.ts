@@ -29,7 +29,7 @@ async function verifyCurrentCredential(auth: NoctuaAuth, db: Database, source: S
   const credential = db.prepare(`SELECT password FROM auth_account WHERE userId=? AND providerId='credential' AND password IS NOT NULL`).get(source.userId);
   if (credential?.password) {
     if (!await (await auth.$context).password.verify({password,hash:credential.password})) badProof();
-  } else await verifyEligibleImap(db, source.userId, password, request);
+  } else await verifyEligibleImap(db, source.userId, password, request, false, undefined, "reauth");
 }
 
 export async function reauthenticate(auth: NoctuaAuth, db: Database, source: SessionSecurity, request: Request, body: unknown, limiter: RateLimiter = proofAttempts) {
