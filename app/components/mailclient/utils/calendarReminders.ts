@@ -4,6 +4,8 @@ import { normalizeReminderDateList } from "@/lib/reminderDates";
 import { resolveCalendarTimeZoneId } from "@/lib/calendarTimezones";
 
 export const CALENDAR_REMINDERS_UPDATED_EVENT = "noctua:calendar-reminders-updated";
+/** Window event after the signed-in user of this browser's reminder storage changed. */
+export const CALENDAR_REMINDER_PRINCIPAL_CHANGED_EVENT = "noctua:calendar-reminder-principal-changed";
 const CALENDAR_REMINDER_DELIVERED_PREFIX = "noctua:calendar-reminder-delivered";
 const CALENDAR_REMINDER_CACHE_PREFIX = "noctua:calendar-reminder-cache";
 const CALENDAR_REMINDER_QUEUE_PREFIX = "noctua:calendar-reminder-queue";
@@ -155,8 +157,12 @@ function resetReminderFetchState() {
 function currentReminderPrincipal(): string | null {
   const principal = readReminderPrincipal();
   if (principal !== lastReminderPrincipal) {
+    const announce = lastReminderPrincipal !== undefined;
     lastReminderPrincipal = principal;
     resetReminderFetchState();
+    if (announce && typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+      window.dispatchEvent(new Event(CALENDAR_REMINDER_PRINCIPAL_CHANGED_EVENT));
+    }
   }
   return principal;
 }
@@ -240,8 +246,8 @@ export function clearCalendarReminderStorage() {
     // ignore
   }
   removeReminderStorage(null);
-  lastReminderPrincipal = null;
   resetReminderFetchState();
+  currentReminderPrincipal();
 }
 
 export function getCalendarReminderStartAtMs(reminder: CalendarReminder) {

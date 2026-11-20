@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { Account, CalendarEvent } from "@/lib/data";
 import { formatAccountMediumDateTime } from "@/lib/dateFormatting";
@@ -10,6 +10,7 @@ import { CALENDAR_EVENTS_UPDATED_EVENT } from "@/app/components/calendar/calenda
 import type { ExceptionEntry } from "./types";
 import { DEFAULT_UPCOMING_WINDOW_MS } from "./status/upcomingEntries";
 import {
+  CALENDAR_REMINDER_PRINCIPAL_CHANGED_EVENT,
   CALENDAR_REMINDERS_UPDATED_EVENT,
   type CalendarReminder,
   fetchCalendarReminders,
@@ -43,6 +44,12 @@ export type UseReminderNotificationsParams = {
   apiFetch: ApiFetch;
 };
 
+/** Results of one mailbox and signed-in user; `scope` changes with either. */
+type ScopedItems<T> = { scope: ReminderScope | null; items: T[] };
+type ReminderScope = { accountId: string };
+const NO_REMINDERS: CalendarReminder[] = [];
+const NO_EVENTS: CalendarEvent[] = [];
+
 export function useReminderNotifications({
   activeAccountId,
   accounts,
@@ -50,8 +57,40 @@ export function useReminderNotifications({
   buildVersionLabel,
   apiFetch
 }: UseReminderNotificationsParams) {
-  const [pendingCalendarReminders, setPendingCalendarReminders] = useState<CalendarReminder[]>([]);
-  const [upcomingCalendarEvents, setUpcomingCalendarEvents] = useState<CalendarEvent[]>([]);
+  // Reminders and upcoming events belong to the mailbox (and user) they were
+  // loaded for. A request that completes after a mailbox switch or a sign-in
+  // of another user is dropped, and state of another scope is never shown.
+  const scopeRef = useRef<ReminderScope>({ accountId: activeAccountId });
+  useLayoutEffect(() => {
+    if (scopeRef.current.accountId !== activeAccountId) scopeRef.current = { accountId: activeAccountId };
+  }, [activeAccountId]);
+  const [pendingReminderState, setPendingReminderState] = useState<ScopedItems<CalendarReminder>>({ scope: null, items: NO_REMINDERS });
+  const [upcomingEventState, setUpcomingEventState] = useState<ScopedItems<CalendarEvent>>({ scope: null, items: NO_EVENTS });
+  const pendingCalendarReminders = useMemo(
+    () => pendingReminderState.scope?.accountId === activeAccountId ? pendingReminderState.items : NO_REMINDERS,
+    [pendingReminderState, activeAccountId]
+  );
+  const upcomingCalendarEvents = useMemo(
+    () => upcomingEventState.scope?.accountId === activeAccountId ? upcomingEventState.items : NO_EVENTS,
+    [upcomingEventState, activeAccountId]
+  );
+  const setPendingCalendarReminders = useCallback((items: CalendarReminder[]) => {
+    setPendingReminderState({ scope: scopeRef.current, items });
+  }, []);
+  const setUpcomingCalendarEvents = useCallback((items: CalendarEvent[]) => {
+    setUpcomingEventState({ scope: scopeRef.current, items });
+  }, []);
+  // Another user signed in on this browser: the same mailbox id is a new scope.
+  // Registered before the refresh listeners below, so they reload into it.
+  useEffect(() => {
+    const handlePrincipalChange = () => {
+      scopeRef.current = { accountId: scopeRef.current.accountId };
+      setPendingReminderState({ scope: null, items: NO_REMINDERS });
+      setUpcomingEventState({ scope: null, items: NO_EVENTS });
+    };
+    window.addEventListener(CALENDAR_REMINDER_PRINCIPAL_CHANGED_EVENT, handlePrincipalChange);
+    return () => window.removeEventListener(CALENDAR_REMINDER_PRINCIPAL_CHANGED_EVENT, handlePrincipalChange);
+  }, []);
   const [exceptionEntries, setExceptionEntries] = useState<ExceptionEntry[]>([]);
   const [requiredBuildVersion, setRequiredBuildVersion] = useState<string | null>(null);
   const { inAppNotices, pushNotice, dismissNotice } = useInAppNotices();
@@ -273,14 +312,16 @@ export function useReminderNotifications({
   );
 
   const refreshPendingCalendarReminders = useCallback(async () => {
+    const scope = scopeRef.current;
     if (!activeAccountId.trim()) {
-      setPendingCalendarReminders([]);
+      setPendingReminderState({ scope, items: NO_REMINDERS });
       return;
     }
     try {
       const reminders = await fetchCalendarReminders(activeAccountId);
+      if (scopeRef.current !== scope) return;
       const upcomingReminders = filterUpcomingCalendarReminders(reminders);
-      setPendingCalendarReminders(upcomingReminders);
+      setPendingReminderState({ scope, items: upcomingReminders });
       if (clientId) {
         pruneDeliveredReminderMap(activeAccountId, clientId, upcomingReminders);
       }
@@ -292,8 +333,9 @@ export function useReminderNotifications({
   }, [activeAccountId, clientId, processDueCalendarReminders, syncReminderStateToServiceWorker]);
 
   const refreshUpcomingCalendarEvents = useCallback(async () => {
+    const scope = scopeRef.current;
     if (!activeAccountId.trim()) {
-      setUpcomingCalendarEvents([]);
+      setUpcomingEventState({ scope, items: NO_EVENTS });
       return;
     }
     const nowMs = Date.now();
@@ -313,6 +355,7 @@ export function useReminderNotifications({
       const payload = (await response.json().catch(() => null)) as
         | { items?: CalendarEvent[] }
         | null;
+      if (scopeRef.current !== scope) return;
       const rawEvents = payload?.items ?? [];
       // Occurrence expansion needs `rrule`; load it on demand, only when a
       // fetched event actually repeats. Non-recurring events expand to
@@ -347,7 +390,8 @@ export function useReminderNotifications({
           });
         });
       });
-      setUpcomingCalendarEvents(expanded);
+      if (scopeRef.current !== scope) return;
+      setUpcomingEventState({ scope, items: expanded });
     } catch {
       // ignore upcoming events fetch failures in status UI
     }
@@ -435,9 +479,11 @@ export function useReminderNotifications({
       run();
     };
     window.addEventListener(CALENDAR_REMINDERS_UPDATED_EVENT, handleUpdate);
+    window.addEventListener(CALENDAR_REMINDER_PRINCIPAL_CHANGED_EVENT, handleUpdate);
     return () => {
       active = false;
       window.removeEventListener(CALENDAR_REMINDERS_UPDATED_EVENT, handleUpdate);
+      window.removeEventListener(CALENDAR_REMINDER_PRINCIPAL_CHANGED_EVENT, handleUpdate);
     };
   }, [refreshPendingCalendarReminders]);
 
@@ -470,11 +516,13 @@ export function useReminderNotifications({
     };
     window.addEventListener(CALENDAR_EVENTS_UPDATED_EVENT, handleUpdate);
     window.addEventListener(CALENDAR_REMINDERS_UPDATED_EVENT, handleUpdate);
+    window.addEventListener(CALENDAR_REMINDER_PRINCIPAL_CHANGED_EVENT, handleUpdate);
     const interval = window.setInterval(run, CALENDAR_REMINDER_REFRESH_INTERVAL_MS);
     return () => {
       active = false;
       window.removeEventListener(CALENDAR_EVENTS_UPDATED_EVENT, handleUpdate);
       window.removeEventListener(CALENDAR_REMINDERS_UPDATED_EVENT, handleUpdate);
+      window.removeEventListener(CALENDAR_REMINDER_PRINCIPAL_CHANGED_EVENT, handleUpdate);
       window.clearInterval(interval);
     };
   }, [refreshUpcomingCalendarEvents]);
