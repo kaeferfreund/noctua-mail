@@ -2,13 +2,14 @@ import { rows } from "./sql";
 import type { Database } from "bun:sqlite";
 import { newOutreachId } from "../ids";
 import { getSendStats, listLinkStats, listSendSummaries } from "../tracking";
-import type {
-  Campaign, CampaignInput, CampaignReport, CampaignSummary, EmailTemplate, EmailTemplateInput, EmailTemplateSummary,
-  Sequence, SequenceInput, SequenceReport, SequenceStep, SequenceSummary
+import {
+  CONTENT_FIELDS, type Campaign, type CampaignInput, type CampaignReport, type CampaignSummary, type ContentField, type EmailTemplate,
+  type EmailTemplateInput, type EmailTemplateSummary, type Sequence, type SequenceInput, type SequenceReport, type SequenceStep,
+  type SequenceSummary
 } from "../types";
-import { SendingError } from "./input";
-import { normalizeTemplate, type Content } from "./render";
-import { carrySequenceEnrollments } from "./queue";
+import { contentLimits, SendingError } from "./input";
+import { isEmptyRendering, normalizeTemplate, previewUnsubscribeUrl, sampleContact, type Content } from "./render";
+import { carrySequenceEnrollments, refreshQueuedSubjects, renderForContact } from "./queue";
 
 export function required<T>(value: T | null | undefined): T {
   if (value == null) throw new SendingError(404, "Eintrag nicht gefunden.");
@@ -19,13 +20,20 @@ export function assertDraft(draft: { status: string }) {
   if (draft.status !== "draft") throw new SendingError(409, "Nur Entwürfe können hier geändert werden.");
 }
 
+/** Content as stored: placeholders normalized, each field within `contentLimits` (normalizing can lengthen a value). */
 function normalizedContent(input: Partial<Content>, current?: Content): Required<Content> {
-  return {
+  const content = {
     subject: normalizeTemplate(input.subject ?? current?.subject ?? ""),
     previewText: normalizeTemplate(input.previewText ?? current?.previewText ?? ""),
     html: normalizeTemplate(input.html ?? current?.html ?? "", true),
     text: normalizeTemplate(input.text ?? current?.text ?? "")
   };
+  for (const field of CONTENT_FIELDS) {
+    if (content[field].length > contentLimits[field]) {
+      throw new SendingError(400, `${field} ist mit ausgeschriebenen Platzhaltern länger als ${contentLimits[field]} Zeichen.`, "content_too_long");
+    }
+  }
+  return content;
 }
 
 function contentArgs(content: Required<Content>) {
@@ -57,6 +65,7 @@ export function saveTemplate(db: Database, accountId: string, input: Partial<Ema
     if (current) {
       db.query(`UPDATE templates SET name = ?, subject = ?, previewText = ?, html = ?, text = ?,
         updatedAt = ?, updatedByUserId = ? WHERE accountId = ? AND id = ?`).run(name, ...contentArgs(content), now, options.userId ?? null, accountId, id);
+      if (CONTENT_FIELDS.some(field => content[field] !== current[field])) touchTemplateSequences(db, accountId, id, now);
     } else {
       db.query(`INSERT INTO templates (id, accountId, name, subject, previewText, html, text, externalId, createdAt, updatedAt, updatedByUserId)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(id, accountId, name, ...contentArgs(content), options.externalId ?? null, now, now, options.userId ?? null);
@@ -72,39 +81,83 @@ export function archiveTemplate(db: Database, accountId: string, id: string, use
   if (!result.changes) required(null);
 }
 
-export function assertContent(content: Content) {
+/** `label` names the item in the refusal (a sequence step). */
+export function assertContent(content: Content, label?: string) {
   if (!content.subject.trim() || !(content.html.trim() || content.text.trim())) {
-    throw new SendingError(400, "Betreff und Nachricht sind erforderlich.");
+    throw new SendingError(400, `${label ? `${label}: ` : ""}Betreff und Nachricht sind erforderlich.`);
   }
 }
 
+/** „Schritt 2 „Tipps““ in a refusal. */
+function stepLabel(step: { position: number; name: string }) {
+  return `Schritt ${step.position + 1}${step.name ? ` „${step.name}“` : ""}`;
+}
+
+/**
+ * The content a sequence step stores, from its authored fields (`input` over `previous`): normalized and, for an enabled
+ * step of a sequence that sends (`sends`: not a draft), resolved from its template and checked like going live: a
+ * subject and a body, also once the placeholders are filled in for the sample contact. A disabled step keeps its own
+ * fields and takes the template's content as it is when the step is enabled. The one rule for a save of the step list,
+ * going live and the answer of a step edit.
+ */
+export function storedStepContent(db: Database, accountId: string, sends: boolean,
+  step: { position: number; name: string; templateId: string | null; enabled: boolean }, input: Partial<Content>, previous?: Content) {
+  const authored = normalizedContent(input, previous);
+  if (!sends || !step.enabled) return authored;
+  const content = resolveContent(db, accountId, { ...authored, templateId: step.templateId });
+  const label = stepLabel(step);
+  assertContent(content, label);
+  const sample = renderForContact(db, accountId, content, { contact: sampleContact, unsubscribeUrl: previewUnsubscribeUrl(), now: Date.now() });
+  if (isEmptyRendering(sample)) {
+    throw new SendingError(400, `${label}: Betreff oder Nachricht ist leer, sobald die Platzhalter eingesetzt sind. Prüfe die Platzhalter.`, "content_empty");
+  }
+  return content;
+}
+
+/** A live sequence keeps at least one enabled step. */
+export function assertEnabledStep(sequence: Pick<Sequence, "steps">) {
+  if (!sequence.steps.some(step => step.enabled)) throw new SendingError(400, "Aktiviere mindestens einen Schritt.");
+}
+
+/** Going live and an edit without a step list: every enabled step stored as `storedStepContent` resolves and checks it. */
 export function snapshotSequenceTemplates(db: Database, sequence: Sequence) {
+  assertEnabledStep(sequence);
   const steps = sequence.steps.filter(step => step.enabled);
-  if (!steps.length) throw new SendingError(400, "Aktiviere mindestens einen Schritt.");
   const update = db.query(`UPDATE sequence_steps SET subject = ?, previewText = ?, html = ?, text = ?
     WHERE accountId = ? AND sequenceId = ? AND id = ?`);
   for (const step of steps) {
-    const content = resolveContent(db, sequence.accountId, step);
-    assertContent(content);
-    update.run(...contentArgs(content), sequence.accountId, sequence.id, step.id);
+    update.run(...contentArgs(storedStepContent(db, sequence.accountId, true, step, step)), sequence.accountId, sequence.id, step.id);
   }
 }
 
+/** The fields an item (a campaign or a step) takes from its template when its content is resolved (`resolveContent`). */
+export function templateBackedFields(item: Required<Content> & { templateId: string | null }): ContentField[] {
+  const hasOwnBody = Boolean(item.html.trim() || item.text.trim());
+  if (!item.templateId || (hasOwnBody && item.subject.trim())) return [];
+  return CONTENT_FIELDS.filter(field => field === "html" || field === "text" ? !hasOwnBody : !item[field].trim());
+}
+
 export function resolveContent(db: Database, accountId: string, item: Required<Content> & { templateId: string | null }): Required<Content> {
-  if (!item.templateId || ((item.html.trim() || item.text.trim()) && item.subject.trim())) {
-    return normalizedContent(item);
-  }
+  const fields = templateBackedFields(item);
   // Archived templates stay usable by existing references. Archiving hides them from selection.
-  const template = rows<EmailTemplate>(db, "SELECT * FROM templates WHERE accountId = ? AND id = ?")
-    .get(accountId, item.templateId);
+  const template = fields.length ? rows<EmailTemplate>(db, "SELECT * FROM templates WHERE accountId = ? AND id = ?")
+    .get(accountId, item.templateId) : null;
   if (!template) return normalizedContent(item);
-  const hasOwnBody = item.html.trim() || item.text.trim();
-  return {
-    subject: item.subject.trim() ? item.subject : template.subject,
-    previewText: item.previewText.trim() ? item.previewText : template.previewText,
-    html: hasOwnBody ? item.html : template.html,
-    text: hasOwnBody ? item.text : template.text
-  };
+  const content = { subject: item.subject, previewText: item.previewText, html: item.html, text: item.text };
+  for (const field of fields) content[field] = template[field];
+  return content;
+}
+
+/**
+ * A content edit of a template can change what a sequence with a step that references the template would store or
+ * approve: a step's empty field is filled from the template, and an edit pending against the version read can empty a
+ * field the step has today. So the version (`updatedAt`) of every sequence of the mailbox with a step that references
+ * the template rises in the same transaction, whatever the step's own content, and a go-live or edit with the version
+ * read before answers `sequence_changed`.
+ */
+function touchTemplateSequences(db: Database, accountId: string, templateId: string, now: number) {
+  db.query(`UPDATE sequences SET updatedAt = MAX(?1, updatedAt + 1) WHERE accountId = ?2
+    AND id IN (SELECT sequenceId FROM sequence_steps WHERE accountId = ?2 AND templateId = ?3)`).run(now, accountId, templateId);
 }
 
 type CampaignRow = Omit<Campaign, "listIds" | "excludedListIds" | "trackOpens" | "trackClicks"> & {
@@ -243,7 +296,9 @@ export function saveSequence(db: Database, accountId: string, input: SequenceInp
       throw new SendingError(409, "Die Auslöserliste kann nur im Entwurf geändert werden.");
     }
 
-    const args = [next.name, next.triggerListId, next.senderIdentityId, +next.trackOpens, +next.trackClicks, now, accountId, id] as const;
+    // `updatedAt` is the version a caller's `expectedUpdatedAt` names: two saves in one millisecond still differ.
+    const updatedAt = Math.max(now, (current?.updatedAt ?? 0) + 1);
+    const args = [next.name, next.triggerListId, next.senderIdentityId, +next.trackOpens, +next.trackClicks, updatedAt, accountId, id] as const;
     if (current) {
       db.query(`UPDATE sequences SET name = ?, triggerListId = ?, senderIdentityId = ?, trackOpens = ?, trackClicks = ?, updatedAt = ?
         WHERE accountId = ? AND id = ?`).run(...args);
@@ -254,6 +309,7 @@ export function saveSequence(db: Database, accountId: string, input: SequenceInp
     if (input.steps) {
       const originals = new Map(current?.steps.map(step => [step.id, step]));
       const seen = new Set<string>();
+      const retitled: Array<{ id: string; subject: string }> = [];
       db.query("DELETE FROM sequence_steps WHERE accountId = ? AND sequenceId = ?").run(accountId, id);
       for (const [position, step] of input.steps.entries()) {
         const previous = step.id ? originals.get(step.id) : undefined;
@@ -262,18 +318,20 @@ export function saveSequence(db: Database, accountId: string, input: SequenceInp
         const templateId = step.templateId === undefined ? previous?.templateId ?? null : step.templateId;
         if (templateId && templateId !== previous?.templateId) getTemplate(db, accountId, templateId);
         const enabled = step.enabled ?? previous?.enabled ?? true;
-        const authored = normalizedContent(step, previous);
-        const content = current?.status !== "draft" && current
-          ? resolveContent(db, accountId, { ...authored, templateId })
-          : authored;
-        if (current && current.status !== "draft" && enabled) assertContent(content);
+        const name = step.name ?? previous?.name ?? "";
+        const content = storedStepContent(db, accountId, current !== undefined && current.status !== "draft",
+          { position, name, templateId, enabled }, step, previous);
         const stepId = previous?.id ?? newOutreachId("stp");
+        if (previous && previous.subject !== content.subject) retitled.push({ id: stepId, subject: content.subject });
         const delayMinutes = step.delayMinutes ?? previous?.delayMinutes ?? 0;
         db.query(`INSERT INTO sequence_steps (id, accountId, sequenceId, position, name, delayMinutes, enabled, templateId, subject, previewText, html, text)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(stepId, accountId, id, position, step.name ?? previous?.name ?? "",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(stepId, accountId, id, position, name,
           delayMinutes, +enabled, templateId, ...contentArgs(content));
       }
-      if (current) carrySequenceEnrollments(db, accountId, id, current.steps, now);
+      if (current) {
+        carrySequenceEnrollments(db, accountId, id, current.steps, now);
+        refreshQueuedSubjects(db, accountId, id, retitled, now);
+      }
     }
     return getSequence(db, accountId, id);
   }).immediate();

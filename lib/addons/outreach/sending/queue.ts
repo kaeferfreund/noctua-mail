@@ -6,7 +6,7 @@ import { newOutreachId } from "../ids";
 import type { SendableRecipient } from "../contacts";
 import type { Campaign, OutreachAccountSettings, SendStatus, SequenceStep } from "../types";
 import { SendStopped, type SendOutcome } from "./send";
-import { renderContent } from "./render";
+import { renderContent, type Content, type RenderOptions } from "./render";
 
 export type QueueRow = {
   id: string; accountId: string; kind: "campaign" | "sequence"; campaignId: string | null; sequenceId: string | null;
@@ -60,16 +60,68 @@ export function cancelContact(db: Database, accountId: string, contactId: string
   }).immediate();
 }
 
-/** A row shows the subject as its recipient will see it until the send stores the subject it used. */
-function recipientSubject(db: Database, accountId: string, contactId: string, subject: string, now: number) {
-  if (!/{[{%]/.test(subject)) return subject;
-  const contact = rows<{ firstName: string; lastName: string; email: string }>(db, `SELECT firstName, lastName, email FROM contacts
-    WHERE accountId = ? AND id = ?`).get(accountId, contactId);
-  if (!contact) return subject;
-  const organization = rows<{ organizationName: string; organizationAddress: string }>(db, `SELECT organizationName, organizationAddress
-    FROM account_settings WHERE accountId = ?`).get(accountId);
-  return renderContent({ subject, html: "", text: "" }, { contact, organizationName: organization?.organizationName ?? "",
-    organizationAddress: organization?.organizationAddress ?? "", unsubscribeUrl: "", now }).subject;
+type Organization = Pick<RenderOptions, "organizationName" | "organizationAddress">;
+type ContactFields = RenderOptions["contact"];
+
+/** The mailbox's organization as stored in this database (synchronous, for use inside a write). */
+function storedOrganization(db: Database, accountId: string): Organization {
+  const organization = rows<Organization>(db, "SELECT organizationName, organizationAddress FROM account_settings WHERE accountId = ?").get(accountId);
+  return { organizationName: organization?.organizationName ?? "", organizationAddress: organization?.organizationAddress ?? "" };
+}
+
+/**
+ * Renders content for a contact with the mailbox's organization as stored in this database (synchronous, for use inside
+ * a write). A caller that renders many rows reads `organization` once and passes it.
+ */
+export function renderForContact(db: Database, accountId: string, content: Content,
+  options: Pick<RenderOptions, "contact" | "unsubscribeUrl" | "now">, organization = storedOrganization(db, accountId)) {
+  return renderContent(content, { ...options, ...organization });
+}
+
+const hasPlaceholders = (subject: string) => /{[{%]/.test(subject);
+
+/**
+ * A row shows the subject as its recipient will see it until the send stores the subject it used. One renderer serves
+ * every row of a call: the organization is read once, and only when a subject has placeholders.
+ */
+function recipientSubjects(db: Database, accountId: string, now: number) {
+  let organization: Organization | undefined;
+  const contactQuery = db.query("SELECT firstName, lastName, email FROM contacts WHERE accountId = ? AND id = ?");
+  const forContact = (contact: ContactFields | null, subject: string) => {
+    if (!contact || !hasPlaceholders(subject)) return subject;
+    organization ??= storedOrganization(db, accountId);
+    return renderForContact(db, accountId, { subject, html: "", text: "" }, { contact, unsubscribeUrl: "", now }, organization).subject;
+  };
+  return {
+    forContact,
+    forContactId(contactId: string, subject: string) {
+      return hasPlaceholders(subject) ? forContact(contactQuery.get(accountId, contactId) as ContactFields | null, subject) : subject;
+    }
+  };
+}
+
+/**
+ * After a step's subject changed: its queued sends that were not attempted yet show the new subject. A subject without
+ * placeholders is one update per step; with placeholders the recipients come from one joined read per step.
+ */
+export function refreshQueuedSubjects(db: Database, accountId: string, sequenceId: string, steps: ReadonlyArray<Pick<SequenceStep, "id" | "subject">>,
+  now: number) {
+  const pending = `s.accountId = ?1 AND s.sequenceId = ?2 AND s.sequenceStepId = ?3 AND s.kind = 'sequence' AND s.status = 'queued' AND s.attempts = 0`;
+  const updateStep = db.query(`UPDATE sends AS s SET subject = ?4 WHERE ${pending}`);
+  const queued = db.query(`SELECT s.id, c.id AS contactId, c.firstName, c.lastName, c.email FROM sends s
+    LEFT JOIN contacts c ON c.accountId = s.accountId AND c.id = s.contactId WHERE ${pending}`);
+  const updateRow = db.query("UPDATE sends SET subject = ? WHERE accountId = ? AND id = ?");
+  const subjects = recipientSubjects(db, accountId, now);
+  for (const step of steps) {
+    if (!hasPlaceholders(step.subject)) {
+      updateStep.run(accountId, sequenceId, step.id, step.subject);
+      continue;
+    }
+    for (const row of queued.all(accountId, sequenceId, step.id) as Array<ContactFields & { id: string; contactId: string | null }>) {
+      // A row without its contact shows the subject as written.
+      updateRow.run(subjects.forContact(row.contactId === null ? null : row, step.subject), accountId, row.id);
+    }
+  }
 }
 
 export function expandCampaign(db: Database, campaign: Campaign, recipients: SendableRecipient[], now: number) {
@@ -82,8 +134,9 @@ export function expandCampaign(db: Database, campaign: Campaign, recipients: Sen
       SELECT ?, c.accountId, 'campaign', c.id, p.id, p.email, ?, 'queued', c.trackOpens, c.trackClicks, c.scheduledByUserId, ?, ?
       FROM campaigns c JOIN contacts p ON p.accountId = c.accountId AND p.id = ?
       WHERE c.accountId = ? AND c.id = ? ON CONFLICT DO NOTHING`);
+    const subjects = recipientSubjects(db, campaign.accountId, now);
     for (const contact of recipients) {
-      insert.run(newOutreachId("snd"), recipientSubject(db, campaign.accountId, contact.contactId, campaign.subject, now), now, now,
+      insert.run(newOutreachId("snd"), subjects.forContactId(contact.contactId, campaign.subject), now, now,
         contact.contactId, campaign.accountId, campaign.id);
     }
   }).immediate();
@@ -145,6 +198,7 @@ export function expandSequences(db: Database, accountId: string, now: number) {
       `SELECT e.*, q.statusChangedByUserId AS userId, q.trackOpens, q.trackClicks FROM sequence_enrollments e
        JOIN sequences q ON q.accountId = e.accountId AND q.id = e.sequenceId
        WHERE e.accountId = ? AND e.status = 'active' AND e.nextSendAt <= ? AND q.status = 'live'`).all(accountId, now);
+    const subjects = recipientSubjects(db, accountId, now);
     for (const enrollment of due) {
       // A removed or moved step, or a disabled one whose send is due, may have a pending row. Keep it for
       // reporting but release the enrollment to the current step at its position. A disabled step's row
@@ -169,7 +223,7 @@ export function expandSequences(db: Database, accountId: string, now: number) {
           status = 'queued', error = NULL, attempts = 0, claimOwner = NULL, subject = excluded.subject, trackOpens = excluded.trackOpens,
           trackClicks = excluded.trackClicks, userId = excluded.userId, sendAt = excluded.sendAt, queuedAt = excluded.queuedAt
         WHERE sends.accountId = excluded.accountId AND sends.status = 'skipped' AND sends.error = 'step_changed'`).run(newOutreachId("snd"), accountId, enrollment.sequenceId, step.id, enrollment.contactId,
-        recipientSubject(db, accountId, enrollment.contactId, step.subject, now),
+        subjects.forContactId(enrollment.contactId, step.subject),
         enrollment.trackOpens, enrollment.trackClicks, enrollment.userId, dueAt, now);
     }
   }).immediate();

@@ -208,8 +208,8 @@ Base for everything else: `/api/addons/outreach/accounts/{accountId}`.
 | POST | `{base}/campaigns/{campaignId}/cancel` | → `{ok, campaign}` |
 | GET | `{base}/campaigns/{campaignId}/report?cursor=` | → `CampaignReport` |
 | GET, POST | `{base}/sequences` | `SequenceInput` → `{ok, sequences: SequenceSummary[]}` / `{ok, sequence}` |
-| GET, PATCH, DELETE | `{base}/sequences/{sequenceId}` | `SequenceInput` → `{ok, sequence: Sequence}`; only drafts delete. `Sequence` and `SequenceSummary` carry `statusChangedByUserId` and `statusChangedVia` |
-| POST | `{base}/sequences/{sequenceId}/status` | `SequenceStatusRequest` (`{status: "live" \| "paused", expectedUpdatedAt?}`) → `{ok, sequence}`; a reviewed `expectedUpdatedAt` that no longer matches answers 409 `sequence_changed` |
+| GET, PATCH, DELETE | `{base}/sequences/{sequenceId}` | `SequenceInput` (PATCH also `expectedUpdatedAt?`) → `{ok, sequence: Sequence}`; a PATCH whose `expectedUpdatedAt` no longer matches the sequence's `updatedAt` answers 409 `sequence_changed` and writes nothing (the app always sends the version it loaded; without it the PATCH saves as before); only drafts delete. `Sequence` and `SequenceSummary` carry `statusChangedByUserId` and `statusChangedVia` |
+| POST | `{base}/sequences/{sequenceId}/status` | `SequenceStatusRequest` (`{status: "live" \| "paused", expectedUpdatedAt?}`) → `{ok, sequence}`; a reviewed `expectedUpdatedAt` that no longer matches answers 409 `sequence_changed`. A content change of a template (subject, preview text, HTML or text; a rename does not count) raises `updatedAt` of every sequence of the mailbox with a step that references the template, also when the step has own content, so a template edit after the review also answers 409 |
 | GET | `{base}/sequences/{sequenceId}/report` | → `SequenceReport` |
 
 Errors: `{ok:false, message, code?}`; 404 flag off or unknown id, 409 `outreach_disabled`
@@ -258,16 +258,51 @@ An area imports another area only through its `index.ts`.
 ## MCP tools
 
 Scopes are listed in `lib/addons/outreach/mcpScopes.ts`. A token without `send` can prepare
-contacts, templates and campaign drafts; scheduling a campaign or switching a sequence live
-needs `send`, consent changes need `manage`. Tools: `get_message_tracking`,
+contacts, templates, campaign drafts and draft sequences; scheduling a campaign, switching a
+sequence live and editing a sequence that is live or paused need `send`, consent changes need
+`manage`. Tools: `get_message_tracking`,
 `list_tracking_events`, `list_contact_lists`, `search_contacts`, `get_contact`,
 `upsert_contact`, `save_contact_list`, `subscribe_contact`, `unsubscribe_contact`,
 `list_email_templates`, `get_email_template`, `save_email_template`, `list_email_images`,
 `upload_email_image` (base64 `data` and `filename`), `list_campaigns`,
 `get_campaign`, `get_campaign_report`, `save_campaign`, `schedule_campaign`,
-`cancel_campaign`, `list_sequences`, `get_sequence`, `save_sequence`, `set_sequence_status`.
+`cancel_campaign`, `list_sequences`, `get_sequence`, `get_sequence_step`, `save_sequence`,
+`update_sequence_step`, `set_sequence_status`.
 `list_campaigns`, `get_campaign`, `list_sequences` and `get_sequence` return the trace fields of
 the REST shapes; `schedule_campaign` and `set_sequence_status` record the calling token.
+
+Sequences over MCP:
+
+- The sequence tools answer the steps without `html` and `text` and with `htmlLength` and
+  `textLength` instead. `get_sequence_step` answers one step in full; `get_sequence` with
+  `includeBodies` answers all of them.
+- `update_sequence_step` changes the content of one step (`name`, `subject`, `previewText`,
+  `html`, `text`) and leaves order, waits, `enabled` and the other steps alone. Whole fields
+  apply first, then `replacements` in order: `find` is exact text that must occur once in the
+  field (non-overlapping matches are counted), or at least once with `replaceAll`. Placeholders
+  are stored as `{{ name }}`. `find` matches the field's text as stored, or as given in the same
+  call when the call supplies the whole field. It requires
+  `expectedUpdatedAt`. `dryRun` runs every check up to the write and answers `changed`,
+  `replacements`, the step and the renderer's `warnings` (preview text included) without saving.
+  `changed` and the step describe the content as it would be stored: normalized and, for an
+  enabled step of a sequence that is not a draft, filled from the step's template. A field equal
+  to the stored value is no change, and an edit without a change saves nothing.
+- `save_sequence` replaces the whole step list when `steps` is given (see `SequenceInput`).
+- Both tools write through the one write path of the REST `PATCH` (`writeSequenceEdit` in
+  `sending/actions.ts`): `save_sequence` through `editSequence`, `update_sequence_step` through
+  `editSequenceStep`. Editing a sequence that is live or paused approves the new content like
+  going live: it goes out with the next mail, the token's creator becomes the recorded approver
+  (`statusChangedByUserId`, `statusChangedVia`) and the scheduler sends under that user. For such
+  a sequence both tools require the token's `send` scope, the editor role, an enabled sender
+  identity, a configured transport and the addon enabled for the mailbox, and `expectedUpdatedAt`
+  equal to the sequence's `updatedAt`. Inside the write the token, its scope, the role and the
+  sender identity are checked again; the transport and the enabled flag are checked before the
+  write and again before every send. Every enabled step must keep a subject
+  and a body that are not empty once the placeholders are filled in for the sample contact.
+  Every save and status change raises `updatedAt`.
+- A refusal with a code reaches MCP clients as a tool error whose text starts with the code, for
+  example `sequence_changed: …` when the sequence changed after it was read
+  (REST answers the same as 409 `sequence_changed`).
 
 Authenticated `/api/mcp` requests have a 36 MiB body limit, including the entire body of a
 JSON-RPC batch. It is sized for a draft with about 25 MiB of attachments; the image upload checks

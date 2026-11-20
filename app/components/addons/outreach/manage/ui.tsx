@@ -39,9 +39,18 @@ export function ErrorNote({ error, onRetry, className }: { error: unknown; onRet
   if (!error) return null;
   const { key, detail } = outreachErrorKey(error);
   return (
+    <AlertNote className={className} actions={onRetry ? <Button size="sm" variant="outline" onClick={onRetry}>{t("actions.retry")}</Button> : null}>
+      {t(key)}{detail ? ` ${t("errors.detail", { detail })}` : ""}
+    </AlertNote>
+  );
+}
+
+/** The red note box of `ErrorNote`, for messages that offer their own actions. */
+export function AlertNote({ children, actions, className }: { children: ReactNode; actions?: ReactNode; className?: string }) {
+  return (
     <div role="alert" className={cn("flex flex-wrap items-center gap-2 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive", className)}>
-      <span className="min-w-0 flex-1">{t(key)}{detail ? ` ${t("errors.detail", { detail })}` : ""}</span>
-      {onRetry ? <Button size="sm" variant="outline" onClick={onRetry}>{t("actions.retry")}</Button> : null}
+      <span className="min-w-0 flex-1">{children}</span>
+      {actions}
     </div>
   );
 }
