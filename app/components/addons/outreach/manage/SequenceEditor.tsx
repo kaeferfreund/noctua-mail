@@ -71,6 +71,9 @@ const STEP_FIELD_LABELS = {
   templateId: "content.template", html: "content.html", text: "sequences.conflict.textVersion", enabled: "sequences.stepEnabled"
 } as const;
 
+/** The conflict actions have long labels: they wrap on a phone instead of overflowing, with touch-sized targets. */
+const conflictButtonClass = "h-auto min-h-7 shrink py-1 whitespace-normal max-md:min-h-11";
+
 export default function SequenceEditor({ sequence }: { sequence: Sequence | null }) {
   const t = useTranslations("outreach");
   const { api, canEdit, navigate, lists } = useOutreachManage();
@@ -214,8 +217,8 @@ export default function SequenceEditor({ sequence }: { sequence: Sequence | null
       {conflict ? (
         <AlertNote actions={
           <div className="flex flex-wrap gap-2">
-            {conflict === "changed" ? <Button size="sm" disabled={busy !== null} onClick={() => void keepMine()}>{busy === "keepMine" ? t("actions.working") : t("sequences.conflict.keepMine")}</Button> : null}
-            <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => void discardMine()}>{busy === "discardMine" ? t("actions.working") : t("sequences.conflict.discardMine")}</Button>
+            {conflict === "changed" ? <Button size="sm" className={conflictButtonClass} disabled={busy !== null} onClick={() => void keepMine()}>{busy === "keepMine" ? t("actions.working") : t("sequences.conflict.keepMine")}</Button> : null}
+            <Button size="sm" variant="outline" className={conflictButtonClass} disabled={busy !== null} onClick={() => void discardMine()}>{busy === "discardMine" ? t("actions.working") : t("sequences.conflict.discardMine")}</Button>
           </div>
         }>{conflict === "changed" ? t("sequences.conflict.changed") : t("sequences.conflict.structure")}</AlertNote>
       ) : null}
