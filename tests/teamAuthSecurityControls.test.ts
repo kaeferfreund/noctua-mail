@@ -38,7 +38,7 @@ async function proof(f:TestAuthHarness,a:Awaited<ReturnType<typeof enrolled>>,pu
 
 for(const change of ['demoted','banned'] as const)test(`F1 fixed: ${change} issuer invite rejects before network and reservation`,async()=>{
  const f=await setup(),issuer=await enrolled(f),other=await enrolled(f),address=email();
- const {invite:i}=await issueOnboardingInvite(f.master,issuer.source,{email:address,name:'Synthetic Invitee',role:'admin'});
+ const {invite:i}=await issueOnboardingInvite(f.master,issuer.source,{email:address,name:'Synthetic Invitee',role:'admin'},await proof(f,issuer,'admin.grant'));
  await updateUserLifecycle(f.auth,f.master,other.source,req(other.jar),issuer.user.id,change==='demoted'?{role:'user'}:{disabled:true});
  let calls=0;await expect(provisionUser(f.auth,f.master,body(i.code,address,box()),{imap:async()=>{calls++;return true},smtp:async()=>{calls++;return true}})).rejects.toMatchObject({status:403,code:'invalid_invite'});
  expect(calls).toBe(0);expect(f.master.prepare('SELECT 1 FROM auth_user WHERE email=?').get(address)).toBeNull();

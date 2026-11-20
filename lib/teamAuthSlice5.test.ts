@@ -37,9 +37,9 @@ async function enrolled(f:TestAuthHarness,role:"admin"|"user"="admin") {
   const source=readSessionSecurity(f.master,session!.session.id);
   return {user,jar,factor,source};
 }
-async function adminProof(f:TestAuthHarness,actor:Awaited<ReturnType<typeof enrolled>>) {
+async function adminProof(f:TestAuthHarness,actor:Awaited<ReturnType<typeof enrolled>>,purpose:"admin.recovery"|"admin.grant"="admin.recovery") {
   const req=request(actor.jar);
-  const grant=await reauthenticate(f.auth,f.master,actor.source,req,{purpose:"admin.recovery",currentPassword:password,totpCode:totpFromUri(actor.factor.totpURI)},createRateLimiter({max:50}));
+  const grant=await reauthenticate(f.auth,f.master,actor.source,req,{purpose,currentPassword:password,totpCode:totpFromUri(actor.factor.totpURI)},createRateLimiter({max:50}));
   req.headers.set("x-noctua-reauth",grant.grant);return req;
 }
 async function recovery(f:TestAuthHarness,userId:string) {return issueRecovery(f.auth,f.master,"operator",null,userId,{confirmedTarget:true});}
@@ -146,12 +146,41 @@ describe("slice 5 lifecycle and recovery",()=>{
     const issued=await issueOnboardingInvite(f.master,actor.source,{email:address,name:"Synthetic Invitee",role:"user"});
     expect(issued.invite.email).toBe(address);
     const target=await provisionUser(f.auth,f.master,input(issued.invite.code,address),verified);
-    await updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.userId,{name:"Synthetic Renamed",role:"admin",disabled:true});
+    await updateUserLifecycle(f.auth,f.master,actor.source,await adminProof(f,actor,"admin.grant"),target.userId,{name:"Synthetic Renamed",role:"admin",disabled:true});
     expect(f.master.prepare(`SELECT name,role,banned,banExpires FROM auth_user WHERE id=?`).get(target.userId)).toEqual({name:"Synthetic Renamed",role:"admin",banned:1,banExpires:null});
     expect(f.master.prepare(`SELECT name FROM auth_user WHERE id=?`).get(actor.user.id).name).toBe("Synthetic User");
     await updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.userId,{disabled:false,role:"user"});
     expect(f.master.prepare(`SELECT count(*) n FROM auth_session WHERE userId=?`).get(target.userId).n).toBe(0);
     expect(f.master.prepare(`SELECT count(*) n FROM admin_audit WHERE targetUserId=?`).get(target.userId).n).toBeGreaterThanOrEqual(3);
+  });
+  test("admin invite, promotion and re-enabling an admin need a fresh single-use admin.grant proof",async()=>{
+    const f=await setup(),actor=await enrolled(f),member=await enrolled(f,"user");
+    const admins=()=>f.master.prepare(`SELECT count(*) n FROM auth_user WHERE role='admin'`).get().n;
+    // A live MFA admin session alone cannot mint durable admin authority.
+    await expect(issueOnboardingInvite(f.master,actor.source,{email:email(),name:"Synthetic Admin",role:"admin"},request(actor.jar))).rejects.toThrow("reauth_required");
+    await expect(updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),member.user.id,{role:"admin"})).rejects.toThrow("reauth_required");
+    expect(f.master.prepare(`SELECT count(*) n FROM invite_codes WHERE role='admin' AND issuedByUserId=?`).get(actor.user.id).n).toBe(0);
+    expect(admins()).toBe(1);
+    expect(f.master.prepare(`SELECT 1 FROM admin_lifecycle_operations WHERE slot IS NOT NULL`).get()).toBeNull();
+    // A recovery grant has another purpose.
+    await expect(updateUserLifecycle(f.auth,f.master,actor.source,await adminProof(f,actor),member.user.id,{role:"admin"})).rejects.toThrow("invalid_proof");
+    const invited=await issueOnboardingInvite(f.master,actor.source,{email:email(),name:"Synthetic Admin",role:"admin"},await adminProof(f,actor,"admin.grant"));
+    expect(invited.invite.role).toBe("admin");
+    // The grant is spent once.
+    const proof=await adminProof(f,actor,"admin.grant");
+    await updateUserLifecycle(f.auth,f.master,actor.source,proof,member.user.id,{role:"admin"});
+    expect(admins()).toBe(2);
+    const other=await enrolled(f,"user");
+    await expect(updateUserLifecycle(f.auth,f.master,actor.source,proof,other.user.id,{role:"admin"})).rejects.toThrow("invalid_proof");
+    // Disabling stays a plain admin action; re-enabling an admin restores authority and needs proof.
+    await updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),member.user.id,{disabled:true});
+    await expect(updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),member.user.id,{disabled:false})).rejects.toThrow("reauth_required");
+    await updateUserLifecycle(f.auth,f.master,actor.source,await adminProof(f,actor,"admin.grant"),member.user.id,{disabled:false});
+    // User invites, renames and demotions keep working without proof.
+    await issueOnboardingInvite(f.master,actor.source,{email:email(),name:"Synthetic User",role:"user"});
+    await updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),member.user.id,{name:"Synthetic Renamed"});
+    await updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),member.user.id,{role:"user"});
+    expect(admins()).toBe(1);
   });
   test("last admin and self mutation cannot race; global slot precedes security slots",async()=>{
     const f=await setup(),a=await enrolled(f),b=await enrolled(f);
@@ -289,7 +318,7 @@ describe("slice 5 lifecycle and recovery",()=>{
 
 for(const boundary of ["preflight-reservation","reservation-finalize"] as const)test(`issuer demotion race at ${boundary} cannot create an identity`,async()=>{
   const f=await setup(),issuer=await enrolled(f),other=await enrolled(f),address=email();
-  const issued=await issueOnboardingInvite(f.master,issuer.source,{email:address,name:"Synthetic",role:"admin"});
+  const issued=await issueOnboardingInvite(f.master,issuer.source,{email:address,name:"Synthetic",role:"admin"},await adminProof(f,issuer,"admin.grant"));
   const demote=()=>updateUserLifecycle(f.auth,f.master,other.source,request(other.jar),issuer.user.id,{role:"user"});
   let create:ReturnType<typeof spyOn>|undefined;
   if(boundary==="reservation-finalize") {
@@ -343,7 +372,7 @@ for(const action of ["ban","unban","role","delete","disable-audit"] as const)tes
   if(action==="unban")f.master.prepare(`UPDATE auth_user SET banned=1 WHERE id=?`).run(target.user.id);
   const event=action==="delete"?"BEFORE DELETE ON auth_user":action==="role"?"BEFORE UPDATE OF role ON auth_user":action==="disable-audit"?"BEFORE INSERT ON admin_audit WHEN NEW.action='user.disable'":"BEFORE UPDATE OF banned ON auth_user";
   f.master.exec(`CREATE TRIGGER synthetic_lifecycle_fault ${event} BEGIN SELECT RAISE(ABORT,'synthetic lifecycle fault'); END`);
-  const run=action==="delete"?removeUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.user.id,{},async()=>({status:"not_installed",unassigned:0})):updateUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.user.id,action==="role"?{role:"admin"}:{disabled:action!=="unban"});
+  const run=action==="delete"?removeUserLifecycle(f.auth,f.master,actor.source,request(actor.jar),target.user.id,{},async()=>({status:"not_installed",unassigned:0})):updateUserLifecycle(f.auth,f.master,actor.source,action==="role"?await adminProof(f,actor,"admin.grant"):request(actor.jar),target.user.id,action==="role"?{role:"admin"}:{disabled:action!=="unban"});
   await expect(run).rejects.toThrow();
   expect(f.master.prepare(`SELECT 1 FROM admin_lifecycle_operations WHERE slot=?`).get(`security:${target.user.id}`)).not.toBeNull();
   expect((await http(f,"/sign-in/email",{email:target.user.email,password})).status).toBe(["unban","delete","disable-audit"].includes(action)?401:409);

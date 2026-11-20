@@ -20,7 +20,7 @@ function harness(override?: (url: string, init?: RequestInit) => Response | unde
     const custom = override?.(url, init); if (custom) return custom;
     if (url === "/api/admin/users") return response({ ok: true, users: [user] });
     if (url === "/api/admin/invites") return response({ ok: true, invites: [{ id: "synthetic-history-id", email: "invited@example.test", issuedBy: "synthetic-issuer", status: "issued", expiresAt: 1793000000000, createdAt: 1792900000000 }] });
-    if (url === "/api/auth/reauth") return response({ ok: true, ceremonyRequired: false, grant: "synthetic-proof", purpose: "admin.recovery", expiresAt: 1793000000000 });
+    if (url === "/api/auth/reauth") return response({ ok: true, ceremonyRequired: false, grant: "synthetic-proof", purpose: JSON.parse(String(init?.body)).purpose, expiresAt: 1793000000000 });
     return response({ ok: true });
   };
   const page = render(<Theme><AdminPanel isAdminUser apiFetch={apiFetch} onClose={() => {}} /></Theme>);
@@ -153,6 +153,41 @@ describe("AdminPanel", () => {
     fireEvent.click(secret.getByRole("button", { name: "Done" })); expect(page.queryByText(/synthetic-reset/)).toBeNull();
     fireEvent.click(page.getByRole("button", { name: "Invites" })); fireEvent.click(page.getByRole("button", { name: "Users" }));
     expect(page.queryByText(/synthetic-reset/)).toBeNull();
+  });
+  async function verifyIdentity(page: ReturnType<typeof render>) {
+    const reauth = within(await page.findByRole("dialog", { name: "Verify your identity" }));
+    fireEvent.change(reauth.getByLabelText("Current password"), { target: { value: "synthetic-password" } });
+    fireEvent.change(reauth.getByLabelText("Authenticator code"), { target: { value: "123456" } });
+    fireEvent.click(reauth.getByRole("button", { name: "Verify and continue" }));
+  }
+  it("requires fresh admin.grant proof before issuing an administrator invite", async () => {
+    const { page, calls } = harness((url, init) => url === "/api/admin/users" && init?.method === "POST" ? response({ ok: true, invite: { code: "synthetic-admin-code" } }, 201) : undefined);
+    await page.findByText("Synthetic User"); fireEvent.click(page.getByRole("button", { name: "Invites" }));
+    fireEvent.change(page.getByLabelText("Name", { exact: true }), { target: { value: "Synthetic Admin" } });
+    fireEvent.change(page.getByLabelText("Email", { exact: true }), { target: { value: "admin-invite@example.test" } });
+    fireEvent.change(page.getByLabelText("Invite role", { exact: true }), { target: { value: "admin" } });
+    fireEvent.click(page.getByRole("button", { name: "Issue targeted invite" }));
+    await verifyIdentity(page);
+    await page.findByRole("dialog", { name: "One-time invite code" });
+    expect(JSON.parse(String(calls.find(call => call.url === "/api/auth/reauth")?.init?.body)).purpose).toBe("admin.grant");
+    const issued = calls.find(call => call.init?.method === "POST" && call.url === "/api/admin/users");
+    expect(new Headers(issued?.init?.headers).get("x-noctua-reauth")).toBe("synthetic-proof");
+    expect(JSON.parse(String(issued?.init?.body))).toMatchObject({ role: "admin" });
+  });
+  it("requires fresh admin.grant proof before promoting a user to administrator", async () => {
+    const member = { ...user, id: "synthetic-member", email: "member@example.test", role: "user" };
+    const { page, calls } = harness(url => url === "/api/admin/users" ? response({ ok: true, users: [member] }) : undefined);
+    await page.findByText("member@example.test");
+    fireEvent.change(page.getByLabelText("Role for member@example.test"), { target: { value: "admin" } });
+    const dialog = within(await page.findByRole("dialog", { name: "Change user role" }));
+    fireEvent.click(dialog.getByRole("button", { name: "Confirm" }));
+    expect(calls.filter(call => call.init?.method === "PATCH")).toHaveLength(0);
+    await verifyIdentity(page);
+    await waitFor(() => expect(calls.some(call => call.init?.method === "PATCH")).toBe(true));
+    expect(JSON.parse(String(calls.find(call => call.url === "/api/auth/reauth")?.init?.body)).purpose).toBe("admin.grant");
+    const patch = calls.find(call => call.init?.method === "PATCH");
+    expect(new Headers(patch?.init?.headers).get("x-noctua-reauth")).toBe("synthetic-proof");
+    expect(JSON.parse(String(patch?.init?.body))).toEqual({ role: "admin" });
   });
   it("shows Retry-After on 429", async () => {
     const { page } = harness((url, init) => init?.method === "PATCH" ? response({ ok: false, code: "admin_rate_limited" }, 429, { "Retry-After": "75" }) : undefined);

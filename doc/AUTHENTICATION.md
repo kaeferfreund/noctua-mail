@@ -314,6 +314,7 @@ session's original factor. A backup code is accepted only for `totp.replace`.
 | `passkey.rename` | Password + TOTP, or same-user UV passkey (same policy as enrollment) |
 | `sessions.revoke` | Current credential + TOTP/UV |
 | `admin.recovery` | Admin app password + TOTP/UV; administration additionally verifies the target out of band |
+| `admin.grant` | Admin app password + TOTP/UV; required for an admin invite, promoting a user to admin and re-enabling a disabled admin |
 | `mcp.create` | Current credential + TOTP/UV |
 
 Password+UV uses `proofMode:"passkey"` with `currentPassword` for purposes that require password.
@@ -574,6 +575,10 @@ The 201 response is `{ok:true,invite}`; generic redemption still uses ordinary s
   without installing future collaboration tables. Only then does plugin `removeUser` run. A failed
   cleanup leaves the identity banned and the durable slot held. Startup retries idempotently using
   local adapter authority after shard cleanup; it does not fabricate an admin session.
+- Durable admin authority needs a fresh, single-use `admin.grant` in `x-noctua-reauth`: `POST /api/admin/users`
+  with `role:"admin"`, and `PATCH /api/admin/users/[userId]` when it promotes a user to admin or re-enables a
+  disabled admin. A live admin session alone (e.g. a stolen cookie) cannot create an identity that outlives its
+  revocation. User invites, renames, demotions and disabling need no grant.
 - `POST /api/admin/users/[userId]/recovery` JSON `{confirmedTarget:true}` additionally requires a
   fresh `admin.recovery` grant in `x-noctua-reauth` (admin app password + freshly verified TOTP/UV).
   `confirmedTarget` is the admin's explicit assertion of personal out-of-band identity verification.

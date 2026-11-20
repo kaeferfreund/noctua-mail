@@ -21,21 +21,23 @@ function parseName(value:unknown) {
   if (typeof value!=="string" || !value.trim() || value.trim().length>256) throw new AuthPolicyError("invalid_request",400);
   return value.trim();
 }
-export async function issueOnboardingInvite(db:Database,source:SessionSecurity,body:unknown) {
+/** An admin invite creates a durable admin identity: it needs a fresh, single-use `admin.grant` proof. */
+export async function issueOnboardingInvite(db:Database,source:SessionSecurity,body:unknown,request:Request|null=null) {
   strictFields(body,["email","name","role"]);
   const parsed=personalEmailSchema.safeParse(body.email),name=parseName(body.name);
   if (!parsed.success || !["admin","user"].includes(body.role as string)) throw new AuthPolicyError("invalid_request",400);
-  return issueInvite(db,source,{email:parsed.data,name,role:body.role as "admin"|"user"});
+  return issueInvite(db,source,{email:parsed.data,name,role:body.role as "admin"|"user"},request);
 }
 
 export async function issueGenericInvite(db:Database,source:SessionSecurity,body:unknown) {
   strictFields(body,[]);
-  return issueInvite(db,source,{email:null,role:"user"});
+  return issueInvite(db,source,{email:null,role:"user"},null);
 }
 
-async function issueInvite(db:Database,source:SessionSecurity,input:{email:string|null;name?:string;role:"admin"|"user"}) {
+async function issueInvite(db:Database,source:SessionSecurity,input:{email:string|null;name?:string;role:"admin"|"user"},request:Request|null) {
   const op=await reserveLifecycle(db,source,"","user.invite",{});
   try {
+    if (input.role==="admin") await consumeActorGrant(db,op,source,request,"admin.grant");
     return await withDbWriteRetry("issueInvite",()=>db.transaction(()=>{
       assertAdminActor(db,source);assertLifecycle(db,op);
       if(input.email)assertNewIdentity(db,input.email);
@@ -55,12 +57,22 @@ async function revokeTarget(db:Database,userId:string) {
   revokeAuthStreams({userId});
 }
 
-async function authorizeAdminSecurity(db:Database,op:LifecycleOperation,actor:SessionSecurity|"operator",request:Request|null) {
-  if (actor!=="operator") {
-    const actorSlot=await takeLifecycleUserSlot(db,op,actor.userId);
-    await consumeReauthGrant(db,request?.headers.get("x-noctua-reauth")??null,actor,"admin.recovery",actorSlot);
-  }
+/** Spends the acting admin's fresh proof under the lifecycle slot; the actor's security slot stays held until the operation finishes. */
+async function consumeActorGrant(db:Database,op:LifecycleOperation,actor:SessionSecurity,request:Request|null,purpose:"admin.recovery"|"admin.grant") {
+  const actorSlot=await takeLifecycleUserSlot(db,op,actor.userId);
+  await consumeReauthGrant(db,request?.headers.get("x-noctua-reauth")??null,actor,purpose,actorSlot);
+}
+
+async function authorizeAdminSecurity(db:Database,op:LifecycleOperation,actor:SessionSecurity|"operator",request:Request|null,purpose:"admin.recovery"|"admin.grant"="admin.recovery") {
+  if (actor!=="operator") await consumeActorGrant(db,op,actor,request,purpose);
   if (actor==="operator" || actor.userId!==op.targetUserId) await takeLifecycleUserSlot(db,op);
+}
+
+/** True when the change leaves the target an enabled admin who was not one before (promotion or re-enabling an admin). */
+function grantsAdminAuthority(target:{role:string;enabledAdmin:number|boolean},changes:{role?:"admin"|"user";disabled?:boolean}) {
+  if (target.enabledAdmin || changes.disabled===true) return false;
+  if (changes.role===undefined && changes.disabled===undefined) return false;
+  return (changes.role??target.role)==="admin";
 }
 
 export type AdminSecurityAction="mfa-reset"|"passkey-remove"|"sessions-revoke";
@@ -103,8 +115,9 @@ export async function updateUserLifecycle(auth:NoctuaAuth,db:Database,source:Ses
   const op=await reserveLifecycle(db,source,userId,"user.update",changes);
   let started=false;
   try {
-    assertTargetPolicy(db,op,changes);
-    await takeLifecycleUserSlot(db,op);
+    const target=assertTargetPolicy(db,op,changes);
+    if (grantsAdminAuthority(target,changes)) await authorizeAdminSecurity(db,op,source,request,"admin.grant");
+    else await takeLifecycleUserSlot(db,op);
     assertAdminActor(db,source);
     await markStarted(db,op);started=true;
     await withAuthProof({db,internal:true,source,authenticatedAt:source.authenticatedAt,method:source.method,createdSessionIds:[]},async()=>{

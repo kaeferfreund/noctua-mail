@@ -5,7 +5,7 @@ import { AuthPolicyError, assertSecurityOperation, enrollmentState, readSessionS
 import { withDbWriteRetry } from "./dbWriteRetry";
 
 export { AuthPolicyError } from "./db/authPolicy";
-export const REAUTH_PURPOSES = ["totp.enroll", "totp.replace", "passkey.enroll", "password.set", "password.change", "backup.regenerate", "passkey.remove", "passkey.rename", "sessions.revoke", "admin.recovery", "mcp.create"] as const;
+export const REAUTH_PURPOSES = ["totp.enroll", "totp.replace", "passkey.enroll", "password.set", "password.change", "backup.regenerate", "passkey.remove", "passkey.rename", "sessions.revoke", "admin.recovery", "admin.grant", "mcp.create"] as const;
 export type ReauthPurpose = typeof REAUTH_PURPOSES[number];
 export const PROOF_MATRIX = {
   "totp.enroll": "password_setup", "totp.replace": "password_factor_or_backup",
@@ -13,6 +13,8 @@ export const PROOF_MATRIX = {
   "password.change": "password_factor", "backup.regenerate": "password_factor",
   "passkey.remove": "password_factor_or_uv", "passkey.rename": "password_factor_or_uv",
   "sessions.revoke": "password_factor", "admin.recovery": "admin_password_factor",
+  // Durable admin authority (admin invite, promotion, re-enabling an admin) needs the same fresh proof as recovery.
+  "admin.grant": "admin_password_factor",
   "mcp.create": "password_factor"
 } as const;
 export const GRANT_TTL_MS = 300000;
