@@ -144,8 +144,8 @@ function schemaProblem(db: Database) {
 
 async function readExactSource(accountId: string, id: string) {
   try {
-    // Same decoding as getMessageSource, which the reader and the lazy backfill use.
-    return await fs.readFile(getExactMessageSourcePath(accountId, id), "utf-8");
+    // The stored bytes, as the lazy backfill reads them (getMessageSourceBuffer).
+    return await fs.readFile(getExactMessageSourcePath(accountId, id));
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw error;

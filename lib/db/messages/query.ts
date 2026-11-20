@@ -57,7 +57,7 @@ import { collectCalendarInviteMutationGroups } from "../../calendarInviteProcess
 import { deriveInviteDeckEventBounds } from "../../inviteDeckEventBounds";
 import { normalizeCalendarEventUidKeys } from "../../calendarEventUids";
 import { getAttachmentContentBuffer } from "../../mail/syncMessageSanitizer";
-import { getMessageSource } from "../../storage";
+import { getMessageSourceBuffer } from "../../storage";
 import { isTopicNoneSentinel } from "../../topics/searchSentinels";
 import {
   buildCalendarEventUidMatchSql,
@@ -132,11 +132,11 @@ function getInviteDeckGroupKeyForEventRow(row: InviteDeckEventRow, nowMs = Date.
 }
 
 async function collectInviteDeckGroupsByEventUidKeyFromSource(
-  source: string,
+  source: Buffer,
   nowMs: number
 ): Promise<Map<string, string>> {
   const result = new Map<string, string>();
-  if (!source.trim()) return result;
+  if (!source.length) return result;
   try {
     const parsed = await simpleParser(source);
     const parsedAttachments = (parsed.attachments ?? []) as Attachment[];
@@ -245,8 +245,8 @@ async function getInviteDeckGroupKeysByMessageId(
 
   for (const [messageId, missingEventUids] of missingEventUidsByMessageId.entries()) {
     if (groupsByMessageId.get(messageId) === "UPCOMING") continue;
-    const source = await getMessageSource(accountId, messageId);
-    if (!source) continue;
+    const source = await getMessageSourceBuffer(accountId, messageId);
+    if (!source?.length) continue;
     const groupsByEventUidKey = await collectInviteDeckGroupsByEventUidKeyFromSource(source, nowMs);
     let fallbackGroup: string | null = null;
     missingEventUids.forEach((eventUidKey) => {

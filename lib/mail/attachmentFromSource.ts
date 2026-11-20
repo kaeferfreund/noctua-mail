@@ -8,6 +8,7 @@ import {
   resolveAttachmentIndex
 } from "@/lib/mail/attachmentMatch";
 import { isCalendarAttachment } from "@/lib/messageFlags";
+import { rawMessageSourceText, type RawMessageSource } from "@/lib/messageSource";
 
 type ParsedAttachmentCandidate = {
   filename?: string | null;
@@ -133,7 +134,7 @@ export function mergeAttachmentMetadataFromParsedAttachments<
 }
 
 export async function extractAttachmentBufferFromSource(
-  source: string,
+  source: RawMessageSource,
   target: Pick<Attachment, "id" | "filename" | "contentType" | "cid">
 ) {
   const parsed = await simpleParser(source);
@@ -147,11 +148,13 @@ export async function extractAttachmentBufferFromSource(
 // text/calendar part with Content-Transfer-Encoding: quoted-printable yields
 // `RRULE:FREQ=3DWEEKLY` and `TZID=3DEurope/Berlin`, breaking RRULE parsing and
 // timezone resolution. A source that already starts with `BEGIN:VCALENDAR` is
-// returned as-is to support callers that pass a bare ICS string.
-export async function extractIcsSourceFromEmailSource(source: string): Promise<string | null> {
-  const trimmed = source.trim();
+// returned as-is to support callers that pass a bare ICS string. Stored email
+// sources are passed as bytes so mailparser decodes 8bit parts by their charset.
+export async function extractIcsSourceFromEmailSource(source: RawMessageSource): Promise<string | null> {
+  const text = rawMessageSourceText(source);
+  const trimmed = text.trim();
   if (!trimmed) return null;
-  if (trimmed.startsWith("BEGIN:VCALENDAR")) return source;
+  if (trimmed.startsWith("BEGIN:VCALENDAR")) return text;
   try {
     const parsed = await simpleParser(source);
     for (const attachment of parsed.attachments ?? []) {

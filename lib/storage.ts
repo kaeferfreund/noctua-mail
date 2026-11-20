@@ -213,7 +213,7 @@ export async function saveMessageSource(
  * assignment, file publication and the ownership digest stored in that row.
  */
 export async function stageMessageFiles(accountId: string, messages: Array<{
-  source?: string;
+  source?: string | Buffer;
   attachments: Array<{ id: string; data: Buffer }>;
 }>) {
   type StagedFile = { path: string; attachmentId?: string };
@@ -332,6 +332,12 @@ export async function listMessageSourceSizes(accountId: string) {
   return sizes;
 }
 
+/**
+ * UTF-8 text view of the stored source, for display and for header-level checks
+ * of sources Noctua generated itself. Lossy for 8bit/binary parts in other
+ * charsets: MIME parsing, attachment extraction, digests and uploads must read
+ * the bytes with getMessageSourceBuffer.
+ */
 export async function getMessageSource(accountId: string, messageId: string, options: { exact?: boolean } = {}) {
   await ensureSourcesDir();
   const candidates = options.exact ? [messageId] : buildMessageRowIdLookupCandidates(messageId);
@@ -345,12 +351,13 @@ export async function getMessageSource(accountId: string, messageId: string, opt
   return null;
 }
 
-// Raw-bytes variant of getMessageSource. Rewriting a message's MIME must
-// operate on the exact bytes (binary/8bit parts included); reading as utf-8
-// would mangle them before the surgery even runs.
-export async function getMessageSourceBuffer(accountId: string, messageId: string) {
+// Raw-bytes variant of getMessageSource. Parsing or rewriting a message's MIME
+// must operate on the exact bytes (binary/8bit parts included); reading as
+// utf-8 would mangle them first. Sources written before ingestion kept the wire
+// bytes were stored as UTF-8 text; those files read back unchanged here.
+export async function getMessageSourceBuffer(accountId: string, messageId: string, options: { exact?: boolean } = {}) {
   await ensureSourcesDir();
-  const candidates = buildMessageRowIdLookupCandidates(messageId);
+  const candidates = options.exact ? [messageId] : buildMessageRowIdLookupCandidates(messageId);
   for (const candidateId of candidates) {
     try {
       return await fs.readFile(sourceFilePath(accountId, candidateId));

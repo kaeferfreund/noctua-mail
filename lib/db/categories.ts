@@ -330,9 +330,9 @@ export async function applyCategoryFeedback(
 
     let features: Record<string, number> | null = null;
     try {
-      const { getMessageSource } = await import("../storage");
-      const source = await getMessageSource(accountId, messageId);
-      if (source) {
+      const { getMessageSourceBuffer } = await import("../storage");
+      const source = await getMessageSourceBuffer(accountId, messageId);
+      if (source?.length) {
         const parsed = await simpleParser(source);
         const headers = (parsed.headers ?? new Map()) as Map<string, any>;
         features = extractLinearFeatures(parsed as any, headers, parseStringArray(row.categorySignals));
@@ -409,7 +409,7 @@ export async function recomputeCategoriesForAccount(
     getCategorizationConfig,
     parseMailForCategorization
   } = await import("@/lib/mail/categorization");
-  const { getMessageSource } = await import("@/lib/storage");
+  const { getMessageSourceBuffer } = await import("@/lib/storage");
 
   const db = await getAccountDb(accountId);
   const account = await getAccountById(accountId);
@@ -477,8 +477,8 @@ export async function recomputeCategoriesForAccount(
       chunk.map(async (message) => {
         if (!message.hasSource) return;
         try {
-          const source = await getMessageSource(accountId, message.id);
-          if (!source) return;
+          const source = await getMessageSourceBuffer(accountId, message.id);
+          if (!source?.length) return;
           const parsed = await parseMailForCategorization(source);
           // Copy only the fields classification actually reads. Critically, map
           // attachments to `{ filename }` so the parsed attachment content

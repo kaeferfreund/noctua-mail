@@ -71,7 +71,7 @@ for (const kind of ['draft', 'series', 'occurrence'] as const) {
       expect(failedMasterBegins).toBe(preparations - 1);
       expect(shardRollbacks).toBe(failedMasterBegins);
       expect(snapshot()).toBe(prior);
-      expect(await getMessageSource(f.accountId, old.id)).toBe(old.source!);
+      expect(await getMessageSource(f.accountId, old.id)).toBe(old.source as string);
       expect((await getAttachmentData(f.accountId, old.id, 'synthetic-att'))?.toString()).toBe('old');
       expect(master.inTransaction || f.db.inTransaction).toBe(false);
       console.info('OUTBOUND_REVOKE', kind, { preparations, finalAssertions, failedMasterBegins, shardRollbacks, status: caught.response.status });
@@ -114,7 +114,7 @@ test('commit BUSY after file publication rolls SQL/files back before reauthoriza
     preparations++;
     if (preparations === 2) {
       expect(snap()).toBe(prior);
-      expect(source()).toBe(old.source!);
+      expect(source()).toBe(old.source as string);
       expect(attachment()).toBe('old');
     }
     return authorizeOutbound({ request }, { accountId: f.accountId, minRole: 'editor' });
@@ -139,7 +139,7 @@ test('commit BUSY after file publication rolls SQL/files back before reauthoriza
     expect(logs[0][1].delayMs).toBeLessThanOrEqual(144);
     expect(failed).toBe(1);
     expect(snap()).toBe(prior);
-    expect(await getMessageSource(f.accountId, old.id)).toBe(old.source!);
+    expect(await getMessageSource(f.accountId, old.id)).toBe(old.source as string);
     expect((await getAttachmentData(f.accountId, old.id, 'synthetic-att'))?.toString()).toBe('old');
     expect(master.inTransaction || f.db.inTransaction).toBe(false);
   }
