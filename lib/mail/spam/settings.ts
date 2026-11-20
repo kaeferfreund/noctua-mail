@@ -1,5 +1,12 @@
 import type { Account } from "@/lib/data";
-import { countSpamTrustDecisions, getSpamSettings, saveSpamSettings } from "@/lib/db";
+import {
+  countSpamTrustDecisions,
+  getSpamSettings,
+  GLOBAL_SPAM_SCOPE as GLOBAL_SCOPE,
+  legacyMailboxSpamScope as legacyMailboxScope,
+  mailboxSpamScope,
+  saveSpamSettings
+} from "@/lib/db";
 import {
   parseSpamAdminSettings,
   parseSpamMailboxSettings,
@@ -10,16 +17,7 @@ import {
 } from "./config";
 import { spamModelUnavailableReason } from "./provider";
 
-const GLOBAL_SCOPE = "global";
-const MAILBOX_SCOPE_PREFIX = "account:";
-
-/** Mailbox rows are keyed `account:<id>`, so no account id can address the global row. */
-export const mailboxSpamScope = (accountId: string) => `${MAILBOX_SCOPE_PREFIX}${accountId}`;
-
-/** Rows written before the prefix used the bare account id; never "global" or an id that looks prefixed. */
-function legacyMailboxScope(accountId: string) {
-  return accountId === GLOBAL_SCOPE || accountId.startsWith(MAILBOX_SCOPE_PREFIX) ? undefined : accountId;
-}
+export { mailboxSpamScope };
 
 function lenient<T>(parse: (input: unknown) => T, stored: unknown): T | null {
   if (!stored) return null;

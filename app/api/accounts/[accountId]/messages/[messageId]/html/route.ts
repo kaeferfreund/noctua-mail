@@ -39,7 +39,9 @@ function postprocessHtml(
   let nextHtml = html;
   attachments.forEach((attachment) => {
     if (attachment.url && attachment.dataUrl) {
-      nextHtml = nextHtml.replaceAll(attachment.dataUrl, attachment.url);
+      const url = attachment.url;
+      // Function replacer: keep $ sequences in the URL literal.
+      nextHtml = nextHtml.replaceAll(attachment.dataUrl, () => url);
     }
   });
   nextHtml = replaceInlineImageSources(nextHtml, attachments);

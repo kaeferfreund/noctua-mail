@@ -7,6 +7,7 @@ import { getAccountDb, getDb } from "./connection";
 import { ACCOUNT_SHARD_RUNTIME_TABLES, ACCOUNT_SHARD_TABLES } from "./shardFormat";
 import { getSenderProfile, recordSenderProfileMail, saveSpamExample } from "./spam";
 import { trustedFacts } from "../mail/spam/testProfiles";
+import { loadMailboxSpamSettings, saveMailboxSpamSettings } from "../mail/spam/settings";
 import { validateFtsIdentity } from "./ftsIdentity";
 import { createApiToken, authenticateSubscribeToken } from "../addons/outreach/contacts/apiTokens";
 import { createContactList, upsertContact } from "../addons/outreach/contacts/records";
@@ -92,6 +93,25 @@ describe("mailbox deletion lifecycle", () => {
     expect(await f.api.deleteAccountControlPlane(f.accountId)).toBe(true);
     expect(master.prepare("SELECT COUNT(*) AS n FROM scheduled_sends WHERE accountId = ?").get(f.accountId)).toEqual({ n: 0 });
     expect(master.prepare("SELECT COUNT(*) AS n FROM mailbox_watcher_auth WHERE accountId = ?").get(f.accountId)).toEqual({ n: 0 });
+  });
+
+  test("the mailbox's spam settings (prefixed and legacy scope) end with it; global and other mailboxes stay", async () => {
+    const f = await createCollabFixture();
+    const other = await createCollabFixture();
+    const master = await getDb();
+    await saveMailboxSpamSettings(f.accountId, { enabled: false, autoMove: true, threshold: 0.5 }, "synthetic-admin");
+    await saveMailboxSpamSettings(other.accountId, { enabled: false }, "synthetic-admin");
+    master.prepare(`INSERT INTO spam_settings (scope, settings, updatedAt) VALUES (?, '{"enabled":false}', 0)`).run(f.accountId);
+    master.prepare(`INSERT INTO spam_settings (scope, settings, updatedAt) VALUES ('global', '{}', 0) ON CONFLICT(scope) DO NOTHING`).run();
+    const scopes = [`account:${f.accountId}`, f.accountId, `account:${other.accountId}`, "global"];
+    const stored = () => (master.prepare("SELECT scope FROM spam_settings WHERE scope IN (?, ?, ?, ?) ORDER BY scope")
+      .all(...scopes) as Array<{ scope: string }>).map(row => row.scope);
+    expect(stored()).toHaveLength(4);
+
+    expect(await f.api.deleteAccountControlPlane(f.accountId)).toBe(true);
+    expect(stored()).toEqual([`account:${other.accountId}`, "global"].sort());
+    // A mailbox recreated for the same address starts with the defaults.
+    expect(await loadMailboxSpamSettings(f.accountId)).toEqual({});
   });
 
   test("newsletter data and subscribe tokens end with the mailbox; only the hashed suppression stays", async () => {

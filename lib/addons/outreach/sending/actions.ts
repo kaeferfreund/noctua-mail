@@ -48,10 +48,6 @@ async function checkTransportAndSender(actor: SendingActor, identityId: string |
   return { settings, identity, userId: authorized.userId, assertAuthorized };
 }
 
-function assertUnchanged<T>(start: T, current: T) {
-  if (JSON.stringify(start) !== JSON.stringify(current)) throw new SendingError(409, "Der Eintrag wurde inzwischen geändert.");
-}
-
 function campaignChanged() {
   return new SendingError(409, "Der Entwurf wurde inzwischen geändert. Prüfe die Kampagne erneut.", "campaign_changed");
 }
@@ -124,49 +120,75 @@ function sequenceChanged() {
   return new SendingError(409, "Die Sequenz wurde inzwischen geändert. Prüfe sie erneut.", "sequence_changed");
 }
 
-/**
- * `expectedUpdatedAt` binds an edit to the version the caller read. `authorization` is the caller's credential when the
- * scope that let the request in does not cover mail that goes out (an MCP token): an edit of a sequence that is not a
- * draft reaches subscribers without another approval, so it needs the right to send and a named version.
- */
-export type SequenceEditGuard = { expectedUpdatedAt?: number; authorization?: OutboundAuthorization };
+/** Inside the write transaction: the sequence (status included) is still the one the caller read. */
+function assertSequenceUnchanged(db: Database, read: Sequence) {
+  if (JSON.stringify(read) !== JSON.stringify(getSequence(db, read.accountId, read.id))) throw sequenceChanged();
+}
 
-/** Saves an edit of the sequence as the caller read it (`sequence`). `checkOnly` stops after the checks that precede the write. */
-async function saveSequenceEdit(db: Database, sequence: Sequence, input: SequenceInput, guard: SequenceEditGuard, checkOnly = false) {
-  const { accountId, id } = sequence;
-  if (guard.expectedUpdatedAt !== undefined && sequence.updatedAt !== guard.expectedUpdatedAt) throw sequenceChanged();
-  let assertAuthorized: (() => void) | undefined;
-  if (sequence.status !== "draft") {
-    if (guard.authorization) {
-      if (guard.expectedUpdatedAt === undefined) {
-        throw new SendingError(400, "Für eine Sequenz, die live oder pausiert ist, ist expectedUpdatedAt erforderlich.", "expected_updated_at_required");
-      }
-      assertAuthorized = await prepareOutboundAssertion(await authorizeOutbound(guard.authorization, { accountId, minRole: "editor" }));
-    }
-    if (input.senderIdentityId !== undefined) {
-      await resolveOutreachIdentity(accountId, input.senderIdentityId ?? (await getOutreachSettings(accountId)).senderIdentityId);
-    }
+/**
+ * `expectedUpdatedAt` binds an edit to the version the caller read. A token caller must name it for a sequence that is
+ * not a draft. `checkOnly` runs every check that precedes the write and saves nothing (a dry run).
+ */
+export type SequenceEditOptions = { expectedUpdatedAt?: number; checkOnly?: boolean };
+
+/**
+ * The checks that precede an edit of `sequence` as the caller read it: the version first, then, for a sequence that is
+ * not a draft, the outbound authorization of going live (`checkTransportAndSender`: editor role, sender identity,
+ * transport, an MCP token's `send` scope). A draft is only content and needs no outbound authorization.
+ */
+async function authorizeSequenceEdit(actor: SendingActor, sequence: Sequence, options: SequenceEditOptions,
+  senderIdentityId?: string | null) {
+  if (options.expectedUpdatedAt !== undefined && sequence.updatedAt !== options.expectedUpdatedAt) throw sequenceChanged();
+  if (sequence.status === "draft") return null;
+  const authorized = await checkTransportAndSender(actor, senderIdentityId === undefined ? sequence.senderIdentityId : senderIdentityId);
+  if (options.expectedUpdatedAt === undefined && "tokenId" in actor.authorization) {
+    throw new SendingError(400, "Für eine Sequenz, die live oder pausiert ist, ist expectedUpdatedAt erforderlich.", "expected_updated_at_required");
   }
-  if (checkOnly) return sequence;
+  return authorized;
+}
+
+/**
+ * The one write path of an edit of a sequence. A sequence that is live, or paused and able to resume, sends what is
+ * stored: editing it approves the new content like going live does, so the editor becomes the recorded approver (the
+ * scheduler sends under that user, `scheduler.ts`) and the templates are snapshotted again.
+ */
+function writeSequenceEdit(db: Database, actor: SendingActor, sequence: Sequence, input: SequenceInput,
+  authorized: Awaited<ReturnType<typeof authorizeSequenceEdit>>) {
+  const { accountId, id } = sequence;
   return db.transaction(() => {
-    assertAuthorized?.();
-    // Also the status: a draft must not go live between the caller's read and this write.
-    if (JSON.stringify(sequence) !== JSON.stringify(getSequence(db, accountId, id))) throw sequenceChanged();
-    return saveSequence(db, accountId, input, { id });
+    authorized?.assertAuthorized();
+    // Also the status: a draft that went live meanwhile would be edited without the approval above.
+    assertSequenceUnchanged(db, sequence);
+    const saved = saveSequence(db, accountId, input, { id });
+    if (!authorized) return saved;
+    if (saved.status === "live") snapshotSequenceTemplates(db, saved);
+    db.query("UPDATE sequences SET statusChangedByUserId = ?, statusChangedVia = ? WHERE accountId = ? AND id = ?")
+      .run(authorized.userId, actor.via, accountId, id);
+    return getSequence(db, accountId, id);
   }).immediate();
 }
 
-export async function editSequence(db: Database, accountId: string, id: string, input: SequenceInput, guard: SequenceEditGuard = {}) {
-  return saveSequenceEdit(db, getSequence(db, accountId, id), input, guard);
+/** Edits a sequence (REST passes the session actor, MCP the token actor). */
+export async function editSequence(db: Database, actor: SendingActor, id: string, input: SequenceInput, options: SequenceEditOptions = {}) {
+  const sequence = getSequence(db, actor.accountId, id);
+  const authorized = await authorizeSequenceEdit(actor, sequence, options, input.senderIdentityId);
+  if (options.checkOnly) {
+    authorized?.assertAuthorized();
+    return sequence;
+  }
+  return writeSequenceEdit(db, actor, sequence, input, authorized);
 }
 
 /**
- * Changes the content of one step and leaves the step list alone. `dryRun` answers what a save would do.
- * `warnings` are the renderer's (an unknown placeholder, for example) for the content as it would be sent.
+ * Changes the content of one step and leaves the step list alone, through the write path of `editSequence`.
+ * `dryRun` answers what a save would do. `warnings` are the renderer's (an unknown placeholder, for example) for the
+ * content as it would be sent.
  */
-export async function editSequenceStep(db: Database, accountId: string, id: string, stepId: string, edit: SequenceStepEdit,
-  guard: SequenceEditGuard & { dryRun?: boolean }) {
+export async function editSequenceStep(db: Database, actor: SendingActor, id: string, stepId: string, edit: SequenceStepEdit,
+  options: { expectedUpdatedAt?: number; dryRun?: boolean }) {
+  const { accountId } = actor;
   const sequence = getSequence(db, accountId, id);
+  const authorized = await authorizeSequenceEdit(actor, sequence, options);
   const step = required(sequence.steps.find(item => item.id === stepId));
   const next = { name: edit.name ?? step.name, subject: edit.subject ?? step.subject, previewText: edit.previewText ?? step.previewText,
     html: edit.html ?? step.html, text: edit.text ?? step.text };
@@ -190,11 +212,14 @@ export async function editSequenceStep(db: Database, accountId: string, id: stri
   const content = resolveContent(db, accountId, { ...next, templateId: step.templateId });
   if (sequence.status !== "draft" && step.enabled) assertContent(content);
   const { warnings } = await renderExample(db, accountId, content);
+  const saved = !options.dryRun && changed.length > 0;
+  if (!saved) {
+    authorized?.assertAuthorized();
+    return { sequence, step: { ...step, ...next }, changed, replacements, warnings, saved };
+  }
   const input = { steps: sequence.steps.map(item => item.id === stepId ? { id: stepId, ...next } : { id: item.id }) };
-  const saved = !guard.dryRun && changed.length > 0;
-  const result = await saveSequenceEdit(db, sequence, input, guard, !saved);
-  return { sequence: result, step: saved ? required(result.steps.find(item => item.id === stepId)) : { ...step, ...next },
-    changed, replacements, warnings, saved };
+  const result = writeSequenceEdit(db, actor, sequence, input, authorized);
+  return { sequence: result, step: required(result.steps.find(item => item.id === stepId)), changed, replacements, warnings, saved };
 }
 
 export async function setSequenceStatus(db: Database, actor: SendingActor, id: string, status: Exclude<SequenceStatus, "draft">,
@@ -210,7 +235,7 @@ export async function setSequenceStatus(db: Database, actor: SendingActor, id: s
     })();
   return db.transaction(() => {
     authorized.assertAuthorized();
-    assertUnchanged(sequence, getSequence(db, accountId, id));
+    assertSequenceUnchanged(db, sequence);
     if (status === sequence.status) return sequence;
     if (status === "paused" && sequence.status === "draft") throw new SendingError(409, "Entwürfe können nicht pausiert werden.");
     if (status === "live") {

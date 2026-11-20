@@ -102,22 +102,26 @@ export class OutreachScheduler {
   }
 
   private async attempt(db: Database, row: QueueRow): Promise<SendOutcome> {
-    const { accountId, campaignId, sequenceId, sequenceStepId, contactId, userId } = row;
+    const { accountId, campaignId, sequenceId, sequenceStepId, contactId } = row;
+    const sequence = sequenceId ? sequenceRow(db, accountId, sequenceId) : null;
+    // A sequence send runs under the user who last approved the sequence's content (going live or editing it),
+    // not under the approver recorded when the row was queued: an edit by a collaborator must not borrow the
+    // earlier approver's role.
+    const userId = sequence ? sequence.statusChangedByUserId : row.userId;
     if (!contactId || !userId) {
       return this.settle(db, row, { status: "failed", reason: "send_context_missing" });
     }
     const settings = await this.deps.settings(accountId);
-    const sequence = sequenceId ? sequenceRow(db, accountId, sequenceId) : null;
     const campaign = campaignId ? campaignRow(db, accountId, campaignId) : null;
     const step = sequence ? sequenceStep(db, accountId, sequence.id, sequenceStepId) : null;
     const item = campaign ?? (step?.enabled ? step : null);
     if (!item) return this.settle(db, row, { status: "skipped", reason: "step_changed" });
     const trackOpens = sequence?.trackOpens ?? row.trackOpens;
     const trackClicks = sequence?.trackClicks ?? row.trackClicks;
-    if (trackOpens !== row.trackOpens || trackClicks !== row.trackClicks) {
-      db.query(`UPDATE sends SET trackOpens = ?, trackClicks = ?
+    if (trackOpens !== row.trackOpens || trackClicks !== row.trackClicks || userId !== row.userId) {
+      db.query(`UPDATE sends SET trackOpens = ?, trackClicks = ?, userId = ?
         WHERE accountId = ? AND id = ? AND claimOwner = ? AND status = 'sending'`)
-        .run(trackOpens, trackClicks, accountId, row.id, row.claimOwner);
+        .run(trackOpens, trackClicks, userId, accountId, row.id, row.claimOwner);
     }
     const outcome = await this.deps.send({
       settings, content: item, sendId: row.id,
@@ -128,7 +132,8 @@ export class OutreachScheduler {
         if (sequence) {
           const live = sequenceRow(db, accountId, sequence.id);
           const liveStep = sequenceStep(db, accountId, sequence.id, sequenceStepId);
-          if (!live || live.senderIdentityId !== sequence.senderIdentityId || live.trackOpens !== trackOpens
+          if (!live || live.senderIdentityId !== sequence.senderIdentityId || live.statusChangedByUserId !== userId
+              || live.trackOpens !== trackOpens
               || live.trackClicks !== trackClicks || JSON.stringify(liveStep) !== JSON.stringify(step)) {
             throw new SendStopped("configuration_changed");
           }

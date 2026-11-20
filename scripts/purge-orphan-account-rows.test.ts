@@ -51,6 +51,15 @@ describe("purge-orphan-account-rows", () => {
       await upsertContact(mailbox.accountId, { email: "reader@example.test", firstName: "Synthetic" });
       await createApiToken(mailbox.accountId, "synthetic-manager", { name: "Website", listIds: [list.id] });
     }
+    // Spam settings are keyed by scope: the prefixed and the legacy bare-id row of A are orphans, B's row and "global" are not.
+    const spamScopes = [`account:${a.accountId}`, a.accountId, `account:${b.accountId}`, "global"];
+    for (const scope of spamScopes) {
+      // "global" stays empty: other test files share this master DB and must keep the default spam detection.
+      master.prepare(`INSERT INTO spam_settings (scope, settings, updatedAt, updatedByUserId) VALUES (?, ?, 0, NULL)
+        ON CONFLICT(scope) DO NOTHING`).run(scope, scope === "global" ? "{}" : '{"enabled":false}');
+    }
+    const spamRows = () => (master.prepare("SELECT scope FROM spam_settings WHERE scope IN (?, ?, ?, ?) ORDER BY scope")
+      .all(...spamScopes) as Array<{ scope: string }>).map(row => row.scope);
     const outreach = await getOutreachDb();
     const liveOutreachBefore = outreachRows(outreach, b.accountId);
     const sharedFile = getDefaultAccountDbPath(a.accountId);
@@ -66,7 +75,7 @@ describe("purge-orphan-account-rows", () => {
 
     const scan = scanOrphanAccountRows();
     expect(scan.master).toEqual({
-      [a.accountId]: { user_accounts: 1, sender_identities: 1, scheduled_sends: 1, mailbox_watcher_auth: 1 },
+      [a.accountId]: { user_accounts: 1, sender_identities: 1, scheduled_sends: 1, mailbox_watcher_auth: 1, spam_settings: 2 },
       [c.accountId]: { sender_identities: 1 }
     });
     const withRows = scan.shards.filter(shard => Object.keys(shard.orphans).length || shard.removable);
@@ -96,6 +105,7 @@ describe("purge-orphan-account-rows", () => {
     expect(shared.prepare("SELECT COUNT(*) AS n FROM message_fts_v3 WHERE accountId = ?").get(a.accountId)).toEqual({ n: 0 });
     expect(countRows(master, MASTER_TABLES, a.accountId)).toEqual({});
     expect(countRows(master, MASTER_TABLES, c.accountId)).toEqual({});
+    expect(spamRows()).toEqual([`account:${b.accountId}`, "global"].sort());
     expect(outreachRows(outreach, a.accountId)).toEqual({ erased_addresses: 1 });
     // The live mailbox sharing the shard keeps everything.
     expect(countRows(shared, shardTables, b.accountId)).toEqual(liveShardBefore);

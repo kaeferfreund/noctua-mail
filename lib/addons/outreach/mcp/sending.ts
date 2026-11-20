@@ -21,7 +21,7 @@ const actor = (account: OutreachMcpAccount) => ({ accountId: account.accountId, 
 /** A step body is a whole HTML mail. A sequence is answered with the bodies' lengths; `get_sequence_step` answers one step in full. */
 const stepOutline = ({ html, text, ...step }: SequenceStep) => ({ ...step, htmlLength: html.length, textLength: text.length });
 const sequenceOutline = (sequence: Sequence) => ({ ...sequence, steps: sequence.steps.map(stepOutline) });
-const liveEdit = "A sequence that is live or paused needs the token's send permission: the change goes out with the next mail, without another approval.";
+const liveEdit = "Editing a sequence that is live or paused approves the new content for sending like going live: it needs the token's send permission, the change goes out with the next mail, and the token's creator becomes the sequence's approver.";
 
 export function registerOutreachSendingTools(host: OutreachMcpHost) {
   const { server, outreachAccount, result } = host;
@@ -104,7 +104,7 @@ export function registerOutreachSendingTools(host: OutreachMcpHost) {
   }, async ({ accountId: requested, sequenceId, expectedUpdatedAt, ...input }) => {
     const ctx = await outreachAccount(requested, "editor");
     const db = await getOutreachDb();
-    const sequence = sequenceId ? await editSequence(db, ctx.accountId, sequenceId, input, { expectedUpdatedAt, authorization: actor(ctx).authorization })
+    const sequence = sequenceId ? await editSequence(db, actor(ctx), sequenceId, input, { expectedUpdatedAt })
       : saveSequence(db, ctx.accountId, input);
     return result("Sequence saved", { ok: true, sequence: sequenceOutline(sequence) });
   });
@@ -113,8 +113,8 @@ export function registerOutreachSendingTools(host: OutreachMcpHost) {
     inputSchema: stepEditInput.extend({ ...mailbox.shape, ...sequenceId, stepId: itemId }), annotations: edit
   }, async ({ accountId: requested, sequenceId, stepId, expectedUpdatedAt, dryRun, ...change }) => {
     const ctx = await outreachAccount(requested, "editor");
-    const { sequence, step, ...outcome } = await editSequenceStep(await getOutreachDb(), ctx.accountId, sequenceId, stepId, change,
-      { expectedUpdatedAt, dryRun, authorization: actor(ctx).authorization });
+    const { sequence, step, ...outcome } = await editSequenceStep(await getOutreachDb(), actor(ctx), sequenceId, stepId, change,
+      { expectedUpdatedAt, dryRun });
     return result(outcome.saved ? "Sequence step saved" : "Sequence step not saved", { ok: true, ...outcome,
       sequence: { id: sequence.id, name: sequence.name, status: sequence.status, updatedAt: sequence.updatedAt }, step: stepOutline(step) });
   });
