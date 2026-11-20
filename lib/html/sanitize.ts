@@ -176,11 +176,14 @@ const STYLE_END_TAG = /<\/style/i;
 
 /**
  * Links in sanitized HTML open in a new browsing context without opener or
- * referrer. Set on the element here, not by rewriting the serialized markup,
- * so attribute values stay attribute values.
+ * referrer. With `forceBlank` (HTML inside the app document) a sender
+ * `target` (`_top`, `_parent`, `_self`, a named frame) is replaced too, so a
+ * click never navigates the Noctua tab itself. Set on the element here, not
+ * by rewriting the serialized markup, so attribute values stay attribute
+ * values.
  */
-function applySafeLinkAttributes(attribs: sanitizeHtml.Attributes) {
-  if (attribs.target === undefined) attribs.target = "_blank";
+function applySafeLinkAttributes(attribs: sanitizeHtml.Attributes, forceBlank: boolean) {
+  if (forceBlank || attribs.target === undefined) attribs.target = "_blank";
   const tokens = (attribs.rel ?? "").split(/\s+/).filter(Boolean);
   if (!tokens.length) {
     attribs.rel = "noreferrer noopener";
@@ -193,18 +196,24 @@ function applySafeLinkAttributes(attribs: sanitizeHtml.Attributes) {
 
 /**
  * Sanitizer profile. `styleElements: false` drops `<style>` blocks with their
- * text (HTML rendered inside the app document, where a sender stylesheet
- * would restyle the app). `safeLinks` applies applySafeLinkAttributes.
+ * text and the document-level tags (`html`, `head`, `meta`, `body`, `title`;
+ * the title text too): HTML rendered inside the app document, where a sender
+ * stylesheet or `<meta name="viewport|theme-color">` would change the app.
+ * `safeLinks` applies applySafeLinkAttributes.
  */
 type SanitizeProfile = { styleElements: boolean; safeLinks: boolean };
 const MESSAGE_FRAME_PROFILE: SanitizeProfile = { styleElements: true, safeLinks: false };
+const APP_DOCUMENT_DROPPED_TAGS = new Set(["style", "html", "head", "meta", "body", "title"]);
+const APP_DOCUMENT_ALLOWED_TAGS = (SANITIZE_HTML_OPTIONS.allowedTags as string[]).filter(
+  (tag) => !APP_DOCUMENT_DROPPED_TAGS.has(tag)
+);
 
 function sanitizeNormalized(normalized: string, blockRemote: RemoteRewriteGate, css: CssFilter, profile = MESSAGE_FRAME_PROFILE) {
   const sanitized = sanitizeHtml(normalized, {
     ...SANITIZE_HTML_OPTIONS,
-    allowedTags: profile.styleElements
-      ? SANITIZE_HTML_OPTIONS.allowedTags
-      : (SANITIZE_HTML_OPTIONS.allowedTags as string[]).filter((tag) => tag !== "style"),
+    allowedTags: profile.styleElements ? SANITIZE_HTML_OPTIONS.allowedTags : APP_DOCUMENT_ALLOWED_TAGS,
+    // sanitize-html's own list plus title, whose text is not page content.
+    ...(profile.styleElements ? {} : { nonTextTags: ["script", "style", "textarea", "option", "xmp", "title"] }),
     exclusiveFilter: (frame) => frame.tag === "style" && STYLE_END_TAG.test(frame.text),
     transformTags: {
       "*": (tagName, original) => {
@@ -217,7 +226,7 @@ function sanitizeNormalized(normalized: string, blockRemote: RemoteRewriteGate, 
         }
         if (attribs.style) attribs.style = css(attribs.style, true);
         if (tagName === "img") attribs.referrerpolicy = "no-referrer";
-        if (tagName === "a" && profile.safeLinks) applySafeLinkAttributes(attribs);
+        if (tagName === "a" && profile.safeLinks) applySafeLinkAttributes(attribs, !profile.styleElements);
         // The only mode-dependent code, and it runs only through the gate.
         if (tagName === "img" || tagName === "source") {
           if (attribs.src && !isLocalMailResource(attribs.src)) blockRemote(() => {
