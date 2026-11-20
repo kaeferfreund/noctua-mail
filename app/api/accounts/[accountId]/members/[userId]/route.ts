@@ -5,6 +5,7 @@ import { requireJsonSameOrigin, requireBodylessSameOrigin } from "@/app/api/_hel
 import { withAuthResponse } from "@/lib/auth";
 import { isAccountRole } from "@/lib/data";
 import { changeAccountMember, MembershipError } from "@/lib/accountMembers";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 async function mutate(request: Request, params: AccountRouteParams["params"], remove: boolean) {
   const context = await requireAccountContextFromParams(request, params, { minRole: "manager" });
   if (context instanceof NextResponse) return membershipErrorResponse(context);
@@ -13,7 +14,9 @@ async function mutate(request: Request, params: AccountRouteParams["params"], re
     if (origin) return membershipErrorResponse(origin);
     const { userId } = await params;
     if (typeof userId !== "string" || !userId.trim()) return NextResponse.json({ ok: false, code: "invalid_request", message: "Missing userId" }, { status: 400 });
-    const body = remove ? null : await request.json().catch(() => null);
+    const json = remove ? null : await readJsonBody<any>(request);
+    if (json && !json.ok) return json.response;
+    const body = json?.ok ? json.value : null;
     if (!remove && !isAccountRole(body?.role)) return NextResponse.json({ ok: false, code: "above_manager", message: "Invalid role" }, { status: 400 });
     try { return NextResponse.json({ ok: true, ...await changeAccountMember(context.accountId, userId, context.userId, remove ? null : body.role) }); }
     catch (error) { if (error instanceof MembershipError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status }); throw error; }

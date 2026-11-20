@@ -7,6 +7,7 @@ import { withAuthResponse } from "@/lib/auth";
 import { listMcpTokens } from "@/lib/serverDb";
 import { mintMcpToken } from "@/lib/mcpAuth";
 import { requireMcpGrant } from "./mcpGrant";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const context = await requireAccountContextFromParams(request, params, { minRole: "editor" });
   if (context instanceof NextResponse) return context;
@@ -23,7 +24,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
     const origin = requireJsonSameOrigin(request); if (origin) return origin;
-    const body = await request.json().catch(() => null);
+    const json = await readJsonBody<any>(request);
+    if (!json.ok) return json.response;
+    const body = json.value;
     if (!body || typeof body.label !== "string" || (body.ttlSeconds !== undefined && (!Number.isSafeInteger(body.ttlSeconds) || body.ttlSeconds < 60 || body.ttlSeconds > 31_536_000))) return NextResponse.json({ ok: false, message: "Invalid token parameters" }, { status: 400 });
     if ((body.mode !== undefined && !MCP_PERMISSION_MODES.includes(body.mode)) ||
       (body.accountIds !== undefined && !isMcpAccountIdList(body.accountIds, context.accountId))) {

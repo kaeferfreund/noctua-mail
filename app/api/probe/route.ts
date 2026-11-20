@@ -8,6 +8,7 @@ import { resolvePublicHost } from "@/lib/net/urlSafety";
 import net from "net";
 import tls from "tls";
 import { createRateLimiter, getRequestIp } from "@/lib/rateLimit";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 /**
  * POST /api/probe — tests whether an IMAP/SMTP host:port supports implicit
@@ -152,7 +153,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const payload = parsePayload(await request.json().catch(() => null));
+    const body = await readJsonBody<unknown>(request);
+    if (!body.ok) return body.response;
+    const payload = parsePayload(body.value);
     if (!payload) {
       return NextResponse.json({ ok: false, message: "Protocol, host and port required" }, { status: 400 });
     }

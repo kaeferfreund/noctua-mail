@@ -13,6 +13,7 @@ export type FolderSidebarPaneProps = {
   accountFolderCount: number;
   isRecomputingThreads: boolean;
   isRecomputingCategories: boolean;
+  canRecompute: boolean;
   syncAccount: (
     folderId?: string,
     mode?: "new" | "full",
@@ -63,6 +64,7 @@ export default function FolderSidebarPane({
   accountFolderCount,
   isRecomputingThreads,
   isRecomputingCategories,
+  canRecompute,
   syncAccount,
   recomputeThreads,
   recomputeCategories,
@@ -107,7 +109,8 @@ export default function FolderSidebarPane({
         folderQuery,
         accountFolderCount,
         isRecomputingThreads,
-        isRecomputingCategories
+        isRecomputingCategories,
+        canRecompute
       }}
       actions={{
         setFolderQuery,

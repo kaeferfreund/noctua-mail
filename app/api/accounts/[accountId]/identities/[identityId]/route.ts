@@ -3,6 +3,7 @@ import { requireAccountContextFromParams, type AccountRouteParams } from "@/app/
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { withAuthResponse } from "@/lib/auth";
 import { updateSenderIdentity, SenderIdentityError } from "@/lib/senderIdentities";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 async function mutate(request: Request, { params }: AccountRouteParams, disable: boolean) {
   const context = await requireAccountContextFromParams(request, params, { minRole: "manager" });
@@ -10,10 +11,12 @@ async function mutate(request: Request, { params }: AccountRouteParams, disable:
   return withAuthResponse(context, async () => {
     const origin = requireJsonSameOrigin(request); if (origin) return origin;
     const { identityId } = await params;
+    const json = disable ? null : await readJsonBody(request);
+    if (json && !json.ok) return json.response;
     try {
       if (typeof identityId !== "string" || !identityId || identityId.length > 256) throw new SenderIdentityError("invalid_identity", 400, "Invalid identity id");
       const identity = await updateSenderIdentity(context.accountId, typeof identityId === "string" ? identityId : "",
-        disable ? { enabled: false } : await request.json().catch(() => null), context);
+        disable || !json?.ok ? { enabled: false } : json.value, context);
       return NextResponse.json({ ok: true, identity });
     } catch (error) {
       if (error instanceof SenderIdentityError) return NextResponse.json({ ok: false, code: error.code, message: error.message }, { status: error.status });

@@ -17,6 +17,7 @@ import { toFiniteNumber, toPositiveNumberArray } from "@/app/api/_helpers/number
 import { deleteCalendarEventAndRelatedData } from "@/lib/calendarEventDeletion";
 import { buildCalendarEventEmailSnapshotFromMessageId } from "@/lib/calendarEventEmailSnapshot.server";
 import { toCalendarEventResponse } from "@/lib/calendarEventEmailSnapshot";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 function generateId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -59,9 +60,6 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const body = (await request.json().catch(() => null)) as Partial<CalendarEvent> & {
-    accountId?: string;
-  } | null;
   const accountId = await getAccountIdFromParams(params);
   if (!accountId) {
     return NextResponse.json({ ok: false, message: "Missing accountId" }, { status: 400 });
@@ -71,6 +69,11 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  const json = await readJsonBody<Partial<CalendarEvent> & {
+    accountId?: string;
+  }>(request);
+  if (!json.ok) return json.response;
+  const body = json.value;
   return withAuthResponse(accountContext, async () => {
     const summary = String(body?.summary ?? "").trim();
     if (!summary) {
@@ -156,20 +159,21 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
 
 export async function DELETE(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const body = (await request.json().catch(() => null)) as {
-    accountId?: string;
-    eventId?: string;
-  } | null;
   const accountId = await getAccountIdFromParams(params);
-  const eventId = body?.eventId?.trim() ?? "";
-  if (!accountId || !eventId) {
-    return NextResponse.json({ ok: false, message: "Missing accountId or eventId" }, { status: 400 });
-  }
   const accountContext = await requireAccountContext(request, accountId, {
     minRole: "editor",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  const json = await readJsonBody<{
+    accountId?: string;
+    eventId?: string;
+  }>(request);
+  if (!json.ok) return json.response;
+  const eventId = json.value?.eventId?.trim() ?? "";
+  if (!eventId) {
+    return NextResponse.json({ ok: false, message: "Missing accountId or eventId" }, { status: 400 });
+  }
   return withAuthResponse(accountContext, async () => {
     try {
       const result = await deleteCalendarEventAndRelatedData({ accountId, eventId });

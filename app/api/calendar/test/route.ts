@@ -3,6 +3,7 @@ import { requireAccountContext } from "@/app/api/_helpers/accountContext";
 import { withAuthResponse } from "@/lib/auth";
 import { NextResponse } from "next/server";
 import { testCaldavConnection } from "@/lib/caldav/client";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 /**
  * Tests CalDAV credentials for one mailbox. Only managers of that mailbox may
@@ -10,12 +11,15 @@ import { testCaldavConnection } from "@/lib/caldav/client";
  */
 export async function POST(request: Request) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const body = (await request.json().catch(() => null)) as {
+  // The mailbox id travels in the body, so it is read (size-capped) before the role check.
+  const json = await readJsonBody<{
     accountId?: unknown;
     url?: unknown;
     user?: unknown;
     password?: unknown;
-  } | null;
+  }>(request);
+  if (!json.ok) return json.response;
+  const body = json.value;
   const accountId = typeof body?.accountId === "string" ? body.accountId.trim() : "";
   const accountContext = await requireAccountContext(request, accountId, {
     minRole: "manager",

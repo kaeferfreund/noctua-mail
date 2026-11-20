@@ -9,6 +9,7 @@ import { withDbWriteRetry } from "./dbWriteRetry";
 import { revokeAuthStreams } from "./authStreams";
 import { hasResetDelivery, resetCallback } from "./authRecoveryContext";
 import { requireJsonSameOrigin } from "../app/api/_helpers/requestOrigin";
+import { BodyReadTimeoutError, readBoundedBody } from "../app/api/_helpers/readAuthJson";
 
 export const RAW_DISABLED_PATHS = [
   "/change-password", "/update-user", "/change-email", "/delete-user", "/request-password-reset", "/set-password",
@@ -372,8 +373,31 @@ async function finalizePolicy(proof: AuthProofContext, path: string, response: R
   return response;
 }
 
+/** Largest body any auth library endpoint accepts (sign-in, passkey ceremonies, reset). */
+export const AUTH_HANDLER_BODY_LIMIT = 64 * 1024;
+
+/**
+ * Auth endpoints are public: read at most AUTH_HANDLER_BODY_LIMIT bytes within the
+ * auth read deadline before any policy or library work, and hand the library a
+ * request that carries exactly those bytes.
+ */
+async function boundAuthRequestBody(request: Request): Promise<Request | Response> {
+  if (!request.body) return request;
+  const noStore = { "cache-control": "no-store" };
+  let bytes: Uint8Array | null;
+  try { bytes = await readBoundedBody(request, AUTH_HANDLER_BODY_LIMIT); }
+  catch (error) {
+    if (error instanceof BodyReadTimeoutError) return Response.json({ ok: false, code: "request_timeout" }, { status: 408, headers: noStore });
+    return Response.json({ ok: false, code: "invalid_request" }, { status: 400, headers: noStore });
+  }
+  if (!bytes) return Response.json({ ok: false, code: "payload_too_large" }, { status: 413, headers: noStore });
+  return new Request(request, { body: bytes as Uint8Array<ArrayBuffer> });
+}
+
 export function wrapAuthPolicyHandler(handler: (request: Request) => Promise<Response>, database: () => Promise<Database>) {
-  return async (request: Request): Promise<Response> => {
+  return async (incoming: Request): Promise<Response> => {
+    const request = await boundAuthRequestBody(incoming);
+    if (request instanceof Response) return request;
     const proof: AuthProofContext = { db: await database(), request, authenticatedAt:Date.now(), method:"password", createdSessionIds:[] };
     return withAuthProof(proof, async () => {
       const path = new URL(request.url).pathname.replace(/^\/api\/ba/, "");

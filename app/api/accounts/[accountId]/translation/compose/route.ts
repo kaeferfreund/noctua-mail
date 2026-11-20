@@ -14,6 +14,8 @@ import {
   requireAccountContext,
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
+import { deeplRateLimitResponse } from "@/app/api/_helpers/deeplRateLimit";
 
 /**
  * Translates compose-draft text supplied in the request body. Unlike the
@@ -49,9 +51,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
 
     // Parse the body only after auth so an unauthenticated caller can't force
     // request-body parsing work.
-    const payload = (await request.json().catch(() => null)) as
-      | { text?: string; targetLang?: string; format?: string }
-      | null;
+    const body = await readJsonBody<{ text?: string; targetLang?: string; format?: string }>(request);
+    if (!body.ok) return body.response;
+    const payload = body.value;
     const format: DeeplFormat = payload?.format === "html" ? "html" : "text";
     const targetLang = normalizeDeeplTargetLang(payload?.targetLang ?? deepl.targetLang);
     const rawSource = typeof payload?.text === "string" ? payload.text : "";
@@ -66,6 +68,8 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     // and splice them back into the result.
     const { text: sourceText, tokens: inlineData, marker } = extractInlineData(rawSource);
 
+    const limited = deeplRateLimitResponse(context.userId, context.accountId);
+    if (limited) return limited;
     try {
       const result = await deeplTranslate({ apiKey, text: sourceText, targetLang, format });
       return NextResponse.json({

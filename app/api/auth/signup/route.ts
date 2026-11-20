@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { BodyReadTimeoutError, readAuthJson } from "@/app/api/_helpers/readAuthJson";
 import { getAuth } from "@/lib/betterAuth";
 import { getDb } from "../../../../lib/db/connection";
 import { provisionUser } from "@/lib/userProvisioning";
@@ -13,7 +14,9 @@ export async function POST(request:Request) {
   if (attempts.isLimited(getRequestIp(request))) return NextResponse.json({ok:false,code:"signup_rate_limited"},{status:429,headers:{...headers,"retry-after":"60"}});
   try {
     const auth=await getAuth(), db=await getDb();
-    const input:unknown=await request.json();
+    // Bounded read (bytes and time) before any provisioning work.
+    const input:unknown=await readAuthJson(request);
+    if (input instanceof Response) { for (const [key,value] of Object.entries(headers)) input.headers.set(key,value); return input; }
     const result=await provisionUser(auth,db,input);
     const body=input as {email:string;password:string};
     // Provisioning is committed. A failed setup sign-in must still return the new identity.
@@ -30,6 +33,6 @@ export async function POST(request:Request) {
     return output;
   } catch (error) {
     return NextResponse.json({ok:false,code:error instanceof AuthPolicyError?error.code:error instanceof SyntaxError?"invalid_request":"provisioning_failed"},
-      {status:error instanceof AuthPolicyError?error.status:error instanceof SyntaxError?400:503,headers});
+      {status:error instanceof AuthPolicyError?error.status:error instanceof SyntaxError?400:error instanceof BodyReadTimeoutError?408:503,headers});
   }
 }

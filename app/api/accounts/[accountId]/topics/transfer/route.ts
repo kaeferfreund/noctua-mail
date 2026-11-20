@@ -7,6 +7,7 @@ import {
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
 import { exportTopicTransferData, importTopicTransferData } from "@/lib/topics";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
@@ -21,14 +22,16 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const body = (await request.json().catch(() => null)) as {
-    accountId?: string;
-    data?: unknown;
-  } | null;
 
   const accountId = await getAccountIdFromParams(params);
   const context = await requireAccountContext(request, accountId, { minRole: "manager" });
   if (context instanceof NextResponse) return context;
+  const json = await readJsonBody<{
+    accountId?: string;
+    data?: unknown;
+  }>(request);
+  if (!json.ok) return json.response;
+  const body = json.value;
   return withAuthResponse(context, async () => {
 
     try {

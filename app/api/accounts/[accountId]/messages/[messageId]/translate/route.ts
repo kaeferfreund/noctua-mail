@@ -15,6 +15,8 @@ import {
   getAccountIdFromParams,
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
+import { deeplRateLimitResponse } from "@/app/api/_helpers/deeplRateLimit";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; messageId?: string }>;
@@ -57,9 +59,9 @@ export async function POST(request: Request, { params }: Params) {
 
     // Parse the body only after auth so an unauthenticated caller can't force
     // request-body parsing work.
-    const payload = (await request.json().catch(() => null)) as
-      | { targetLang?: string; format?: string }
-      | null;
+    const body = await readJsonBody<{ targetLang?: string; format?: string }>(request);
+    if (!body.ok) return body.response;
+    const payload = body.value;
     const format: DeeplFormat = payload?.format === "html" ? "html" : "text";
     const targetLang = normalizeDeeplTargetLang(payload?.targetLang ?? deepl.targetLang);
     const rawSource = format === "html" ? message.htmlBody ?? "" : message.body ?? "";
@@ -94,6 +96,8 @@ export async function POST(request: Request, { params }: Params) {
       });
     }
 
+    const limited = deeplRateLimitResponse(context.userId, resolvedAccountId);
+    if (limited) return limited;
     try {
       const result = await deeplTranslate({ apiKey, text: sourceText, targetLang, format });
       await putCachedTranslation(resolvedAccountId, {

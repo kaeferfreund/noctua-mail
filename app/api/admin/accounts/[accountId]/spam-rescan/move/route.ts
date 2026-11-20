@@ -5,6 +5,7 @@ import { withAuthResponse } from "@/lib/auth";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import type { AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { SpamRescanBusyError, SpamRescanInputError, startSpamRescanMove } from "@/lib/mail/spam/rescan";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 /**
  * `{ jobId, ids }`: moves the reviewed selection of a finished scan to Junk in
@@ -17,7 +18,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     const limited = spamRescanRateLimited(request, session.userId); if (limited) return limited;
     const accountId = await resolveAdminMemberAccount(params, session.userId);
     if (!accountId) return spamRescanFailure(404, "account_not_found");
-    const body = await request.json().catch(() => null) as { jobId?: unknown; ids?: unknown } | null;
+    const json = await readJsonBody<{ jobId?: unknown; ids?: unknown }>(request);
+    if (!json.ok) return json.response;
+    const body = json.value;
     if (typeof body?.jobId !== "string") return spamRescanFailure(400, "invalid_selection");
     try {
       const selected = await startSpamRescanMove({ accountId, jobId: body.jobId, ids: body.ids, userId: session.userId });

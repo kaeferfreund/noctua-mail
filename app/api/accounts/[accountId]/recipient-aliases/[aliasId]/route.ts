@@ -11,6 +11,7 @@ import {
   deleteRecipientAlias,
   updateRecipientAlias
 } from "@/lib/recipientAliases";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; aliasId?: string }>;
@@ -25,12 +26,12 @@ export async function PUT(request: Request, { params }: Params) {
   if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
 
-    const body = (await request.json().catch(() => null)) as
-      | {
+    const json = await readJsonBody<{
           name?: string;
           recipients?: string;
-        }
-      | null;
+        }>(request);
+    if (!json.ok) return json.response;
+    const body = json.value;
     const changes: { name?: string; recipients?: string } = {};
     if (body?.name !== undefined) {
       const name = body.name.trim();

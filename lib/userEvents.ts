@@ -10,6 +10,19 @@ export type UserEvent =
   | { type: "thread-collab"; accountId: string; threadId: string; revision: number }
   | { type: "mailboxes-changed" };
 
+/** Open user event streams of one login session (tabs); more are refused until one closes. */
+export const MAX_USER_EVENT_STREAMS_PER_SESSION = 16;
+/** Events a reader may leave unread before the stream ends; the client reconnects and refetches. */
+export const MAX_UNREAD_USER_EVENTS = 64;
+const streamsKey = Symbol.for("noctua.userEventStreams");
+const streamGlobals = globalThis as typeof globalThis & { [streamsKey]?: Map<string, number> };
+const openStreamsBySession = streamGlobals[streamsKey] ??= new Map<string, number>();
+
+/** False when this login session already holds the maximum number of event streams. */
+export function canOpenUserEventStream(session: Pick<ActiveUserSession, "sessionId">) {
+  return (openStreamsBySession.get(session.sessionId) ?? 0) < MAX_USER_EVENT_STREAMS_PER_SESSION;
+}
+
 /** Narrow transport seam for race/timer tests; production uses the canonical summary reader. */
 type Dependencies = { loadSummary?: typeof getUserMailboxSummary; debounceMs?: number; heartbeatMs?: number };
 export function createUserEventStream(request: Request, session: ActiveUserSession, deps: Dependencies = {}) {
@@ -20,8 +33,15 @@ export function createUserEventStream(request: Request, session: ActiveUserSessi
     start(controller) {
       let stopped = false;
       let work = Promise.resolve();
+      let queuedTasks = 0;
       const pending = new Map<string, { timer: ReturnType<typeof setTimeout>; threads: Map<string, number> }>();
       const cleanups: Array<() => void> = [];
+      openStreamsBySession.set(session.sessionId, (openStreamsBySession.get(session.sessionId) ?? 0) + 1);
+      cleanups.push(() => {
+        const open = (openStreamsBySession.get(session.sessionId) ?? 1) - 1;
+        if (open > 0) openStreamsBySession.set(session.sessionId, open);
+        else openStreamsBySession.delete(session.sessionId);
+      });
       const stop = () => {
         if (stopped) return;
         stopped = true;
@@ -50,13 +70,17 @@ export function createUserEventStream(request: Request, session: ActiveUserSessi
         await assertStreamAuthorized(session, db => {
           if (stopped) return;
           if (event && "accountId" in event && !resolveAccountRoleRow(db, session.userId, event.accountId)) return;
+          // A reader that stops consuming would grow this queue without bound: end the stream instead.
+          if ((controller.desiredSize ?? 0) < -MAX_UNREAD_USER_EVENTS) { authStream.close(); return; }
           controller.enqueue(encoder.encode(event ? `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n` : ": heartbeat\n\n"));
         });
       };
       function queue(task: () => Promise<void>) {
         // Serialize reads and enqueues, so an older slow refresh cannot overtake
         // a later refresh. Authorization failures terminate the user stream.
-        work = work.then(async () => { if (!stopped) await task(); }).catch(() => authStream.close());
+        queuedTasks++;
+        work = work.then(async () => { if (!stopped) await task(); }).catch(() => authStream.close())
+          .finally(() => { queuedTasks--; });
       }
       function schedule(accountId: string, threadId?: string, revision?: number) {
         if (stopped) return;
@@ -82,7 +106,8 @@ export function createUserEventStream(request: Request, session: ActiveUserSessi
       }
       cleanups.push(subscribeMailboxEvents(event => schedule(event.accountId)));
       cleanups.push(subscribeThreadCollabEvents(event => schedule(event.accountId, event.threadId, event.revision)));
-      const heartbeat = setInterval(() => queue(() => send()), deps.heartbeatMs ?? 15_000);
+      // A heartbeat only matters on an idle stream; never stack one behind pending work.
+      const heartbeat = setInterval(() => { if (queuedTasks === 0) queue(() => send()); }, deps.heartbeatMs ?? 15_000);
       heartbeat.unref?.();
       cleanups.push(() => clearInterval(heartbeat));
       if (request.signal.aborted) onAbort();

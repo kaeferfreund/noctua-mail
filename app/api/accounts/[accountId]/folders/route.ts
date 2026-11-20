@@ -10,6 +10,7 @@ import {
   requireAccountContext,
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
@@ -26,7 +27,9 @@ export async function PUT(request: Request, { params }: AccountRouteParams) {
   const accountContext = await requireAccountContext(request, accountId, { minRole: "manager" });
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
-    const payload = (await request.json()) as Folder[];
+    const body = await readJsonBody<Folder[]>(request);
+    if (!body.ok) return body.response;
+    const payload = body.value ?? ({} as NonNullable<typeof body.value>);
     if (!Array.isArray(payload)) {
       return NextResponse.json({ ok: false, message: "Invalid payload" }, { status: 400 });
     }

@@ -5,6 +5,7 @@ import { withAuthResponse } from "@/lib/auth";
 import { getUserAccountPrefs, mergeUserAccountPrefs } from "@/lib/serverDb";
 import { InvalidAccountPreferencesError } from "@/lib/serverDb";
 import { accountPrefsPatchSchema } from "@/lib/accountPrefs";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const context = await requireAccountContextFromParams(request, params, { minRole: "viewer" });
   if (context instanceof NextResponse) return context;
@@ -15,7 +16,9 @@ export async function PUT(request: Request, { params }: AccountRouteParams) {
   if (context instanceof NextResponse) return context;
   return withAuthResponse(context, async () => {
     const origin = requireJsonSameOrigin(request); if (origin) return origin;
-    const patch = accountPrefsPatchSchema.safeParse(await request.json().catch(() => null));
+    const json = await readJsonBody<any>(request);
+    if (!json.ok) return json.response;
+    const patch = accountPrefsPatchSchema.safeParse(json.value);
     if (!patch.success) return NextResponse.json({ ok: false, code: "invalid_preferences", message: "Invalid preferences" }, { status: 400 });
     try {
       return NextResponse.json({ ok: true, prefs: await mergeUserAccountPrefs(context.userId, context.accountId, patch.data) });

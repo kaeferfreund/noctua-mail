@@ -5,6 +5,7 @@ import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { SpamSettingsError } from "@/lib/mail/spam/config";
 import { describeSpamConfig, loadSpamAdminSettings, loadSpamConfig, loadSpamTrustCounters, saveSpamAdminSettings } from "@/lib/mail/spam/settings";
 import { listMemberAccounts } from "@/lib/accountAccess";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 /** `trust` and `rescanMailboxes` („Posteingang jetzt prüfen“): the admin's own mailboxes only. */
 async function body(userId: string) {
@@ -22,8 +23,10 @@ export async function PUT(request: Request) {
   const origin = requireJsonSameOrigin(request); if (origin) return origin;
   const session = await requireAdminSessionOr403(request); if (session instanceof NextResponse) return session;
   return withAuthResponse(session, async () => {
+    const json = await readJsonBody<any>(request);
+    if (!json.ok) return json.response;
     try {
-      await saveSpamAdminSettings(await request.json().catch(() => null), session.userId);
+      await saveSpamAdminSettings(json.value, session.userId);
     } catch (error) {
       if (error instanceof SpamSettingsError) return NextResponse.json({ ok: false, message: error.message }, { status: 400 });
       throw error;

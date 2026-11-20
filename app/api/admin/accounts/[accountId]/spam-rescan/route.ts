@@ -6,6 +6,7 @@ import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import type { AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { loadSpamRescanState, previewSpamRescan, SpamRescanBusyError, SpamRescanInputError, startSpamRescan } from "@/lib/mail/spam/rescan";
 import { isSpamRescanPeriod } from "@/lib/mail/spam/rescanTypes";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 /**
  * „Posteingang jetzt prüfen“ for one mailbox, admins who are members of it only (else 404). GET `?period=30d|12m|all`:
@@ -31,7 +32,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     const limited = spamRescanRateLimited(request, session.userId); if (limited) return limited;
     const accountId = await resolveAdminMemberAccount(params, session.userId);
     if (!accountId) return spamRescanFailure(404, "account_not_found");
-    const body = await request.json().catch(() => null) as { period?: unknown; withModel?: unknown; modelLimit?: unknown } | null;
+    const json = await readJsonBody<{ period?: unknown; withModel?: unknown; modelLimit?: unknown }>(request);
+    if (!json.ok) return json.response;
+    const body = json.value;
     if (!isSpamRescanPeriod(body?.period)) return spamRescanFailure(400, "invalid_period");
     if (typeof body.withModel !== "boolean" || (body.withModel && typeof body.modelLimit !== "number")) return spamRescanFailure(400, "invalid_model_limit");
     try {

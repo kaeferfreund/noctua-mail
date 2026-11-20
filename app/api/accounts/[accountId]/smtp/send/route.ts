@@ -28,6 +28,7 @@ import {
 import { toFiniteNumber } from "@/app/api/_helpers/numberParsing";
 import { smtpUpstreamErrorResponse } from "@/app/api/_helpers/smtpUpstreamError";
 import { outreachAddonEnabled } from "@/lib/addons/outreach/config";
+import { JSON_BODY_LIMITS, JSON_BODY_TIMEOUT_MS, readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 function buildMessageId(address: string) {
   const domain = address.split("@")[1]?.trim();
@@ -45,7 +46,7 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   return withAuthResponse(accountContext, async () => {
     const originError = requireJsonSameOrigin(request);
     if (originError) return originError;
-    const payload = (await request.json()) as {
+    const body = await readJsonBody<{
       accountId?: string;
       identityId?: string;
       /** Saved draft this compose session edits: its schedule is held during the send. */
@@ -73,7 +74,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
         cid?: string;
         dataUrl?: string;
       }>;
-    };
+    }>(request, { limit: JSON_BODY_LIMITS.compose, timeoutMs: JSON_BODY_TIMEOUT_MS.compose });
+    if (!body.ok) return body.response;
+    const payload = body.value ?? ({} as NonNullable<typeof body.value>);
     const { account, clientId } = accountContext;
     let identity;
     try {

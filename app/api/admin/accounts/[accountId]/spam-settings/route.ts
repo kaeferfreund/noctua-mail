@@ -5,6 +5,7 @@ import type { AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
 import { SpamSettingsError } from "@/lib/mail/spam/config";
 import { loadMailboxSpamSettings, loadSpamConfig, saveMailboxSpamSettings } from "@/lib/mail/spam/settings";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 /** Per-mailbox spam settings (on/off, auto-move to Junk, threshold override). Admin only, own mailboxes only. */
 
@@ -28,8 +29,10 @@ export async function PUT(request: Request, { params }: AccountRouteParams) {
   return withAuthResponse(session, async () => {
     const accountId = await resolveAdminMemberAccount(params, session.userId);
     if (!accountId) return adminAccountNotFound();
+    const json = await readJsonBody<any>(request);
+    if (!json.ok) return json.response;
     try {
-      await saveMailboxSpamSettings(accountId, await request.json().catch(() => null), session.userId);
+      await saveMailboxSpamSettings(accountId, json.value, session.userId);
     } catch (error) {
       if (error instanceof SpamSettingsError) return NextResponse.json({ ok: false, message: error.message }, { status: 400 });
       throw error;

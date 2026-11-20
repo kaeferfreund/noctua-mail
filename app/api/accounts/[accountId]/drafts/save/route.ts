@@ -11,6 +11,7 @@ import {
   getAccountIdFromParams,
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
+import { JSON_BODY_LIMITS, JSON_BODY_TIMEOUT_MS, readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
@@ -22,7 +23,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   return withAuthResponse(accountContext, async () => {
     const originError = requireJsonSameOrigin(request);
     if (originError) return originError;
-    const parsed = saveDraftSchema.safeParse(await request.json().catch(() => null));
+    const json = await readJsonBody(request, { limit: JSON_BODY_LIMITS.compose, timeoutMs: JSON_BODY_TIMEOUT_MS.compose });
+    if (!json.ok) return json.response;
+    const parsed = saveDraftSchema.safeParse(json.value);
     if (!parsed.success) return NextResponse.json({ ok: false, code: "invalid_identity", message: "Invalid draft payload" }, { status: 400 });
     const payload: SaveDraftInput = parsed.data;
     const { account, accountId: resolvedAccountId, clientId } = accountContext;

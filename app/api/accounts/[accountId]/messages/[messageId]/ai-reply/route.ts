@@ -19,6 +19,7 @@ import { collabActorFromSession } from "@/lib/threadCollab";
 import { getAccountIdFromParams, type AccountRouteParams } from "@/app/api/_helpers/accountContext";
 import { requireAccountAndMessageContext } from "@/app/api/_helpers/message/routeHelpers";
 import { requireJsonSameOrigin } from "@/app/api/_helpers/requestOrigin";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 type Params = AccountRouteParams & {
   params: Promise<{ accountId?: string; messageId?: string }>;
@@ -45,7 +46,9 @@ export async function POST(request: Request, { params }: Params) {
     const config = resolveAiReplyConfig();
     const model = getAiReplyLanguageModel(config);
     if (!model) return NextResponse.json({ ok: false, code: "ai_unavailable", message: "AI reply is not configured (no API key)." }, { status: 503 });
-    const body = (await request.json().catch(() => null)) as { locale?: unknown; instruction?: unknown } | null;
+    const json = await readJsonBody<{ locale?: unknown; instruction?: unknown }>(request);
+    if (!json.ok) return json.response;
+    const body = json.value;
     if (body?.instruction != null && typeof body.instruction !== "string") {
       return NextResponse.json({ ok: false, code: "invalid_instruction", message: "instruction must be a string." }, { status: 400 });
     }

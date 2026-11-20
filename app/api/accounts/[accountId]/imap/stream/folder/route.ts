@@ -8,6 +8,7 @@ import {
   requireAccountContext,
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 type StreamFolderPayload = { streamKey?: unknown; folderId?: unknown; seq?: unknown };
 
@@ -22,7 +23,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
   if (accountContext instanceof NextResponse) return accountContext;
   return withAuthResponse(accountContext, async () => {
     const { accountId, session } = accountContext;
-    const payload = (await request.json().catch(() => null)) as StreamFolderPayload | null;
+    const body = await readJsonBody<StreamFolderPayload>(request);
+    if (!body.ok) return body.response;
+    const payload = body.value;
     const folderId = payload?.folderId ?? null;
     const seq = payload?.seq;
     if (!isStreamKey(payload?.streamKey) || (folderId !== null && typeof folderId !== "string") ||

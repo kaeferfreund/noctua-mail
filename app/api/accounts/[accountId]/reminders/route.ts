@@ -14,6 +14,7 @@ import {
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
 import { toFiniteNumber, toPositiveNumberArray } from "@/app/api/_helpers/numberParsing";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 export async function GET(request: Request, { params }: AccountRouteParams) {
   const accountId = await getAccountIdFromParams(params);
@@ -30,7 +31,13 @@ export async function GET(request: Request, { params }: AccountRouteParams) {
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const payload = (await request.json()) as {
+  const accountId = await getAccountIdFromParams(params);
+  const accountContext = await requireAccountContext(request, accountId, {
+    minRole: "viewer",
+    missingAccountMessage: "Missing accountId"
+  });
+  if (accountContext instanceof NextResponse) return accountContext;
+  const body = await readJsonBody<{
     accountId?: string;
     id?: string;
     messageId?: string;
@@ -46,13 +53,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     eventEndAtMs?: number;
     leadMinutes?: number;
     leadLabel?: string;
-  };
-  const accountId = await getAccountIdFromParams(params);
-  const accountContext = await requireAccountContext(request, accountId, {
-    minRole: "viewer",
-    missingAccountMessage: "Missing accountId"
-  });
-  if (accountContext instanceof NextResponse) return accountContext;
+  }>(request);
+  if (!body.ok) return body.response;
+  const payload = body.value ?? ({} as NonNullable<typeof body.value>);
   return withAuthResponse(accountContext, async () => {
     const eventStartAtMs = toFiniteNumber(payload.eventStartAtMs);
     const eventEndAtMs =
@@ -104,20 +107,22 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
 
 export async function DELETE(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
-  const payload = (await request.json()) as {
-    accountId?: string;
-    clearAll?: boolean;
-    reminderId?: string;
-    eventUid?: string;
-    eventTitle?: string;
-    eventStartAtMs?: number;
-  };
   const accountId = await getAccountIdFromParams(params);
   const accountContext = await requireAccountContext(request, accountId, {
     minRole: "viewer",
     missingAccountMessage: "Missing accountId"
   });
   if (accountContext instanceof NextResponse) return accountContext;
+  const body = await readJsonBody<{
+    accountId?: string;
+    clearAll?: boolean;
+    reminderId?: string;
+    eventUid?: string;
+    eventTitle?: string;
+    eventStartAtMs?: number;
+  }>(request);
+  if (!body.ok) return body.response;
+  const payload = body.value ?? ({} as NonNullable<typeof body.value>);
   return withAuthResponse(accountContext, async () => {
 
     if (payload.clearAll === true) {

@@ -7,6 +7,7 @@ import {
   requireAccountContext,
   type AccountRouteParams
 } from "@/app/api/_helpers/accountContext";
+import { readJsonBody } from "@/app/api/_helpers/readJsonBody";
 
 export async function POST(request: Request, { params }: AccountRouteParams) {
   const originError = requireJsonSameOrigin(request); if (originError) return originError;
@@ -21,7 +22,9 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
 
     // Parse the body only after auth so an unauthenticated caller can't force
     // request-body parsing work.
-    const payload = (await request.json().catch(() => null)) as { apiKey?: string } | null;
+    const body = await readJsonBody<{ apiKey?: string }>(request);
+    if (!body.ok) return body.response;
+    const payload = body.value;
     // Prefer a key typed into the form; fall back to the stored key so the test
     // works for an already-saved account (the form field is blank by design).
     const provided = typeof payload?.apiKey === "string" ? payload.apiKey.trim() : "";
