@@ -23,7 +23,11 @@ export async function reserveLifecycle(db:Database, actor:SessionSecurity|"opera
 export async function takeLifecycleUserSlot(db:Database, op:LifecycleOperation, userId=op.targetUserId) {
   return withDbWriteRetry("takeLifecycleUserSlot",()=>db.transaction(()=>{
     assertLifecycle(db,op);
-    if (db.prepare(`SELECT 1 FROM admin_lifecycle_operations WHERE slot=?`).get(`security:${userId}`)) throw new AuthPolicyError("security_operation_pending",409);
+    const held=db.prepare(`SELECT id,action FROM admin_lifecycle_operations WHERE slot=?`).get(`security:${userId}`) as {id:string;action:string}|null;
+    // Every lifecycle change revokes the target. A sign-in in flight (often before its credential is
+    // even verified) must not delay that: it loses its slot and can no longer register a challenge or session.
+    if (held?.action==="security.login" && userId===op.targetUserId) db.prepare(`UPDATE admin_lifecycle_operations SET slot=NULL,state='cancelled',updatedAt=? WHERE id=?`).run(Date.now(),held.id);
+    else if (held) throw new AuthPolicyError("security_operation_pending",409);
     const generation=db.prepare(`SELECT generation FROM auth_security_state WHERE userId=?`).get(userId)?.generation;
     if (!Number.isSafeInteger(generation)) throw new AuthPolicyError("user_not_found",404);
     const id=crypto.randomUUID(),now=Date.now();
