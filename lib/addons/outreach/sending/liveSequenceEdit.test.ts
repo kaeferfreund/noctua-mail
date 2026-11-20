@@ -10,10 +10,11 @@ import { PATCH as editSequenceRoute } from "@/app/api/addons/outreach/accounts/[
 import { POST as setSequenceStatus } from "@/app/api/addons/outreach/accounts/[accountId]/sequences/[sequenceId]/status/route";
 import { getOutreachDb, initOutreachSchema } from "../db";
 import { getOutreachSettings, saveOutreachSettings } from "../settings";
-import { editSequence, setSequenceStatus as setSequenceStatusAction } from "./actions";
+import { editSequence, editSequenceStep, setSequenceStatus as setSequenceStatusAction, type SendingActor } from "./actions";
 import { enroll } from "./queue";
 import { OutreachScheduler } from "./scheduler";
 import { getSequence, saveSequence } from "./store";
+import type { Sequence } from "../types";
 
 /** Editing a live sequence is an approval of what it sends (synthetic data only). */
 
@@ -50,7 +51,8 @@ async function liveSequence() {
   expect(live.status).toBe(200);
   const sequence = getSequence(db, accountId, draft.id);
   expect(sequence).toMatchObject({ status: "live", statusChangedByUserId: approver.user.id, statusChangedVia: "app" });
-  const edit = (who: typeof editor, body: unknown) => editSequenceRoute(request(who, `sequences/${draft.id}`, "PATCH", body), at);
+  const edit = (who: typeof editor, body: unknown, sequenceId = draft.id) => editSequenceRoute(request(who, `sequences/${sequenceId}`, "PATCH", body),
+    { params: Promise.resolve({ accountId, sequenceId }) });
   return { accountId, db, listId, approver, editor, viewer, sequence, edit };
 }
 
@@ -71,6 +73,29 @@ test("an editor's edit of a live sequence records the editor as approver; a view
   });
 }));
 
+test("the REST PATCH takes the version the caller loaded: a stale one is refused and writes nothing, the current one or none saves", () => withFlag(async () => {
+  const { db, accountId, listId, editor, sequence: live, edit } = await liveSequence();
+  const draft = saveSequence(db, accountId, { name: "Entwurf", triggerListId: listId, steps: [{ subject: "Hallo", text: "Entwurf" }] });
+  for (const loaded of [live, draft]) {
+    const read = () => getSequence(db, accountId, loaded.id);
+    const refused = await edit(editor, { ...changedSteps(loaded), expectedUpdatedAt: loaded.updatedAt - 1 }, loaded.id);
+    expect(refused.status).toBe(409);
+    expect(await refused.json()).toMatchObject({ ok: false, code: "sequence_changed" });
+    expect(read()).toEqual(loaded);
+
+    const saved = await edit(editor, { ...changedSteps(loaded), expectedUpdatedAt: loaded.updatedAt }, loaded.id);
+    expect(saved.status).toBe(200);
+    const after = read();
+    expect(after).toMatchObject({ status: loaded.status, steps: [{ subject: "Geändert", text: "Neuer Inhalt" }] });
+    expect(after.updatedAt).toBeGreaterThan(loaded.updatedAt);
+    expect(((await saved.json()) as { sequence: Sequence }).sequence.updatedAt).toBe(after.updatedAt);
+
+    // Without a version the PATCH saves as before.
+    expect((await edit(editor, { name: `${loaded.name} neu` }, loaded.id)).status).toBe(200);
+    expect(read()).toMatchObject({ name: `${loaded.name} neu`, steps: [{ subject: "Geändert" }] });
+  }
+}));
+
 test("an MCP token without the send scope cannot edit a live sequence but can still edit a draft", () => withFlag(async () => {
   const { db, accountId, listId, editor, sequence } = await liveSequence();
   const active = await requireActiveUserSession(new Request(TEST_BASE_URL, { headers: editor.jar.headers() }));
@@ -86,11 +111,17 @@ test("an MCP token without the send scope cannot edit a live sequence but can st
   expect((await editSequence(db, actor, draft.id, { name: "Entwurf 2" })).name).toBe("Entwurf 2");
 
   editor.master.prepare("UPDATE mcp_tokens SET scopes = ? WHERE id = ?").run(JSON.stringify(["read", "drafts", "manage", "send"]), tokenRecord.id);
-  await editSequence(db, actor, sequence.id, changedSteps(sequence));
+  await editSequence(db, actor, sequence.id, changedSteps(sequence), { expectedUpdatedAt: sequence.updatedAt });
   expect(getSequence(db, accountId, sequence.id)).toMatchObject({ statusChangedByUserId: editor.user.id, statusChangedVia: actor.via });
 }));
 
-test("sends of an edited live sequence run under the editor and stop once the editor loses the role", () => withFlag(async () => {
+/** Both edit paths (the whole sequence, one step) approve what they change. */
+const edits: Array<[string, (db: Database, actor: SendingActor, sequence: Sequence) => Promise<unknown>]> = [
+  ["the whole sequence", (db, actor, sequence) => editSequence(db, actor, sequence.id, changedSteps(sequence))],
+  ["one step", (db, actor, sequence) => editSequenceStep(db, actor, sequence.id, sequence.steps[0].id, { subject: "Geändert", text: "Neuer Inhalt" }, {})]
+];
+
+test.each(edits)("sends of a live sequence edited through %s run under the editor and stop once the editor loses the role", (_path, edit) => withFlag(async () => {
   const { accountId, approver, editor } = await liveSequence();
   // A separate outreach database keeps the scheduler pass to this mailbox.
   const db = new Database(":memory:");
@@ -135,7 +166,7 @@ test("sends of an edited live sequence run under the editor and stop once the ed
     // Queued under the earlier approver (send rate 0 holds it back), then edited by a collaborator.
     await scheduler.tick();
     expect(sends()).toEqual([{ userId: approver.user.id, status: "queued" }]);
-    await editSequence(db, actorOf(editor), sequence.id, changedSteps(sequence));
+    await edit(db, actorOf(editor), sequence);
     expect(getSequence(db, accountId, sequence.id).statusChangedByUserId).toBe(editor.user.id);
 
     editor.master.prepare("DELETE FROM user_accounts WHERE userId = ? AND accountId = ?").run(editor.user.id, accountId);

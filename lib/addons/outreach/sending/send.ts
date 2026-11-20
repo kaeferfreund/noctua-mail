@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import { z } from "zod";
 import { escapeHtml } from "@/lib/html/strip";
-import { addToHtmlBody, hasUnsubscribeLink, renderContent, sampleContact, type Content } from "./render";
+import { addToHtmlBody, hasUnsubscribeLink, isEmptyRendering, renderContent, renderPreviewText, sampleContact, type Content } from "./render";
 import { outreachPublicOrigin } from "../config";
 import { createUnsubscribeUrls, getSendableRecipient } from "../contacts";
 import { newOutreachToken } from "../ids";
@@ -212,9 +212,7 @@ export async function sendOutreachMail(input: SendInput, deps = defaultSendDepen
     const options = { contact, organizationName: settings.organizationName, organizationAddress: settings.organizationAddress,
       unsubscribeUrl: unsubscribe.url, now: deps.now() };
     const rendered = renderContent(content, options);
-    if (!rendered.subject.trim() || !(rendered.text.trim() || rendered.html.trim())) {
-      return { status: "failed", reason: "content_empty" };
-    }
+    if (isEmptyRendering(rendered)) return { status: "failed", reason: "content_empty" };
     let { html, text } = rendered;
     // Text-only content: the HTML part carries the same message, not only the footer.
     if (!html.trim()) html = textToHtml(text);
@@ -223,7 +221,7 @@ export async function sendOutreachMail(input: SendInput, deps = defaultSendDepen
     }
     if (!text.includes(unsubscribe.url)) text += `\n\nAbmelden: ${unsubscribe.url}`;
     if (content.previewText) {
-      const preview = renderContent({ subject: content.previewText, html: "", text: "" }, options).subject;
+      const preview = renderPreviewText(content.previewText, options).subject;
       if (preview) html = addToHtmlBody(html, `<div style="display:none;max-height:0;overflow:hidden">${escapeHtml(preview)}</div>`, true);
     }
     try {

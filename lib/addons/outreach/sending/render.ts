@@ -33,8 +33,10 @@ export function normalizeTemplate(value: string, html = false): string {
 
 type ContactFields = { firstName: string; lastName: string; email: string };
 export const sampleContact: ContactFields = { firstName: "Alex", lastName: "Muster", email: "alex@example.test" };
+/** The unsubscribe URL of a preview: the page answers it without unsubscribing anyone. */
+export const previewUnsubscribeUrl = () => `${outreachPublicOrigin() ?? "https://example.test"}/t/u/preview`;
 export type Content = { subject: string; html: string; text: string; previewText?: string };
-type RenderOptions = {
+export type RenderOptions = {
   contact: ContactFields;
   organizationName: string;
   organizationAddress: string;
@@ -138,6 +140,16 @@ export function renderContent(content: Content, options: RenderOptions): RenderR
   const renderedText = renderText(content.text);
   const text = renderedText.trim() ? renderedText : htmlToPlainText(html);
   return { ok: true, subject, html, text, warnings: [...warnings] };
+}
+
+/** The preview text as the send path puts it in front of the HTML body: rendered like a subject. */
+export function renderPreviewText(previewText: string, options: RenderOptions) {
+  return renderContent({ subject: previewText, html: "", text: "" }, options);
+}
+
+/** A rendering without a subject or without a body; the send path refuses it (`content_empty`). */
+export function isEmptyRendering(rendered: Pick<RenderResponse, "subject" | "html" | "text">) {
+  return !rendered.subject.trim() || !(rendered.text.trim() || rendered.html.trim());
 }
 
 function htmlBody(tree: Tree.Document | Tree.DocumentFragment): Tree.Element | Tree.DocumentFragment | undefined {
