@@ -7,6 +7,7 @@ import { openDetachedWindow } from "@/lib/ui/openDetachedWindow";
 import { formatByteSize } from "@/lib/ui/byteSize";
 import { formatAttachmentPageTitle } from "@/lib/appBranding";
 import { isRenderableInlineAttachment, shouldHideAttachmentFromList } from "@/lib/messageFlags";
+import { blobPreviewMimeType, normalizeMimeType } from "@/lib/attachmentDocument";
 
 const PREVIEW_MIME_PREFIXES = ["image/", "text/"];
 const PREVIEW_MIME_TYPES = new Set([
@@ -20,10 +21,6 @@ const getFileExtension = (filename?: string) => {
   const lastDotIndex = filename?.lastIndexOf(".") ?? -1;
   if (!filename || lastDotIndex <= 0 || lastDotIndex === filename.length - 1) return "";
   return filename.slice(lastDotIndex + 1).toLowerCase();
-};
-
-const normalizeMimeType = (contentType?: string) => {
-  return contentType?.split(";")[0]?.toLowerCase().trim() ?? "";
 };
 
 function appendQueryParam(url: string, key: string, value: string) {
@@ -74,11 +71,13 @@ export function getAttachmentPreviewHref(
 function openAttachmentPreview(url: string, filename?: string) {
   const options = { width: 920, height: 760, title: formatAttachmentPageTitle(filename) };
   // A data: attachment has no server URL to wrap, so it keeps the blob route
-  // and the window stays named after the blob.
+  // and the window stays named after the blob. The blob document has the app's
+  // origin, so only passive types keep their type; others show as text.
   if (url.startsWith("data:")) {
     fetch(url)
       .then((response) => response.blob())
-      .then((blob) => openDetachedWindow(URL.createObjectURL(blob), options))
+      .then((blob) => openDetachedWindow(
+        URL.createObjectURL(new Blob([blob], { type: blobPreviewMimeType(blob.type) })), options))
       .catch(() => {});
     return;
   }

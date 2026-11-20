@@ -94,4 +94,29 @@ describe("AttachmentsList", () => {
     fireEvent.click(getByLabelText("Retry loading attachment: README"));
     expect(retried).toEqual([pdf.id]);
   });
+
+  it("previews a browser-only HTML attachment as plain text, not as an app-origin document", async () => {
+    const blobs: Blob[] = [];
+    const opened: string[] = [];
+    const createObjectURL = URL.createObjectURL;
+    const open = window.open;
+    URL.createObjectURL = (blob: Blob) => { blobs.push(blob); return "blob:synthetic-preview"; };
+    window.open = ((url?: string | URL) => { opened.push(String(url)); return null; }) as typeof window.open;
+    try {
+      const html = '<form method="post" action="/api/x"><button>Synthetic</button></form>';
+      const { getByLabelText } = render(<AttachmentsList attachments={[{
+        id: "att-local", filename: "draft.html", contentType: "text/html", size: html.length, inline: false,
+        dataUrl: `data:text/html;base64,${Buffer.from(html).toString("base64")}`
+      }]} />);
+      fireEvent.click(getByLabelText("Preview attachment", { selector: ".attachment-link" }));
+      for (let attempt = 0; attempt < 50 && opened.length === 0; attempt++) await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(opened).toEqual(["blob:synthetic-preview"]);
+      expect(blobs.map((blob) => blob.type)).toEqual(["text/plain;charset=utf-8"]);
+      expect(await blobs[0].text()).toBe(html);
+    } finally {
+      URL.createObjectURL = createObjectURL;
+      window.open = open;
+    }
+  });
 });
+
