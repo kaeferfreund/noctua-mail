@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
 import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { render } from "@/lib/i18n/testRender";
+import { previewCsp, withPreviewCsp } from "./HtmlContent";
 import type { OutreachLocation } from "./location";
 import { CONTACT_DETAIL, DRAFT, LISTS, ManageHarness, SEQUENCE, SENT, TEMPLATE, json, stubFetch } from "./testFixtures";
 
@@ -133,7 +134,7 @@ describe("newsletter templates", () => {
     const { page } = mount({ initial: { section: "templates", id: TEMPLATE.id } });
     const frame = await page.findByTitle("Live preview") as HTMLIFrameElement;
     expect(frame.getAttribute("sandbox")).toBe("");
-    expect(frame.getAttribute("srcdoc")).toBe(TEMPLATE.html);
+    expect(frame.getAttribute("srcdoc")).toBe(withPreviewCsp(TEMPLATE.html, previewCsp(window.location.origin, false)));
     expect(frame.getAttribute("src")).toBeNull();
   });
 

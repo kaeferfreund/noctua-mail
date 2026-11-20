@@ -3,6 +3,7 @@
  */
 
 import { ElementNode, type DOMConversionMap, type DOMConversionOutput, type LexicalNode, type NodeKey, type SerializedElementNode, type Spread } from "lexical";
+import { applyExportAttributes, applyLiveAttributes, filterImportedAttributes } from "./importedAttributes";
 
 type SerializedCenterNode = Spread<
   { attributes?: Record<string, string> },
@@ -38,7 +39,7 @@ export class CenterNode extends ElementNode {
 
   static importJSON(serializedNode: SerializedCenterNode): CenterNode {
     const node = new CenterNode();
-    node.__attributes = serializedNode.attributes || {};
+    node.__attributes = filterImportedAttributes(serializedNode.attributes);
     return node;
   }
 
@@ -50,11 +51,10 @@ export class CenterNode extends ElementNode {
     };
   }
 
+  // Mounted in the app document: presentational attributes only (SD1).
   createDOM(): HTMLElement {
     const element = document.createElement("center");
-    Object.entries(this.__attributes).forEach(([name, value]) => {
-      element.setAttribute(name, value);
-    });
+    applyLiveAttributes(element, this.__attributes);
     return element;
   }
 
@@ -64,9 +64,7 @@ export class CenterNode extends ElementNode {
 
   exportDOM() {
     const element = document.createElement("center");
-    Object.entries(this.__attributes).forEach(([name, value]) => {
-      element.setAttribute(name, value);
-    });
+    applyExportAttributes(element, this.__attributes);
     return { element };
   }
 }
@@ -74,11 +72,8 @@ export class CenterNode extends ElementNode {
 function convertCenterElement(domNode: Node): DOMConversionOutput | null {
   if (!(domNode instanceof HTMLElement)) return null;
   const node = new CenterNode();
-  // Preserve all attributes
-  for (let i = 0; i < domNode.attributes.length; i++) {
-    const attr = domNode.attributes[i];
-    node.__attributes[attr.name] = attr.value;
-  }
+  // Mail markup is untrusted: keep presentational attributes only (SD1).
+  node.__attributes = filterImportedAttributes(domNode);
   return { node };
 }
 

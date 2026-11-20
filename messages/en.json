@@ -2603,7 +2603,9 @@
       "liveFrame": "Live preview",
       "backToLive": "Back to the live preview",
       "liveHint": "Live preview of the source, placeholders not yet replaced. Scripts are off.",
-      "emptyPreview": "No content yet."
+      "emptyPreview": "No content yet.",
+      "remoteBlocked": "External content (images, fonts, stylesheets) is blocked in the preview.",
+      "loadRemote": "Load external content"
     },
     "images": {
       "insert": "Insert image",

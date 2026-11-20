@@ -4,6 +4,7 @@ import { Theme } from "@radix-ui/themes";
 import { render } from "@/lib/i18n/testRender";
 import type { Campaign, Sequence } from "@/lib/addons/outreach/types";
 import { resetOutreachStatusForTests } from "../useOutreachStatus";
+import { previewCsp, withPreviewCsp } from "./HtmlContent";
 import type { OutreachLocation } from "./location";
 import OutreachManagePage from "./OutreachManagePage";
 import { ACCOUNT_ID, CONTACTS, DRAFT, REPORT, SENT, SEQUENCE, TEMPLATE, json, stubFetch, ManageHarness, type Handler } from "./testFixtures";
@@ -44,7 +45,7 @@ describe("content from a referenced template (M)", () => {
     expect(goLive.disabled).toBe(false);
     expect(page.queryByText(/To switch live, the sequence needs/)).toBeNull();
     // The open first step previews the referenced template instead of "No content yet".
-    await waitFor(() => expect((page.getByTitle("Live preview") as HTMLIFrameElement).getAttribute("srcdoc")).toBe(TEMPLATE.html), { timeout: 2000 });
+    await waitFor(() => expect((page.getByTitle("Live preview") as HTMLIFrameElement).getAttribute("srcdoc")).toBe(withPreviewCsp(TEMPLATE.html, previewCsp(window.location.origin, false))), { timeout: 2000 });
     expect((page.getByLabelText("Template") as HTMLSelectElement).value).toBe(TEMPLATE.id);
 
     fireEvent.click(goLive);

@@ -40,6 +40,35 @@ describe("sender-icon route", () => {
   });
 });
 
+// SD46: a user who turned sender icons off for this mailbox must not cause a
+// provider request, even when the mailbox default (or another client) has
+// them on.
+describe("sender-icon route with a personal opt-out", () => {
+  test("serves the initials without contacting an icon provider", async () => {
+    const { mergeUserAccountPrefs } = await dbModulePromise;
+    const enabledId = `acc-sender-icon-on-${crypto.randomUUID()}`;
+    await upsertAccount({ ...account, id: enabledId, settings: { appearance: { senderIcons: true } } });
+    const fixture = await createAuthenticatedTestSession(enabledId);
+    await mergeUserAccountPrefs(fixture.user.id, enabledId, { appearance: { senderIcons: false } });
+    const originalFetch = globalThis.fetch;
+    const fetched: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      fetched.push(String(input));
+      return new Response(null, { status: 404 });
+    }) as typeof fetch;
+    try {
+      const res = await senderIcon(
+        new Request(`http://localhost:3000/api/accounts/${enabledId}/sender-icon?fromEmail=news%40brand-sd46.example.test&fallback=none`,
+          { headers: { cookie: fixture.jar.header() } }),
+        { params: Promise.resolve({ accountId: enabledId }) });
+      expect(res.status).toBe(404);
+      expect(fetched).toEqual([]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
 describe("sender-icon route with an admin-uploaded domain icon", async () => {
   const { saveDomainIcon, resetDomainIcon } = await import("@/lib/domainIcons");
   const { normalizeDomainIcon } = await import("@/lib/domainIconImage");

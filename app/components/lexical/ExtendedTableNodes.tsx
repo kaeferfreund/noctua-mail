@@ -1,5 +1,5 @@
 /**
- * Extended Lexical table nodes that preserve all HTML attributes
+ * Extended Lexical table nodes that preserve presentational HTML attributes
  */
 
 import {
@@ -24,23 +24,13 @@ import type {
   EditorConfig,
   Spread
 } from "lexical";
+import { applyExportAttributes, filterImportedAttributes } from "./importedAttributes";
 
-// Helper to get all attributes from an element
-function getAllAttributes(element: HTMLElement): Record<string, string> {
-  const attrs: Record<string, string> = {};
-  for (let i = 0; i < element.attributes.length; i++) {
-    const attr = element.attributes[i];
-    attrs[attr.name] = attr.value;
-  }
-  return attrs;
-}
-
-// Helper to set all attributes on an element
-function setAllAttributes(element: HTMLElement, attrs: Record<string, string>) {
-  Object.entries(attrs).forEach(([name, value]) => {
-    element.setAttribute(name, value);
-  });
-}
+// Imported mail markup is untrusted: only presentational attributes are kept
+// and written to the outgoing HTML (SD1). The live table DOM comes from
+// @lexical/table's createDOM and does not use these attributes.
+const getAllAttributes = filterImportedAttributes;
+const setAllAttributes = applyExportAttributes;
 
 // Extended TableNode with attribute preservation
 type SerializedExtendedTableNode = Spread<
@@ -79,7 +69,7 @@ export class ExtendedTableNode extends TableNode {
 
   static importJSON(serializedNode: SerializedExtendedTableNode): ExtendedTableNode {
     const node = $createExtendedTableNode();
-    node.__attributes = serializedNode.attributes || {};
+    node.__attributes = filterImportedAttributes(serializedNode.attributes);
     return node;
   }
 
@@ -149,7 +139,7 @@ export class ExtendedTableCellNode extends TableCellNode {
 
   static importJSON(serializedNode: SerializedExtendedTableCellNode): ExtendedTableCellNode {
     const node = $createExtendedTableCellNode();
-    node.__attributes = serializedNode.attributes || {};
+    node.__attributes = filterImportedAttributes(serializedNode.attributes);
     return node;
   }
 
@@ -205,7 +195,7 @@ export class ExtendedTableRowNode extends TableRowNode {
 
   static importJSON(serializedNode: SerializedExtendedTableRowNode): ExtendedTableRowNode {
     const node = $createExtendedTableRowNode();
-    node.__attributes = serializedNode.attributes || {};
+    node.__attributes = filterImportedAttributes(serializedNode.attributes);
     return node;
   }
 

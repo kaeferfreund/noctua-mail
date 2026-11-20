@@ -2603,7 +2603,9 @@
       "liveFrame": "Live-Vorschau",
       "backToLive": "Zurück zur Live-Vorschau",
       "liveHint": "Live-Vorschau des Quelltexts, Platzhalter noch nicht ersetzt. Skripte sind abgeschaltet.",
-      "emptyPreview": "Noch kein Inhalt."
+      "emptyPreview": "Noch kein Inhalt.",
+      "remoteBlocked": "Externe Inhalte (Bilder, Schriften, Stylesheets) sind in der Vorschau blockiert.",
+      "loadRemote": "Externe Inhalte laden"
     },
     "images": {
       "insert": "Bild einfügen",

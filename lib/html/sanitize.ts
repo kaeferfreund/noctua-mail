@@ -225,6 +225,15 @@ function sanitizeNormalized(normalized: string, blockRemote: RemoteRewriteGate, 
           delete attribs.content;
         }
         if (attribs.style) attribs.style = css(attribs.style, true);
+        // Inside the app document sender classes would pick up app styles
+        // (look like app controls) and ids/names would clobber document
+        // globals or collide with app anchors (SD20). Neither is needed
+        // without the sender's own stylesheet.
+        if (!profile.styleElements) {
+          delete attribs.class;
+          delete attribs.id;
+          delete attribs.name;
+        }
         if (tagName === "img") attribs.referrerpolicy = "no-referrer";
         if (tagName === "a" && profile.safeLinks) applySafeLinkAttributes(attribs, !profile.styleElements);
         // The only mode-dependent code, and it runs only through the gate.
@@ -267,7 +276,8 @@ export function sanitizeHtmlForDisplay(input: string, mode: RemoteContentMode = 
  * Sender HTML that is inserted into the app document itself (calendar event
  * descriptions and source-mail snapshots) instead of the sandboxed message
  * frame: no `<style>` elements (a sender stylesheet would apply to the whole
- * app), safe link attributes, remote images blocked. Inline styles stay for
+ * app), no class/id/name attributes, safe link attributes, remote images
+ * blocked. Inline styles stay for
  * formatting; the container must confine them (`contain: paint`, see
  * app/components/calendar/SenderHtml.module.css) so positioned content cannot cover
  * app controls.
@@ -276,6 +286,32 @@ export function sanitizeHtmlForAppDocument(input: string) {
   if (!input) return input;
   return sanitizeNormalized(normalizeHtmlStructure(input), applyRemoteRewrite, memoizedPrivateCss(),
     { styleElements: false, safeLinks: true });
+}
+
+/**
+ * Declarations that take an element out of the normal flow or move it over
+ * other content. Mail HTML that the rich compose editor mounts in the app
+ * document must not lay itself over the toolbar or other app controls.
+ */
+const POSITIONING_PROPERTY = /^(?:position|z-index|inset(?:-.*)?|top|right|bottom|left|translate|transform|float)$/i;
+
+/**
+ * One sender `style` attribute for an element inside the app document: the
+ * viewer's inline-CSS filter (no URLs, imports or escapes) plus, with
+ * `dropPositioning`, no positioning or stacking declarations.
+ */
+export function sanitizeInlineStyle(style: string, options: { dropPositioning?: boolean } = {}) {
+  const filtered = privateCss(style, true);
+  if (!options.dropPositioning || !filtered.trim()) return filtered.trim();
+  try {
+    const root = postcss.parse(`x{${filtered}}`);
+    root.walkDecls((decl) => {
+      if (POSITIONING_PROPERTY.test(decl.prop.trim())) decl.remove();
+    });
+    return root.toString().slice(2, -1).trim();
+  } catch {
+    return "";
+  }
 }
 
 export type SanitizedHtmlPair = { block: string; allow: string };
