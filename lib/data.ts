@@ -209,6 +209,12 @@ export type Message = {
   spamVerdict?: "spam" | "ham" | "unsure";
   spamConfidence?: number | null;
   spamReasons?: string[];
+  /**
+   * Sender check of an opened message (detail route only): whether the receiving
+   * server's SPF or DKIM passed for the From domain; null when it does not apply
+   * (own mail, Sent/Drafts, source not stored). Absent on list payloads.
+   */
+  senderVerified?: boolean | null;
   calendarEventUids?: string[];
   calendarInviteStates?: MessageCalendarInviteState[];
   listUnsubscribe?: string | null;

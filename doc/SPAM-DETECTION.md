@@ -163,8 +163,16 @@ subdomain of it; `getRootDomain` knows multi-label public suffixes
 with `bank.co.uk`. No Authentication-Results counts as not aligned.
 
 **Receiving server** (`receivingAuthenticationResults` in `input.ts`, shared
-with the allowlist): only `Authentication-Results` blocks above the second
-`Received` line whose authserv-id belongs to the receiving server count. That
+with the allowlist, the remote-image gate and the reader's sender badge): the
+server's own `Received` lines sit at the top. Internal hops (no `from`, a
+server-written loopback address, or a client that is one of the server's own
+`by` hosts — a provider that re-injects after its spam check writes such a line
+above the hand-off) are skipped; the first line with an external client is the
+hand-off, and only `Authentication-Results` blocks above the next `Received`
+line after it count. The `by` host of a line is the last `by` outside comments,
+so a HELO holding `by`, `;` or other keywords changes nothing. Of the blocks in
+range whose authserv-id belongs to the receiving server, only the top-most
+counts. That
 is the exact list in `NOCTUA_SPAM_AUTHSERV_ID`, or else the host after "by" in
 the top-most `Received` line (written by our server, never by the sender): an
 authserv-id matches when it equals that host, its first label, or lies in its

@@ -8,7 +8,7 @@ export type FixtureMessage = { uid: number; flags: Set<string>; date: Date; mime
 export type Mailbox = { path: string; special?: string; uidValidity: number; uidNext: number; subscribed: boolean; messages: FixtureMessage[] };
 export class MailStore extends EventEmitter {
   readonly boxes = new Map<string, Mailbox>();
-  constructor(readonly seed = "monkeydent", readonly anchor = new Date(), readonly uidValidityPath = join(process.env.NOCTUA_DATA_DIR ?? ".data", "fixture-uidvalidity.sqlite")) { super(); this.reset(); }
+  constructor(readonly seed = "demo-praxis", readonly anchor = new Date(), readonly uidValidityPath = join(process.env.NOCTUA_DATA_DIR ?? ".data", "fixture-uidvalidity.sqlite")) { super(); this.reset(); }
   private nextUidValidity(): number {
     // Persist only this high-water mark, never mailbox contents. SQLite serializes
     // allocations across fixture processes, including restarts in the same second.

@@ -50,6 +50,7 @@ import SpamBadge, { SpamCorrectionButton } from "../SpamBadge";
 import { ScheduledSendBar } from "../scheduledSend/ScheduledSend";
 import FlagBadge from "./FlagBadge";
 import MessageBadge from "./MessageBadge";
+import UnverifiedSenderBadge from "./UnverifiedSenderBadge";
 import SenderIcon from "../SenderIcon";
 import InReplyToReferenceRow from "../InReplyToReferenceRow";
 import { hasNonInlineAttachments, getUnsubscribeCapability } from "../utils/messageHelpers";
@@ -791,6 +792,7 @@ function ThreadMessageCard({
                   )}
                   <SpamBadge message={message} />
                   <SpamCorrectionButton message={message} />
+                  <UnverifiedSenderBadge message={message} />
                   {mailboxBadge ?? (
                     <FolderBadges
                       folderIds={folderBadgeIds}

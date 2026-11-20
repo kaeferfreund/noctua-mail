@@ -29,7 +29,7 @@ async function client(port = imap.port) {
 }
 beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), "noctua-fixture-"));
-  imap = await startImapServer({ port: 0, controlPort: 0, store: new MailStore("monkeydent", anchor, join(directory, "uidvalidity.sqlite")) });
+  imap = await startImapServer({ port: 0, controlPort: 0, store: new MailStore("demo-praxis", anchor, join(directory, "uidvalidity.sqlite")) });
   smtp = await startSmtpSink({ port: 0, out: directory, deliver: source => { imap.store.append("INBOX", source); } });
 });
 afterAll(async () => {
@@ -47,7 +47,7 @@ test("seed is reproducible, has 25 inbox threads, both team members and realisti
   expect(first.filter(m => m.folder === "Drafts")).toHaveLength(3);
 });
 test("Noctua verifyImapCredentials accepts plaintext and rejects bad credentials", async () => {
-  const account = { id: "fixture", avatar: "", email: demoUser, name: "MonkeyDent", imap: { host: "127.0.0.1", port: imap.port, secure: false, user: demoUser, password: demoPass }, smtp: { host: "127.0.0.1", port: smtp.port, secure: false, user: demoUser, password: demoPass } } satisfies Account;
+  const account = { id: "fixture", avatar: "", email: demoUser, name: "Demo-Praxis", imap: { host: "127.0.0.1", port: imap.port, secure: false, user: demoUser, password: demoPass }, smtp: { host: "127.0.0.1", port: smtp.port, secure: false, user: demoUser, password: demoPass } } satisfies Account;
   expect(await verifyImapCredentials(account, demoPass)).toBe("ok");
   expect(await verifyImapCredentials(account, "wrong")).toBe("invalid");
 });
@@ -161,7 +161,7 @@ test("nodemailer verifies, authenticates, sends dot-stuffed mail, persists and r
     const transporter = nodemailer.createTransport({ host: "127.0.0.1", port: smtp.port, secure: false, auth: { user: demoUser, pass: demoPass }, authMethod }) as ReturnType<typeof nodemailer.createTransport> & { verify(): Promise<true> };
     expect(await transporter.verify()).toBe(true);
     const before = imap.store.get("INBOX").messages.length;
-    await transporter.sendMail({ from: '"Toni Muster" <demo@monkeydent.test>', to: demoUser, subject: `Synthetic ${authMethod} reply`, text: "Hello\r\n.Leading dot\r\n..Two dots\r\nGrüße" });
+    await transporter.sendMail({ from: '"Toni Muster" <demo@demo-praxis.test>', to: demoUser, subject: `Synthetic ${authMethod} reply`, text: "Hello\r\n.Leading dot\r\n..Two dots\r\nGrüße" });
     const mail = smtp.received.at(-1)!;
     expect<Buffer>(await readFile(mail.file)).toEqual(mail.source);
     expect(mail.source.toString()).toContain(".Leading dot");
@@ -213,10 +213,10 @@ test("wire LOGIN, synchronizing and fragmented literals, partial FETCH, STORE an
   }
   async function command(tag: string, value: string) { socket.write(`${tag} ${value}\r\n`); return until(`${tag} OK`); }
   try {
-    await until("MonkeyDent synthetic mailbox");
+    await until("Demo-Praxis synthetic mailbox");
     await command("a", `LOGIN "${demoUser}" "${demoPass}"`);
     await command("b", 'CREATE "Wire"');
-    const raw = Buffer.from("From: Demo <demo@monkeydent.test>\r\nTo: Example <example@example.test>\r\nSubject: Wire literal\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nGrüße 👋\r\n");
+    const raw = Buffer.from("From: Demo <demo@demo-praxis.test>\r\nTo: Example <example@example.test>\r\nSubject: Wire literal\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nGrüße 👋\r\n");
     socket.write(`c APPEND "Wire" (\\Draft) {${raw.length}}\r\n`);
     await until("+ Ready for literal");
     socket.write(raw.subarray(0, 17));
@@ -239,7 +239,7 @@ test("wire LOGIN, synchronizing and fragmented literals, partial FETCH, STORE an
   } finally { socket.destroy(); }
 });
 test("HTTP reset disconnects selected clients and changes UIDVALIDITY", async () => {
-  const server = await startImapServer({ port: 0, controlPort: 0, store: new MailStore("monkeydent", anchor, join(directory, "uidvalidity.sqlite")) });
+  const server = await startImapServer({ port: 0, controlPort: 0, store: new MailStore("demo-praxis", anchor, join(directory, "uidvalidity.sqlite")) });
   const connection = new ImapFlow({ host: "127.0.0.1", port: server.port, secure: false, auth: { user: demoUser, pass: demoPass }, logger: false, disableAutoIdle: true });
   try {
     await connection.connect();
@@ -284,7 +284,7 @@ test("multiple wire literals authenticate; malformed commands return BAD and pre
     wire = "";
   }
   try {
-    await until("MonkeyDent synthetic mailbox");
+    await until("Demo-Praxis synthetic mailbox");
     socket.write(`a LOGIN {${Buffer.byteLength(demoUser)}+}\r\n${demoUser} {${Buffer.byteLength(demoPass)}+}\r\n${demoPass}\r\n`);
     await until("a OK");
     for (const [tag, command] of [["b", 'CREATE "unterminated'], ["c", "FETCH 1 BODY[TEXT"], ["d", "FETCH 1 BODY]TEXT"]]) {

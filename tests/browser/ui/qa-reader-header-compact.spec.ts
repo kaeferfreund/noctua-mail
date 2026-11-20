@@ -17,8 +17,8 @@ const evidence = path.resolve(process.env.READER_HEADER_EVIDENCE_DIR
 // Long enough to wrap onto two lines in the 1280 px split reader.
 const subject = "Support-Anfrage von Synthetic Person (anfrage.person@praxis-beispiel.example.test) - Zahnarztpraxis Dr. Beispiel";
 const message = (n: number) => [
-  `From: ${n % 2 ? "Demo Team <demo@monkeydent.test>" : "Synthetic Reader <reader@example.test>"}`,
-  `To: ${n % 2 ? "reader@example.test" : "demo@monkeydent.test"}`,
+  `From: ${n % 2 ? "Demo Team <demo@demo-praxis.test>" : "Synthetic Reader <reader@example.test>"}`,
+  `To: ${n % 2 ? "reader@example.test" : "demo@demo-praxis.test"}`,
   `Message-ID: <qa-reader-header-${n}@example.test>`,
   ...(n ? [`In-Reply-To: <qa-reader-header-${n - 1}@example.test>`,
     `References: ${Array.from({ length: n }, (_, i) => `<qa-reader-header-${i}@example.test>`).join(" ")}`] : []),
