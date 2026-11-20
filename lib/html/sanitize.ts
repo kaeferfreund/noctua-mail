@@ -278,6 +278,32 @@ export function sanitizeHtmlForAppDocument(input: string) {
     { styleElements: false, safeLinks: true });
 }
 
+/**
+ * Declarations that take an element out of the normal flow or move it over
+ * other content. Mail HTML that the rich compose editor mounts in the app
+ * document must not lay itself over the toolbar or other app controls.
+ */
+const POSITIONING_PROPERTY = /^(?:position|z-index|inset(?:-.*)?|top|right|bottom|left|translate|transform|float)$/i;
+
+/**
+ * One sender `style` attribute for an element inside the app document: the
+ * viewer's inline-CSS filter (no URLs, imports or escapes) plus, with
+ * `dropPositioning`, no positioning or stacking declarations.
+ */
+export function sanitizeInlineStyle(style: string, options: { dropPositioning?: boolean } = {}) {
+  const filtered = privateCss(style, true);
+  if (!options.dropPositioning || !filtered.trim()) return filtered.trim();
+  try {
+    const root = postcss.parse(`x{${filtered}}`);
+    root.walkDecls((decl) => {
+      if (POSITIONING_PROPERTY.test(decl.prop.trim())) decl.remove();
+    });
+    return root.toString().slice(2, -1).trim();
+  } catch {
+    return "";
+  }
+}
+
 export type SanitizedHtmlPair = { block: string; allow: string };
 
 /**
