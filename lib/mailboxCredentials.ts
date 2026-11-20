@@ -57,6 +57,7 @@ export async function updateMailboxCredentials(accountId: string, patchInput: Ma
     if ("secure" in server && typeof server.secure !== "boolean") throw new MailboxCredentialError("Invalid secure flag");
     if (endpointKeys.some(k => k in server && server[k] !== original[protocol][k]) && !server.password?.trim()) throw new MailboxCredentialError(`Changing ${protocol} endpoint requires its password`);
   }
+  assertCaldavPatch(original.caldav, patch.caldav);
   if (patch.settings?.signatures !== undefined) {
     if (!Array.isArray(patch.settings.signatures)) throw new SignatureTemplateError("invalid signature list");
     for (const signature of patch.settings.signatures) {
@@ -115,6 +116,34 @@ export async function updateMailboxCredentials(accountId: string, patchInput: Ma
   return next;
   } finally {
     if (operation && operation !== inherited) await finishSecurityOperation(db, operation);
+  }
+}
+
+/** Comparable CalDAV endpoint: parsed URL (scheme, host, port, path) or the trimmed raw text. */
+function caldavEndpoint(url: string | undefined): string {
+  const raw = (url ?? "").trim();
+  return URL.canParse(raw) ? new URL(raw).href.replace(/\/+$/, "") : raw;
+}
+
+/**
+ * The stored CalDAV password is only reused for the endpoint and user it was entered for:
+ * a different URL (scheme, host, port or path) or user requires the password again, as for
+ * IMAP/SMTP. A password is never accepted together with a plain-HTTP server URL.
+ */
+function assertCaldavPatch(original: Account["caldav"], patch: MailboxPatch["caldav"]) {
+  if (patch === undefined || patch === null) return;
+  if (typeof patch !== "object" || Array.isArray(patch)) throw new MailboxCredentialError("Invalid caldav settings");
+  for (const key of ["url", "user", "password", "calendarPath"] as const) {
+    if (patch[key] !== undefined && typeof patch[key] !== "string") throw new MailboxCredentialError(`Invalid caldav.${key}`);
+  }
+  const url = patch.url ?? original?.url ?? "";
+  const user = (patch.user ?? original?.user ?? "").trim();
+  const newPassword = !!patch.password?.trim();
+  const endpointChanged = !original || caldavEndpoint(url) !== caldavEndpoint(original.url) || user !== (original.user ?? "").trim();
+  if (endpointChanged && original?.password && !newPassword) throw new MailboxCredentialError("Changing caldav endpoint requires its password");
+  const usesPassword = newPassword || !!original?.password;
+  if (usesPassword && (endpointChanged || newPassword) && URL.canParse(url.trim()) && new URL(url.trim()).protocol === "http:") {
+    throw new MailboxCredentialError("CalDAV with a password requires an https:// URL");
   }
 }
 

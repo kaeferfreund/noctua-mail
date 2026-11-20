@@ -260,6 +260,40 @@ test("SMTP verifies the new endpoint before persisting, blank CalDAV secret pres
   expect(changed.caldav?.password).toBe("secret");
 });
 
+test("a changed CalDAV endpoint or user never reuses the stored CalDAV password", async () => {
+  const f = await fixture();
+  const manager = { userId: f.user.id };
+  // The settings dialog sends the whole block back with a blank password; unchanged endpoint keeps the secret.
+  expect((await updateMailboxCredentials(f.id, { caldav: { ...f.account.caldav!, url: "https://calendar.example.test/", password: "", calendarPath: "/cal/" } }, manager, verified)).caldav?.password).toBe("secret");
+  for (const caldav of [
+    { url: "https://attacker.example.test/" },
+    { url: "https://attacker.example.test/", user: "x" },
+    { url: "http://calendar.example.test/" },
+    { url: "https://calendar.example.test:8443/" },
+    { url: "https://calendar.example.test/other/" },
+    { user: "someone-else" },
+    { ...f.account.caldav!, url: "https://attacker.example.test/dav", password: "  " }
+  ]) {
+    await expect(updateMailboxCredentials(f.id, { caldav } as MailboxPatch, manager, verified)).rejects.toThrow("requires its password");
+  }
+  const stored = await f.db.getAccountById(f.id);
+  expect(stored?.caldav?.url).toBe("https://calendar.example.test/");
+  expect(stored?.caldav?.password).toBe("secret");
+  // With a newly entered password the endpoint may change.
+  const moved = await updateMailboxCredentials(f.id, { caldav: { url: "https://calendar2.example.test/", user: "synthetic", password: "fresh" } }, manager, verified);
+  expect(moved.caldav).toMatchObject({ url: "https://calendar2.example.test/", password: "fresh" });
+});
+
+test("CalDAV passwords are only accepted for https:// servers", async () => {
+  const f = await fixture();
+  const manager = { userId: f.user.id };
+  await expect(updateMailboxCredentials(f.id, { caldav: { url: "http://calendar.example.test/", user: "synthetic", password: "fresh" } }, manager, verified)).rejects.toThrow("https://");
+  // Without a password plain HTTP stays possible (no credential to expose).
+  await updateMailboxCredentials(f.id, { caldav: null } as unknown as MailboxPatch, manager, verified);
+  const open = await updateMailboxCredentials(f.id, { caldav: { url: "http://calendar.example.test/", user: "synthetic", password: "" } }, manager, verified);
+  expect(open.caldav).toMatchObject({ url: "http://calendar.example.test/", password: "" });
+});
+
 test("admin mailbox creation makes the creator owner; admin override only as a member; manager failures carry no repair payload for viewers", async () => {
   const admin = await createAuthenticatedTestSession(undefined, "admin");
   const f = await fixture();
