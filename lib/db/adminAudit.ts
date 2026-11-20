@@ -90,7 +90,8 @@ export function decodeAdminAuditCursor(cursor: string): { createdAt: number; id:
 /**
  * Newest (createdAt,rowid) first. Numeric `before` remains a legacy storage API. `visibleTo` limits the
  * entries to what one admin may see: entries without a mailbox, entries of the given mailboxes (the
- * admin's memberships), and deleted mailboxes (id only). Filtering happens before LIMIT, so pages stay full.
+ * admin's memberships), and deleted mailboxes (id only: their payload and target user are removed, as the
+ * former membership is no longer known). Filtering happens before LIMIT, so pages stay full.
  */
 export async function listAdminAudit(
   options: { limit?: number; before?: number | string | null; visibleTo?: { userId: string; accountIds: Iterable<string> } } = {}
@@ -100,6 +101,7 @@ export async function listAdminAudit(
   const cursor = typeof options.before === "string" ? decodeAdminAuditCursor(options.before) : null;
   const before = typeof options.before === "number" && Number.isFinite(options.before) ? options.before : null;
   const where: string[] = [], args: Array<string | number> = [];
+  const memberAccountIds = new Set(options.visibleTo?.accountIds ?? []);
   if (cursor) {
     const row = db.prepare("SELECT rowid FROM admin_audit WHERE id = ?").get(cursor.id) as { rowid: number } | null;
     if (row) {
@@ -114,7 +116,7 @@ export async function listAdminAudit(
   else if (before !== null) { where.push("createdAt < ?"); args.push(before); }
   if (options.visibleTo) {
     where.push("(targetAccountId IS NULL OR targetAccountId IN (SELECT value FROM json_each(?)) OR NOT EXISTS (SELECT 1 FROM accounts WHERE accounts.id = admin_audit.targetAccountId))");
-    args.push(JSON.stringify([...options.visibleTo.accountIds]));
+    args.push(JSON.stringify([...memberAccountIds]));
   }
   const rows = db
     .prepare(
@@ -128,11 +130,15 @@ export async function listAdminAudit(
   const entries = rows.map(mapAdminAuditRow);
   if (!options.visibleTo) return entries;
   const viewerUserId = options.visibleTo.userId;
+  // Rows of other mailboxes passed the filter above only because the mailbox was deleted.
+  const visibleEntries = entries.map(entry => entry.targetAccountId && !memberAccountIds.has(entry.targetAccountId)
+    ? { ...entry, targetUserId: null, payload: null }
+    : entry);
   // The admin user directory is global; mailbox labels require current membership.
   const userLabel = db.prepare("SELECT COALESCE(NULLIF(name,''), email) AS label FROM auth_user WHERE id=?");
   const accountLabel = db.prepare(`SELECT COALESCE(NULLIF(name,''), email) AS label FROM accounts a WHERE id=?
     AND (ownerUserId=? OR EXISTS (SELECT 1 FROM user_accounts WHERE accountId=a.id AND userId=?))`);
-  return entries.map(entry => ({ ...entry,
+  return visibleEntries.map(entry => ({ ...entry,
     actorLabel: (userLabel.get(entry.actorUserId) as { label: string } | null)?.label ?? null,
     targetUserLabel: entry.targetUserId ? (userLabel.get(entry.targetUserId) as { label: string } | null)?.label ?? null : null,
     targetAccountLabel: entry.targetAccountId ? (accountLabel.get(entry.targetAccountId, viewerUserId, viewerUserId) as { label: string } | null)?.label ?? null : null

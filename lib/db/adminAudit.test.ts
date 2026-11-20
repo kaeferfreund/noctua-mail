@@ -137,6 +137,25 @@ test("deleted mailbox audit is visible to all admins; existing mailboxes still r
   }
 });
 
+test("entries of a deleted mailbox show only the mailbox id to admins outside it", async () => {
+  await createAuthenticatedTestSession(undefined, "admin");
+  const f = await createCollabFixture();
+  const actor = crypto.randomUUID(), targetUser = crypto.randomUUID();
+  const audit = await recordAdminAudit({ actorUserId: actor, action: "identity.create", targetUserId: targetUser,
+    targetAccountId: f.accountId, payload: { email: "alias@example.test", displayName: "Synthetic alias" } });
+  const find = async (accountIds: string[]) => (await listAdminAudit({
+    visibleTo: { userId: crypto.randomUUID(), accountIds }, limit: ADMIN_AUDIT_MAX_LIMIT
+  })).find(entry => entry.id === audit.id);
+  expect(await find([f.accountId])).toMatchObject({ payload: { email: "alias@example.test" }, targetUserId: targetUser });
+  await f.api.deleteAccountControlPlane(f.accountId);
+  const redacted = await find([]);
+  expect(redacted).toMatchObject({ id: audit.id, action: "identity.create", targetAccountId: f.accountId, payload: null, targetUserId: null });
+  expect(JSON.stringify(redacted)).not.toContain("alias@example.test");
+  // The unfiltered storage API (no viewer) keeps the full record.
+  expect((await listAdminAudit({ limit: ADMIN_AUDIT_MAX_LIMIT })).find(entry => entry.id === audit.id)?.payload).toEqual({
+    email: "alias@example.test", displayName: "Synthetic alias" });
+});
+
 test("an unknown audit cursor falls back to strictly older timestamps", async () => {
   const db = await getDb();
   const createdAt = Date.now() + 1_000_000;
