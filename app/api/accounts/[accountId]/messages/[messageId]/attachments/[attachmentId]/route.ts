@@ -15,7 +15,7 @@ import { requireAccountAndMessageContext } from "@/app/api/_helpers/message/rout
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
 import { entityTagForStat, ifNoneMatchMatches } from "@/app/api/_helpers/etag";
 import { createHash } from "node:crypto";
-import { attachmentContentDisposition, attachmentDocumentCsp, isPdfMimeType } from "@/lib/attachmentDocument";
+import { attachmentContentDisposition, attachmentDocumentCsp, isPdfMimeType, normalizeMimeType } from "@/lib/attachmentDocument";
 
 /**
  * Private cache, revalidated on every use (ETag/304): a stored copy is only shown after the server re-checked
@@ -34,9 +34,23 @@ function attachmentCacheHeaders(etag: string) {
 }
 
 // The preview shell loads nothing but the attachment frame; its one style block is allowed by hash.
-const PREVIEW_SHELL_STYLE = "html,body{margin:0;height:100%;background:#1f1d1a}iframe{border:0;display:block;width:100%;height:100%}";
-const PREVIEW_SHELL_CSP = `default-src 'none'; style-src 'sha256-${createHash("sha256").update(PREVIEW_SHELL_STYLE).digest("base64")}'; ` +
-  "frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+function previewShell(backdrop: string) {
+  const style = `html,body{margin:0;height:100%;background:${backdrop}}iframe{border:0;display:block;width:100%;height:100%}`;
+  const csp = `default-src 'none'; style-src 'sha256-${createHash("sha256").update(style).digest("base64")}'; ` +
+    "frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
+  return { style, csp };
+}
+const DARK_PREVIEW_SHELL = previewShell("#1f1d1a");
+const LIGHT_PREVIEW_SHELL = previewShell("#fff");
+
+/**
+ * The browser's own text viewer draws default black text on a transparent
+ * canvas, so text attachments (.txt, .md, …) need a light backdrop behind the
+ * frame; images and PDFs sit on the dark one.
+ */
+function previewShellFor(contentType?: string | null) {
+  return normalizeMimeType(contentType).startsWith("text/") ? LIGHT_PREVIEW_SHELL : DARK_PREVIEW_SHELL;
+}
 
 type Params = AccountRouteParams & {
   params: Promise<{
@@ -78,11 +92,12 @@ export async function GET(request: Request, { params }: Params) {
       frameUrl.searchParams.delete("preview");
       // The frame is sandboxed like the bytes' own CSP; PDF viewers do not run in a sandbox.
       const sandbox = isPdfMimeType(attachment.contentType) ? "" : ' sandbox=""';
+      const shellStyle = previewShellFor(attachment.contentType);
       const shell = [
         '<!doctype html><html lang="en"><head>',
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width,initial-scale=1">',
-        `<style>${PREVIEW_SHELL_STYLE}</style>`,
+        `<style>${shellStyle.style}</style>`,
         "</head><body>",
         `<iframe src="${escapeHtml(frameUrl.pathname + frameUrl.search)}"${sandbox} referrerpolicy="no-referrer"></iframe>`,
         "</body></html>"
@@ -93,7 +108,7 @@ export async function GET(request: Request, { params }: Params) {
           headers: {
             "Content-Type": "text/html; charset=utf-8",
             "Cache-Control": "no-store",
-            "Content-Security-Policy": PREVIEW_SHELL_CSP,
+            "Content-Security-Policy": shellStyle.csp,
             "Referrer-Policy": "no-referrer"
           }
         }
