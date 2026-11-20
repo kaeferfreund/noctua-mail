@@ -408,22 +408,43 @@ export async function upsertCalendarEvent(
   });
 }
 
+const CALENDAR_EVENT_WRITE_COLUMNS = [
+  "id", "accountId", "calendarId", "eventUid", "summary", "description", "location",
+  "startAtMs", "endAtMs", "allDay", "startTimezone", "endTimezone",
+  "recurrenceRule", "recurrenceDates", "excludedDates",
+  "status", "organizer", "attendees", "myPartstat", "myPartstatUpdatedAtMs", "myAttendeeEmail", "replyRequested",
+  "remoteEtag", "remoteHref", "rawIcs", "pendingRemoteSync", "sourceType", "messageId", "occurrenceMessageIds",
+  "sourceSubject", "sourceFromAddr", "sourceToAddr", "sourceCcAddr", "sourceBccAddr",
+  "sourceDateMs", "sourceBodyText", "sourceBodyHtml", "occurrenceSnapshots", "occurrenceRecurrenceIds",
+  "eventUidKey",
+  "createdAtMs", "updatedAtMs", "deletedAtMs"
+] as const;
+
+// `id` is the shard-wide primary key, and a legacy shared shard holds several
+// mailboxes. The update branch only fires for a row of the same mailbox, so a
+// write can never replace or take over another mailbox's event (INSERT OR
+// REPLACE used to delete the foreign row and re-insert it under this account).
+const UPSERT_CALENDAR_EVENT_SQL = `INSERT INTO calendar_events (${CALENDAR_EVENT_WRITE_COLUMNS.join(", ")})
+  VALUES (${CALENDAR_EVENT_WRITE_COLUMNS.map(() => "?").join(", ")})
+  ON CONFLICT(id) DO UPDATE SET
+    ${CALENDAR_EVENT_WRITE_COLUMNS.filter((column) => column !== "id" && column !== "accountId")
+      .map((column) => `${column} = excluded.${column}`)
+      .join(",\n    ")}
+  WHERE calendar_events.accountId = excluded.accountId`;
+
+export class CalendarEventOwnershipError extends Error {
+  constructor() {
+    super("Calendar event id belongs to another mailbox");
+    this.name = "CalendarEventOwnershipError";
+  }
+}
+
 function upsertCalendarEventRow(db: Database, accountId: string, event: CalendarEvent, clearParticipationOccurrenceAtMs?: number) {
-  db.prepare(
-    `INSERT OR REPLACE INTO calendar_events (
-      id, accountId, calendarId, eventUid, summary, description, location,
-      startAtMs, endAtMs, allDay, startTimezone, endTimezone,
-      recurrenceRule, recurrenceDates, excludedDates,
-      status, organizer, attendees, myPartstat, myPartstatUpdatedAtMs, myAttendeeEmail, replyRequested,
-      remoteEtag, remoteHref, rawIcs, pendingRemoteSync, sourceType, messageId, occurrenceMessageIds,
-      sourceSubject, sourceFromAddr, sourceToAddr, sourceCcAddr, sourceBccAddr,
-      sourceDateMs, sourceBodyText, sourceBodyHtml, occurrenceSnapshots, occurrenceRecurrenceIds,
-      eventUidKey,
-      createdAtMs, updatedAtMs, deletedAtMs
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run(
+  const result = db.prepare(UPSERT_CALENDAR_EVENT_SQL).run(
     event.id,
-    event.accountId,
+    // Scope to the mailbox whose shard we opened, never the caller-supplied
+    // field, so a row cannot be written under an id the reads can't see.
+    accountId,
     event.calendarId ?? null,
     event.eventUid,
     event.summary,
@@ -472,6 +493,9 @@ function upsertCalendarEventRow(db: Database, accountId: string, event: Calendar
     event.updatedAtMs,
     event.deletedAtMs ?? null
   );
+  if (result.changes === 0) {
+    throw new CalendarEventOwnershipError();
+  }
   if (Number.isFinite(clearParticipationOccurrenceAtMs)) {
     deleteCalendarParticipationOverrideRow(db, accountId, event.eventUid, clearParticipationOccurrenceAtMs!);
   }

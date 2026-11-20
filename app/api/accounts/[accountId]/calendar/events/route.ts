@@ -89,6 +89,12 @@ export async function POST(request: Request, { params }: AccountRouteParams) {
     // only ever hit for the edge case of id === eventUid and silently break
     // snapshot-fallback when the POST body updates an existing event.
     const existing = existingId ? await getCalendarEventById(accountId, existingId) : null;
+    // A client-supplied id must name an event of this mailbox. Row ids are
+    // shard-wide, so an unknown id may belong to another mailbox in a legacy
+    // shared shard; new events always get a server-generated id.
+    if (existingId && !existing) {
+      return NextResponse.json({ ok: false, message: "Event not found" }, { status: 404 });
+    }
     const resolvedMessageId = body?.messageId?.trim() || undefined;
     const freshSnapshot =
       isNew && resolvedMessageId
