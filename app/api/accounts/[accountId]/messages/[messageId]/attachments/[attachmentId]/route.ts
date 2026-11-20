@@ -14,6 +14,8 @@ import { removeMessageAttachmentEverywhere } from "@/lib/mail/removeMessageAttac
 import { requireAccountAndMessageContext } from "@/app/api/_helpers/message/routeHelpers";
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
 import { entityTagForStat, ifNoneMatchMatches } from "@/app/api/_helpers/etag";
+import { createHash } from "node:crypto";
+import { attachmentContentDisposition, attachmentDocumentCsp, isPdfMimeType } from "@/lib/attachmentDocument";
 
 /**
  * Private cache, revalidated on every use (ETag/304): a stored copy is only shown after the server re-checked
@@ -30,6 +32,11 @@ function attachmentCacheHeaders(etag: string) {
     "Cache-Control": ATTACHMENT_CACHE_CONTROL
   };
 }
+
+// The preview shell loads nothing but the attachment frame; its one style block is allowed by hash.
+const PREVIEW_SHELL_STYLE = "html,body{margin:0;height:100%;background:#1f1d1a}iframe{border:0;display:block;width:100%;height:100%}";
+const PREVIEW_SHELL_CSP = `default-src 'none'; style-src 'sha256-${createHash("sha256").update(PREVIEW_SHELL_STYLE).digest("base64")}'; ` +
+  "frame-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 
 type Params = AccountRouteParams & {
   params: Promise<{
@@ -69,14 +76,15 @@ export async function GET(request: Request, { params }: Params) {
     if (searchParams.get("preview") === "1") {
       const frameUrl = new URL(request.url);
       frameUrl.searchParams.delete("preview");
+      // The frame is sandboxed like the bytes' own CSP; PDF viewers do not run in a sandbox.
+      const sandbox = isPdfMimeType(attachment.contentType) ? "" : ' sandbox=""';
       const shell = [
         '<!doctype html><html lang="en"><head>',
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width,initial-scale=1">',
-        "<style>html,body{margin:0;height:100%;background:#1f1d1a}",
-        "iframe{border:0;display:block;width:100%;height:100%}</style>",
+        `<style>${PREVIEW_SHELL_STYLE}</style>`,
         "</head><body>",
-        `<iframe src="${escapeHtml(frameUrl.pathname + frameUrl.search)}"></iframe>`,
+        `<iframe src="${escapeHtml(frameUrl.pathname + frameUrl.search)}"${sandbox} referrerpolicy="no-referrer"></iframe>`,
         "</body></html>"
       ].join("");
       return new NextResponse(
@@ -84,7 +92,9 @@ export async function GET(request: Request, { params }: Params) {
         {
           headers: {
             "Content-Type": "text/html; charset=utf-8",
-            "Cache-Control": "no-store"
+            "Cache-Control": "no-store",
+            "Content-Security-Policy": PREVIEW_SHELL_CSP,
+            "Referrer-Policy": "no-referrer"
           }
         }
       );
@@ -105,9 +115,6 @@ export async function GET(request: Request, { params }: Params) {
     }
     fileStat ??= await statAttachmentData(accountId, messageId, attachmentId);
 
-    const rawName = attachment.filename ?? "attachment";
-    const asciiName = rawName.replace(/[^\x20-\x7E]+/g, "_");
-    const encodedName = encodeURIComponent(rawName);
     const shouldDownload = searchParams.get("download") === "1";
     const disposition = shouldDownload ? "attachment" : "inline";
     const etag = fileStat ? attachmentEntityTag(fileStat) : null;
@@ -119,9 +126,10 @@ export async function GET(request: Request, { params }: Params) {
       headers: {
         "Content-Type": attachment.contentType ?? "application/octet-stream",
         ...(etag ? attachmentCacheHeaders(etag) : {}),
-        "Content-Disposition": `${disposition}; filename="${asciiName}"; filename*=UTF-8''${encodedName}`,
+        "Content-Disposition": attachmentContentDisposition(disposition, attachment.filename ?? "attachment"),
         "X-Content-Type-Options": "nosniff",
-        "Content-Security-Policy": "default-src 'none'"
+        "Content-Security-Policy": attachmentDocumentCsp(attachment.contentType),
+        "Referrer-Policy": "no-referrer"
       }
     });
   });
