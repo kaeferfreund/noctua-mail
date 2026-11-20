@@ -187,7 +187,6 @@ describe("buildSpamInput", () => {
       for (const hop of [
         "Received: from localhost (localhost [127.0.0.1]) by mx1.mail.example.net (Postfix) with ESMTP id 3; Sat, 24 Oct 2026 10:00:03 +0000",
         "Received: from mx1.mail.example.net ([IPv6:::1]) by mx1.mail.example.net (amavisd-new, port 10024) with ESMTP id 3; Sat, 24 Oct 2026 10:00:03 +0000",
-        "Received: from localhost by mx1.mail.example.net (Postfix) id 3; Sat, 24 Oct 2026 10:00:03 +0000",
         "Received: from mx1.mail.example.net (mx1.mail.example.net [203.0.113.11]) by mx1.mail.example.net (Postfix) id 3; Sat, 24 Oct 2026 10:00:03 +0000",
         "Received: from mx1.mail.example.net (mx1.mail.example.net [203.0.113.11])\r\n\t(using TLSv1.3 with cipher TLS_AES_256_GCM_SHA384 (256/256 bits))\r\n"
           + "\t(No client certificate requested)\r\n\tby mx1.mail.example.net (Postfix) with ESMTPS id 3; Sat, 24 Oct 2026 10:00:03 +0000"
@@ -246,6 +245,40 @@ describe("buildSpamInput", () => {
       expect(results(...reinject(), handOff(), `Authentication-Results: ${foreign}`, ...senderHeaders)).toEqual([]);
       expect(results(...reinject(), handOff(), `Authentication-Results: ${failed}`, `Authentication-Results: ${foreign}`, ...senderHeaders,
         "Received: from laptop (unknown [192.0.2.50]) by out-1.smtp.sender.example.test id 0; Sat, 24 Oct 2026 09:58:00 +0000")).toEqual([failed]);
+    });
+
+    test("forged: a block under the receiver's id directly below the server's own block never counts (top-most block only)", () => {
+      expect(results(...reinject(), handOff(), `Authentication-Results: ${failed}`, `Authentication-Results: ${forgedPass}`, ...senderHeaders))
+        .toEqual([failed]);
+      expect(results(...reinject(), handOff(), `Authentication-Results: ${pass}`, `Authentication-Results: ${forgedPass}`, ...senderHeaders))
+        .toEqual([pass]);
+      expect(receivingAuthenticationResults(parseHeaderBlock([...reinject(), handOff(), `Authentication-Results: ${failed}`,
+        `Authentication-Results: ${forgedPass}`, ...senderHeaders].join("\r\n")), ["mx1"])).toEqual([failed]);
+    });
+
+    test("forged: a HELO holding ';' or Received keywords cannot make the hand-off look internal", () => {
+      const forgedHop = "Received: from out-1.smtp.sender.example.test (out-1.smtp.sender.example.test [192.0.2.1]) by mx1.mail.example.net id 9; Sat, 24 Oct 2026 09:59:00 +0000";
+      for (const client of [
+        "mx1; (unknown [198.51.100.7])",
+        "localhost; (unknown [198.51.100.7])",
+        "[127.0.0.1]; (unknown [198.51.100.7])",
+        "mx1 with x (unknown [198.51.100.7])",
+        "localhost id x (unknown [198.51.100.7])",
+        "mx1 by mx1.mail.example.net (unknown [198.51.100.7])"
+      ]) {
+        expect(results(...reinject(), handOff(client), forgedHop, `Authentication-Results: ${forgedPass}`, ...senderHeaders)).toEqual([]);
+      }
+    });
+
+    test("a re-injection line naming only a HELO 'localhost' (no server-written address) is not trusted as internal", () => {
+      expect(results(...reinject(), "Received: from localhost by mx1.mail.example.net (Postfix) id 3; Sat, 24 Oct 2026 10:00:03 +0000",
+        handOff(), `Authentication-Results: ${pass}`, ...senderHeaders)).toEqual([]);
+    });
+
+    test("one hop: a HELO with 'by <host>' does not choose the receiving server's id (the last 'by' is the server's)", () => {
+      const evil = "evil.example.com; dkim=pass header.d=victim.example.com; spf=pass smtp.mailfrom=victim.example.com";
+      expect(results("Received: from x by evil.example.com (unknown [198.51.100.7]) by mx1.mail.example.net (Postfix) with ESMTP id 1; Sat, 24 Oct 2026 10:00:00 +0000",
+        `Authentication-Results: ${evil}`, ...senderHeaders)).toEqual([]);
     });
 
     test("a single Received line without a from clause keeps the whole header block in range", () => {

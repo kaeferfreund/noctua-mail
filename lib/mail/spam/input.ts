@@ -133,17 +133,8 @@ export function configuredAuthservIds(env: Record<string, string | undefined> = 
 const authservId = (value: string) =>
   value.split(";")[0].replace(/\([^()]*\)/g, " ").trim().split(/\s+/)[0]?.toLowerCase().replace(/\.$/, "") ?? "";
 
-/** The host after "by" in a Received value: the server that stamped it. */
-function receivedByHost(value: string) {
-  return value.replace(/\([^()]*\)/g, " ").match(/(?:^|\s)by\s+([a-z0-9.-]+)/i)?.[1].toLowerCase().replace(/\.$/, "") ?? null;
-}
-
-const LOOPBACK_NAMES = new Set(["localhost", "localhost.localdomain"]);
-const isLoopbackIp = (ip: string) => /^(?:ipv6:)?(?:127\.|::1$|::ffff:127\.)/i.test(ip);
-
-/** The `from` clause of a Received value with its comments (`from helo (rdns [192.0.2.1])`); null without one. */
-function receivedFromClause(value: string) {
-  // Blank out comments (same length) so "from userid 1001" or a keyword in a comment is not a clause.
+/** A Received value with its comments blanked out (same length), so keywords inside comments do not count. */
+function blankComments(value: string) {
   let depth = 0;
   let blank = "";
   for (const char of value) {
@@ -151,11 +142,41 @@ function receivedFromClause(value: string) {
     blank += depth ? " ".repeat(char.length) : char;
     if (char === ")" && depth) depth--;
   }
-  const from = /(?:^|\s)from\s/i.exec(blank);
-  if (!from) return null;
+  return blank;
+}
+
+/**
+ * The server-written `by` clause of a Received value: the LAST `by <host>`
+ * outside comments and before the date (after the last ";"). The client's HELO
+ * comes first and may itself contain "by", ";" or other keywords
+ * (`from x by evil.example`), so the first match is not the server's.
+ */
+function receivedBy(value: string) {
+  const blank = blankComments(value);
+  const dateCut = blank.lastIndexOf(";");
+  const head = dateCut < 0 ? blank : blank.slice(0, dateCut);
+  const last = [...head.matchAll(/(?:^|\s)by\s+([a-z0-9.-]+)/gi)].at(-1);
+  return { blank, head, byIndex: last ? last.index : null, host: last ? last[1].toLowerCase().replace(/\.$/, "") : null };
+}
+
+/** The host after the server's "by" in a Received value: the server that stamped it. */
+function receivedByHost(value: string) {
+  return receivedBy(value).host;
+}
+
+const LOOPBACK_NAMES = new Set(["localhost", "localhost.localdomain"]);
+const isLoopbackIp = (ip: string) => /^(?:ipv6:)?(?:127\.|::1$|::ffff:127\.)/i.test(ip);
+
+/**
+ * The `from` clause of a Received value with its comments (`from helo (rdns [192.0.2.1])`): everything from
+ * `from` up to the server's own `by` (receivedBy), so a HELO holding ";" or keywords cannot cut it short; null without one.
+ */
+function receivedFromClause(value: string) {
+  const { head, byIndex } = receivedBy(value);
+  const from = /(?:^|\s)from\s/i.exec(head);
+  if (!from || (byIndex !== null && from.index >= byIndex)) return null;
   const start = from.index + from[0].length;
-  const end = blank.slice(start).search(/\s(?:by|via|with|id|for)\s|;/i);
-  return value.slice(start, end < 0 ? value.length : start + end);
+  return value.slice(start, byIndex ?? head.length);
 }
 
 /**
@@ -173,7 +194,8 @@ function isInternalHop(value: string, isHost: (name: string) => boolean) {
   const clause = receivedFromClause(value);
   if (clause === null) return true;
   const addresses = [...clause.matchAll(/\[([^\]]*)\]/g)].map((match) => match[1].trim());
-  const loopbackOnly = addresses.every(isLoopbackIp);
+  // No address literal at all proves nothing: only a server-written loopback address counts as loopback.
+  const loopbackOnly = addresses.length > 0 && addresses.every(isLoopbackIp);
   if (addresses.length && loopbackOnly) return true;
   // The client's names: the HELO and every comment holding an address literal, among them the server's
   // `(rdns [address])` that no HELO can hide. Comments without one (TLS cipher, authenticated sender) are dropped.
@@ -220,7 +242,9 @@ function receiverHeaderLimit(lines: HeaderLine[], receivedIndexes: number[], isR
  * is the end of the header block.
  *
  * Of the blocks in range only those whose authserv-id belongs to the receiving
- * server count, and of those the top-most id's blocks. The receiving server is
+ * server count, and of those only the top-most block: the server prepends its
+ * own block above anything the sender wrote, so a forged block under the same
+ * id directly below it never counts. The receiving server is
  * the configured `NOCTUA_SPAM_AUTHSERV_ID` list (exact ids) or else the host
  * that stamped the top-most Received line, which no sender can write: an id
  * matches when it is that host, its first label (`by mx1.mail.example.com` and
@@ -238,8 +262,9 @@ export function receivingAuthenticationResults(lines: HeaderLine[], configured: 
   const pinned = (id: string) => (configured.length ? configured.includes(id)
     : byHost === null ? receivedIndexes.length === 0 : isReceiver(id));
   const results = lines.filter((line, index) => line.key === "authentication-results" && index < limit && pinned(authservId(line.value)));
-  const first = results[0] ? authservId(results[0].value) : "";
-  return results.filter((line) => authservId(line.value) === first).map((line) => line.value);
+  // Only the top-most block: the server prepends its own block above anything the sender wrote, so a
+  // forged block under the same id directly below it never counts (the provider writes one block per hop).
+  return results.slice(0, 1).map((line) => line.value);
 }
 
 function topSpamHeaders(lines: HeaderLine[]) {
