@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Text } from "@radix-ui/themes";
 import CalendarEventBrowser from "@/app/components/calendar/CalendarEventBrowser";
 import CalendarDropOverlay from "@/app/components/calendar/CalendarDropOverlay";
@@ -11,6 +12,7 @@ import type { Account, AccountDateFormat } from "@/lib/data";
 import { formatCalendarPageTitle } from "@/lib/appBranding";
 import { useWindowTitle } from "@/lib/ui/windowTitle";
 import { normalizeAccountDateFormat } from "@/lib/dateFormatting";
+import { useDetachedSessionGuard } from "@/app/hooks/useDetachedSessionGuard";
 import styles from "./page.module.css";
 
 function CalendarWindowContent() {
@@ -20,7 +22,11 @@ function CalendarWindowContent() {
   const [dateFormat, setDateFormat] = useState<AccountDateFormat | undefined>();
   const [accountEmail, setAccountEmail] = useState("");
 
-  useWindowTitle(formatCalendarPageTitle(accountEmail));
+  const tShell = useTranslations("Shell");
+  // After sign-out (or another person's sign-in) the calendar of the previous person unmounts.
+  const sessionEnded = useDetachedSessionGuard();
+
+  useWindowTitle(formatCalendarPageTitle(sessionEnded ? "" : accountEmail));
 
   useEffect(() => {
     if (!accountId) return;
@@ -41,6 +47,15 @@ function CalendarWindowContent() {
     };
   }, [accountId]);
 
+  if (sessionEnded) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.state}>
+          <Text size="2" color="gray">{tShell("detachedSignedOut")}</Text>
+        </div>
+      </div>
+    );
+  }
   if (!accountId) {
     return (
       <div className={styles.page}>

@@ -11,39 +11,13 @@ import FolderPickerNode from "../folder/FolderPickerNode";
 import { folderSpecialIcon } from "../RenderHelpers";
 import styles from "./MoveToDialog.module.css";
 import TooltipIconButton from "@/app/components/TooltipIconButton";
-
-const RECENT_MOVE_FOLDERS_KEY = "noctua-recent-move-folders";
-const MAX_RECENT = 10;
-
-export function getRecentMoveFolderIds(accountId: string): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(RECENT_MOVE_FOLDERS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Record<string, string[]>;
-    return parsed[accountId] ?? [];
-  } catch {
-    return [];
-  }
-}
-
-export function recordRecentMoveFolder(accountId: string, folderId: string) {
-  if (typeof window === "undefined") return;
-  try {
-    const raw = localStorage.getItem(RECENT_MOVE_FOLDERS_KEY);
-    const parsed: Record<string, string[]> = raw ? JSON.parse(raw) : {};
-    const current = parsed[accountId] ?? [];
-    const updated = [folderId, ...current.filter((id) => id !== folderId)].slice(0, MAX_RECENT);
-    parsed[accountId] = updated;
-    localStorage.setItem(RECENT_MOVE_FOLDERS_KEY, JSON.stringify(parsed));
-  } catch {
-    // ignore
-  }
-}
+import { getRecentMoveFolderIds } from "../utils/recentMoveFolders";
 
 type MoveToDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Signed-in user: recent destinations are this user's own. */
+  userId: string | null | undefined;
   accountId: string;
   rootFolders: Folder[];
   folderTree: Map<string, Folder[]>;
@@ -54,6 +28,7 @@ type MoveToDialogProps = {
 export default function MoveToDialog({
   open,
   onOpenChange,
+  userId,
   accountId,
   rootFolders,
   folderTree,
@@ -67,8 +42,8 @@ export default function MoveToDialog({
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const recentIds = useMemo(
-    () => (open ? getRecentMoveFolderIds(accountId) : []),
-    [open, accountId]
+    () => (open ? getRecentMoveFolderIds(userId, accountId) : []),
+    [open, userId, accountId]
   );
 
   const recentFolders = useMemo(

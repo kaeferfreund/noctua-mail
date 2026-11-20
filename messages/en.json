@@ -539,6 +539,7 @@
       "evictCache": "Evict thread cache"
     },
     "logout": "Log out",
+    "detachedSignedOut": "You were signed out. This window no longer shows mail and can be closed.",
     "calendar": "Calendar",
     "compose": {
       "label": "Compose",

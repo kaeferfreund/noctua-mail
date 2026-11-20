@@ -3,7 +3,7 @@
 import { SENDER_SETTINGS_STORAGE_KEY } from "@/lib/ui/senderSettings";
 import { retryAutoReadOnce } from "@/lib/autoMarkRead";
 
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { getFolderDisplayPath } from "@/lib/i18n/folderNames";
 import { withRemoteContentDecision } from "@/lib/html/remoteContentSession";
 
@@ -23,6 +23,7 @@ import type { Account, AccountDateFormat, Folder, Message } from "@/lib/data";
 import { formatMessageHtmlPageTitle, formatMessagePageTitle } from "@/lib/appBranding";
 import { useWindowTitle } from "@/lib/ui/windowTitle";
 import { useDarkMode } from "@/app/hooks/useDarkMode";
+import { useDetachedSessionGuard } from "@/app/hooks/useDetachedSessionGuard";
 import { createAutoReadCoordinator, useAutoMarkRead, useAutoMarkReadDelay } from "@/app/hooks/useAutoMarkRead";
 import { notifyDetachedMessageDeleted } from "@/lib/ui/detachedMessageEvents";
 import { getImapFlagBadges, hasHtmlContent } from "@/lib/ui/messageView";
@@ -77,7 +78,14 @@ export default function MessageWindowPage() {
   const sourceFetchRef = useRef<Map<string, Promise<string | null>>>(new Map());
   const missingParams = !accountId || !messageId;
 
-  useWindowTitle(formatMessagePageTitle(message?.subject));
+  const tShell = useTranslations("Shell");
+  // After sign-out (or another person's sign-in) this window drops the previous person's mail.
+  const sessionEnded = useDetachedSessionGuard();
+  if (sessionEnded && (message || account || folders.length)) {
+    setMessage(null); setAccount(null); setFolders([]);
+  }
+
+  useWindowTitle(formatMessagePageTitle(sessionEnded ? null : message?.subject));
 
   useEffect(() => {
     let active = true;
@@ -383,7 +391,9 @@ export default function MessageWindowPage() {
 
   return (
     <div className={styles.page}>
-      {missingParams ? (
+      {sessionEnded ? (
+        renderState(tShell("detachedSignedOut"))
+      ) : missingParams ? (
         renderState("Missing accountId or messageId.", "red")
       ) : status === "loading" ? (
         renderState("Loading message…")

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import type React from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Text } from "@radix-ui/themes";
 import DetachedComposeWindowClient from "@/app/components/mailclient/composition/DetachedComposeWindowClient";
 import { formatComposePageTitle } from "@/lib/appBranding";
@@ -12,6 +13,7 @@ import {
   readDetachedComposeHandoff,
   type DetachedComposeHandoff
 } from "@/lib/ui/detachedComposeHandoff";
+import { useDetachedSessionGuard } from "@/app/hooks/useDetachedSessionGuard";
 import styles from "./page.module.css";
 
 function ComposeWindowContent() {
@@ -20,8 +22,11 @@ function ComposeWindowContent() {
   const [handoff, setHandoff] = useState<DetachedComposeHandoff | null>(null);
   const [missingHandoff, setMissingHandoff] = useState(false);
   const [composeSubject, setComposeSubject] = useState("");
+  const tShell = useTranslations("Shell");
+  // After sign-out (or another person's sign-in) the composer unmounts with the draft it holds.
+  const sessionEnded = useDetachedSessionGuard();
 
-  useWindowTitle(formatComposePageTitle(composeSubject));
+  useWindowTitle(formatComposePageTitle(sessionEnded ? "" : composeSubject));
 
   useEffect(() => {
     if (!handoffId || (handoff && handoff.status !== "preparing")) return;
@@ -54,6 +59,9 @@ function ComposeWindowContent() {
     };
   }, [handoff, handoffId]);
 
+  if (sessionEnded) {
+    return <ComposeWindowState color="gray">{tShell("detachedSignedOut")}</ComposeWindowState>;
+  }
   if (!handoffId) {
     return <ComposeWindowState color="red">Missing compose handoff.</ComposeWindowState>;
   }

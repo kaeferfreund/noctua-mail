@@ -285,6 +285,15 @@ Known-user challenges bind generation and first-factor time. Anonymous passkey o
 `auth_login_epoch` before the library call; credential/reset/revoke generation advances cancel them.
 An ordinary logout only ends its own session and the user's pending logins; it does not advance the
 epoch, so other people's passkey sign-ins in progress stay valid.
+An admin lifecycle change on a user (session revocation, disable, MFA reset, recovery, ...) takes the
+user's security slot over from a pending sign-in (`security.login`, often still verifying its first
+factor): the sign-in loses the slot and can no longer register a challenge or session. Other pending
+security operations still make the admin change wait (`security_operation_pending`).
+On a shared browser, sign-out also removes the recent move destinations and closes the detached
+windows the main window opened; detached reader, composer and calendar windows drop their content
+when the browser's signed-in user changes or their session is gone (`useDetachedSessionGuard`). The
+mounted mail client resets search text, its place in the address bar and per-person dialogs when
+another person signs in (`usePrincipalBoundary`).
 Expired challenge registry rows, their library verification rows, expired reauth grants and finished
 security operations are swept periodically (`sweepExpiredAuthState`).
 Missing, expired, mismatched or removed registry entries fail before verification and again atomically
