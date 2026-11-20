@@ -72,6 +72,7 @@ const messages: Record<string, string> = {
   mailbox_exists: "This mailbox already exists. Ask your admin for access.",
   auth_integration_pending: "Sign-in is temporarily unavailable. Please try again later.",
   provisioning_failed: "Account creation could not finish. Contact your admin before retrying.",
+  mail_server_unreachable: "The mail server could not be reached or could not check the login. Please try again later.",
   INVALID_TOKEN: "This reset link is invalid, expired or already used. Ask your admin for a new link.",
   invalid_request: "Check the form fields and try again."
 };

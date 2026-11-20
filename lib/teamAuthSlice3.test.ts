@@ -14,6 +14,8 @@ import { assertStreamAuthorized, registerAuthStream, revokeAuthStreams } from ".
 import { cleanupUserAccountAccess, retryMembershipCleanup } from "./membershipCleanup";
 import { changeAccountMember } from "./accountMembers";
 import { createAdminMailbox } from "./adminMailbox";
+import { accountIdFromEmail } from "./accountId";
+import { MAIL_SERVER_UNREACHABLE_MESSAGE } from "./mail/imapError";
 import { mailboxFailure, mailboxErrorResponse } from "./mailboxFailure";
 import { stripPersonalSettings } from "./accountPrefs";
 import { Database } from "bun:sqlite";
@@ -38,7 +40,7 @@ async function fixture() {
   if (session instanceof Response) throw new Error("Missing fixture session");
   return { id, account, db, ...auth, context: session };
 }
-const verified = { imap: async () => true, smtp: async () => true };
+const verified = { imap: async () => "ok" as const, smtp: async () => true };
 const parameters = (accountId: string) => ({ params: Promise.resolve({ accountId }) });
 function jsonRequest(f: Awaited<ReturnType<typeof fixture>>, body: unknown) {
   return new Request(`http://localhost:3000/api/accounts/${f.id}/prefs`, { method: "PUT", headers: f.jar.headers({ origin: "http://localhost:3000", "content-type": "application/json" }), body: JSON.stringify(body) });
@@ -104,7 +106,7 @@ describe("Slice 3 credentials", () => {
       const account = { ...f.account, smtp: { ...f.account.smtp, user: sameUser ? "MAILBOX@example.test" : "different@example.test", password: stored } };
       await f.db.upsertAccount(account);
       let smtpTests = 0;
-      const verification = { imap: async () => true, smtp: async () => { smtpTests++; return true; } };
+      const verification = { imap: async () => "ok" as const, smtp: async () => { smtpTests++; return true; } };
       let next: Account;
       // relogin changes only IMAP; explicit SMTP input is deliberately ignored at that endpoint.
       const explicitSmtp = explicit && entry !== "relogin";
@@ -126,14 +128,14 @@ describe("Slice 3 credentials", () => {
       await expect(updateMailboxCredentials(f.id, patch as MailboxPatch, { userId: f.user.id }, verified)).rejects.toThrow();
     }
     expect((await updateMailboxCredentials(f.id, { imap: { password: "" } }, { userId: f.user.id }, verified)).imap.password).toBe("old-imap");
-    await expect(updateMailboxCredentials(f.id, { imap: { host: "new.example.test", password: "new" } }, { userId: f.user.id }, { imap: async account => { expect(account.imap.host).toBe("new.example.test"); return false; }, smtp: verified.smtp })).rejects.toThrow("Invalid IMAP");
+    await expect(updateMailboxCredentials(f.id, { imap: { host: "new.example.test", password: "new" } }, { userId: f.user.id }, { imap: async account => { expect(account.imap.host).toBe("new.example.test"); return "invalid" as const; }, smtp: verified.smtp })).rejects.toThrow("Invalid IMAP");
     expect((await f.db.getAccountById(f.id))?.imap.host).toBe("imap.example.test");
-    await expect(updateMailboxCredentials(f.id, { imap: { password: "new" } }, { userId: f.user.id }, { imap: async () => { await f.db.patchAccount(f.id, { name: "Concurrent update" }); return true; }, smtp: verified.smtp })).rejects.toThrow("retry");
+    await expect(updateMailboxCredentials(f.id, { imap: { password: "new" } }, { userId: f.user.id }, { imap: async () => { await f.db.patchAccount(f.id, { name: "Concurrent update" }); return "ok" as const; }, smtp: verified.smtp })).rejects.toThrow("retry");
   });
   test("mandatory STARTTLS is stored, verified with the requirement and cannot be dropped without the password (A14, S3)", async () => {
     const f = await fixture();
     const seen: Account[] = [];
-    const recording = { imap: async (account: Account) => { seen.push(account); return true; }, smtp: async (account: Account) => { seen.push(account); return true; } };
+    const recording = { imap: async (account: Account) => { seen.push(account); return "ok" as const; }, smtp: async (account: Account) => { seen.push(account); return true; } };
     await updateMailboxCredentials(f.id, { imap: { secure: false, requireTls: true, port: 143, password: "new-imap" }, smtp: { secure: false, requireTls: true, port: 587, password: "new-smtp" } }, { userId: f.user.id }, recording);
     expect(seen.map(account => [account.imap.requireTls, account.smtp.requireTls])).toEqual([[true, true], [true, true]]);
     const stored = (await f.db.getAccountById(f.id))!;
@@ -367,7 +369,7 @@ test("relogin verifies even an unchanged submitted password; setup assurance can
   const f = await fixture();
   let attempts = 0;
   const response = await handleMailboxCredentialMutation(jsonRequest(f, { password: "old-imap" }), "relogin", parameters(f.id).params, {
-    imap: async () => { attempts++; return false; }, smtp: verified.smtp
+    imap: async () => { attempts++; return "invalid" as const; }, smtp: verified.smtp
   });
   expect(response.status).toBe(400); expect(attempts).toBe(1);
   f.master.prepare("UPDATE auth_session_security SET assurance='setup' WHERE sessionId=?").run(f.context.sessionId);
@@ -487,7 +489,7 @@ test("account repair returns final 404 for an absent mailbox without credential 
   const f = await fixture();
   let verified = false;
   const response = await handleMailboxCredentialMutation(jsonRequest(f, { id: "synthetic-absent", email: "absent@example.test", imap: { password: "synthetic-password" } }), "post-existing", undefined, {
-    imap: async () => { verified = true; return true; }, smtp: async () => { verified = true; return true; }
+    imap: async () => { verified = true; return "ok" as const; }, smtp: async () => { verified = true; return true; }
   });
   expect(response.status).toBe(404);
   expect(await response.json()).toEqual({ok:false,code:"account_not_found"});
@@ -499,7 +501,7 @@ test("account repair answers an existing mailbox outside the caller's membership
   const foreignId = `s3-foreign-${crypto.randomUUID()}`;
   await f.db.upsertAccount({ ...f.account, id: foreignId, email: "foreign@example.test" });
   let verified = false;
-  const verification = { imap: async () => { verified = true; return true; }, smtp: async () => { verified = true; return true; } };
+  const verification = { imap: async () => { verified = true; return "ok" as const; }, smtp: async () => { verified = true; return true; } };
   const answers = [];
   for (const target of [{ id: foreignId, email: "foreign@example.test" }, { id: "synthetic-absent", email: "absent@example.test" }]) {
     const response = await handleMailboxCredentialMutation(jsonRequest(f, { ...target, imap: { password: "synthetic-password" } }), "post-existing", undefined, verification);
@@ -508,4 +510,33 @@ test("account repair answers an existing mailbox outside the caller's membership
   expect(answers[0]).toEqual(answers[1]);
   expect(answers[0]).toEqual({ status: 404, body: { ok: false, code: "account_not_found" } });
   expect(verified).toBe(false);
+});
+
+test.each(["invalid", "unreachable", "ok"] as const)("relogin stores new IMAP credentials only when the server accepts them (%s)", async (check) => {
+  const f = await fixture();
+  let smtpChecks = 0;
+  const response = await handleMailboxCredentialMutation(jsonRequest(f, { password: "synthetic-new-secret" }), "relogin", parameters(f.id).params, {
+    imap: async () => check, smtp: async () => { smtpChecks++; return true; }
+  });
+  const stored = (await f.db.getAccountById(f.id))!;
+  if (check === "ok") {
+    expect(response.status).toBe(200);
+    expect(stored.imap.password).toBe("synthetic-new-secret");
+    return;
+  }
+  // A rejected login stays a wrong password; an outage is reported as such, not as bad credentials.
+  expect(response.status).toBe(check === "invalid" ? 400 : 503);
+  expect((await response.json()).message).toBe(check === "invalid" ? "Invalid IMAP credentials" : MAIL_SERVER_UNREACHABLE_MESSAGE);
+  expect(stored.imap.password).toBe("old-imap");
+  expect(smtpChecks).toBe(0);
+});
+
+test.each(["invalid", "unreachable"] as const)("admin mailbox creation is refused when the IMAP check answers %s", async (check) => {
+  const admin = await createAuthenticatedTestSession(undefined, "admin");
+  const email = `refused-${crypto.randomUUID()}@example.test`;
+  const server = { user: email, password: "synthetic", secure: true };
+  const creation = { name: "Refused", email, avatar: "", imap: { ...server, host: "imap.example.test", port: 993 }, smtp: { ...server, host: "smtp.example.test", port: 465 } };
+  await expect(createAdminMailbox(admin.user.id, creation, "synthetic", { imap: async () => check, smtp: verified.smtp }))
+    .rejects.toMatchObject(check === "invalid" ? { status: 400, message: "Invalid mailbox credentials" } : { status: 503, message: MAIL_SERVER_UNREACHABLE_MESSAGE });
+  expect(await (await dbModulePromise).getAccountById(accountIdFromEmail(email))).toBeNull();
 });

@@ -988,6 +988,7 @@
       "mailboxExists": "Dieses Postfach existiert bereits. Bitte deine Administration um Zugriff.",
       "unavailable": "Die Anmeldung ist vorübergehend nicht verfügbar. Versuche es später erneut.",
       "provisioning": "Das Konto konnte nicht vollständig erstellt werden. Wende dich vor einem erneuten Versuch an deine Administration.",
+      "mailServerUnreachable": "Der Mailserver ist nicht erreichbar oder konnte die Anmeldung nicht prüfen. Versuche es später erneut.",
       "invalidToken": "Dieser Link ist ungültig, abgelaufen oder bereits verwendet. Bitte deine Administration um einen neuen Link.",
       "invalidRequest": "Prüfe deine Eingaben und versuche es erneut.",
       "connection": "Verbindung nicht möglich. Versuche es erneut.",

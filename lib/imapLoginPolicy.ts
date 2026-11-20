@@ -95,14 +95,17 @@ export async function verifyEligibleImap(db: Database, userId: string, password:
   const limitedVerify: typeof verify = async (...args) => {
     if (sourceFailures.isBlocked(sourceKey)) throw new AuthPolicyError("invalid_credentials", 401);
     if (userFailures.isBlocked(userKey) && !isKnownSource(userId, source)) throw new AuthPolicyError("invalid_credentials", 401);
-    if (!await verify(...args)) {
+    // Only "ok" accepts: "invalid" and "unreachable" are truthy strings. Both keep the generic
+    // answer and count against the budgets as before, so sign-in reveals no IMAP login mailbox.
+    const check = await verify(...args);
+    if (check !== "ok") {
       sourceFailures.recordFailure(sourceKey);
       userFailures.recordFailure(userKey);
       throw new AuthPolicyError("invalid_credentials", 401);
     }
     checkSnapshot();
     rememberSource(userId, source);
-    return true;
+    return check;
   };
   if (writeBack) await updateMailboxCredentials(account.id, { imap: { password } },
     { userId, clientId: getRequestClientId(request) }, { imap: limitedVerify,

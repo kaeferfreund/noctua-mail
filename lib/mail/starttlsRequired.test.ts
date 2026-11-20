@@ -85,9 +85,9 @@ describe("mandatory STARTTLS (A14, S3)", () => {
 
   test("IMAP refuses to authenticate when the required upgrade is not offered", async () => {
     imap.credentialsSeen = 0;
-    expect(await verifyImapCredentials(account({ requireTls: true }), "synthetic-password")).toBe(false);
+    expect(await verifyImapCredentials(account({ requireTls: true }), "synthetic-password")).toBe("invalid");
     expect(imap.credentialsSeen).toBe(0);
-    expect(await verifyImapCredentials(account({ requireTls: false }), "synthetic-password")).toBe(true);
+    expect(await verifyImapCredentials(account({ requireTls: false }), "synthetic-password")).toBe("ok");
     expect(imap.credentialsSeen).toBe(1);
   }, 20000);
 
