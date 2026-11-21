@@ -6,7 +6,7 @@ import { Image as ImageIcon, Languages, MoveRight, Paperclip, RefreshCw } from "
 import { Badge, Button, Card, Flex, Select, Text } from "@radix-ui/themes";
 import { CaretRightIcon } from "@radix-ui/react-icons";
 import * as Collapsible from "@radix-ui/react-collapsible";
-import { badgeColors, getFlagBadgeColor, getPriorityBadgeColor } from "@/lib/ui/badgeColors";
+import { getFlagBadgeColor, getPriorityBadgeColor } from "@/lib/ui/badgeColors";
 import {
   hasMeaningfulHtmlText,
   hasTextContent,
@@ -808,26 +808,14 @@ function ThreadMessageCard({
                     </Badge>
                   )}
                   {hasNonInlineAttachments(message) && (
-                    <Badge
-                      size="1"
-                      variant="soft"
-                      color={badgeColors.attachment}
-                      className={badgeStyles.badge}
-                      title={t("attachments")}
-                    >
-                      <Paperclip size={12} />
-                    </Badge>
+                    <span role="img" className={badgeStyles.attachmentIcon} title={t("attachments")} aria-label={t("attachments")}>
+                      <Paperclip size={14} strokeWidth={1.75} aria-hidden="true" />
+                    </span>
                   )}
                   {hasInlineImageAttachments && (
-                    <Badge
-                      size="1"
-                      variant="soft"
-                      color={badgeColors.inlineAttachment}
-                      className={badgeStyles.badge}
-                      title={t("inlineImages")}
-                    >
-                      <ImageIcon size={12} />
-                    </Badge>
+                    <span role="img" className={badgeStyles.attachmentIcon} title={t("inlineImages")} aria-label={t("inlineImages")}>
+                      <ImageIcon size={14} strokeWidth={1.75} aria-hidden="true" />
+                    </span>
                   )}
                 </div>
               </div>

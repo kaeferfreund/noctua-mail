@@ -1,23 +1,19 @@
 import { useTranslations } from "next-intl";
-import { Badge } from "@radix-ui/themes";
 import { Paperclip } from "lucide-react";
-import { badgeColors } from "@/lib/ui/badgeColors";
 import badgeStyles from "../message/MessageBadge.module.css";
 
-/** Paperclip of a list row whose message (or collapsed thread) has attachments. */
+/** Paperclip of a list row whose message (or collapsed thread) has attachments: a bare, muted glyph, no badge box. */
 export default function AttachmentBadge() {
   const t = useTranslations("List");
   return (
-    <Badge
-      size="1"
-      variant="soft"
-      color={badgeColors.attachment}
-      className={badgeStyles.badge}
+    <span
+      role="img"
+      className={badgeStyles.attachmentIcon}
       title={t("attachments")}
       aria-label={t("attachments")}
       data-attachment-badge=""
     >
-      <Paperclip size={12} />
-    </Badge>
+      <Paperclip size={14} strokeWidth={1.75} aria-hidden="true" />
+    </span>
   );
 }
