@@ -182,6 +182,7 @@ export default function MessageMenu({
   const t = useTranslations("Reader");
   const tSchedule = useTranslations("Compose.schedule");
   const scheduleDraft = useDraftScheduleAction(message);
+  const pendingSchedule = useRef<(() => void) | null>(null);
   const readerActions = useMessageReaderActions();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const aiReplyPrompt = useAiReplyPromptFromMenu(message, triggerRef);
@@ -292,6 +293,14 @@ export default function MessageMenu({
         onKeyDown={event => event.stopPropagation()}
         sideOffset={6}
         onCloseAutoFocus={(event) => {
+          // The menu must release focus before the scheduling dialog takes it.
+          const openSchedule = pendingSchedule.current;
+          if (openSchedule) {
+            pendingSchedule.current = null;
+            event.preventDefault();
+            openSchedule();
+            return;
+          }
           if (!aiReplyPrompt.onCloseAutoFocus(event)) quietFocusReturn.onCloseAutoFocus();
         }}
         className={`${styles.menuContent} ${isMobile ? mobileStyles.messageMenu : ""}`}
@@ -315,12 +324,15 @@ export default function MessageMenu({
                 )
               : null,
             isDraft && scheduleDraft && isVisible("scheduleDraft")
-              ? buildItem(
-                  "scheduleDraft",
-                  tSchedule("open"),
-                  <Clock size={14} />,
-                  scheduleDraft.open,
-                  !canSendDraft || scheduleDraft.busy
+              ? (
+                  <DropdownMenu.Item
+                    key="scheduleDraft"
+                    onSelect={() => { pendingSchedule.current = scheduleDraft.open; }}
+                    disabled={!canSendDraft || scheduleDraft.busy}
+                  >
+                    <span className={styles.menuIcon}><Clock size={14} /></span>
+                    <span className={styles.menuLabel}>{tSchedule("open")}</span>
+                  </DropdownMenu.Item>
                 )
               : null,
             isDraft && onDiscardDraft && isVisible("discardDraft")

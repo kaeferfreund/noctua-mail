@@ -1088,9 +1088,13 @@ export default function MailClient({
     () => [...currentSearchExcludedFolderIds].sort().join(","),
     [currentSearchExcludedFolderIds]
   );
+  const domainMemberIdsKey = useMemo(
+    () => (domainView ? domainAccounts.map((account) => account.id).sort().join(",") : ""),
+    [domainAccounts, domainView]
+  );
   const messagesKey = useMemo(
     () =>
-      `${domainView ? `domain:${domainView.domain}:${domainView.role}|` : ""}${activeAccountId}|${searchScope}|${everywhereExclusionKey}|${activeFolderId}|${activeVirtualFolder?.id ?? ""}|${trimmedQuery}|${groupBy}|${threadDateSource}|sort-${messageSort}|threads-${threadsMode}|${searchFieldKey}|${Object.entries(searchBadges)
+      `${domainView ? `domain:${domainView.domain}:${domainView.role}:${domainMemberIdsKey}|` : ""}${activeAccountId}|${searchScope}|${everywhereExclusionKey}|${activeFolderId}|${activeVirtualFolder?.id ?? ""}|${trimmedQuery}|${groupBy}|${threadDateSource}|sort-${messageSort}|threads-${threadsMode}|${searchFieldKey}|${Object.entries(searchBadges)
         .filter(([, enabled]) => enabled)
         .map(([key]) => key)
         .join(",")}`,
@@ -1098,6 +1102,7 @@ export default function MailClient({
       activeAccountId,
       activeFolderId,
       activeVirtualFolder?.id,
+      domainMemberIdsKey,
       domainView,
       everywhereExclusionKey,
       groupBy,
@@ -1337,6 +1342,7 @@ export default function MailClient({
     markMessagesMutated,
     authoritativeRevision,
     prefetchFirstPage,
+    prefetchDomainFirstPage,
     dropFirstPagePrefetch,
     domainFolderIds,
     domainRoleFolders,
@@ -1713,7 +1719,9 @@ export default function MailClient({
     setEditingAccount,
     setDeletingFolderIds,
     prefetchFirstPage,
+    prefetchDomainFirstPage,
     dropFirstPagePrefetch,
+    setDomainView,
     viewCache,
     setSwitchPending
   });
