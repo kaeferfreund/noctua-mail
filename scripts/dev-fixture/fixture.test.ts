@@ -46,6 +46,33 @@ test("seed is reproducible, has 25 inbox threads, both team members and realisti
   expect(first.filter(m => m.folder === "Sent")).toHaveLength(15);
   expect(first.filter(m => m.folder === "Drafts")).toHaveLength(3);
 });
+test("extended 500-message seed is reproducible and covers folders, domains, auth and MIME variety", () => {
+  const first = createSeed("demo-praxis", anchor, { count: 500 });
+  const second = createSeed("demo-praxis", anchor, { count: 500 });
+  expect(first).toHaveLength(500);
+  expect(first.map(m => m.source.toString())).toEqual(second.map(m => m.source.toString()));
+  const folders = new Set(first.map(m => m.folder));
+  for (const folder of ["INBOX", "Sent", "Drafts", "Archive", "Trash", "Junk", "Projekte/Website", "Projekte/Praxisumbau", "Buchhaltung/2026", "Lieferanten"]) {
+    expect(folders.has(folder)).toBe(true);
+  }
+  const rawAll = first.map(m => m.source.toString());
+  expect(rawAll.some(s => s.includes("dkim=pass"))).toBe(true);
+  expect(rawAll.some(s => s.includes("dmarc=fail"))).toBe(true);
+  expect(rawAll.some(s => s.includes("Content-Type: text/html"))).toBe(true);
+  expect(rawAll.some(s => s.includes("application/pdf"))).toBe(true);
+  expect(rawAll.some(s => s.includes("text/calendar"))).toBe(true);
+  const darkHtmlPart = rawAll.find(s => s.includes("status.cloudstatus.example.test") || s.includes("Content-Type: multipart/alternative"));
+  expect(darkHtmlPart).toBeDefined();
+  const decodedHtmls = rawAll.flatMap(raw =>
+    [...raw.matchAll(/Content-Type: text\/html;[^\r\n]*\r\nContent-Transfer-Encoding: base64\r\n\r\n([A-Za-z0-9+/=\r\n]+)/g)]
+      .map(m => Buffer.from(m[1].replace(/\s+/g, ""), "base64").toString("utf8"))
+  );
+  expect(decodedHtmls.some(h => h.includes("prefers-color-scheme: dark"))).toBe(true);
+  expect(decodedHtmls.some(h => h.includes('bgcolor="#111111"'))).toBe(true);
+  expect(first.some(m => m.source.length > 50_000)).toBe(true);
+  const spanDays = (first.at(-1)!.date.getTime() - first[0].date.getTime()) / 86400000;
+  expect(spanDays).toBeGreaterThan(300);
+});
 test("Noctua verifyImapCredentials accepts plaintext and rejects bad credentials", async () => {
   const account = { id: "fixture", avatar: "", email: demoUser, name: "Demo-Praxis", imap: { host: "127.0.0.1", port: imap.port, secure: false, user: demoUser, password: demoPass }, smtp: { host: "127.0.0.1", port: smtp.port, secure: false, user: demoUser, password: demoPass } } satisfies Account;
   expect(await verifyImapCredentials(account, demoPass)).toBe("ok");
