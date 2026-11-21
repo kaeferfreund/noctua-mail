@@ -83,8 +83,9 @@ export function getImapFlagBadges(message: Message, locale: UiLocale = "de"): Im
           message.recent ? "\\Recent" : null
         ].filter(Boolean);
   const hasForwardedHeader = Boolean(message.xForwardedMessageId?.trim());
+  const isSeen = message.seen ?? (rawFlags as string[]).some((flag) => flag.trim().toLowerCase() === "\\seen");
   const seen = new Set<string>();
-  const badges = (rawFlags as string[])
+  const mappedBadges = (rawFlags as string[])
     .map((flag) => flag.trim())
     .filter((flag) => {
       if (!flag) return false;
@@ -100,7 +101,7 @@ export function getImapFlagBadges(message: Message, locale: UiLocale = "de"): Im
       const isTodo = lower === TODO_FLAG.toLowerCase();
       const isDone = lower === DONE_FLAG.toLowerCase();
       const isAiModified = lower === AI_MODIFIED_FLAG.toLowerCase();
-      if (lower === "\\recent" && (message.seen || message.draft)) return null;
+      if (lower === "\\recent" && (isSeen || message.draft)) return null;
       const label = isForwarded
         ? t("Reader.flags.forwarded")
         : isCalendarInvite
@@ -133,6 +134,15 @@ export function getImapFlagBadges(message: Message, locale: UiLocale = "de"): Im
       return { label, kind };
     })
     .filter(Boolean) as ImapFlagBadge[];
+  // Different raw flags can mean the same thing ("$Forwarded" and "Forwarded"):
+  // show each resulting badge once.
+  const shownBadges = new Set<string>();
+  const badges = mappedBadges.filter((badge) => {
+    const key = badge.kind === "custom" ? `custom:${badge.label.toLowerCase()}` : badge.kind;
+    if (shownBadges.has(key)) return false;
+    shownBadges.add(key);
+    return true;
+  });
   if (hasForwardedHeader && !badges.some((badge) => badge.kind === "forwarded")) {
     badges.unshift({ label: t("Reader.flags.forwarded"), kind: "forwarded" });
   }
