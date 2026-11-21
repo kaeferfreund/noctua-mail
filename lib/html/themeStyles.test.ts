@@ -14,24 +14,33 @@ describe("sanitizeCssColorValue", () => {
     expect(sanitizeCssColorValue("  White  !important")).toBe("white");
     expect(sanitizeCssColorValue("rgb(17, 17, 17)")).toBe("rgb(17, 17, 17)");
     expect(sanitizeCssColorValue("rgba(255, 255, 255, 0.9)")).toBe("rgba(255, 255, 255, 0.9)");
+    expect(sanitizeCssColorValue("hsl(120deg, 50%, 50%)")).toBe("hsl(120deg, 50%, 50%)");
   });
 
-  test("rejects transparent keywords and CSS injection attempts", () => {
+  test("rejects transparent, malformed and CSS-injection values", () => {
     expect(sanitizeCssColorValue("transparent")).toBeNull();
     expect(sanitizeCssColorValue("inherit")).toBeNull();
+    expect(sanitizeCssColorValue("#00000000")).toBeNull();
+    expect(sanitizeCssColorValue("#fff0")).toBeNull();
+    expect(sanitizeCssColorValue("rgba(0, 0, 0, 0)")).toBeNull();
+    expect(sanitizeCssColorValue("rgba(255, 255, 255, 0.08)")).toBeNull();
+    expect(sanitizeCssColorValue("rgb(1,2,3//)")).toBeNull();
+    expect(sanitizeCssColorValue("rgb(1.2.3, 4, 5)")).toBeNull();
+    expect(sanitizeCssColorValue("hsl(120, 50, 50)")).toBeNull();
     expect(sanitizeCssColorValue("white; } body { color: red")).toBeNull();
     expect(sanitizeCssColorValue("url(https://tracker.example.test/x.png)")).toBeNull();
-    expect(sanitizeCssColorValue("rgba(0, 0, 0, 0)")).toBeNull();
   });
 });
 
 describe("parseColorLuminance and isDarkColor", () => {
-  test("classifies dark and light colours across formats", () => {
+  test("classifies dark and light colours across formats and CSS angle units", () => {
     expect(parseColorLuminance("#000000")).toBe(0);
     expect(parseColorLuminance("#ffffff")).toBeCloseTo(1, 5);
     expect(parseColorLuminance("transparent")).toBeNull();
     expect(parseColorLuminance("#ffffff00")).toBeNull();
     expect(parseColorLuminance("rgb(0 0 0 / 0%)")).toBeNull();
+    // 0.5turn == 180deg (cyan), luminance ~0.787 (not red ~0.213).
+    expect(parseColorLuminance("hsl(0.5turn 100% 50%)")).toBeGreaterThan(0.7);
     expect(isDarkColor("#111111")).toBe(true);
     expect(isDarkColor("#333")).toBe(true);
     expect(isDarkColor("rgb(23, 23, 23)")).toBe(true);
@@ -46,7 +55,7 @@ describe("parseColorLuminance and isDarkColor", () => {
 describe("rewriteEmailStylesForTheme", () => {
   const contentClass = "noctua-email-content";
 
-  test("maps html, :root and body selectors cleanly inside prefers-color-scheme", () => {
+  test("maps html, :root and body selectors in-place with zero-specificity :where", () => {
     const css = `
       @media (prefers-color-scheme: dark) {
         /* Base */
@@ -60,100 +69,160 @@ describe("rewriteEmailStylesForTheme", () => {
     `;
     const dark = rewriteEmailStylesForTheme(css, "dark", contentClass);
     expect(dark.hasDarkSchemeRules).toBe(true);
-    expect(dark.hasLightSchemeRules).toBe(false);
-    expect(dark.baseCss).not.toContain("prefers-color-scheme");
-    expect(dark.themeCss).toContain('html[data-theme="dark"] { --surface: #111111; }');
-    expect(dark.themeCss).not.toContain('html[data-theme="dark"] html');
-    expect(dark.themeCss).not.toContain('html[data-theme="dark"] :root');
-    expect(dark.themeCss).toContain(
-      'html[data-theme="dark"], html[data-theme="dark"] body, html[data-theme="dark"] .noctua-email-content { background-color: #111111 !important; }'
+    expect(dark.hasDarkRootBackgroundOverride).toBe(true);
+    expect(dark.hasAnyLightMediaQuery).toBe(false);
+    expect(dark.css).not.toContain("prefers-color-scheme");
+    expect(dark.css).toContain(':root:where([data-theme="dark"]) { --surface: #111111; }');
+    expect(dark.css).not.toContain('html[data-theme="dark"] html');
+    expect(dark.css).not.toContain('html[data-theme="dark"] :root');
+    expect(dark.css).toContain(
+      'html:where([data-theme="dark"]), :where(html[data-theme="dark"]) body, :where(html[data-theme="dark"]) .noctua-email-content { background-color: #111111 !important; }'
     );
-    expect(dark.themeCss).toContain(
-      'html[data-theme="dark"] body.mail-body, html[data-theme="dark"] .noctua-email-content.mail-body'
+    expect(dark.css).toContain(
+      ':where(html[data-theme="dark"]) body.mail-body, :where(html[data-theme="dark"]) .noctua-email-content.mail-body'
     );
-    expect(dark.themeCss).toContain(
-      'html[data-theme="dark"] body > table, html[data-theme="dark"] .noctua-email-content > table'
+    expect(dark.css).toContain(
+      ':where(html[data-theme="dark"]) body > table, :where(html[data-theme="dark"]) .noctua-email-content > table'
     );
-    // `tbody` must not be mistaken for `body`.
-    expect(dark.themeCss).toContain('html[data-theme="dark"] tbody td');
-    expect(dark.themeCss).not.toContain("t.noctua-email-content");
+    expect(dark.css).toContain(':where(html[data-theme="dark"]) tbody td');
+    expect(dark.css).not.toContain("t.noctua-email-content");
 
     const light = rewriteEmailStylesForTheme(css, "light", contentClass);
-    expect(light.hasDarkSchemeRules).toBe(true);
-    expect(light.themeCss).toBe("");
-    expect(light.baseCss).not.toContain("#111111");
+    expect(light.css).not.toContain("#111111");
   });
 
   test("handles minified prefers-color-scheme without whitespace", () => {
     const css = "@media (prefers-color-scheme:dark){.card{background:#121212;color:#f5f5f5}}";
     const dark = rewriteEmailStylesForTheme(css, "dark", contentClass);
     expect(dark.hasDarkSchemeRules).toBe(true);
-    expect(dark.themeCss).toContain('html[data-theme="dark"] .card');
-    expect(dark.themeCss).toContain("background:#121212");
+    expect(dark.css).toContain(':where(html[data-theme="dark"]) .card');
+    expect(dark.css).toContain("background:#121212");
   });
 
-  test("preserves sibling media features in combined prefers-color-scheme queries", () => {
-    const css = `
+  test("preserves sibling media features and enclosing @media/@supports/@layer wrappers", () => {
+    const combined = `
       @media screen and (prefers-color-scheme: dark) and (max-width: 600px) {
         .card { background: #181818; }
       }
     `;
-    const dark = rewriteEmailStylesForTheme(css, "dark", contentClass);
-    expect(dark.hasDarkSchemeRules).toBe(true);
-    expect(dark.themeCss).toMatch(/@media screen and \(max-width: 600px\)/);
-    expect(dark.themeCss).toContain('html[data-theme="dark"] .card');
+    const darkCombined = rewriteEmailStylesForTheme(combined, "dark", contentClass);
+    // Width-constrained dark rules do not count as unconditional desktop dark support.
+    expect(darkCombined.hasDarkSchemeRules).toBe(false);
+    expect(darkCombined.css).toMatch(/@media screen and \(max-width: 600px\)/);
+    expect(darkCombined.css).toContain(':where(html[data-theme="dark"]) .card');
 
-    const light = rewriteEmailStylesForTheme(css, "light", contentClass);
-    expect(light.themeCss).toBe("");
-    expect(light.baseCss).not.toContain("#181818");
+    const nested = `
+      @media (max-width: 600px) {
+        @media (prefers-color-scheme: dark) {
+          .desktop { display: none; color: #fff; }
+        }
+      }
+    `;
+    const darkNested = rewriteEmailStylesForTheme(nested, "dark", contentClass);
+    expect(darkNested.hasDarkSchemeRules).toBe(false);
+    expect(darkNested.css).toMatch(/@media \(max-width: 600px\)[\s\S]*:where\(html\[data-theme="dark"\]\) \.desktop/);
+    const lightNested = rewriteEmailStylesForTheme(nested, "light", contentClass);
+    expect(lightNested.css.trim()).toBe("");
   });
 
-  test("ignores empty or non-visual prefers-color-scheme blocks when flagging dark support", () => {
+  test("evaluates negated and Level 4 `or` media queries accurately", () => {
+    const negated = "@media not all and (prefers-color-scheme: dark) { .light-only { color: #111; } }";
+    const light = rewriteEmailStylesForTheme(negated, "light", contentClass);
+    expect(light.css).not.toContain("not all");
+    expect(light.css).toContain(':where(html[data-theme="light"]) .light-only');
+    const dark = rewriteEmailStylesForTheme(negated, "dark", contentClass);
+    expect(dark.hasDarkSchemeRules).toBe(false);
+    expect(dark.hasAnyLightMediaQuery).toBe(true);
+    expect(dark.css.trim()).toBe("");
+
+    const orQuery = "@media (prefers-color-scheme: dark) or (max-width: 600px) { .m { color: #eee; } }";
+    const orLight = rewriteEmailStylesForTheme(orQuery, "light", contentClass);
+    expect(orLight.css).toContain("@media (max-width: 600px)");
+    expect(orLight.css).toContain(':where(html[data-theme="light"]) .m');
+    const orDark = rewriteEmailStylesForTheme(orQuery, "dark", contentClass);
+    expect(orDark.css).not.toContain("@media");
+    expect(orDark.css).toContain(':where(html[data-theme="dark"]) .m');
+  });
+
+  test("preserves cascade source order, blockless @layer semicolons and CSS nesting", () => {
+    const cascade = `
+      @media (prefers-color-scheme: dark) {
+        @layer a, b;
+        .notice { color: white; }
+        .card { background: #111; & .title { color: #fff; } }
+      }
+      .notice { background: white; color: black; }
+    `;
+    const dark = rewriteEmailStylesForTheme(cascade, "dark", contentClass);
+    expect(dark.css).toContain("@layer a, b;");
+    expect(dark.css.indexOf(':where(html[data-theme="dark"]) .notice')).toBeLessThan(
+      dark.css.indexOf(".notice { background: white; color: black; }")
+    );
+    expect(dark.css).toContain("& .title");
+    expect(dark.css).not.toContain(':where(html[data-theme="dark"]) & .title');
+  });
+
+  test("ignores non-color/print/border-only dark blocks when flagging full dark support", () => {
     const empty = rewriteEmailStylesForTheme("@media (prefers-color-scheme: dark) {}", "dark", contentClass);
     expect(empty.hasDarkSchemeRules).toBe(false);
 
-    const layoutOnly = rewriteEmailStylesForTheme(
-      "@media (prefers-color-scheme: dark) { .only-dark { display: block; } }",
+    const filterOnly = rewriteEmailStylesForTheme(
+      "@media (prefers-color-scheme: dark) { img { filter: brightness(0.8); } .logo { border-color: #555; } }",
       "dark",
       contentClass
     );
-    expect(layoutOnly.hasDarkSchemeRules).toBe(false);
-    expect(layoutOnly.themeCss).toContain('html[data-theme="dark"] .only-dark');
+    expect(filterOnly.hasDarkSchemeRules).toBe(false);
+
+    const printDark = rewriteEmailStylesForTheme(
+      "@media print and (prefers-color-scheme: dark) { body { background: #111; color: #fff; } }",
+      "dark",
+      contentClass
+    );
+    expect(printDark.hasDarkSchemeRules).toBe(false);
   });
 
   test("mirrors qualified body selectors in base stylesheets without altering plain body rules", () => {
     const css = "body { font-family: Georgia, serif; } body.dark-theme { background: #111; color: #fff; }";
     const out = rewriteEmailStylesForTheme(css, "light", contentClass);
-    expect(out.baseCss).toContain("body { font-family: Georgia, serif; }");
-    expect(out.baseCss).toContain("body.dark-theme, .noctua-email-content.dark-theme");
+    expect(out.css).toContain("body { font-family: Georgia, serif; }");
+    expect(out.css).toContain("body.dark-theme, .noctua-email-content.dark-theme");
   });
 });
 
 describe("analyzeEmailColorScheme", () => {
-  test("ignores prose and prefers-color-scheme blocks while detecting base colours", () => {
-    const proseOnly = analyzeEmailColorScheme(
-      "<p>Color: #000000 and Background: #ffffff in prose text.</p>"
+  test("ignores prose, comments, data-* attributes, URL query params and @media print", () => {
+    const clean = analyzeEmailColorScheme(
+      [
+        "<!-- <table bgcolor=\"#ffffff\"><tr><td style=\"color:#000\">hidden</td></tr></table> -->",
+        "<style>@media print { * { color: #000 !important; background: #fff !important; } }</style>",
+        '<div data-bgcolor="#ffffff" data-background="hero.png" style="background: var(--bg-white)">',
+        '<p>Color: #000000 and Background: #ffffff. <a href="https://example.test/?background=1">Link</a></p>',
+        "</div>"
+      ].join("")
     );
-    expect(proseOnly).toEqual({
-      hasExplicitColor: false,
-      hasLightOwnBackground: false,
-      hasDarkOwnBackground: false,
-      hasDarkOwnText: false
-    });
+    expect(clean.hasLightOwnBackground).toBe(false);
+    expect(clean.hasDarkOwnBackground).toBe(false);
+    expect(clean.hasDarkOwnText).toBe(false);
+  });
 
-    const darkTextNoBg = analyzeEmailColorScheme(
-      '<div style="color: #242424">Invoice body</div>'
+  test("resolves base CSS custom properties and ignores descendant anchor-only rules", () => {
+    const withVars = analyzeEmailColorScheme(
+      "<style>:root { --paper: #ffffff; --ink: #111111; } .card { background: var(--paper); color: var(--ink); }</style><div class=\"card\">Invoice</div>"
     );
-    expect(darkTextNoBg.hasExplicitColor).toBe(true);
-    expect(darkTextNoBg.hasDarkOwnText).toBe(true);
-    expect(darkTextNoBg.hasLightOwnBackground).toBe(false);
-    expect(darkTextNoBg.hasDarkOwnBackground).toBe(false);
+    expect(withVars.hasLightOwnBackground).toBe(true);
+    expect(withVars.hasDarkOwnText).toBe(true);
 
-    // A single coloured link does not flag the body as dark-text-only.
     const linkOnly = analyzeEmailColorScheme(
-      '<p>Hello <a href="https://example.test" style="color:#0066cc">link</a></p>'
+      "<style>#wrap a, .footer > a:visited { color: #0066cc; }</style><p>Plain</p>"
     );
     expect(linkOnly.hasExplicitColor).toBe(true);
     expect(linkOnly.hasDarkOwnText).toBe(false);
+  });
+
+  test("scans malformed unclosed tags in linear time without catastrophic backtracking", () => {
+    const malformed = '<div title="' + "a".repeat(2000) + "<div title=\"".repeat(100);
+    const start = performance.now();
+    analyzeEmailColorScheme(malformed);
+    expect(performance.now() - start).toBeLessThan(200);
   });
 });

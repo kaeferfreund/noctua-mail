@@ -70,7 +70,7 @@ describe("HTML preview document text colour", () => {
     const dark = build(html, undefined, true);
     expect(dark).toContain('data-theme="dark"');
     expect(dark).toContain(
-      'html[data-theme="dark"], html[data-theme="dark"] body, html[data-theme="dark"] .noctua-email-content { background-color: #111111 !important; }'
+      'html:where([data-theme="dark"]), :where(html[data-theme="dark"]) body, :where(html[data-theme="dark"]) .noctua-email-content { background-color: #111111 !important; }'
     );
     expect(dark).not.toContain('html[data-theme="dark"] html');
 
@@ -82,15 +82,49 @@ describe("HTML preview document text colour", () => {
     const html = '<style>@media (prefers-color-scheme:dark){body{background:#121212!important;color:#fff!important}}</style><body style="background:#fff;color:#111"><p>Hi</p></body>';
     const dark = build(html, undefined, true);
     expect(dark).toContain('data-theme="dark"');
-    expect(dark).toContain('html[data-theme="dark"] .noctua-email-content');
+    expect(dark).toContain(':where(html[data-theme="dark"]) .noctua-email-content');
     expect(dark).toContain("background:#121212!important");
   });
-  test("preserves dark body bgcolor in light mode so light text stays readable", () => {
-    const html = '<body bgcolor="#000000"><p style="color:#ffffff">Dark newsletter</p></body>';
+  test("partial dark-mode rule on a white body still falls back to light canvas in dark mode", () => {
+    const html = '<style>@media (prefers-color-scheme: dark) { .btn { background: #333; color: #fff; } }</style><body bgcolor="#ffffff"><p>Invoice</p><a class="btn">Pay</a></body>';
+    const dark = build(html, undefined, true);
+    expect(dark).toContain('data-theme="light"');
+    expect(bodyRule(dark)).toContain("background: #ffffff;");
+    expect(bodyRule(dark)).toContain("color: #1a1a1a;");
+  });
+  test("dark text with a small dark button still falls back to light canvas in dark mode", () => {
+    const html = '<div style="color:#242424"><p>Invoice</p><a style="background:#111111;color:#ffffff">Pay</a></div>';
+    const dark = build(html, undefined, true);
+    expect(dark).toContain('data-theme="light"');
+    expect(bodyRule(dark)).toContain("background: #ffffff;");
+  });
+  test("dark newsletter with a white CTA button stays dark in dark mode", () => {
+    const html = '<body bgcolor="#111111" style="color:#ffffff"><p>Newsletter</p><a href="https://example.test">More</a><table bgcolor="#ffffff"><tr><td style="color:#111111">CTA</td></tr></table></body>';
+    const dark = build(html, undefined, true);
+    expect(dark).toContain('data-theme="dark"');
+    expect(bodyRule(dark)).toContain("background: #111111;");
+  });
+  test("preserves dark body bgcolor and readable text/links in light mode even with a coloured link", () => {
+    const html = '<body bgcolor="#000000"><p>Meeting tomorrow</p><a href="https://example.test" style="color:cyan">Details</a></body>';
     const light = build(html, undefined, false);
     expect(bodyRule(light)).toContain("background: #000000;");
+    expect(bodyRule(light)).toContain("color: #eeeeee;");
+    expect(light).toContain("a { color: #b8d5ff; }");
+    expect(light).toContain('<body bgcolor="#000000">');
   });
-  test("honours per-message light and dark appearance overrides", () => {
+  test("dark body bgcolor with a white inner card keeps dark default text on the card", () => {
+    const html = '<body bgcolor="#333333"><table bgcolor="#ffffff"><tr><td>Card text</td></tr></table></body>';
+    const light = build(html, undefined, false);
+    expect(bodyRule(light)).toContain("color: #1a1a1a;");
+  });
+  test("light-canvas fallback re-applies non-visual prefers-color-scheme:light rules", () => {
+    const html = '<style>.dark-logo{display:block}@media (prefers-color-scheme: light){.dark-logo{display:none}}</style><body style="background:#fff;color:#222"><div class="dark-logo">Logo</div></body>';
+    const dark = build(html, undefined, true);
+    expect(dark).toContain('data-theme="light"');
+    expect(dark).toContain(':where(html[data-theme="light"]) .dark-logo');
+    expect(dark).toContain("display:none");
+  });
+  test("honours per-message light and dark appearance overrides safely", () => {
     const html = [
       "<style>@media (prefers-color-scheme: dark) { body { background: #111 !important; color: #eee !important; } }</style>",
       '<body style="background:#fff;color:#111"><p>Summary</p></body>'
@@ -104,6 +138,10 @@ describe("HTML preview document text colour", () => {
     expect(forcedDarkInLightApp).toContain('data-theme="dark"');
     expect(bodyRule(forcedDarkInLightApp)).toContain("background: #171717;");
     expect(bodyRule(forcedDarkInLightApp)).toContain("color: #eeeeee;");
+
+    // Forcing Dark on a light-only invoice must not turn it dark-on-dark.
+    const forcedDarkOnInvoice = build('<body bgcolor="#ffffff"><p style="color:#111111">Invoice</p></body>', undefined, false, "dark");
+    expect(bodyRule(forcedDarkOnInvoice)).toContain("background: #ffffff;");
   });
 });
 

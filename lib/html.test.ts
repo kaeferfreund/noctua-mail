@@ -484,9 +484,14 @@ describe("extractBodyContent", () => {
     expect(result.bodyAttrs.bgcolor).toBe("#FFFFFF");
   });
 
-  it("preserves quoted and unquoted body bgcolor attributes", () => {
+  it("preserves quoted and unquoted body bgcolor attributes without matching inner quotes or data-*", () => {
     expect(extractBodyContent('<body bgcolor="#101010"><p>Dark</p></body>').bodyAttrs.bgcolor).toBe("#101010");
     expect(extractBodyContent("<body bgcolor=black><p>Dark</p></body>").bodyAttrs.bgcolor).toBe("black");
+    const quoted = extractBodyContent(
+      `<body title="Use bgcolor=black" data-bgcolor="#000000" bgcolor="#ffffff" style="font-family:'Segoe UI',sans-serif;background-color:#111111"><p>Hi</p></body>`
+    );
+    expect(quoted.bodyAttrs.bgcolor).toBe("#ffffff");
+    expect(quoted.bodyAttrs.style).toBe("font-family:'Segoe UI',sans-serif;background-color:#111111");
   });
 });
 

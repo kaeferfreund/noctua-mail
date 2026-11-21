@@ -19,6 +19,7 @@ import {
   shouldShowHtmlViewerFrame,
   stripBodyHeightStyles,
   stripConditionalComments,
+  type EmailColorAnalysis,
   type HtmlColorSchemeOverride,
   type SanitizedHtmlPair
 } from "@/lib/html";
@@ -62,20 +63,18 @@ function scaleFontSizes(input: string) {
 }
 
 function rewriteStyleBlocksForTheme(html: string, theme: "dark" | "light") {
-  let injectedCss = "";
   let hasDarkSchemeRules = false;
-  let hasLightSchemeRules = false;
+  let hasDarkRootBackgroundOverride = false;
+  let hasAnyLightMediaQuery = false;
   const rewrittenHtml = html.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (_, css) => {
     const scaledCss = scaleFontSizes(css);
     const rewritten = rewriteEmailStylesForTheme(scaledCss, theme, NOCTUA_EMAIL_CONTENT_CLASS);
-    if (rewritten.themeCss) {
-      injectedCss += `\n${rewritten.themeCss}`;
-    }
     if (rewritten.hasDarkSchemeRules) hasDarkSchemeRules = true;
-    if (rewritten.hasLightSchemeRules) hasLightSchemeRules = true;
-    return `<style>${rewritten.baseCss}</style>`;
+    if (rewritten.hasDarkRootBackgroundOverride) hasDarkRootBackgroundOverride = true;
+    if (rewritten.hasAnyLightMediaQuery) hasAnyLightMediaQuery = true;
+    return `<style>${rewritten.css}</style>`;
   });
-  return { rewrittenHtml, injectedCss, hasDarkSchemeRules, hasLightSchemeRules };
+  return { rewrittenHtml, hasDarkSchemeRules, hasDarkRootBackgroundOverride, hasAnyLightMediaQuery };
 }
 
 function escapeAttribute(value: string) {
@@ -334,6 +333,7 @@ export function buildPreviewDocument({
   safeHtml,
   darkMode,
   colorSchemeOverride = "auto",
+  colorAnalysis: precomputedColorAnalysis,
   fontScale,
   zoom,
   showViewerFrame,
@@ -345,6 +345,7 @@ export function buildPreviewDocument({
   safeHtml: string;
   darkMode: boolean;
   colorSchemeOverride?: HtmlColorSchemeOverride;
+  colorAnalysis?: EmailColorAnalysis;
   fontScale: number;
   zoom: number;
   showViewerFrame: boolean;
@@ -356,7 +357,6 @@ export function buildPreviewDocument({
   const viewportUnit = typeof hostViewportHeight === "number" && Number.isFinite(hostViewportHeight) && hostViewportHeight > 0
     ? hostViewportHeight / 100
     : 8;
-  const cleanedHtml = stripConditionalComments(html || "");
   const requestedTheme: "dark" | "light" =
     colorSchemeOverride === "light"
       ? "light"
@@ -373,32 +373,42 @@ export function buildPreviewDocument({
   const preliminaryBody = extractBodyContent(stylePass.rewrittenHtml);
   const bodyBgcolor = sanitizeCssColorValue(preliminaryBody.bodyAttrs.bgcolor || "");
   const bodyBgIsDark = bodyBgcolor ? isDarkColor(bodyBgcolor) : false;
-  const colorAnalysis = analyzeEmailColorScheme(cleanedHtml, bodyBgcolor ?? "");
+  const bodyBgIsLight = Boolean(bodyBgcolor) && !bodyBgIsDark;
+  // Analyse the sanitized markup (not raw `html`) so comments and stripped
+  // attributes like `data-bgcolor` cannot skew the theme decision.
+  const colorAnalysis = precomputedColorAnalysis ?? analyzeEmailColorScheme(safeHtml || html, bodyBgcolor ?? "");
+  const hasRootDarkBg = bodyBgIsDark || colorAnalysis.hasRootDarkBackground;
+  const hasRootLightBg = bodyBgIsLight || colorAnalysis.hasRootLightBackground;
 
-  // In automatic dark mode, emails that paint a light background or declare
-  // dark text without dark-mode styles (`prefers-color-scheme: dark`) and
-  // without a dark background are designed for a light canvas. Giving them a
-  // crisp white paper canvas avoids dark-on-dark unreadability, while plain
-  // HTML mails and dark-aware mails keep native dark rendering.
+  // A dark media block only counts as full dark-mode support if it either
+  // recolours a light root background or the mail had no light root background.
+  const hasEffectiveDarkSupport =
+    stylePass.hasDarkSchemeRules && (!hasRootLightBg || stylePass.hasDarkRootBackgroundOverride);
+
+  // In automatic dark mode, emails that paint a light canvas or declare dark
+  // text without dark-mode support and without a dark root background are
+  // designed for a light canvas. Giving them a crisp white paper canvas avoids
+  // dark-on-dark unreadability, while plain HTML mails and dark-aware mails
+  // keep native dark rendering.
   const fallbackToLightCanvas =
     colorSchemeOverride === "auto" &&
     requestedTheme === "dark" &&
-    !stylePass.hasDarkSchemeRules &&
-    (colorAnalysis.hasLightOwnBackground || (colorAnalysis.hasDarkOwnText && !colorAnalysis.hasDarkOwnBackground));
+    !hasEffectiveDarkSupport &&
+    !hasRootDarkBg &&
+    (
+      hasRootLightBg ||
+      colorAnalysis.hasDarkOwnText ||
+      (colorAnalysis.hasLightOwnBackground && !colorAnalysis.hasLightOwnText)
+    );
 
   const effectiveTheme: "dark" | "light" = fallbackToLightCanvas ? "light" : requestedTheme;
-  if (effectiveTheme !== requestedTheme && stylePass.hasLightSchemeRules) {
+  if (effectiveTheme !== requestedTheme && stylePass.hasAnyLightMediaQuery) {
     stylePass = rewriteStyleBlocksForTheme(viewportHtml, effectiveTheme);
   }
 
   const effectiveDark = effectiveTheme === "dark";
   const scaledHtml = scaleFontSizes(stylePass.rewrittenHtml);
   const { body, styles: styleBlocks, bodyAttrs } = extractBodyContent(scaledHtml);
-  const blockquoteBorder = effectiveDark ? "#8aa7d4" : "#1847d5";
-  const linkColor = effectiveDark ? "#b8d5ff" : "#1847d5";
-  const quoteChipBackground = effectiveDark ? "#2b303b" : "#e8ebf0";
-  const quoteChipHoverBackground = effectiveDark ? "#39404e" : "#dbe0e8";
-  const quoteChipColor = effectiveDark ? "#aab4c4" : "#6b7480";
 
   // Preserve `<body bgcolor>` (e.g. dark newsletters in light mode) and supply
   // an explicit opaque canvas whenever the message theme differs from the host
@@ -406,7 +416,13 @@ export function buildPreviewDocument({
   let bodyBackground = "transparent";
   if (effectiveDark) {
     if (colorSchemeOverride === "dark") {
-      bodyBackground = bodyBgcolor && bodyBgIsDark ? bodyBgcolor : "#171717";
+      if (hasEffectiveDarkSupport) {
+        bodyBackground = bodyBgcolor ?? "#171717";
+      } else if (bodyBgIsLight || (colorAnalysis.hasDarkOwnText && !hasRootDarkBg)) {
+        bodyBackground = bodyBgcolor ?? "#ffffff";
+      } else {
+        bodyBackground = bodyBgcolor && bodyBgIsDark ? bodyBgcolor : "#171717";
+      }
     } else if (bodyBgcolor) {
       bodyBackground = bodyBgcolor;
     }
@@ -416,24 +432,43 @@ export function buildPreviewDocument({
     bodyBackground = bodyBgcolor;
   }
 
+  const bodySurfaceIsLight =
+    (bodyBackground !== "transparent" && !isDarkColor(bodyBackground) && !stylePass.hasDarkRootBackgroundOverride) ||
+    (!effectiveDark && !bodyBgIsDark);
+  const darkSurfaceForHost =
+    (effectiveDark && !bodySurfaceIsLight && !(colorSchemeOverride === "dark" && !hasEffectiveDarkSupport && colorAnalysis.hasLightOwnBackground)) ||
+    (bodyBgIsDark && !colorAnalysis.hasLightOwnBackground);
+
+  const blockquoteBorder = darkSurfaceForHost ? "#8aa7d4" : "#1847d5";
+  const linkColor = darkSurfaceForHost ? "#b8d5ff" : "#1847d5";
+  const quoteChipBackground = darkSurfaceForHost ? "#2b303b" : "#e8ebf0";
+  const quoteChipHoverBackground = darkSurfaceForHost ? "#39404e" : "#dbe0e8";
+  const quoteChipColor = darkSurfaceForHost ? "#aab4c4" : "#6b7480";
+
   // The frame is its own document: the app's --mail-view-fg never reaches it,
-  // so the host colour must be a literal. Dark uses the app's gray-12 (Radix
-  // dark), except for mails on a light canvas or with their own colours.
-  const defaultDarkText = effectiveDark || bodyBgIsDark;
-  const hostTextColor = colorAnalysis.hasExplicitColor
-    ? ""
-    : `color: ${defaultDarkText ? "#eeeeee" : "#1a1a1a"};`;
+  // so the host colour must be a literal. When a dark `<body bgcolor>` is
+  // painted without a body-level text colour, keep `#eeeeee` even if an inner
+  // link/span declares its own colour, so unstyled body prose stays readable.
+  const forceLightTextOnDarkBody =
+    bodyBgIsDark && !colorAnalysis.hasRootTextColor && !colorAnalysis.hasLightOwnBackground;
+  const hostTextColor =
+    forceLightTextOnDarkBody
+      ? "color: #eeeeee;"
+      : colorAnalysis.hasExplicitColor
+        ? ""
+        : `color: ${darkSurfaceForHost ? "#eeeeee" : "#1a1a1a"};`;
+
   const bodyClassName = [NOCTUA_EMAIL_CONTENT_CLASS, "email-body", bodyAttrs.className]
     .filter(Boolean)
     .join(" ");
   const bodyId = escapeAttribute(bodyAttrs.id || "NoctuaMessageViewBody");
   const bodyStyle = escapeAttribute(stripBodyHeightStyles(bodyAttrs.style || ""));
+  const bodyBgAttr = bodyBgcolor && bodyBackground === bodyBgcolor
+    ? ` bgcolor="${escapeAttribute(bodyBgcolor)}"`
+    : "";
   const contentMarkup = body
     ? `<div class="${escapeAttribute(bodyClassName)}" id="${bodyId}" style="${bodyStyle}">${body}</div>`
     : `<div class="${NOCTUA_EMAIL_CONTENT_CLASS} email-body" id="NoctuaMessageViewBody">${scaledHtml}</div>`;
-  const themeStyleBlock = stylePass.injectedCss.trim()
-    ? `<style>${stylePass.injectedCss}\n</style>`
-    : "";
 
   return [
     "<!doctype html>",
@@ -444,7 +479,7 @@ export function buildPreviewDocument({
     `<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(messageHtmlCsp(remoteContent))}">`,
     '<meta name="referrer" content="no-referrer">',
     "<style>",
-    `:root { color-scheme: ${effectiveTheme}; --zoom: ${zoom}; --font-scale: ${fontScale}; --noctua-vh: ${viewportUnit}px; }`,
+    `:root { color-scheme: ${darkSurfaceForHost ? "dark" : "light"}; --zoom: ${zoom}; --font-scale: ${fontScale}; --noctua-vh: ${viewportUnit}px; }`,
     // The app font sits on <html> so a mail's own font wins, whether it comes
     // inline (body attributes move onto the content div) or as a body/html rule.
     `html { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; font-family: ${APP_FONT_STACK}; font-size: 100%; }`,
@@ -474,14 +509,11 @@ export function buildPreviewDocument({
     `details.${NOCTUA_QUOTE_COLLAPSE_CLASS} > summary::-webkit-details-marker { display: none; }`,
     "</style>",
     styleBlocks.join("\n"),
-    // Place extracted prefers-color-scheme overrides after base sender styles so
-    // equal-specificity theme rules keep normal cascade priority.
-    themeStyleBlock,
     // The copied body can carry height classes or IDs with !important rules.
     // ID specificity keeps the frame's measuring boxes content-sized even then.
     `<style>html#noctua-email-root, html#noctua-email-root body, html#noctua-email-root .${NOCTUA_EMAIL_CONTENT_CLASS} { height: auto !important; min-height: 0 !important; max-height: none !important; }</style>`,
     "</head>",
-    "<body>",
+    `<body${bodyBgAttr}>`,
     '<div class="html-scale">',
     `<div class="${NOCTUA_EMAIL_VIEWPORT_CLASS} ${showViewerFrame ? NOCTUA_EMAIL_VIEWPORT_DEFAULT_MARGIN_CLASS : ""}">`,
     contentMarkup,
@@ -489,7 +521,7 @@ export function buildPreviewDocument({
     "</div>",
     "</body>",
     "</html>"
-  ].filter(Boolean).join("\n");
+  ].join("\n");
 }
 
 function HtmlMessage({
@@ -532,6 +564,9 @@ function HtmlMessage({
   );
   const hasRemoteContent = blockedHtml !== allowedHtml;
   const safeHtml = remote.allowed ? allowedHtml : blockedHtml;
+  // Memoize colour analysis on the sanitized HTML so zoom, font-scale and
+  // appearance-override steps do not re-parse large newsletters on every click.
+  const colorAnalysis = useMemo(() => analyzeEmailColorScheme(safeHtml), [safeHtml]);
 
   useEffect(() => {
     const iframe = iframeRef.current;
@@ -547,6 +582,7 @@ function HtmlMessage({
       safeHtml,
       darkMode,
       colorSchemeOverride,
+      colorAnalysis,
       fontScale,
       zoom,
       showViewerFrame,
@@ -795,7 +831,7 @@ function HtmlMessage({
       frameObserver?.disconnect();
       iframe.removeEventListener("load", handleLoad);
     };
-  }, [colorSchemeOverride, darkMode, fontScale, html, remoteContent, safeHtml, setLinkPreviewUrl, showViewerFrame, t, zoom]);
+  }, [colorAnalysis, colorSchemeOverride, darkMode, fontScale, html, remoteContent, safeHtml, setLinkPreviewUrl, showViewerFrame, t, zoom]);
 
   return (
     <div className={`${styles.htmlMessage} ${showViewerFrame ? styles.framed : styles.unframed}`}>

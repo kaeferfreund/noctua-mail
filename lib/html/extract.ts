@@ -74,6 +74,45 @@ export function selectPreferredHtmlDocument(input: string) {
   );
 }
 
+function parseOpeningTagAttributes(attrs: string): Record<string, string> {
+  const result: Record<string, string> = {};
+  let i = 0;
+  const len = attrs.length;
+  while (i < len) {
+    while (i < len && /[\s/]/.test(attrs[i])) i += 1;
+    if (i >= len) break;
+    const nameStart = i;
+    while (i < len && !/[\s=/>]/.test(attrs[i])) i += 1;
+    const name = attrs.slice(nameStart, i).toLowerCase();
+    if (!name) {
+      i += 1;
+      continue;
+    }
+    while (i < len && /\s/.test(attrs[i])) i += 1;
+    let value = "";
+    if (i < len && attrs[i] === "=") {
+      i += 1;
+      while (i < len && /\s/.test(attrs[i])) i += 1;
+      if (i < len && (attrs[i] === '"' || attrs[i] === "'")) {
+        const quote = attrs[i];
+        i += 1;
+        const valStart = i;
+        while (i < len && attrs[i] !== quote) i += 1;
+        value = attrs.slice(valStart, i);
+        if (i < len && attrs[i] === quote) i += 1;
+      } else {
+        const valStart = i;
+        while (i < len && !/[\s>]/.test(attrs[i])) i += 1;
+        value = attrs.slice(valStart, i);
+      }
+    }
+    if (!Object.prototype.hasOwnProperty.call(result, name)) {
+      result[name] = value;
+    }
+  }
+  return result;
+}
+
 export function extractBodyContent(input: string) {
   const candidates = splitConcatenatedHtmlDocuments(input)
     .map((candidate) => candidate.trim())
@@ -96,21 +135,17 @@ export function extractBodyContent(input: string) {
     // the first </body>, which closes the inner body right after the header and
     // drops the entire message. Match through the last </body> instead.
     const bodyMatch = candidate.match(/<body([^>]*)>([\s\S]*)<\/body>/i);
-    const attrs = bodyMatch?.[1] ?? "";
-    const classMatch = attrs.match(/\bclass\s*=\s*["']([^"']+)["']/i);
-    const styleMatch = attrs.match(/\bstyle\s*=\s*["']([^"']+)["']/i);
-    const idMatch = attrs.match(/\bid\s*=\s*["']([^"']+)["']/i);
-    const bgcolorMatch = attrs.match(/\bbgcolor\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
+    const parsedAttrs = parseOpeningTagAttributes(bodyMatch?.[1] ?? "");
 
     return {
       ...scored,
       styles,
       body: (bodyMatch?.[2] ?? candidate).replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ""),
       bodyAttrs: {
-        className: classMatch?.[1] ?? "",
-        style: styleMatch?.[1] ?? "",
-        id: idMatch?.[1] ?? "",
-        bgcolor: (bgcolorMatch?.[1] ?? bgcolorMatch?.[2] ?? bgcolorMatch?.[3] ?? "").trim()
+        className: parsedAttrs.class ?? "",
+        style: parsedAttrs.style ?? "",
+        id: parsedAttrs.id ?? "",
+        bgcolor: (parsedAttrs.bgcolor ?? "").trim()
       }
     };
   });
@@ -121,8 +156,9 @@ export function extractBodyContent(input: string) {
   const renderedParts = visibleParts.length > 0 ? visibleParts : parts;
   const primaryPart =
     renderedParts.find(
-      (part) => part.bodyAttrs.className || part.bodyAttrs.style || part.bodyAttrs.id || part.bodyAttrs.bgcolor
+      (part) => part.bodyAttrs.className || part.bodyAttrs.style || part.bodyAttrs.id
     ) ??
+    renderedParts.find((part) => part.bodyAttrs.bgcolor) ??
     renderedParts[0];
 
   return {
