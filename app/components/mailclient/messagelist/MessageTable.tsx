@@ -38,6 +38,8 @@ import {
 } from "./listInteractions";
 import { isTopicSuggestionGroupKey } from "./topicSuggestionGroup";
 import TopicSuggestionAcceptButton from "./TopicSuggestionAcceptButton";
+import AttachmentBadge from "./AttachmentBadge";
+import { rowHasAttachments } from "./threadBadgeUnion";
 import FromAddressHoverCard from "./FromAddressHoverCard";
 import groupStyles from "./MessageCardList.module.css";
 import styles from "./MessageTable.module.css";
@@ -69,7 +71,7 @@ export default function MessageTable({
     messageTopicsById,
     sortDir,
     showMessageSize,
-    preferToDisplay,
+    showRecipientsFor,
     activeTopic,
     userEmail,
     findRecipientAlias,
@@ -170,7 +172,7 @@ export default function MessageTable({
     flattenThread,
     getThreadLatestDate,
     userEmail,
-    preferToDisplay,
+    showRecipientsFor,
     findRecipientAlias,
     mode: "flat"
   });
@@ -530,7 +532,7 @@ export default function MessageTable({
                   }}
                 >
                   {renderFolderBadges(item.folderIds)}
-                  <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><SpamBadge message={message} /><ScheduledSendBadge message={message} /><span data-mobile-collab=""><CollabRowBadges message={message} /></span></span>
+                  <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><SpamBadge message={message} /><ScheduledSendBadge message={message} /><span data-mobile-collab="">{rowHasAttachments({ isCollapsedThreadRoot, fullFlat: item.fullFlat, message }) && <AttachmentBadge />}<CollabRowBadges message={message} /></span></span>
                   {messageTopicsById?.get(message.threadId)?.map((topic) => (
                     <TopicBadge key={topic.id} topic={topic} size="1" preferShortName />
                   ))}

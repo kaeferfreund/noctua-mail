@@ -5,7 +5,8 @@ import CollabRowBadges from "@/app/components/collab/CollabRowBadges";
 import { useIsMobile } from "@/app/hooks/use-mobile";
 import type React from "react";
 import type { CSSProperties } from "react";
-import { CalendarDays, GitBranch, MoveRight, Paperclip, Trash2 } from "lucide-react";
+import { CalendarDays, GitBranch, MoveRight, Trash2 } from "lucide-react";
+import AttachmentBadge from "./AttachmentBadge";
 import { Badge, Text, VisuallyHidden } from "@radix-ui/themes";
 import { badgeColors } from "@/lib/ui/badgeColors";
 import { describeMessageSize } from "@/lib/ui/byteSize";
@@ -73,7 +74,7 @@ export default function MessageThreadList({
     draggingMessageIds,
     pendingMessageActions,
     pendingSuggestedThreadIds,
-    preferToDisplay,
+    showRecipientsFor,
     activeTopic,
     userEmail,
     findRecipientAlias,
@@ -147,7 +148,7 @@ export default function MessageThreadList({
     flattenThread,
     getThreadLatestDate,
     userEmail,
-    preferToDisplay,
+    showRecipientsFor,
     findRecipientAlias,
     mode: "nested",
     collapsedNestedMessages
@@ -251,6 +252,9 @@ export default function MessageThreadList({
           threadHasAttachments: false,
           threadHasCalendar: false
         };
+
+        // Narrow rows show only the subject line; its mobile slot repeats the paperclip.
+        const rowHasAttachment = threadBadgeUnion.threadHasAttachments || shouldShowAttachmentIcon(message);
 
         const rowContainerClassName = [
           styles.messageRowContainer,
@@ -381,21 +385,9 @@ export default function MessageThreadList({
                 </FromAddressHoverCard>
 
                 <span data-message-cell="subject" className={styles.cellSubject}>
-                  <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><SpamBadge message={message} /><ScheduledSendBadge message={message} /><span data-mobile-collab=""><CollabRowBadges message={message} /></span></span>
+                  <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><SpamBadge message={message} /><ScheduledSendBadge message={message} /><span data-mobile-collab="">{rowHasAttachment && <AttachmentBadge />}<CollabRowBadges message={message} /></span></span>
                   {renderFolderBadges(item.folderIds)}
-                  {(threadBadgeUnion.threadHasAttachments ||
-                    shouldShowAttachmentIcon(message)) && (
-                    <Badge
-                      size="1"
-                      variant="soft"
-                      color={badgeColors.attachment}
-                      className={badgeStyles.badge}
-                      title={t("attachments")}
-                      aria-label={t("attachments")}
-                    >
-                      <Paperclip size={12} />
-                    </Badge>
-                  )}
+                  {rowHasAttachment && <AttachmentBadge />}
                   {(threadBadgeUnion.threadHasCalendar ||
                     hasMessageFlag(message.flags, CALENDAR_INVITE_FLAG)) && (
                     <Badge

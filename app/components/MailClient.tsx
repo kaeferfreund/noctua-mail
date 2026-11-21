@@ -312,7 +312,7 @@ import {
   isDraftsFolder as checkIsDraftsFolder,
   isTrashFolder as checkIsTrashFolder,
   isSpamFolder as checkIsSpamFolder,
-  isSentFolder as checkIsSentFolder,
+  collectRecipientListFolderIds,
   isNotificationSuppressedFolder as checkIsNotificationSuppressedFolder,
   getFolderSpecialKind
 } from "@/lib/specialFolders";
@@ -1275,7 +1275,6 @@ export default function MailClient({
   const isDraftsFolder = useCallback((folderId?: string | null) => checkIsDraftsFolder(folderId, actionFolders), [actionFolders]);
   const isTrashFolder = (folderId?: string | null) => checkIsTrashFolder(folderId, actionFolders);
   const isSpamFolder = (folderId?: string | null) => checkIsSpamFolder(folderId, actionFolders);
-  const isSentFolder = (folderId?: string | null) => checkIsSentFolder(folderId, folders);
 
   // Preserve identity when counts change but thread-exclusion structure does not.
   const excludedThreadFolderIdsKey = JSON.stringify(folders.filter(folder =>
@@ -1718,7 +1717,13 @@ export default function MailClient({
     setSwitchPending
   });
 
-  const preferToDisplay = isDraftsFolder(activeFolderId) || isSentFolder(activeFolderId);
+  // A row names its recipients when the message itself lies in its mailbox's
+  // Sent or Drafts folder (every view, incl. the domain view), else its sender.
+  const recipientListFolderIds = useMemo(() => collectRecipientListFolderIds(actionFolders), [actionFolders]);
+  const showRecipientsFor = useCallback(
+    (message: Message) => recipientListFolderIds.has(message.folderId),
+    [recipientListFolderIds]
+  );
   const draftsFolder = useMemo(
     () =>
       folders.find(
@@ -2785,8 +2790,6 @@ export default function MailClient({
     buildThreadTree,
     flattenThread,
     getThreadLatestDate,
-    userEmail: currentAccount ? getOwnAddresses(currentAccount) : [],
-    preferToDisplay,
     setCollapsedGroups
   });
 
@@ -2813,6 +2816,10 @@ export default function MailClient({
   // The saved preference applies only while a message is open; every list
   // behaviour (paging, scroll capture, notice anchor) follows the shown layout.
   const readerFocused = !isMobile && readerLayout === "focus" && Boolean(activeMessage);
+  // Focus reader header: the open message's own mailbox. The domain view's cards
+  // already carry a mailbox badge each, so the header names none there.
+  const readerFocusMailbox = readerFocused && !domainView && activeMessage ? accountById.get(activeMessage.accountId) : undefined;
+  const readerFocusMailboxLabel = readerFocusMailbox ? readerFocusMailbox.name || readerFocusMailbox.email : undefined;
 
   const handleBeforeSelectMessage = useCallback(
     (nextMessage: Message, currentMessage: Message | null) => {
@@ -5846,7 +5853,7 @@ export default function MailClient({
                 sortDir,
                 showMessageSize: messageSort === "size",
                 listIsNarrow,
-                preferToDisplay,
+                showRecipientsFor,
                 activeTopic,
                 userEmail: currentAccount ? getOwnAddresses(currentAccount) : [],
                 findRecipientAlias,
@@ -5951,7 +5958,7 @@ export default function MailClient({
             <MessageViewOrchestrator
               ref={messageViewHandleRef}
               header={{
-                mailboxLabel: readerFocused ? currentAccount?.name || currentAccount?.email : undefined,
+                mailboxLabel: readerFocusMailboxLabel,
                 toolbar: !isMobile && activeMessage ? <ReaderToolbar
                   layout={readerLayout}
                   toggleLayout={() => readerLayout === "focus" ? closeReaderFocus() : openReaderFocus(activeMessage)}
@@ -6046,6 +6053,7 @@ export default function MailClient({
                   reportError,
                   dateFormat: accountDateFormat,
                   userEmail: currentAccount ? getOwnAddresses(currentAccount) : [],
+                  showRecipientsFor,
                   senderIconsEnabled: currentAccount?.settings?.appearance?.senderIcons ?? true,
                   onSearchByAddress: handleSearchByAddress,
                   onComposeTo: handleComposeTo,

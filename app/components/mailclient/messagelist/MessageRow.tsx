@@ -2,7 +2,7 @@ import { useLocale, useTranslations } from "next-intl";
 import CollabRowBadges from "@/app/components/collab/CollabRowBadges";
 import { memo, useEffect, useRef, useState } from "react";
 import type React from "react";
-import { CalendarDays, GitBranch, MoveRight, Paperclip, Search, Trash2 } from "lucide-react";
+import { CalendarDays, GitBranch, MoveRight, Search, Trash2 } from "lucide-react";
 import { Badge, Checkbox, Text, VisuallyHidden } from "@radix-ui/themes";
 import { CaretRightIcon } from "@radix-ui/react-icons";
 import { badgeColors } from "@/lib/ui/badgeColors";
@@ -14,6 +14,7 @@ import badgeStyles from "../message/MessageBadge.module.css";
 import commonStyles from "./MessageListCommon.module.css";
 import { getMessageListDateDisplay, useMessageListRelativeDayLabels } from "./messageDateDisplay";
 import styles from "./MessageRow.module.css";
+import AttachmentBadge from "./AttachmentBadge";
 import CategoryBadge from "../CategoryBadge";
 import SpamBadge from "../SpamBadge";
 import { ScheduledSendBadge, useDraftSchedule } from "../scheduledSend/ScheduledSend";
@@ -191,6 +192,7 @@ function MessageRow({
   const effectiveSelected = optimisticSelected ?? isSelected;
   const effectiveActive = isActive || optimisticActive;
   const seen = displaySeen ?? Boolean(message.seen);
+  const rowHasAttachment = threadHasAttachments ?? showAttachmentIcon;
   const rowClassName = [
     styles.row,
     isCompactView ? styles.rowCompact : "",
@@ -484,7 +486,8 @@ function MessageRow({
             {message.subject}
           </Text>
         </div>
-        <span className={styles.mobileCollab}><CollabRowBadges message={message} /></span>
+        {/* Phone compact rows hide the meta badges; the paperclip stays here. */}
+        <span className={styles.mobileCollab}>{rowHasAttachment && <AttachmentBadge />}<CollabRowBadges message={message} /></span>
         {(
           showFolderBadgesInSubjectMeta ||
           showThreadIndicator ||
@@ -505,18 +508,7 @@ function MessageRow({
                 <span title={t("threadMessageCount", { count: threadSize ?? 0 })}>{threadSize}</span>
               </Badge>
             )}
-            {(threadHasAttachments ?? showAttachmentIcon) && (
-              <Badge
-                size="1"
-                variant="soft"
-                color={badgeColors.attachment}
-                className={badgeStyles.badge}
-                title={t("attachments")}
-                aria-label={t("attachments")}
-              >
-                <Paperclip size={12} />
-              </Badge>
-            )}
+            {rowHasAttachment && <AttachmentBadge />}
             {(threadHasCalendar ?? showCalendarInviteIcon) && (
               <Badge
                 size="1"
@@ -610,6 +602,8 @@ const areEqual = (prev: MessageRowProps, next: MessageRowProps) =>
   prev.threadHasTodo === next.threadHasTodo &&
   prev.threadHasDone === next.threadHasDone &&
   prev.threadHasAiModified === next.threadHasAiModified &&
+  prev.threadHasAttachments === next.threadHasAttachments &&
+  prev.threadHasCalendar === next.threadHasCalendar &&
   prev.messageTopics === next.messageTopics &&
   prev.showSize === next.showSize &&
   prev.senderIconsEnabled === next.senderIconsEnabled;

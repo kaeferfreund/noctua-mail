@@ -20,7 +20,7 @@ export function useMessageListItems({
   flattenThread,
   getThreadLatestDate,
   userEmail,
-  preferToDisplay,
+  showRecipientsFor,
   findRecipientAlias,
   mode,
   collapsedNestedMessages
@@ -41,7 +41,7 @@ export function useMessageListItems({
         flattenThread,
         getThreadLatestDate,
         userEmail,
-        preferToDisplay,
+        showRecipientsFor,
         findRecipientAlias,
         mode,
         collapsedNestedMessages
@@ -59,7 +59,7 @@ export function useMessageListItems({
       flattenThread,
       getThreadLatestDate,
       userEmail,
-      preferToDisplay,
+      showRecipientsFor,
       findRecipientAlias,
       mode,
       collapsedNestedMessages

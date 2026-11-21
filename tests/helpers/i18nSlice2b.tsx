@@ -24,7 +24,7 @@ export function reviewListProps(): Omit<MessageListViewProps, "view"> {
       pendingMessageActions: new Set(), supportsThreads: false, includeThreadAcrossFolders: false,
       searchScope: "folder", activeFolderId: message.folderId, messageById: new Map([[message.id, message]]),
       messageTopicsById: new Map(), suggestedThreadIds: new Set(), pendingSuggestedThreadIds: new Set(),
-      sortDir: "desc", showMessageSize: false, listIsNarrow: true, preferToDisplay: false, activeTopic: null,
+      sortDir: "desc", showMessageSize: false, listIsNarrow: true, showRecipientsFor: () => false, activeTopic: null,
       senderIconsEnabled: false
     },
     actions: {

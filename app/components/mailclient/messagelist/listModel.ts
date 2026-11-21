@@ -116,12 +116,18 @@ type SharedListParams = {
     visited?: Set<string>
   ) => Array<{ message: Message; depth: number }>;
   getThreadLatestDate: (node: ThreadNode) => number;
-  userEmail?: OwnAddressInput;
-  preferToDisplay: boolean;
-  findRecipientAlias?: (value?: string | null) => RecipientAlias | null;
 };
 
 export type BuildMessageListItemsParams = SharedListParams & {
+  /** Collapsed thread header only: own mail reads "Ich" there. */
+  userEmail?: OwnAddressInput;
+  /**
+   * Whether a row names the message's recipients instead of its sender:
+   * decided by the folder the message itself lies in (its mailbox's Sent or
+   * Drafts folder), never by the active folder or mailbox.
+   */
+  showRecipientsFor: (message: Message) => boolean;
+  findRecipientAlias?: (value?: string | null) => RecipientAlias | null;
   mode: "flat" | "nested";
   collapsedNestedMessages?: Record<string, boolean>;
 };
@@ -298,7 +304,7 @@ export function buildMessageListItems(params: BuildMessageListItemsParams): List
     flattenThread,
     getThreadLatestDate,
     userEmail,
-    preferToDisplay,
+    showRecipientsFor,
     findRecipientAlias,
     mode,
     collapsedNestedMessages
@@ -338,7 +344,7 @@ export function buildMessageListItems(params: BuildMessageListItemsParams): List
             ? getCollapsedThreadFromDisplay(
                 fullFlat,
                 userEmail,
-                preferToDisplay,
+                fullFlat.every(({ message }) => showRecipientsFor(message)),
                 findRecipientAlias, locale
               )
             : null;
@@ -379,16 +385,13 @@ export function buildMessageListItems(params: BuildMessageListItemsParams): List
                   (includeThreadAcrossFolders && message.folderId !== activeFolderId)
                 ? [message.folderId]
                 : [];
-          const isInExpandedThread = !isCollapsed || index > 0;
           const fromDisplay =
             index === 0 && collapsedThreadFrom
               ? collapsedThreadFrom
               : getMessageFromDisplay(
                   message.from,
                   { to: message.to, cc: message.cc, bcc: message.bcc },
-                  userEmail,
-                  isInExpandedThread,
-                  preferToDisplay,
+                  showRecipientsFor(message),
                   findRecipientAlias, locale
                 );
 
@@ -440,9 +443,7 @@ export function buildMessageListItems(params: BuildMessageListItemsParams): List
       const fromDisplay = getMessageFromDisplay(
         message.from,
         { to: message.to, cc: message.cc, bcc: message.bcc },
-        userEmail,
-        false,
-        preferToDisplay,
+        showRecipientsFor(message),
         findRecipientAlias, locale
       );
       rows.push({
