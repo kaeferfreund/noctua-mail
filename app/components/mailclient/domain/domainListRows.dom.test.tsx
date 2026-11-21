@@ -96,6 +96,21 @@ describe("domain view list rows", () => {
     });
   }
 
+  it("table: one paperclip for wide rows and one for narrow rows, never both visible", async () => {
+    const css = readFileSync(new URL("../messagelist/MessageListPane.module.css", import.meta.url), "utf8");
+    // The phone slot is hidden unless the row is narrow; a narrow row hides the subject cell's other children.
+    expect(css).toContain(".pane :global([data-mobile-collab]) { display: none; }");
+    expect(css).toContain('[data-message-layout="stacked"][data-message-narrow="true"] [data-mobile-collab]) { display: inline-flex;');
+    const { internalRow, externalRow } = await renderRows("table");
+    for (const row of [internalRow, externalRow]) {
+      expect(row.querySelectorAll("[data-attachment-badge]").length).toBe(2);
+      // Wide: a direct child of the subject cell (hidden on narrow rows).
+      expect(row.querySelectorAll('[data-message-cell="subject"] > [data-attachment-badge]').length).toBe(1);
+      // Narrow: inside the subject line's phone slot (hidden on wide rows).
+      expect(row.querySelectorAll("[data-message-subject-line] [data-mobile-collab] [data-attachment-badge]").length).toBe(1);
+    }
+  });
+
   it("compact: the phone slot of the subject row repeats the paperclip", async () => {
     const { internalRow, externalRow } = await renderRows("compact");
     for (const row of [internalRow, externalRow]) {
