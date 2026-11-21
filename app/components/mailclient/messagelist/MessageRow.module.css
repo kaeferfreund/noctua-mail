@@ -363,5 +363,5 @@
 
 .mobileCollab { display: none; }
 @media (width < 768px) {
-  .rowCompact .mobileCollab { display: inline-flex; flex-shrink: 0; margin-left: auto; }
+  .rowCompact .mobileCollab { display: inline-flex; flex-shrink: 0; align-items: center; gap: 4px; margin-left: auto; }
 }

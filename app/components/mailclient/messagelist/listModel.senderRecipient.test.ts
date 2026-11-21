@@ -109,9 +109,12 @@ describe("name column by the message's own folder", () => {
     const onlySent = [...rows([first, second], { activeFolderId: "acc-a:INBOX", userEmail: ["anna@example.test"] }).values()];
     expect(onlySent).toHaveLength(1);
     expect(onlySent[0].fromText).toBe("Carla Customer");
+    // Like a single row in Sent: the arrow, not the recipient's avatar.
+    expect(onlySent[0].showRecipientIcon).toBe(true);
     const inbound = mail("inbound2", "acc-a", "INBOX", CUSTOMER, ANNA, 2, { threadId, inReplyTo: "<second@example.test>", parentId: "second" });
     const mixed = [...rows([first, second, inbound], { activeFolderId: "acc-a:Sent", userEmail: ["anna@example.test"] }).values()];
     expect(mixed).toHaveLength(1);
     expect(mixed[0].fromText.split(", ").sort()).toEqual(["Carla Customer", "Me"]);
+    expect(mixed[0].showRecipientIcon).toBe(false);
   });
 });

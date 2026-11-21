@@ -16,7 +16,7 @@ import { buildMessageListQueryUrl } from "./messageListQueryUrl";
 import type { ThreadDateSource } from "@/lib/threadDate";
 import type { MessageListSortBy } from "@/lib/messageListSort";
 import type { MailboxViewCache } from "./mailboxViewCache";
-import type { DomainFolderRole } from "@/lib/domainView";
+import { NO_DOMAIN_ROLE_FOLDERS, readDomainRoleFolders, type DomainFolderRole, type DomainRoleFolders } from "@/lib/domainView";
 
 type ApiFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -86,8 +86,9 @@ export function useMessageData({
 }: UseMessageDataParams) {
   const inListScope = (accountId: string) =>
     listAccountIds ? listAccountIds.has(accountId) : accountId === activeAccountId;
-  // Domain view: the role folder of each listed mailbox, from the list response.
-  const [domainFolderIds, setDomainFolderIds] = useState<string[]>([]);
+  // Domain view: the role folder of each listed mailbox, from the list response,
+  // kept together with the role that response was for.
+  const [domainRoleFolders, setDomainRoleFolders] = useState<DomainRoleFolders>(NO_DOMAIN_ROLE_FOLDERS);
   const [authoritativeRevision, setAuthoritativeRevision] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [groupMeta, setGroupMeta] = useState<MessageGroupMeta[]>([]);
@@ -394,6 +395,7 @@ export function useMessageData({
             total?: number;
             baseCount?: number;
             relatedSubject?: string;
+            role?: string;
             folders?: Array<{ accountId: string; folderId: string }>;
           };
           const items = Array.isArray(data?.items) ? data.items.filter(Boolean) : [];
@@ -449,7 +451,7 @@ export function useMessageData({
           setHasMoreMessages(Boolean(data?.hasMore));
           setTotalMessages(typeof data?.total === "number" ? data.total : null);
           if (page === 1) {
-            setDomainFolderIds(Array.isArray(data?.folders) ? data.folders.map((entry) => entry.folderId) : []);
+            setDomainRoleFolders(readDomainRoleFolders(data));
             shownPageKeyRef.current = requestKey;
             shownPageUrlRef.current = url;
             firstPageSizeRef.current = {
@@ -523,6 +525,7 @@ export function useMessageData({
         total?: number;
         baseCount?: number;
         relatedSubject?: string;
+        role?: string;
         folders?: Array<{ accountId: string; folderId: string }>;
       };
       const nextMessages = Array.isArray(messageData?.items)
@@ -545,7 +548,7 @@ export function useMessageData({
       if (messageMutationVersionRef.current !== requestMutationVersion) {
         return false;
       }
-      setDomainFolderIds(Array.isArray(messageData?.folders) ? messageData.folders.map((entry) => entry.folderId) : []);
+      setDomainRoleFolders(readDomainRoleFolders(messageData));
       shownPageKeyRef.current = requestKey;
       shownPageUrlRef.current = requestUrl;
       firstPageSizeRef.current = {
@@ -619,6 +622,7 @@ export function useMessageData({
     markMessagesMutated,
     prefetchFirstPage,
     dropFirstPagePrefetch,
-    domainFolderIds
+    domainFolderIds: domainRoleFolders.folderIds,
+    domainRoleFolders
   };
 }
