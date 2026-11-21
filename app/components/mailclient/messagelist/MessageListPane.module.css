@@ -201,4 +201,4 @@
 .pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-message-subject]) {
   flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
 }
-.pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-mobile-collab]) { display: inline-flex; flex-shrink: 0; }
+.pane :global([data-message-layout="stacked"][data-message-narrow="true"] [data-mobile-collab]) { display: inline-flex; flex-shrink: 0; align-items: center; gap: 4px; }

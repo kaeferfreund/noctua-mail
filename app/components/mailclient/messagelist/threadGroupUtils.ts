@@ -335,6 +335,9 @@ export function getCollapsedThreadFromDisplay(
     text: fromTexts.join(", "),
     tooltip: fromTooltips.join(", "),
     participants,
+    // Every message lies in a Sent/Drafts folder: the row lists recipients and
+    // shows the arrow instead of an avatar, like a single row there.
+    showRecipientIcon: Boolean(forceRecipientDisplay),
     iconFrom: iconParticipant?.from,
     iconFromEmail: iconParticipant?.fromEmail ?? null
   };

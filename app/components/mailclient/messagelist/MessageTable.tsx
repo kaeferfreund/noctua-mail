@@ -321,6 +321,9 @@ export default function MessageTable({
           const { isCollapsedThreadRoot, displaySeen } = getThreadRowDisplayMeta({
             item
           });
+          // Wide rows show the paperclip in the subject cell; narrow rows hide it
+          // there and show it in the subject line's mobile slot instead.
+          const rowHasAttachment = rowHasAttachments({ isCollapsedThreadRoot, fullFlat: item.fullFlat, message });
           const rowClassName = [
             styles.row,
             showRowDivider ? styles.rowDivider : "",
@@ -532,7 +535,8 @@ export default function MessageTable({
                   }}
                 >
                   {renderFolderBadges(item.folderIds)}
-                  <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><SpamBadge message={message} /><ScheduledSendBadge message={message} /><span data-mobile-collab="">{rowHasAttachments({ isCollapsedThreadRoot, fullFlat: item.fullFlat, message }) && <AttachmentBadge />}<CollabRowBadges message={message} /></span></span>
+                  <span data-message-subject-line="" style={{ display: "flex", minWidth: 0, alignItems: "center", gap: 6 }}><span data-message-subject="" className={styles.cellSubjectText}>{message.subject}</span><SpamBadge message={message} /><ScheduledSendBadge message={message} /><span data-mobile-collab="">{rowHasAttachment && <AttachmentBadge />}<CollabRowBadges message={message} /></span></span>
+                  {rowHasAttachment && <AttachmentBadge />}
                   {messageTopicsById?.get(message.threadId)?.map((topic) => (
                     <TopicBadge key={topic.id} topic={topic} size="1" preferShortName />
                   ))}

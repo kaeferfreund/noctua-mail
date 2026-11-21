@@ -445,7 +445,7 @@ import { useFolderRefresh } from "./mailclient/useFolderRefresh";
 import { getFolderDisplayName } from "@/lib/i18n/folderNames";
 import { takeInviteCodeFromLocation } from "@/lib/inviteLink";
 import { mailboxGroupDomain } from "@/lib/senderIdentity";
-import { DOMAIN_FOLDER_ROLES, domainFolderRoleOf, findDomainRoleFolder, type DomainFolderRole } from "@/lib/domainView";
+import { DOMAIN_FOLDER_ROLES, domainFolderRoleOf, domainRecipientListFolderIds, findDomainRoleFolder, type DomainFolderRole } from "@/lib/domainView";
 import MailboxBadge from "./mailclient/domain/MailboxBadge";
 import DomainViewBar from "./mailclient/domain/DomainViewBar";
 import { mailboxLabel } from "./shell/types";
@@ -1339,6 +1339,7 @@ export default function MailClient({
     prefetchFirstPage,
     dropFirstPagePrefetch,
     domainFolderIds,
+    domainRoleFolders,
   } = useMessageData({
     messagesKey,
     activeAccountId,
@@ -1719,7 +1720,13 @@ export default function MailClient({
 
   // A row names its recipients when the message itself lies in its mailbox's
   // Sent or Drafts folder (every view, incl. the domain view), else its sender.
-  const recipientListFolderIds = useMemo(() => collectRecipientListFolderIds(actionFolders), [actionFolders]);
+  // A domain Sent/Drafts list names those folders of every listed mailbox
+  // itself, so its rows never wait for the other mailboxes' folder lists.
+  const recipientListFolderIds = useMemo(() => {
+    const ids = collectRecipientListFolderIds(actionFolders);
+    domainRecipientListFolderIds(domainRoleFolders).forEach((id) => ids.add(id));
+    return ids;
+  }, [actionFolders, domainRoleFolders]);
   const showRecipientsFor = useCallback(
     (message: Message) => recipientListFolderIds.has(message.folderId),
     [recipientListFolderIds]

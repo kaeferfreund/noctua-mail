@@ -52,3 +52,31 @@ export function findDomainRoleFolder(folders: Folder[], accountId: string, role:
 export function domainFolderRoleOf(folder: Pick<Folder, "name" | "specialUse"> | null | undefined): DomainFolderRole | null {
   return getFolderSpecialKind(folder);
 }
+
+/** The role folders a domain list response names, with the role they play (role null: not a domain list). */
+export type DomainRoleFolders = { role: DomainFolderRole | null; folderIds: string[] };
+
+export const NO_DOMAIN_ROLE_FOLDERS: DomainRoleFolders = { role: null, folderIds: [] };
+
+/** Reads `role` and `folders` of a list response; ids are only kept together with the role they came with. */
+export function readDomainRoleFolders(
+  data: { role?: unknown; folders?: Array<{ folderId?: unknown }> } | null | undefined
+): DomainRoleFolders {
+  const role = typeof data?.role === "string" && (DOMAIN_FOLDER_ROLES as readonly string[]).includes(data.role)
+    ? (data.role as DomainFolderRole)
+    : null;
+  const folderIds = Array.isArray(data?.folders)
+    ? data.folders.map((entry) => entry?.folderId).filter((id): id is string => typeof id === "string")
+    : [];
+  return role || folderIds.length > 0 ? { role, folderIds } : NO_DOMAIN_ROLE_FOLDERS;
+}
+
+/**
+ * Folder ids a domain list response proves to be Sent or Drafts folders (the
+ * server resolves them with the same finders as `collectRecipientListFolderIds`).
+ * Ids of any other role add nothing, so a response still on screen from the
+ * previous role (e.g. Inbox while Sent loads) never marks its folders.
+ */
+export function domainRecipientListFolderIds(roleFolders: DomainRoleFolders): readonly string[] {
+  return roleFolders.role === "sent" || roleFolders.role === "drafts" ? roleFolders.folderIds : [];
+}
