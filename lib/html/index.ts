@@ -12,6 +12,7 @@
 //   - quotedParts.ts: build / assemble / extract the "quoted original" block
 //   - viewportUnits.ts: freeze viewport-height lengths in auto-height previews
 //   - quoteBoundary.ts: locate the quoted thread inside an incoming message
+//   - themeStyles.ts: prefers-color-scheme CSS rewriting and colour-contrast analysis
 //
 // Prefer importing from "@/lib/html" rather than the sibling files directly;
 // the re-exports here keep the surface stable for the rest of the codebase.
@@ -71,3 +72,15 @@ export {
   assembleQuotedHtml,
   extractQuotedHtmlFromDraft
 } from "./quotedParts";
+export type {
+  EmailColorAnalysis,
+  HtmlColorSchemeOverride,
+  RewrittenEmailStyles
+} from "./themeStyles";
+export {
+  analyzeEmailColorScheme,
+  isDarkColor,
+  parseColorLuminance,
+  rewriteEmailStylesForTheme,
+  sanitizeCssColorValue
+} from "./themeStyles";

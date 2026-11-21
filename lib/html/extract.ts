@@ -84,7 +84,7 @@ export function extractBodyContent(input: string) {
     return {
       body: normalizedCandidates[0] ?? "",
       styles: (normalizedCandidates[0] ?? "").match(/<style[^>]*>[\s\S]*?<\/style>/gi) ?? [],
-      bodyAttrs: { className: "", style: "", id: "" }
+      bodyAttrs: { className: "", style: "", id: "", bgcolor: "" }
     };
   }
 
@@ -97,9 +97,10 @@ export function extractBodyContent(input: string) {
     // drops the entire message. Match through the last </body> instead.
     const bodyMatch = candidate.match(/<body([^>]*)>([\s\S]*)<\/body>/i);
     const attrs = bodyMatch?.[1] ?? "";
-    const classMatch = attrs.match(/class=["']([^"']+)["']/i);
-    const styleMatch = attrs.match(/style=["']([^"']+)["']/i);
-    const idMatch = attrs.match(/id=["']([^"']+)["']/i);
+    const classMatch = attrs.match(/\bclass\s*=\s*["']([^"']+)["']/i);
+    const styleMatch = attrs.match(/\bstyle\s*=\s*["']([^"']+)["']/i);
+    const idMatch = attrs.match(/\bid\s*=\s*["']([^"']+)["']/i);
+    const bgcolorMatch = attrs.match(/\bbgcolor\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
 
     return {
       ...scored,
@@ -108,7 +109,8 @@ export function extractBodyContent(input: string) {
       bodyAttrs: {
         className: classMatch?.[1] ?? "",
         style: styleMatch?.[1] ?? "",
-        id: idMatch?.[1] ?? ""
+        id: idMatch?.[1] ?? "",
+        bgcolor: (bgcolorMatch?.[1] ?? bgcolorMatch?.[2] ?? bgcolorMatch?.[3] ?? "").trim()
       }
     };
   });
@@ -118,13 +120,15 @@ export function extractBodyContent(input: string) {
   );
   const renderedParts = visibleParts.length > 0 ? visibleParts : parts;
   const primaryPart =
-    renderedParts.find((part) => part.bodyAttrs.className || part.bodyAttrs.style || part.bodyAttrs.id) ??
+    renderedParts.find(
+      (part) => part.bodyAttrs.className || part.bodyAttrs.style || part.bodyAttrs.id || part.bodyAttrs.bgcolor
+    ) ??
     renderedParts[0];
 
   return {
     body: renderedParts.map((part) => part.body).join(""),
     styles: renderedParts.flatMap((part) => part.styles),
-    bodyAttrs: primaryPart?.bodyAttrs ?? { className: "", style: "", id: "" }
+    bodyAttrs: primaryPart?.bodyAttrs ?? { className: "", style: "", id: "", bgcolor: "" }
   };
 }
 

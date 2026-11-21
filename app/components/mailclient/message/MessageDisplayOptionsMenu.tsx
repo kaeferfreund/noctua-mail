@@ -10,8 +10,10 @@ import headerStyles from "./MessageHeaderControls.module.css";
 import styles from "./MessageDisplayOptionsMenu.module.css";
 import { useMessageMenuPrimitives } from "./messageMenuPrimitives";
 import type { MessageTab } from "./types";
+import type { HtmlColorSchemeOverride } from "@/lib/html";
 
 const SCALE_STEP = 0.1;
+const COLOR_SCHEME_OPTIONS: readonly HtmlColorSchemeOverride[] = ["auto", "light", "dark"];
 
 
 type StepperLabels = {
@@ -34,13 +36,16 @@ type MessageDisplayOptionsMenuProps = {
   zoom: number;
   onAdjustZoom: (delta: number) => void;
   onResetZoom: () => void;
+  colorScheme?: HtmlColorSchemeOverride;
+  onColorSchemeChange?: (scheme: HtmlColorSchemeOverride) => void;
 };
 
 /**
  * Per-message "Display options" menu in the thread card header: body format
- * (HTML / Plain text / Markdown / Source), text size and HTML zoom. When the
- * message is not shown in its default presentation the trigger turns accent
- * and a short chip names the deviation, so a changed rendering stays explicable.
+ * (HTML / Plain text / Markdown / Source), HTML appearance, text size and HTML
+ * zoom. When the message is not shown in its default presentation the trigger
+ * turns accent and a short chip names the deviation, so a changed rendering
+ * stays explicable.
  */
 export default function MessageDisplayOptionsMenu({
   formats,
@@ -52,7 +57,9 @@ export default function MessageDisplayOptionsMenu({
   onResetTextScale,
   zoom,
   onAdjustZoom,
-  onResetZoom
+  onResetZoom,
+  colorScheme = "auto",
+  onColorSchemeChange
 }: MessageDisplayOptionsMenuProps) {
   const t = useTranslations("Reader");
   const locale = useLocale();
@@ -78,17 +85,26 @@ export default function MessageDisplayOptionsMenu({
     increase: t("zoomIn")
   };
 
+  const APPEARANCE_LABELS: Record<HtmlColorSchemeOverride, string> = {
+    auto: t("appearanceAuto"),
+    light: t("appearanceLight"),
+    dark: t("appearanceDark")
+  };
+
   const { isMobile, DropdownMenu } = useMessageMenuPrimitives();
   const formatLabelId = useId();
+  const appearanceLabelId = useId();
   const textSizeLabelId = useId();
   const zoomLabelId = useId();
   // Same visibility rules as the panels: Source ignores text size, and only
-  // the HTML renderer applies zoom.
+  // the HTML renderer applies zoom and appearance overrides.
   const showTextSize = format !== "source";
   const showZoom = format === "html";
+  const showColorScheme = format === "html" && Boolean(onColorSchemeChange);
   const showFormats = formats.length > 1;
   const summary = [
     format !== defaultFormat ? FORMAT_LABELS[format] : null,
+    showColorScheme && colorScheme !== "auto" ? APPEARANCE_LABELS[colorScheme] : null,
     showTextSize && textScale !== 1 ? t("textScale", { percent: formatPercent(textScale) }) : null,
     showZoom && zoom !== 1 ? t("zoomScale", { percent: formatPercent(zoom) }) : null
   ]
@@ -194,7 +210,27 @@ export default function MessageDisplayOptionsMenu({
                 </DropdownMenu.RadioGroup>
               </>
             ) : null}
-            {showFormats && showTextSize ? <DropdownMenu.Separator /> : null}
+            {showFormats && (showColorScheme || showTextSize) ? <DropdownMenu.Separator /> : null}
+            {showColorScheme ? (
+              <>
+                <DropdownMenu.Label id={appearanceLabelId} className={styles.menuLabel}>{t("appearance")}</DropdownMenu.Label>
+                <DropdownMenu.RadioGroup
+                  value={colorScheme}
+                  aria-labelledby={appearanceLabelId}
+                  onValueChange={(value) => {
+                    const next = COLOR_SCHEME_OPTIONS.find((option) => option === value);
+                    if (next && next !== colorScheme) onColorSchemeChange?.(next);
+                  }}
+                >
+                  {COLOR_SCHEME_OPTIONS.map((option) => (
+                    <DropdownMenu.RadioItem key={option} value={option} className={styles.formatItem}>
+                      {APPEARANCE_LABELS[option]}
+                    </DropdownMenu.RadioItem>
+                  ))}
+                </DropdownMenu.RadioGroup>
+              </>
+            ) : null}
+            {showColorScheme && showTextSize ? <DropdownMenu.Separator /> : null}
             {showTextSize
               ? renderStepper(
                   textSizeLabelId,

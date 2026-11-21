@@ -1,10 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { buildPreviewDocument } from "./HtmlMessage";
-import { extractBodyContent } from "@/lib/html";
+import { extractBodyContent, type HtmlColorSchemeOverride } from "@/lib/html";
 import { APP_FONT_STACK } from "@/lib/ui/fonts";
 
-const build = (html: string, hostViewportHeight?: number, darkMode = false) => buildPreviewDocument({
-  html, safeHtml: html, darkMode, fontScale: 1, zoom: 1,
+const build = (
+  html: string,
+  hostViewportHeight?: number,
+  darkMode = false,
+  colorSchemeOverride: HtmlColorSchemeOverride = "auto"
+) => buildPreviewDocument({
+  html, safeHtml: html, darkMode, colorSchemeOverride, fontScale: 1, zoom: 1,
   showViewerFrame: false, hostViewportHeight, remoteContent: "block", token: "test-preview"
 });
 
@@ -44,6 +49,61 @@ describe("HTML preview document text colour", () => {
     for (const dark of [true, false]) {
       expect(bodyRule(build('<p style="color:#123456">Own</p>', undefined, dark))).not.toContain("color:");
     }
+  });
+  test("mails with dark text and no dark-mode styles get a light paper canvas in dark mode", () => {
+    const output = build('<div style="color:#242424"><p>Invoice #1042</p><a href="https://example.test">Open</a></div>', undefined, true);
+    expect(output).toContain('data-theme="light"');
+    expect(output).toContain("color-scheme: light;");
+    expect(bodyRule(output)).toContain("background: #ffffff;");
+    expect(output).toContain("a { color: #1847d5; }");
+  });
+  test("dark-mode-aware mails with white inline body background override .noctua-email-content in dark mode", () => {
+    const html = [
+      "<html><head><style>",
+      "@media (prefers-color-scheme: dark) {",
+      "  html, body { background-color: #111111 !important; }",
+      "  body, p, td { color: #ededed !important; }",
+      "}",
+      "</style></head>",
+      '<body style="background-color:rgb(255,255,255);color:rgb(23,23,23)"><p>Usage summary</p></body></html>'
+    ].join("\n");
+    const dark = build(html, undefined, true);
+    expect(dark).toContain('data-theme="dark"');
+    expect(dark).toContain(
+      'html[data-theme="dark"], html[data-theme="dark"] body, html[data-theme="dark"] .noctua-email-content { background-color: #111111 !important; }'
+    );
+    expect(dark).not.toContain('html[data-theme="dark"] html');
+
+    const light = build(html, undefined, false);
+    expect(light).toContain('data-theme="light"');
+    expect(light).not.toContain("#111111");
+  });
+  test("minified prefers-color-scheme:dark without space is preserved in dark mode", () => {
+    const html = '<style>@media (prefers-color-scheme:dark){body{background:#121212!important;color:#fff!important}}</style><body style="background:#fff;color:#111"><p>Hi</p></body>';
+    const dark = build(html, undefined, true);
+    expect(dark).toContain('data-theme="dark"');
+    expect(dark).toContain('html[data-theme="dark"] .noctua-email-content');
+    expect(dark).toContain("background:#121212!important");
+  });
+  test("preserves dark body bgcolor in light mode so light text stays readable", () => {
+    const html = '<body bgcolor="#000000"><p style="color:#ffffff">Dark newsletter</p></body>';
+    const light = build(html, undefined, false);
+    expect(bodyRule(light)).toContain("background: #000000;");
+  });
+  test("honours per-message light and dark appearance overrides", () => {
+    const html = [
+      "<style>@media (prefers-color-scheme: dark) { body { background: #111 !important; color: #eee !important; } }</style>",
+      '<body style="background:#fff;color:#111"><p>Summary</p></body>'
+    ].join("");
+    const forcedLightInDarkApp = build(html, undefined, true, "light");
+    expect(forcedLightInDarkApp).toContain('data-theme="light"');
+    expect(bodyRule(forcedLightInDarkApp)).toContain("background: #ffffff;");
+    expect(forcedLightInDarkApp).not.toContain("background: #111");
+
+    const forcedDarkInLightApp = build("<p>Plain</p>", undefined, false, "dark");
+    expect(forcedDarkInLightApp).toContain('data-theme="dark"');
+    expect(bodyRule(forcedDarkInLightApp)).toContain("background: #171717;");
+    expect(bodyRule(forcedDarkInLightApp)).toContain("color: #eeeeee;");
   });
 });
 
