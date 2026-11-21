@@ -105,7 +105,7 @@ describe("buildMessageListItems", () => {
       buildThreadTree: () => [],
       flattenThread: () => [],
       getThreadLatestDate: () => 0,
-      preferToDisplay: false,
+      showRecipientsFor: () => false,
       mode: "flat"
     });
 
@@ -162,7 +162,7 @@ describe("buildMessageListItems", () => {
         ...node.children.flatMap((child) => [{ message: child.message, depth: depth + 1 }])
       ],
       getThreadLatestDate: (node) => node.message.dateValue,
-      preferToDisplay: false,
+      showRecipientsFor: () => false,
       mode: "nested"
     });
 
@@ -226,7 +226,7 @@ describe("buildMessageListItems", () => {
         ])
       ],
       getThreadLatestDate: (node) => node.message.dateValue,
-      preferToDisplay: false,
+      showRecipientsFor: () => false,
       mode: "flat"
     });
 

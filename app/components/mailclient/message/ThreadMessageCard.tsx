@@ -132,6 +132,8 @@ type ThreadMessageCardProps = {
   dateFormat?: AccountDateFormat;
   threadViewMode?: "full" | "compact";
   userEmail?: OwnAddressInput;
+  /** Compact card name: recipients for mail in its mailbox's Sent/Drafts folder, else the sender. */
+  showRecipientsFor?: (message: Message) => boolean;
   senderIconsEnabled?: boolean;
   onSearchByAddress?: (action: "with" | "from" | "to", email: string) => void;
   onComposeTo?: (email: string) => void;
@@ -201,6 +203,7 @@ function ThreadMessageCard({
   dateFormat,
   threadViewMode,
   userEmail,
+  showRecipientsFor,
   senderIconsEnabled = true,
   onSearchByAddress,
   onComposeTo,
@@ -595,9 +598,8 @@ function ThreadMessageCard({
     const fromDisplay = getMessageFromDisplay(
       message.from ?? "",
       { to: message.to, cc: message.cc, bcc: message.bcc },
-      userEmail,
-      true,
-      false, undefined, locale
+      showRecipientsFor?.(message) ?? false,
+      undefined, locale
     );
     const senderText = fromDisplay.text || message.from || t("unknownSenderLabel");
     const senderEmail = getPrimaryEmail(message.from);

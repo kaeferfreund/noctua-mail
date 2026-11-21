@@ -129,9 +129,7 @@ describe("recipient alias display", () => {
     const result = getMessageFromDisplay(
       "Me <me@example.com>",
       { to: "Bob <bob@example.com>, Carol <carol@example.com>" },
-      "me@example.com",
       true,
-      false,
       findRecipientAlias
     );
 
@@ -146,9 +144,7 @@ describe("recipient alias display", () => {
         to: "Bob <bob@example.com>, Carol <carol@example.com>",
         cc: "Dave <dave@example.com>"
       },
-      "me@example.com",
       true,
-      false,
       findRecipientAlias
     );
 

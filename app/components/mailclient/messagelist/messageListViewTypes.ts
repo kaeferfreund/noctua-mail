@@ -67,7 +67,8 @@ export type MessageListViewState = {
   /** Render each row's stored-source size; on while the list is size-ordered. */
   showMessageSize: boolean;
   listIsNarrow: boolean;
-  preferToDisplay: boolean;
+  /** Name column per message: recipients for mail in its mailbox's Sent/Drafts folder, else the sender. */
+  showRecipientsFor: (message: Message) => boolean;
   activeTopic: Topic | null;
   userEmail?: OwnAddressInput;
   findRecipientAlias?: (value?: string | null) => RecipientAlias | null;

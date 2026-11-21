@@ -295,3 +295,26 @@ export function isThreadExcludedFolder(
   const special = (folder.specialUse ?? "").toLowerCase();
   return special === "\\trash" || special === "\\junk" || special === "\\spam";
 }
+
+/**
+ * Ids of the folders whose messages a list names by their recipients instead
+ * of their sender (Outlook / Apple Mail rule): the Sent and the Drafts folder
+ * of every mailbox in `folders`. A row is decided by the folder the message
+ * itself lies in, never by the folder or mailbox being viewed.
+ */
+export function collectRecipientListFolderIds(folders: Folder[]): Set<string> {
+  const ids = new Set<string>();
+  const accountIds = new Set<string>();
+  for (const folder of folders) {
+    accountIds.add(folder.accountId);
+    const special = normalize(folder.specialUse);
+    if (special === "\\sent" || special === "\\drafts") ids.add(folder.id);
+  }
+  for (const accountId of accountIds) {
+    const sent = findSentFolder(folders, accountId);
+    if (sent) ids.add(sent.id);
+    const drafts = findDraftsFolder(folders, accountId);
+    if (drafts) ids.add(drafts.id);
+  }
+  return ids;
+}

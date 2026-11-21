@@ -4,7 +4,7 @@ import { collectTopicSignalEntries } from "./topicSignals";
 import { resolveCalendarParticipationFromPreview } from "./calendarParticipation";
 import { classifyCategoryFromMetadata } from "./mail/categorization/classifier";
 import { computeComposeInitState } from "../app/components/mailclient/composition/composeInitState";
-import { getCollapsedThreadIconParticipant, getMessageFromDisplay } from "../app/components/mailclient/messagelist/threadGroupUtils";
+import { getCollapsedThreadFromDisplay, getCollapsedThreadIconParticipant } from "../app/components/mailclient/messagelist/threadGroupUtils";
 import { planNewMailNotifications } from "../app/components/mailclient/syncNotificationFilter";
 const ownAddresses = ["primary@example.test", "alias@example.test", "disabled@example.test"];
 const message: Message = { id: "synthetic", accountId: "a", folderId: "a:INBOX", threadId: "t", subject: "Synthetic",
@@ -21,7 +21,8 @@ describe("own-address consumers", () => {
     expect(compose("reply", { ...message, from: "external@example.test", replyTo: "list@example.test" }).composeTo).toBe("list@example.test");
   });
   test("thread display/icons and notifications recognize historical aliases", () => {
-    expect(getMessageFromDisplay("disabled@example.test", undefined, ownAddresses).isFromUser).toBe(true);
+    expect(getCollapsedThreadFromDisplay([{ message: { ...message, from: "disabled@example.test" }, depth: 0 }], ownAddresses,
+      false, undefined, "en").participants?.[0]?.displayName).toBe("Me");
     expect(getCollapsedThreadIconParticipant([{ message, depth: 0 }], ownAddresses)?.fromEmail).toBe("customer@example.test");
     expect(planNewMailNotifications({ items: [{ uid: 2, from: "alias@example.test" }], lastNotifiedUid: 1,
       notifiedKeys: new Set(), isNotificationSuppressedFolder: () => false, accountEmail: ownAddresses }).dispatch.kind).toBe("none");

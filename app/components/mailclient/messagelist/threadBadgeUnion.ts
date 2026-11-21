@@ -55,3 +55,15 @@ export function getCollapsedThreadBadgeUnion(params: {
     threadHasCalendar: hasCalendar
   };
 }
+
+/** Paperclip of one row: any message of a collapsed thread, else the row's own message. */
+export function rowHasAttachments(params: {
+  isCollapsedThreadRoot: boolean;
+  fullFlat: ThreadFlatEntry[];
+  message: Message;
+}): boolean {
+  const { isCollapsedThreadRoot, fullFlat, message } = params;
+  return isCollapsedThreadRoot
+    ? fullFlat.some((entry) => shouldShowAttachmentIcon(entry.message))
+    : shouldShowAttachmentIcon(message);
+}
