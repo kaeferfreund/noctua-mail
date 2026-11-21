@@ -1,10 +1,17 @@
-import postcss, { type AtRule, type Declaration, type Rule } from "postcss";
+import postcss, { type AtRule, type Declaration, type Node, type Rule } from "postcss";
 
 export type HtmlColorSchemeOverride = "auto" | "light" | "dark";
 
 // WCAG relative luminance threshold below which a colour is treated as dark:
 // #757575 is ~0.18, #666666 is ~0.13, #333333 is ~0.03, #000000 is 0.
 const DARK_LUMINANCE_THRESHOLD = 0.18;
+const LIGHT_TEXT_LUMINANCE_THRESHOLD = 0.5;
+const OPAQUE_BG_MIN_ALPHA = 0.45;
+const VISIBLE_TEXT_MIN_ALPHA = 0.2;
+
+const STRICT_NUMBER = /^[+-]?(?:\d+\.?\d*|\.\d+)$/;
+const STRICT_PERCENT = /^[+-]?(?:\d+\.?\d*|\.\d+)%$/;
+const STRICT_ANGLE = /^([+-]?(?:\d+\.?\d*|\.\d+))(deg|rad|grad|turn)?$/i;
 
 const NON_COLOR_KEYWORDS = new Set([
   "transparent",
@@ -90,52 +97,158 @@ function hslToRgb(h: number, sPercent: number, lPercent: number): [number, numbe
   return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
 }
 
-function parseRgbChannel(token: string) {
+function parseStrictRgbChannel(token: string): number | null {
   const trimmed = token.trim();
-  if (trimmed.endsWith("%")) {
-    const num = Number.parseFloat(trimmed.slice(0, -1));
+  if (STRICT_PERCENT.test(trimmed)) {
+    const num = Number(trimmed.slice(0, -1));
     return Number.isFinite(num) ? (num / 100) * 255 : null;
   }
-  const num = Number.parseFloat(trimmed);
+  if (STRICT_NUMBER.test(trimmed)) {
+    const num = Number(trimmed);
+    return Number.isFinite(num) ? num : null;
+  }
+  return null;
+}
+
+function parseStrictPercent(token: string): number | null {
+  const trimmed = token.trim();
+  if (!STRICT_PERCENT.test(trimmed)) return null;
+  const num = Number(trimmed.slice(0, -1));
   return Number.isFinite(num) ? num : null;
 }
 
-function parseAlpha(token: string | undefined) {
-  if (!token) return 1;
+function parseStrictHueDegrees(token: string): number | null {
+  const match = STRICT_ANGLE.exec(token.trim());
+  if (!match) return null;
+  const num = Number(match[1]);
+  if (!Number.isFinite(num)) return null;
+  const unit = (match[2] ?? "deg").toLowerCase();
+  if (unit === "deg") return num;
+  if (unit === "turn") return num * 360;
+  if (unit === "grad") return num * 0.9;
+  if (unit === "rad") return (num * 180) / Math.PI;
+  return null;
+}
+
+function parseStrictAlpha(token: string | undefined): number | null {
+  if (token === undefined) return 1;
   const trimmed = token.trim();
-  if (trimmed.endsWith("%")) {
-    const num = Number.parseFloat(trimmed.slice(0, -1));
-    return Number.isFinite(num) ? num / 100 : 1;
+  if (STRICT_PERCENT.test(trimmed)) {
+    const num = Number(trimmed.slice(0, -1));
+    return Number.isFinite(num) ? Math.min(1, Math.max(0, num / 100)) : null;
   }
-  const num = Number.parseFloat(trimmed);
-  return Number.isFinite(num) ? num : 1;
+  if (STRICT_NUMBER.test(trimmed)) {
+    const num = Number(trimmed);
+    return Number.isFinite(num) ? Math.min(1, Math.max(0, num)) : null;
+  }
+  return null;
+}
+
+function splitFunctionalArgs(body: string): { channels: string[]; alpha: string | undefined } | null {
+  const slashParts = body.split("/");
+  if (slashParts.length > 2) return null;
+  const channelsPart = slashParts[0].trim();
+  const slashAlpha = slashParts[1]?.trim();
+  if (slashParts.length === 2 && !slashAlpha) return null;
+
+  if (channelsPart.includes(",")) {
+    // Legacy comma syntax cannot mix with `/` alpha.
+    if (slashParts.length === 2) return null;
+    const raw = channelsPart.split(",");
+    if (raw.some((part) => !part.trim())) return null;
+    const parts = raw.map((part) => part.trim());
+    if (parts.length !== 3 && parts.length !== 4) return null;
+    return { channels: parts.slice(0, 3), alpha: parts[3] };
+  }
+
+  const parts = channelsPart.split(/\s+/).filter(Boolean);
+  if (parts.length !== 3) return null;
+  return { channels: parts, alpha: slashAlpha };
+}
+
+function parseColorRgba(value: string): { r: number; g: number; b: number; a: number } | null {
+  const cleaned = stripImportant(value).toLowerCase();
+  if (!cleaned || NON_COLOR_KEYWORDS.has(cleaned)) return null;
+
+  const namedHex = Object.prototype.hasOwnProperty.call(CSS_NAMED_COLORS, cleaned)
+    ? CSS_NAMED_COLORS[cleaned]
+    : undefined;
+  const target = namedHex ?? (/^[0-9a-f]{6}$/.test(cleaned) ? `#${cleaned}` : cleaned);
+
+  const hex = /^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/.exec(target);
+  if (hex) {
+    const digits = hex[1];
+    if (digits.length === 3 || digits.length === 4) {
+      return {
+        r: Number.parseInt(digits[0] + digits[0], 16),
+        g: Number.parseInt(digits[1] + digits[1], 16),
+        b: Number.parseInt(digits[2] + digits[2], 16),
+        a: digits.length === 4 ? Number.parseInt(digits[3] + digits[3], 16) / 255 : 1
+      };
+    }
+    return {
+      r: Number.parseInt(digits.slice(0, 2), 16),
+      g: Number.parseInt(digits.slice(2, 4), 16),
+      b: Number.parseInt(digits.slice(4, 6), 16),
+      a: digits.length === 8 ? Number.parseInt(digits.slice(6, 8), 16) / 255 : 1
+    };
+  }
+
+  const rgbMatch = /^rgba?\(\s*([^()]+?)\s*\)$/.exec(target);
+  if (rgbMatch) {
+    const parsed = splitFunctionalArgs(rgbMatch[1]);
+    if (!parsed) return null;
+    const r = parseStrictRgbChannel(parsed.channels[0]);
+    const g = parseStrictRgbChannel(parsed.channels[1]);
+    const b = parseStrictRgbChannel(parsed.channels[2]);
+    const a = parseStrictAlpha(parsed.alpha);
+    if (r === null || g === null || b === null || a === null) return null;
+    return { r, g, b, a };
+  }
+
+  const hslMatch = /^hsla?\(\s*([^()]+?)\s*\)$/.exec(target);
+  if (hslMatch) {
+    const parsed = splitFunctionalArgs(hslMatch[1]);
+    if (!parsed) return null;
+    const h = parseStrictHueDegrees(parsed.channels[0]);
+    const s = parseStrictPercent(parsed.channels[1]);
+    const l = parseStrictPercent(parsed.channels[2]);
+    const a = parseStrictAlpha(parsed.alpha);
+    if (h === null || s === null || l === null || a === null) return null;
+    const [r, g, b] = hslToRgb(h, s, l);
+    return { r, g, b, a };
+  }
+
+  return null;
 }
 
 /**
- * Validates and normalises a CSS colour literal (e.g. from a `<body bgcolor>`
- * attribute) before inserting it into a stylesheet. Rejects syntax tokens and
- * non-colour keywords.
+ * Validates and normalises an opaque CSS colour literal (e.g. from a
+ * `<body bgcolor>` attribute) before inserting it into a stylesheet. Rejects
+ * syntax tokens, transparent colours and malformed functional expressions.
  */
 export function sanitizeCssColorValue(value: string): string | null {
   const cleaned = stripImportant(value);
   if (!cleaned || /[{}();:\\<>"']|\/\*/.test(cleaned)) {
-    // Allow parentheses only for rgb()/rgba()/hsl()/hsla() below.
     if (!/^(?:rgba?|hsla?)\([^()]+\)$/i.test(cleaned)) return null;
   }
   const lower = cleaned.toLowerCase();
   if (NON_COLOR_KEYWORDS.has(lower)) return null;
+
+  const rgba = parseColorRgba(cleaned);
+  if (!rgba || rgba.a < OPAQUE_BG_MIN_ALPHA) return null;
+
   if (/^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(cleaned)) {
     return lower;
   }
-  // Legacy HTML attributes sometimes omit the leading '#' (e.g. bgcolor="ffffff").
   if (/^[0-9a-f]{6}$/i.test(cleaned)) {
     return `#${lower}`;
   }
   if (Object.prototype.hasOwnProperty.call(CSS_NAMED_COLORS, lower)) {
     return lower;
   }
-  if (/^(?:rgba?|hsla?)\(\s*[\d.,\s%/+-]+\s*\)$/i.test(cleaned)) {
-    return parseColorLuminance(cleaned) !== null ? cleaned : null;
+  if (/^(?:rgba?|hsla?)\(\s*[\da-z.,\s%/+-]+\s*\)$/i.test(cleaned)) {
+    return cleaned;
   }
   return null;
 }
@@ -144,59 +257,10 @@ export function sanitizeCssColorValue(value: string): string | null {
  * Computes the WCAG relative luminance (0..1) of a CSS colour value, or `null`
  * for transparent / non-colour / unrecognised values.
  */
-export function parseColorLuminance(value: string): number | null {
-  const cleaned = stripImportant(value).toLowerCase();
-  if (!cleaned || NON_COLOR_KEYWORDS.has(cleaned)) return null;
-
-  const namedHex = CSS_NAMED_COLORS[cleaned];
-  const target = namedHex ?? (/^[0-9a-f]{6}$/.test(cleaned) ? `#${cleaned}` : cleaned);
-
-  const hex = /^#([0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$/.exec(target);
-  if (hex) {
-    const digits = hex[1];
-    if (digits.length === 3 || digits.length === 4) {
-      const r = Number.parseInt(digits[0] + digits[0], 16);
-      const g = Number.parseInt(digits[1] + digits[1], 16);
-      const b = Number.parseInt(digits[2] + digits[2], 16);
-      const a = digits.length === 4 ? Number.parseInt(digits[3] + digits[3], 16) / 255 : 1;
-      return a <= 0.05 ? null : rgbToRelativeLuminance(r, g, b);
-    }
-    const r = Number.parseInt(digits.slice(0, 2), 16);
-    const g = Number.parseInt(digits.slice(2, 4), 16);
-    const b = Number.parseInt(digits.slice(4, 6), 16);
-    const a = digits.length === 8 ? Number.parseInt(digits.slice(6, 8), 16) / 255 : 1;
-    return a <= 0.05 ? null : rgbToRelativeLuminance(r, g, b);
-  }
-
-  const rgbMatch = /^rgba?\(\s*([^)]+?)\s*\)$/.exec(target);
-  if (rgbMatch) {
-    const [channelsPart, slashAlpha] = rgbMatch[1].split("/");
-    const parts = channelsPart.trim().split(/[\s,]+/).filter(Boolean);
-    if (parts.length < 3) return null;
-    const r = parseRgbChannel(parts[0]);
-    const g = parseRgbChannel(parts[1]);
-    const b = parseRgbChannel(parts[2]);
-    if (r === null || g === null || b === null) return null;
-    const alpha = parseAlpha(slashAlpha ?? parts[3]);
-    return alpha <= 0.05 ? null : rgbToRelativeLuminance(r, g, b);
-  }
-
-  const hslMatch = /^hsla?\(\s*([^)]+?)\s*\)$/.exec(target);
-  if (hslMatch) {
-    const [channelsPart, slashAlpha] = hslMatch[1].split("/");
-    const parts = channelsPart.trim().split(/[\s,]+/).filter(Boolean);
-    if (parts.length < 3) return null;
-    const h = Number.parseFloat(parts[0]);
-    const s = Number.parseFloat(parts[1]);
-    const l = Number.parseFloat(parts[2]);
-    if (!Number.isFinite(h) || !Number.isFinite(s) || !Number.isFinite(l)) return null;
-    const alpha = parseAlpha(slashAlpha ?? parts[3]);
-    if (alpha <= 0.05) return null;
-    const [r, g, b] = hslToRgb(h, s, l);
-    return rgbToRelativeLuminance(r, g, b);
-  }
-
-  return null;
+export function parseColorLuminance(value: string, minAlpha = 0.05): number | null {
+  const rgba = parseColorRgba(value);
+  if (!rgba || rgba.a <= minAlpha) return null;
+  return rgbToRelativeLuminance(rgba.r, rgba.g, rgba.b);
 }
 
 export function isDarkColor(value: string): boolean {
@@ -204,22 +268,89 @@ export function isDarkColor(value: string): boolean {
   return luminance !== null && luminance < DARK_LUMINANCE_THRESHOLD;
 }
 
+function stripCssFunctions(input: string, names: RegExp): string {
+  let out = "";
+  let i = 0;
+  while (i < input.length) {
+    const rest = input.slice(i);
+    const match = names.exec(rest);
+    if (match && match.index === 0) {
+      let depth = 1;
+      let j = i + match[0].length;
+      while (j < input.length && depth > 0) {
+        if (input[j] === "(") depth += 1;
+        else if (input[j] === ")") depth -= 1;
+        j += 1;
+      }
+      out += " ";
+      i = j;
+      continue;
+    }
+    out += input[i];
+    i += 1;
+  }
+  return out;
+}
+
+function resolveCustomProperties(value: string, customProps: Map<string, string>, depth = 0): string {
+  if (depth > 4 || !value.includes("var(")) return value;
+  let out = "";
+  let i = 0;
+  while (i < value.length) {
+    const match = /^var\s*\(/i.exec(value.slice(i));
+    if (!match) {
+      out += value[i];
+      i += 1;
+      continue;
+    }
+    let parens = 1;
+    let j = i + match[0].length;
+    while (j < value.length && parens > 0) {
+      if (value[j] === "(") parens += 1;
+      else if (value[j] === ")") parens -= 1;
+      j += 1;
+    }
+    const inner = value.slice(i + match[0].length, j - 1);
+    const commaIndex = (() => {
+      let d = 0;
+      for (let k = 0; k < inner.length; k += 1) {
+        if (inner[k] === "(") d += 1;
+        else if (inner[k] === ")") d = Math.max(0, d - 1);
+        else if (inner[k] === "," && d === 0) return k;
+      }
+      return -1;
+    })();
+    const propName = (commaIndex >= 0 ? inner.slice(0, commaIndex) : inner).trim();
+    const fallback = commaIndex >= 0 ? inner.slice(commaIndex + 1).trim() : "";
+    const resolved = customProps.get(propName);
+    if (resolved !== undefined) {
+      out += resolveCustomProperties(resolved, customProps, depth + 1);
+    } else if (fallback) {
+      out += resolveCustomProperties(fallback, customProps, depth + 1);
+    } else {
+      out += value.slice(i, j);
+    }
+    i = j;
+  }
+  return out;
+}
+
 /**
- * Extracts all colour tokens from a `background` or `background-color` value,
- * handling shorthand declarations like `url(x.png) #f4f4f4 no-repeat`.
+ * Extracts opaque colour luminances from a `background` or `background-color`
+ * value, resolving base custom properties and stripping `url(...)` / unresolved
+ * `var(...)` so filenames and variable names never masquerade as colour words.
  */
-function extractBackgroundColorLuminances(value: string): number[] {
-  const cleaned = stripImportant(value);
-  if (!cleaned) return [];
-  const direct = parseColorLuminance(cleaned);
+function extractBackgroundColorLuminances(value: string, customProps: Map<string, string>): number[] {
+  const resolved = stripImportant(resolveCustomProperties(value, customProps));
+  if (!resolved) return [];
+  const direct = parseColorLuminance(resolved, OPAQUE_BG_MIN_ALPHA);
   if (direct !== null) return [direct];
 
-  // Strip url(...) so filenames do not look like colour keywords.
-  const withoutUrls = cleaned.replace(/url\s*\([^)]*\)/gi, " ");
-  const tokens = withoutUrls.match(/(?:rgba?|hsla?)\([^)]+\)|#[0-9a-f]{3,8}\b|\b[a-z]{3,24}\b/gi) ?? [];
+  const stripped = stripCssFunctions(resolved, /^(?:url|var)\s*\(/i);
+  const tokens = stripped.match(/(?:rgba?|hsla?)\([^()]+\)|#[0-9a-f]{3,8}\b|\b[a-z]{3,24}\b/gi) ?? [];
   const luminances: number[] = [];
   for (const token of tokens) {
-    const luminance = parseColorLuminance(token);
+    const luminance = parseColorLuminance(token, OPAQUE_BG_MIN_ALPHA);
     if (luminance !== null) luminances.push(luminance);
   }
   return luminances;
@@ -309,8 +440,6 @@ function mirrorBodySelector(
         const hasQualifier = /^[.#[:]/.test(rest);
         const hasChildCombinator = trimmedRest.startsWith(">");
         if (hasQualifier || hasChildCombinator || (includeBareSubject && isSubject)) {
-          // `html[data-theme="dark"] > body` cannot stay a direct-child combinator
-          // for `.noctua-email-content`, which sits inside wrapper divs.
           out = out.replace(/\s*>\s*$/, " ");
           out += `.${contentClass}`;
           changed = true;
@@ -327,6 +456,8 @@ function mirrorBodySelector(
   return changed ? out.trim() : null;
 }
 
+const ALREADY_THEME_PREFIXED = /^(?::where\(html\[data-theme=|html:where\(\[data-theme=|:root:where\(\[data-theme=)/i;
+
 function rewriteSelectorForTheme(
   selector: string,
   theme: "dark" | "light",
@@ -334,11 +465,18 @@ function rewriteSelectorForTheme(
 ): string[] {
   const trimmed = selector.trim();
   if (!trimmed) return [];
-  const themeRoot = `html[data-theme="${theme}"]`;
-  const leadingRoot = /^(?:html|:root)(?=$|[\s>+~.#[:])/i.exec(trimmed);
-  const prefixed = leadingRoot
-    ? `${themeRoot}${trimmed.slice(leadingRoot[0].length)}`
-    : `${themeRoot} ${trimmed}`;
+  if (ALREADY_THEME_PREFIXED.test(trimmed)) return [trimmed];
+
+  // Zero-specificity `:where(...)` preserves the sender's exact cascade and
+  // specificity order relative to sibling rules in the same stylesheet.
+  let prefixed: string;
+  if (/^html(?=$|[\s>+~.#[:])/i.test(trimmed)) {
+    prefixed = `html:where([data-theme="${theme}"])${trimmed.slice(4)}`;
+  } else if (/^:root(?=$|[\s>+~.#[:])/i.test(trimmed)) {
+    prefixed = `:root:where([data-theme="${theme}"])${trimmed.slice(5)}`;
+  } else {
+    prefixed = `:where(html[data-theme="${theme}"]) ${trimmed}`;
+  }
 
   const results = [prefixed];
   const mirrored = mirrorBodySelector(prefixed, contentClass, true);
@@ -350,55 +488,199 @@ function rewriteSelectorForTheme(
 
 const PREFERS_COLOR_SCHEME_FEATURE = /\(\s*prefers-color-scheme\s*:\s*(dark|light)\s*\)/gi;
 
-function evaluateMediaQueryForTheme(
-  query: string,
-  theme: "dark" | "light"
-): { kind: "untouched" | "drop" | "match"; remaining: string; scheme?: "dark" | "light" } {
+function splitTopLevelOr(input: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < input.length; i += 1) {
+    const ch = input[i];
+    if (ch === "(") depth += 1;
+    else if (ch === ")") depth = Math.max(0, depth - 1);
+    else if (depth === 0) {
+      const match = /^\s+or\s+/i.exec(input.slice(i));
+      if (match) {
+        parts.push(input.slice(start, i).trim());
+        i += match[0].length - 1;
+        start = i + 1;
+      }
+    }
+  }
+  parts.push(input.slice(start).trim());
+  return parts.filter(Boolean);
+}
+
+type MediaEval = {
+  kind: "untouched" | "drop" | "match";
+  remaining: string;
+  targetsDark: boolean;
+  targetsLight: boolean;
+  isPrintOnly: boolean;
+};
+
+function stripLeadingPrefix(query: string): string {
+  return query
+    .replace(/\band\s+and\b/gi, "and")
+    .replace(/^\s*(?:(?:only|not)\s+)?(?:(?:all|screen)\s+)?and\s+/i, (prefix) => {
+      const hasNot = /\bnot\b/i.test(prefix);
+      const hasScreen = /\bscreen\b/i.test(prefix);
+      if (hasNot) return hasScreen ? "not screen and " : "not all and ";
+      return hasScreen ? "screen and " : "";
+    })
+    .replace(/\s+and\s*$/i, "")
+    .replace(/^\s*(?:only|not)\s*$/i, "")
+    .trim();
+}
+
+function evaluateSimpleMediaQuery(query: string, theme: "dark" | "light"): MediaEval {
   const matches = [...query.matchAll(PREFERS_COLOR_SCHEME_FEATURE)];
-  if (matches.length === 0) return { kind: "untouched", remaining: query };
-
-  const schemes = matches.map((m) => m[1].toLowerCase() as "dark" | "light");
-  const isNegated = /^\s*not\s+/i.test(query);
-
-  // Every prefers-color-scheme feature in an AND-conjunction must agree with the active theme.
-  const satisfied = isNegated
-    ? !schemes.every((scheme) => scheme === theme)
-    : schemes.every((scheme) => scheme === theme);
-
-  const primaryScheme = schemes[0];
-  if (!satisfied) {
-    return { kind: "drop", remaining: "", scheme: primaryScheme };
+  const isPrintOnly = /^\s*(?:only\s+)?print\b/i.test(query);
+  if (matches.length === 0) {
+    return { kind: "untouched", remaining: query, targetsDark: false, targetsLight: false, isPrintOnly };
   }
 
-  // Strip the satisfied prefers-color-scheme clauses and clean dangling `and` / bare media types.
-  let remaining = query.replace(PREFERS_COLOR_SCHEME_FEATURE, "");
-  remaining = remaining
+  const schemes = matches.map((m) => m[1].toLowerCase() as "dark" | "light");
+  const hasDarkFeature = schemes.includes("dark");
+  const hasLightFeature = schemes.includes("light");
+  const isContradictory = hasDarkFeature && hasLightFeature;
+  const isNegated = /^\s*not\s+/i.test(query);
+
+  // Strip prefers-color-scheme features to inspect whether any other condition remains.
+  const withoutPcs = query
+    .replace(PREFERS_COLOR_SCHEME_FEATURE, "")
     .replace(/\band\s+and\b/gi, "and")
-    .replace(/^\s*(?:(?:only\s+)?(?:all|screen)\s+)?and\s+/i, (prefix) =>
-      /\bscreen\b/i.test(prefix) ? "screen and " : ""
-    )
     .replace(/\s+and\s*$/i, "")
-    .replace(/^\s*not\s*$/i, "")
+    .replace(/^\s*(?:only|not)\s+(?:all|screen)\s+and\s+/i, (p) =>
+      /\bnot\b/i.test(p) ? (/\bscreen\b/i.test(p) ? "not screen and " : "not all and ") : (/\bscreen\b/i.test(p) ? "screen and " : "")
+    )
+    .replace(/^\s*(?:all|screen)\s+and\s+/i, (p) => (/\bscreen\b/i.test(p) ? "screen and " : ""))
+    .replace(/^\s*and\s+/i, "")
     .trim();
 
+  const hasOtherConditions = !/^(?:(?:only|not)\s+)?(?:all|screen)?$/i.test(withoutPcs);
+
+  if (isNegated) {
+    // `not (A and B)`:
+    // - If the colour-scheme clause is FALSE for `theme` (or contradictory),
+    //   then the entire negated query is TRUE unconditionally (for screen/all).
+    // - If the colour-scheme clause is TRUE for `theme`:
+    //   - With no other conditions (`not all and (prefers-color-scheme: dark)`),
+    //     the negated query is FALSE -> drop.
+    //   - With other conditions (`not all and (prefers-color-scheme: dark) and (max-width: 600px)`),
+    //     it reduces to `not all and (max-width: 600px)`.
+    const pcsMatchesTheme = !isContradictory && schemes.every((s) => s === theme);
+    const targetsDark = !isPrintOnly && (isContradictory || hasLightFeature);
+    const targetsLight = !isPrintOnly && (isContradictory || hasDarkFeature);
+    if (!pcsMatchesTheme) {
+      if (isPrintOnly) {
+        return { kind: "match", remaining: "not print", targetsDark, targetsLight, isPrintOnly };
+      }
+      return { kind: "match", remaining: "", targetsDark, targetsLight, isPrintOnly: false };
+    }
+    if (!hasOtherConditions) {
+      return { kind: "drop", remaining: "", targetsDark, targetsLight, isPrintOnly };
+    }
+    return {
+      kind: "match",
+      remaining: stripLeadingPrefix(withoutPcs),
+      targetsDark,
+      targetsLight,
+      isPrintOnly
+    };
+  }
+
+  // Positive conjunction: `all and (prefers-color-scheme: dark) and ...`
+  const targetsDark = !isPrintOnly && !isContradictory && hasDarkFeature;
+  const targetsLight = !isPrintOnly && !isContradictory && hasLightFeature;
+  if (isContradictory || !schemes.every((s) => s === theme)) {
+    return { kind: "drop", remaining: "", targetsDark, targetsLight, isPrintOnly };
+  }
+
+  let remaining = stripLeadingPrefix(withoutPcs);
   if (/^(?:only\s+)?(?:all|screen)$/i.test(remaining)) {
     remaining = "";
   }
-  return { kind: "match", remaining, scheme: primaryScheme };
+  return { kind: "match", remaining, targetsDark, targetsLight, isPrintOnly };
 }
 
-const VISUAL_THEME_DECLARATION = /^(?:color|background(?:-.*)?|border(?:-.*)?|outline(?:-.*)?|fill|stroke|opacity|filter|color-scheme|--.+)$/i;
-
-function hasVisualDeclarations(container: AtRule): boolean {
-  let found = false;
-  container.walkDecls((decl) => {
-    if (VISUAL_THEME_DECLARATION.test(decl.prop.trim())) {
-      found = true;
-      return false;
+function evaluateMediaQueryForTheme(query: string, theme: "dark" | "light"): MediaEval {
+  const orBranches = splitTopLevelOr(query);
+  if (orBranches.length === 1) {
+    return evaluateSimpleMediaQuery(query, theme);
+  }
+  let targetsDark = false;
+  let targetsLight = false;
+  let anyTouched = false;
+  const kept: string[] = [];
+  for (const branch of orBranches) {
+    const res = evaluateSimpleMediaQuery(branch, theme);
+    if (res.targetsDark) targetsDark = true;
+    if (res.targetsLight) targetsLight = true;
+    if (res.kind === "untouched") {
+      kept.push(res.remaining);
+    } else {
+      anyTouched = true;
+      if (res.kind === "match") {
+        if (res.remaining === "") {
+          return { kind: "match", remaining: "", targetsDark, targetsLight, isPrintOnly: false };
+        }
+        kept.push(res.remaining);
+      }
     }
-    return undefined;
+  }
+  if (!anyTouched) {
+    return { kind: "untouched", remaining: query, targetsDark: false, targetsLight: false, isPrintOnly: false };
+  }
+  if (kept.length === 0) {
+    return { kind: "drop", remaining: "", targetsDark, targetsLight, isPrintOnly: false };
+  }
+  return { kind: "match", remaining: kept.join(" or "), targetsDark, targetsLight, isPrintOnly: false };
+}
+
+function isRootTargetSelector(selector: string): boolean {
+  return splitTopLevelCommas(selector).some((part) => {
+    const cleaned = part
+      .trim()
+      .replace(/^:where\([^)]*\)\s*/i, "")
+      .replace(/^(?:html|:root):where\([^)]*\)/i, "html")
+      .trim();
+    return /^(?:html|:root|body)(?=$|[.#[:])|^(?:html|:root)\s*(?:>\s*)?body(?=$|[.#[:])|^\.noctua-email-content(?=$|[.#[:])/i.test(
+      cleaned
+    );
   });
-  return found;
+}
+
+function inspectDarkRuleSupport(container: AtRule): { hasColorOrBg: boolean; overridesRootBg: boolean } {
+  let hasColorOrBg = false;
+  let overridesRootBg = false;
+  container.walkRules((rule: Rule) => {
+    if (rule.parent?.type === "atrule" && /keyframes$/i.test((rule.parent as AtRule).name)) return;
+    const isRoot = isRootTargetSelector(rule.selector);
+    rule.each((node) => {
+      if (node.type !== "decl") return;
+      const prop = node.prop.trim().toLowerCase();
+      if (prop === "color" || prop === "background" || prop === "background-color") {
+        hasColorOrBg = true;
+        if (isRoot && (prop === "background" || prop === "background-color")) {
+          overridesRootBg = true;
+        }
+      }
+    });
+  });
+  return { hasColorOrBg, overridesRootBg };
+}
+
+function hasConstrainingAncestorAtRule(node: Node): boolean {
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (parent.type !== "atrule") continue;
+    const at = parent as AtRule;
+    if (/^media$/i.test(at.name)) {
+      const p = at.params.trim();
+      if (p && !/^(?:only\s+)?(?:all|screen)$/i.test(p)) return true;
+    } else if (/^(?:container|supports)$/i.test(at.name)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function rewriteRulesInContainer(
@@ -407,7 +689,9 @@ function rewriteRulesInContainer(
   contentClass: string
 ) {
   container.walkRules((rule: Rule) => {
-    // Do not touch @keyframes stop selectors (`from`, `to`, `50%`).
+    // Skip @keyframes stops (`from`, `to`, `50%`) and CSS Nesting child rules
+    // (whose parent is already a Rule and therefore already theme-prefixed).
+    if (rule.parent?.type === "rule") return;
     if (rule.parent?.type === "atrule" && /keyframes$/i.test((rule.parent as AtRule).name)) {
       return;
     }
@@ -426,6 +710,7 @@ function rewriteRulesInContainer(
 
 function mirrorQualifiedBodySelectorsInBase(root: postcss.Root, contentClass: string) {
   root.walkRules((rule: Rule) => {
+    if (rule.parent?.type === "rule") return;
     if (rule.parent?.type === "atrule" && /keyframes$/i.test((rule.parent as AtRule).name)) {
       return;
     }
@@ -446,23 +731,35 @@ function mirrorQualifiedBodySelectorsInBase(root: postcss.Root, contentClass: st
   });
 }
 
+function pruneEmptyAtRules(root: postcss.Root) {
+  let removed = true;
+  while (removed) {
+    removed = false;
+    root.walkAtRules((atRule) => {
+      if (atRule.nodes && atRule.nodes.every((child) => child.type === "comment")) {
+        atRule.remove();
+        removed = true;
+      }
+    });
+  }
+}
+
 export type RewrittenEmailStyles = {
-  baseCss: string;
-  themeCss: string;
+  css: string;
   hasDarkSchemeRules: boolean;
-  hasLightSchemeRules: boolean;
+  hasDarkRootBackgroundOverride: boolean;
+  hasAnyLightMediaQuery: boolean;
 };
 
 /**
- * Rewrites sender CSS for Noctua's iframe theme:
- * - Parses `@media (prefers-color-scheme: dark|light)` via PostCSS regardless
- *   of whitespace (`prefers-color-scheme:dark`) or combined conditions
- *   (`(prefers-color-scheme: dark) and (max-width: 600px)`).
- * - Maps `html` / `:root` onto `html[data-theme="..."]` instead of invalid
- *   descendant selectors.
- * - Mirrors `body` rules onto `.${contentClass}` so dark-mode overrides beat
- *   the email's copied `<body style="background-color: #fff">` and match
- *   `body.class` / `body#id` / `body > ...`.
+ * Rewrites sender CSS in-place for Noctua's iframe theme:
+ * - Evaluates `@media (prefers-color-scheme: dark|light)` in-place via PostCSS
+ *   so enclosing `@media`, `@supports`, `@layer` and cascade order stay intact.
+ * - Uses zero-specificity `:where(html[data-theme="..."])` so rewritten rules
+ *   keep the sender's original specificity against sibling rules.
+ * - Maps `html`/`:root` onto `html:where(...)`/`:root:where(...)` and mirrors
+ *   `body` rules onto `.${contentClass}` so dark-mode overrides beat copied
+ *   `<body style="background-color: #fff">` and match `body.class` / `body#id`.
  */
 export function rewriteEmailStylesForTheme(
   css: string,
@@ -470,58 +767,85 @@ export function rewriteEmailStylesForTheme(
   contentClass: string
 ): RewrittenEmailStyles {
   if (!css.trim()) {
-    return { baseCss: css, themeCss: "", hasDarkSchemeRules: false, hasLightSchemeRules: false };
+    return {
+      css,
+      hasDarkSchemeRules: false,
+      hasDarkRootBackgroundOverride: false,
+      hasAnyLightMediaQuery: false
+    };
   }
 
   let root: postcss.Root;
   try {
     root = postcss.parse(css);
   } catch {
-    return { baseCss: css, themeCss: "", hasDarkSchemeRules: false, hasLightSchemeRules: false };
+    return {
+      css,
+      hasDarkSchemeRules: false,
+      hasDarkRootBackgroundOverride: false,
+      hasAnyLightMediaQuery: false
+    };
   }
 
   let hasDarkSchemeRules = false;
-  let hasLightSchemeRules = false;
-  const themeChunks: string[] = [];
+  let hasDarkRootBackgroundOverride = false;
+  let hasAnyLightMediaQuery = false;
 
-  root.walkAtRules(/^media$/i, (atRule: AtRule) => {
+  // Collect media rules first and process bottom-up so nested @media blocks
+  // are evaluated inside their parent conditions cleanly.
+  const mediaRules: AtRule[] = [];
+  root.walkAtRules(/^media$/i, (atRule) => {
+    mediaRules.push(atRule);
+  });
+
+  for (let idx = mediaRules.length - 1; idx >= 0; idx -= 1) {
+    const atRule = mediaRules[idx];
+    if (!atRule.parent) continue;
+
     const queries = splitTopLevelCommas(atRule.params);
     const untouchedQueries: string[] = [];
     const matchedRemainders: string[] = [];
-    let sawDark = false;
-    let sawLight = false;
-    let touched = false;
+    let anyTouched = false;
+    let unconditionalDarkTarget = false;
+    let sawLightTarget = false;
 
     for (const query of queries) {
       const result = evaluateMediaQueryForTheme(query, theme);
-      if (result.scheme === "dark") sawDark = true;
-      if (result.scheme === "light") sawLight = true;
+      if (result.targetsLight) sawLightTarget = true;
       if (result.kind === "untouched") {
         untouchedQueries.push(query);
       } else {
-        touched = true;
+        anyTouched = true;
+        if (result.targetsDark && !result.isPrintOnly && result.remaining === "") {
+          unconditionalDarkTarget = true;
+        }
         if (result.kind === "match") {
           matchedRemainders.push(result.remaining);
         }
       }
     }
 
-    if (!touched) return;
+    if (!anyTouched) continue;
+    if (sawLightTarget) hasAnyLightMediaQuery = true;
 
-    const visual = hasVisualDeclarations(atRule);
-    if (visual && sawDark) hasDarkSchemeRules = true;
-    if (visual && sawLight) hasLightSchemeRules = true;
+    const constrainedByAncestor = hasConstrainingAncestorAtRule(atRule);
+    if (unconditionalDarkTarget && !constrainedByAncestor) {
+      const support = inspectDarkRuleSupport(atRule);
+      if (support.hasColorOrBg) hasDarkSchemeRules = true;
+      if (support.overridesRootBg) hasDarkRootBackgroundOverride = true;
+    }
 
     if (matchedRemainders.length > 0) {
-      const cloned = atRule.clone();
-      rewriteRulesInContainer(cloned, theme, contentClass);
+      const matchedClone = atRule.clone();
+      rewriteRulesInContainer(matchedClone, theme, contentClass);
       const unconditional = matchedRemainders.some((part) => part === "");
       if (unconditional) {
-        const inner = cloned.nodes?.map((node) => node.toString()).join("\n") ?? "";
-        if (inner.trim()) themeChunks.push(inner);
+        if (matchedClone.nodes && matchedClone.nodes.length > 0) {
+          atRule.before(matchedClone.nodes);
+        }
       } else {
-        cloned.params = matchedRemainders.join(", ");
-        themeChunks.push(cloned.toString());
+        matchedClone.params = matchedRemainders.join(", ");
+        atRule.before(matchedClone);
       }
     }
 
@@ -530,33 +854,62 @@ export function rewriteEmailStylesForTheme(
     } else {
       atRule.remove();
     }
-  });
+  }
 
+  pruneEmptyAtRules(root);
   mirrorQualifiedBodySelectorsInBase(root, contentClass);
 
   return {
-    baseCss: root.toString(),
-    themeCss: themeChunks.join("\n"),
+    css: root.toString(),
     hasDarkSchemeRules,
-    hasLightSchemeRules
+    hasDarkRootBackgroundOverride,
+    hasAnyLightMediaQuery
   };
 }
 
 export type EmailColorAnalysis = {
   hasExplicitColor: boolean;
+  hasRootTextColor: boolean;
+  hasRootDarkBackground: boolean;
+  hasRootLightBackground: boolean;
   hasLightOwnBackground: boolean;
   hasDarkOwnBackground: boolean;
   hasDarkOwnText: boolean;
+  hasLightOwnText: boolean;
 };
 
 function isAnchorOnlySelector(selector: string): boolean {
   const parts = splitTopLevelCommas(selector);
-  return parts.length > 0 && parts.every((part) => /^a(?=$|[:.#[])/i.test(part.trim()));
+  if (parts.length === 0) return false;
+  return parts.every((part) => {
+    // Check the subject (rightmost compound selector after combinators).
+    const trimmed = part.trim();
+    let depthBracket = 0;
+    let depthParen = 0;
+    let lastCombinator = -1;
+    for (let i = 0; i < trimmed.length; i += 1) {
+      const ch = trimmed[i];
+      if (ch === "[") depthBracket += 1;
+      else if (ch === "]") depthBracket = Math.max(0, depthBracket - 1);
+      else if (ch === "(") depthParen += 1;
+      else if (ch === ")") depthParen = Math.max(0, depthParen - 1);
+      else if (depthBracket === 0 && depthParen === 0 && /[\s>+~]/.test(ch)) {
+        lastCombinator = i;
+      }
+    }
+    const subject = trimmed.slice(lastCombinator + 1).trim();
+    return /^a(?=$|[:.#[])/i.test(subject);
+  });
 }
 
 function inspectStyleDeclarations(
   decls: Declaration[],
-  isAnchorOnly: boolean,
+  options: {
+    isAnchorOnly: boolean;
+    isRoot: boolean;
+    isConditionalMedia: boolean;
+    customProps: Map<string, string>;
+  },
   analysis: EmailColorAnalysis
 ) {
   for (const decl of decls) {
@@ -565,129 +918,278 @@ function inspectStyleDeclarations(
     if (!value) continue;
 
     if (prop === "color") {
-      const luminance = parseColorLuminance(value);
+      const resolved = resolveCustomProperties(value, options.customProps);
+      const luminance = parseColorLuminance(resolved, VISIBLE_TEXT_MIN_ALPHA);
       if (luminance !== null) {
         analysis.hasExplicitColor = true;
-        if (!isAnchorOnly && luminance < DARK_LUMINANCE_THRESHOLD) {
-          analysis.hasDarkOwnText = true;
+        if (options.isRoot) analysis.hasRootTextColor = true;
+        if (!options.isAnchorOnly && !options.isConditionalMedia) {
+          if (luminance < DARK_LUMINANCE_THRESHOLD) analysis.hasDarkOwnText = true;
+          else if (luminance >= LIGHT_TEXT_LUMINANCE_THRESHOLD) analysis.hasLightOwnText = true;
         }
-      } else if (!NON_COLOR_KEYWORDS.has(stripImportant(value).toLowerCase())) {
+      } else if (!NON_COLOR_KEYWORDS.has(stripImportant(resolved).toLowerCase())) {
         analysis.hasExplicitColor = true;
+        if (options.isRoot) analysis.hasRootTextColor = true;
       }
       continue;
     }
 
     if (prop === "background" || prop === "background-color") {
+      if (options.isConditionalMedia) continue;
       const cleaned = stripImportant(value).toLowerCase();
       if (NON_COLOR_KEYWORDS.has(cleaned)) continue;
-      const luminances = extractBackgroundColorLuminances(value);
+      const luminances = extractBackgroundColorLuminances(value, options.customProps);
       for (const luminance of luminances) {
-        if (luminance < DARK_LUMINANCE_THRESHOLD) analysis.hasDarkOwnBackground = true;
-        else analysis.hasLightOwnBackground = true;
+        if (luminance < DARK_LUMINANCE_THRESHOLD) {
+          analysis.hasDarkOwnBackground = true;
+          if (options.isRoot) analysis.hasRootDarkBackground = true;
+        } else {
+          analysis.hasLightOwnBackground = true;
+          if (options.isRoot) analysis.hasRootLightBackground = true;
+        }
       }
     }
   }
 }
 
 /**
- * Inspects only `<style>` blocks (excluding `prefers-color-scheme` blocks) and
- * HTML tag attributes — never visible prose — to determine what colours and
- * backgrounds the sender's base markup declares.
+ * Linear-time HTML opening-tag scanner (no regex backtracking) that skips
+ * HTML comments and `<style>` / `<script>` raw-text elements, returning exact
+ * lower-cased tag names and attribute maps.
+ */
+function scanHtmlOpeningTags(
+  html: string,
+  onTag: (tagName: string, attrs: Map<string, string>) => void
+) {
+  const len = html.length;
+  let i = 0;
+
+  while (i < len) {
+    const lt = html.indexOf("<", i);
+    if (lt === -1) break;
+    i = lt;
+
+    // Skip HTML comments `<!-- ... -->`.
+    if (html.startsWith("<!--", i)) {
+      const end = html.indexOf("-->", i + 4);
+      i = end === -1 ? len : end + 3;
+      continue;
+    }
+
+    // Skip closing tags, declarations and processing instructions.
+    const nextChar = html[i + 1] ?? "";
+    if (!/[a-z]/i.test(nextChar)) {
+      i += 1;
+      continue;
+    }
+
+    let j = i + 1;
+    while (j < len && /[\w:-]/.test(html[j])) j += 1;
+    const tagName = html.slice(i + 1, j).toLowerCase();
+
+    const attrs = new Map<string, string>();
+    while (j < len) {
+      while (j < len && /[\s/]/.test(html[j])) j += 1;
+      if (j >= len) break;
+      if (html[j] === ">") {
+        j += 1;
+        break;
+      }
+      const attrStart = j;
+      while (j < len && !/[\s=/>]/.test(html[j])) j += 1;
+      const attrName = html.slice(attrStart, j).toLowerCase();
+      if (!attrName) {
+        j += 1;
+        continue;
+      }
+      while (j < len && /\s/.test(html[j])) j += 1;
+      let attrValue = "";
+      if (j < len && html[j] === "=") {
+        j += 1;
+        while (j < len && /\s/.test(html[j])) j += 1;
+        if (j < len && (html[j] === '"' || html[j] === "'")) {
+          const quote = html[j];
+          j += 1;
+          const valStart = j;
+          const closeQuote = html.indexOf(quote, j);
+          if (closeQuote === -1) {
+            attrValue = html.slice(valStart);
+            j = len;
+          } else {
+            attrValue = html.slice(valStart, closeQuote);
+            j = closeQuote + 1;
+          }
+        } else {
+          const valStart = j;
+          while (j < len && !/[\s>]/.test(html[j])) j += 1;
+          attrValue = html.slice(valStart, j);
+        }
+      }
+      if (!attrs.has(attrName)) attrs.set(attrName, attrValue);
+    }
+
+    onTag(tagName, attrs);
+    i = j;
+
+    // Skip raw-text contents of <style> and <script>.
+    if (tagName === "style" || tagName === "script") {
+      const closeRe = new RegExp(`</${tagName}\\s*>`, "i");
+      const closeMatch = closeRe.exec(html.slice(i));
+      i = closeMatch ? i + closeMatch.index + closeMatch[0].length : len;
+    }
+  }
+}
+
+/**
+ * Inspects `<style>` blocks (excluding `prefers-color-scheme` and `print`
+ * media blocks) and HTML opening tags in linear time — never visible prose or
+ * HTML comments — to determine the sender's base colour palette.
  */
 export function analyzeEmailColorScheme(
-  cleanedHtml: string,
+  html: string,
   bodyBgcolor = ""
 ): EmailColorAnalysis {
   const analysis: EmailColorAnalysis = {
     hasExplicitColor: false,
+    hasRootTextColor: false,
+    hasRootDarkBackground: false,
+    hasRootLightBackground: false,
     hasLightOwnBackground: false,
     hasDarkOwnBackground: false,
-    hasDarkOwnText: false
+    hasDarkOwnText: false,
+    hasLightOwnText: false
   };
 
   if (bodyBgcolor) {
-    const bodyBgLuminance = parseColorLuminance(bodyBgcolor);
+    const bodyBgLuminance = parseColorLuminance(bodyBgcolor, OPAQUE_BG_MIN_ALPHA);
     if (bodyBgLuminance !== null) {
-      if (bodyBgLuminance < DARK_LUMINANCE_THRESHOLD) analysis.hasDarkOwnBackground = true;
-      else analysis.hasLightOwnBackground = true;
+      if (bodyBgLuminance < DARK_LUMINANCE_THRESHOLD) {
+        analysis.hasDarkOwnBackground = true;
+        analysis.hasRootDarkBackground = true;
+      } else {
+        analysis.hasLightOwnBackground = true;
+        analysis.hasRootLightBackground = true;
+      }
     }
   }
 
-  // 1. Inspect <style> blocks (excluding prefers-color-scheme media blocks so
-  //    dark-mode overrides do not masquerade as base light/dark colours).
-  for (const match of cleanedHtml.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)) {
+  const customProps = new Map<string, string>();
+  const parsedRoots: postcss.Root[] = [];
+
+  // 1. Parse <style> blocks (excluding prefers-color-scheme and print blocks)
+  //    and gather top-level CSS custom properties first.
+  for (const match of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)) {
     const css = match[1];
     if (!css.trim()) continue;
     try {
       const root = postcss.parse(css);
       root.walkAtRules(/^media$/i, (atRule) => {
-        if (/prefers-color-scheme/i.test(atRule.params)) atRule.remove();
+        if (/prefers-color-scheme/i.test(atRule.params) || /^\s*(?:only\s+)?print\b/i.test(atRule.params)) {
+          atRule.remove();
+        }
       });
       root.walkRules((rule) => {
-        const decls: Declaration[] = [];
+        if (!isRootTargetSelector(rule.selector) && rule.selector.trim() !== "*") return;
+        if (hasConstrainingAncestorAtRule(rule)) return;
         rule.each((node) => {
-          if (node.type === "decl") decls.push(node);
+          if (node.type === "decl" && node.prop.trim().startsWith("--")) {
+            customProps.set(node.prop.trim(), node.value.trim());
+          }
         });
-        inspectStyleDeclarations(decls, isAnchorOnlySelector(rule.selector), analysis);
       });
+      parsedRoots.push(root);
     } catch {
       // Malformed CSS blocks are ignored here; inline tags below still run.
     }
   }
 
-  // 2. Inspect HTML opening tags only (never visible text nodes).
-  const withoutStyles = cleanedHtml.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, "");
-  const tags = withoutStyles.match(/<[a-z][\w:-]*(?:"[^"]*"|'[^']*'|[^'">])*>/gi) ?? [];
-  for (const tag of tags) {
-    const tagName = /^<([a-z][\w:-]*)/i.exec(tag)?.[1]?.toLowerCase() ?? "";
-    const isAnchor = tagName === "a";
+  for (const root of parsedRoots) {
+    root.walkRules((rule) => {
+      if (rule.parent?.type === "atrule" && /keyframes$/i.test((rule.parent as AtRule).name)) return;
+      const decls: Declaration[] = [];
+      rule.each((node) => {
+        if (node.type === "decl") decls.push(node);
+      });
+      if (decls.length === 0) return;
+      inspectStyleDeclarations(
+        decls,
+        {
+          isAnchorOnly: isAnchorOnlySelector(rule.selector),
+          isRoot: isRootTargetSelector(rule.selector),
+          isConditionalMedia: hasConstrainingAncestorAtRule(rule),
+          customProps
+        },
+        analysis
+      );
+    });
+  }
 
-    const bgcolorMatch = /\bbgcolor\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag);
-    if (bgcolorMatch) {
-      const raw = (bgcolorMatch[1] ?? bgcolorMatch[2] ?? bgcolorMatch[3] ?? "").trim();
-      if (raw && !NON_COLOR_KEYWORDS.has(raw.toLowerCase())) {
-        const luminance = parseColorLuminance(raw);
-        if (luminance !== null && luminance < DARK_LUMINANCE_THRESHOLD) {
+  // 2. Scan HTML opening tags linearly, memoizing repeated inline style strings.
+  const inlineDeclCache = new Map<string, Declaration[]>();
+  scanHtmlOpeningTags(html, (tagName, attrs) => {
+    const isAnchor = tagName === "a";
+    const isRoot = tagName === "body" || tagName === "html";
+
+    const bgcolor = attrs.get("bgcolor")?.trim();
+    if (bgcolor && !NON_COLOR_KEYWORDS.has(bgcolor.toLowerCase())) {
+      const luminance = parseColorLuminance(bgcolor, OPAQUE_BG_MIN_ALPHA);
+      if (luminance !== null) {
+        if (luminance < DARK_LUMINANCE_THRESHOLD) {
           analysis.hasDarkOwnBackground = true;
+          if (isRoot) analysis.hasRootDarkBackground = true;
         } else {
           analysis.hasLightOwnBackground = true;
+          if (isRoot) analysis.hasRootLightBackground = true;
         }
       }
     }
 
     // Legacy HTML `background="paper.png"` attribute.
-    if (/\bbackground\s*=/i.test(tag)) {
-      analysis.hasLightOwnBackground = true;
+    if (attrs.has("background")) {
+      const bgAttr = attrs.get("background")?.trim() ?? "";
+      if (bgAttr) {
+        analysis.hasLightOwnBackground = true;
+        if (isRoot) analysis.hasRootLightBackground = true;
+      }
     }
 
     // Legacy `<font color="#222">` attribute.
     if (tagName === "font") {
-      const colorAttr = /\bcolor\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(tag);
-      const raw = (colorAttr?.[1] ?? colorAttr?.[2] ?? colorAttr?.[3] ?? "").trim();
-      if (raw && !NON_COLOR_KEYWORDS.has(raw.toLowerCase())) {
+      const colorAttr = attrs.get("color")?.trim();
+      if (colorAttr && !NON_COLOR_KEYWORDS.has(colorAttr.toLowerCase())) {
         analysis.hasExplicitColor = true;
-        const luminance = parseColorLuminance(raw);
-        if (luminance !== null && luminance < DARK_LUMINANCE_THRESHOLD) {
-          analysis.hasDarkOwnText = true;
+        const luminance = parseColorLuminance(colorAttr, VISIBLE_TEXT_MIN_ALPHA);
+        if (luminance !== null) {
+          if (luminance < DARK_LUMINANCE_THRESHOLD) analysis.hasDarkOwnText = true;
+          else if (luminance >= LIGHT_TEXT_LUMINANCE_THRESHOLD) analysis.hasLightOwnText = true;
         }
       }
     }
 
-    const styleMatch = /\bstyle\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(tag);
-    const inlineCss = styleMatch?.[1] ?? styleMatch?.[2] ?? "";
-    if (inlineCss.trim()) {
-      try {
-        const inlineRoot = postcss.parse(`x{${inlineCss}}`);
-        const decls: Declaration[] = [];
-        inlineRoot.walkDecls((decl) => {
-          decls.push(decl);
-        });
-        inspectStyleDeclarations(decls, isAnchor, analysis);
-      } catch {
-        // Ignore unparseable inline style snippets.
+    const inlineCss = attrs.get("style")?.trim();
+    if (inlineCss) {
+      let decls = inlineDeclCache.get(inlineCss);
+      if (!decls) {
+        decls = [];
+        try {
+          const inlineRoot = postcss.parse(`x{${inlineCss}}`);
+          inlineRoot.walkDecls((decl) => {
+            decls!.push(decl);
+          });
+        } catch {
+          // Ignore unparseable inline style snippets.
+        }
+        inlineDeclCache.set(inlineCss, decls);
+      }
+      if (decls.length > 0) {
+        inspectStyleDeclarations(
+          decls,
+          { isAnchorOnly: isAnchor, isRoot, isConditionalMedia: false, customProps },
+          analysis
+        );
       }
     }
-  }
+  });
 
   return analysis;
 }
