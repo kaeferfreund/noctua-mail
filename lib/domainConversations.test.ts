@@ -266,17 +266,49 @@ describe("domain view thread list", () => {
 
   test("deep pages read at most the bounded window from each mailbox", async () => {
     const accounts = await listReadableDomainAccounts(base.principal.user.id, base.domain);
+    const listCandidates = spyOn(messageQuery, "listFolderThreadCandidates");
+    const hydrate = spyOn(messageQuery, "hydrateFolderThreadsForList");
     const listThreads = spyOn(messageQuery, "listThreads");
     try {
       const deep = await listDomainThreads({ accounts, role: "inbox", page: 1000, pageSize: 600, viewerUserId: base.principal.user.id });
-      expect(listThreads.mock.calls.length).toBeGreaterThan(0);
-      expect(listThreads.mock.calls.every(([call]) => call.pageSize <= DOMAIN_THREAD_WINDOW_MAX)).toBe(true);
+      expect(listCandidates.mock.calls.length).toBeGreaterThan(0);
+      expect(listCandidates.mock.calls.every(([call]) => call.limit <= DOMAIN_THREAD_WINDOW_MAX)).toBe(true);
+      // Beyond the window, no message rows are hydrated at all.
+      expect(hydrate.mock.calls.length).toBe(0);
       expect(deep.items).toEqual([]);
       expect(deep.hasMore).toBe(false);
       // The last page inside the window never announces more.
       const last = await listDomainThreads({ accounts, role: "inbox", page: DOMAIN_THREAD_WINDOW_MAX, pageSize: 1, viewerUserId: base.principal.user.id });
       expect(last.hasMore).toBe(false);
-    } finally { listThreads.mockRestore(); }
+      // Search queries still bound listThreads to DOMAIN_THREAD_WINDOW_MAX.
+      const deepSearch = await listDomainThreads({
+        accounts, role: "inbox", page: 1000, pageSize: 600, query: "Synthetic", viewerUserId: base.principal.user.id
+      });
+      expect(listThreads.mock.calls.length).toBeGreaterThan(0);
+      expect(listThreads.mock.calls.every(([call]) => call.pageSize <= DOMAIN_THREAD_WINDOW_MAX)).toBe(true);
+      expect(deepSearch.items).toEqual([]);
+      expect(deepSearch.hasMore).toBe(false);
+    } finally {
+      listCandidates.mockRestore();
+      hydrate.mockRestore();
+      listThreads.mockRestore();
+    }
+  });
+
+  test("two-phase domain merge hydrates only winning threads for the page and counts role-folder items in baseCount", async () => {
+    const accounts = await listReadableDomainAccounts(base.principal.user.id, base.domain);
+    const hydrate = spyOn(messageQuery, "hydrateFolderThreadsForList");
+    try {
+      const first = await listDomainThreads({ accounts, role: "inbox", page: 1, pageSize: 1, viewerUserId: base.principal.user.id });
+      expect(first.items.map((item) => item.id)).toEqual([`u-${base.tag}`]);
+      expect(first.baseCount).toBe(1);
+      expect(first.hasMore).toBe(true);
+      const hydratedThreadCount = hydrate.mock.calls.reduce((sum, [call]) => sum + call.threads.length, 0);
+      // Only the winning threads needed for page 1 (+1 hasMore check) were hydrated, not every thread of every mailbox.
+      expect(hydratedThreadCount).toBeLessThanOrEqual(2);
+    } finally {
+      hydrate.mockRestore();
+    }
   });
 
   test("route: only readable mailboxes; a domain without access answers 404", async () => {
@@ -293,5 +325,108 @@ describe("domain view thread list", () => {
     expect(JSON.stringify(data)).not.toContain(onlyA.ids.B);
     expect((await route(`unknown-${onlyA.tag}.example.test`)).status).toBe(404);
     expect((await route("not a domain")).status).toBe(400);
+  });
+
+  test("equal-timestamp domain threads paginate deterministically without duplicates or gaps", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const domain = `tie-${tag}.example.test`;
+    const accA = syntheticAccount(`dc-tie-a-${tag}`, `a@${domain}`);
+    const accB = syntheticAccount(`dc-tie-b-${tag}`, `b@${domain}`);
+    // 130 tied threads per mailbox (= 260 total) with descending threadIds so PK != rowid.
+    const buildTied = (accountId: string, prefix: string) =>
+      Array.from({ length: 130 }, (_, i) => {
+        const label = String(130 - i).padStart(4, "0");
+        return mail(accountId, "INBOX", {
+          id: `${prefix}-m-${label}-${tag}`,
+          messageId: `<${prefix}-m-${label}-${tag}@example.invalid>`,
+          threadId: `<${prefix}-t-${label}-${tag}@example.invalid>`,
+          minute: 42
+        });
+      });
+    await seedAccount(accA, buildTied(accA.id, "a"));
+    await seedAccount(accB, buildTied(accB.id, "b"));
+    const principal = await createAuthenticatedTestSession();
+    await principal.addMembership(principal.user.id, accA.id, "viewer");
+    await principal.addMembership(principal.user.id, accB.id, "viewer");
+    const accounts = await listReadableDomainAccounts(principal.user.id, domain);
+
+    const pagedIds: string[] = [];
+    for (let page = 1; page <= 6; page++) {
+      const res = await listDomainThreads({ accounts, role: "inbox", page, pageSize: 50, viewerUserId: principal.user.id });
+      pagedIds.push(...res.items.map((item) => item.id));
+      expect(res.hasMore).toBe(page < 6);
+    }
+    expect(pagedIds).toHaveLength(260);
+    expect(new Set(pagedIds).size).toBe(260);
+  });
+
+  test("duplicate message IDs across distinct mailbox threads deduplicate consistently across pages", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const domain = `dup-${tag}.example.test`;
+    const accA = syntheticAccount(`dc-dup-a-${tag}`, `a@${domain}`);
+    const accB = syntheticAccount(`dc-dup-b-${tag}`, `b@${domain}`);
+    const sharedId = `shared-msg-${tag}`;
+    // Thread 1 (account B, minute 30) and Thread 2 (account A, minute 10) happen to share an id;
+    // Thread 3 (account B, minute 20) sits between them.
+    await seedAccount(accA, [
+      mail(accA.id, "INBOX", { id: sharedId, messageId: `<s1-${tag}@example.invalid>`, threadId: `<ta-${tag}>`, minute: 10 })
+    ]);
+    await seedAccount(accB, [
+      mail(accB.id, "INBOX", { id: sharedId, messageId: `<s2-${tag}@example.invalid>`, threadId: `<tb1-${tag}>`, minute: 30 }),
+      mail(accB.id, "INBOX", { id: `mid-${tag}`, messageId: `<mid-${tag}@example.invalid>`, threadId: `<tb2-${tag}>`, minute: 20 })
+    ]);
+    const principal = await createAuthenticatedTestSession();
+    await principal.addMembership(principal.user.id, accA.id, "viewer");
+    await principal.addMembership(principal.user.id, accB.id, "viewer");
+    const accounts = await listReadableDomainAccounts(principal.user.id, domain);
+
+    const p1 = await listDomainThreads({ accounts, role: "inbox", page: 1, pageSize: 1, viewerUserId: principal.user.id });
+    const p2 = await listDomainThreads({ accounts, role: "inbox", page: 2, pageSize: 1, viewerUserId: principal.user.id });
+    const p3 = await listDomainThreads({ accounts, role: "inbox", page: 3, pageSize: 1, viewerUserId: principal.user.id });
+    const allIds = [...p1.items, ...p2.items, ...p3.items].map((item) => `${item.accountId}:${item.id}`);
+    // The earlier-ranked occurrence (account B, minute 30) wins on page 1; the later duplicate in account A is skipped.
+    expect(allIds).toEqual([`${accB.id}:${sharedId}`, `${accB.id}:mid-${tag}`]);
+  });
+
+  test("domain fast path keeps old flagged threads inside the candidate window and clamps search baseCount to total", async () => {
+    const tag = crypto.randomUUID().slice(0, 8);
+    const domain = `flag-${tag}.example.test`;
+    const accA = syntheticAccount(`dc-flag-a-${tag}`, `a@${domain}`);
+    const msgs: Message[] = [
+      {
+        ...mail(accA.id, "INBOX", {
+          id: `old-flagged-${tag}`,
+          messageId: `<old-flagged-${tag}@example.invalid>`,
+          threadId: `<old-flagged-${tag}>`,
+          minute: -1000,
+          subject: "Flagged needle"
+        }),
+        flagged: true
+      },
+      ...Array.from({ length: 12 }, (_, i) =>
+        mail(accA.id, "INBOX", {
+          id: `newer-${i}-${tag}`,
+          messageId: `<newer-${i}-${tag}@example.invalid>`,
+          threadId: `<newer-${i}-${tag}>`,
+          minute: i + 1,
+          subject: "Other subject"
+        })
+      )
+    ];
+    await seedAccount(accA, msgs);
+    const principal = await createAuthenticatedTestSession();
+    await principal.addMembership(principal.user.id, accA.id, "viewer");
+    const accounts = await listReadableDomainAccounts(principal.user.id, domain);
+
+    // Page 1 with pageSize 5 must include the old flagged thread via flagged-first candidate selection.
+    const page1 = await listDomainThreads({ accounts, role: "inbox", page: 1, pageSize: 5, viewerUserId: principal.user.id });
+    expect(page1.items.some((item) => item.id === `old-flagged-${tag}`)).toBe(true);
+
+    // Search fallback never reports baseCount > total.
+    const search = await listDomainThreads({
+      accounts, role: "inbox", page: 1, pageSize: 50, query: "Flagged needle", viewerUserId: principal.user.id
+    });
+    expect(search.total).toBe(1);
+    expect(search.baseCount).toBeLessThanOrEqual(search.total);
   });
 });

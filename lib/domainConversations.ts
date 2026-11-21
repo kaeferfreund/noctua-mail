@@ -11,7 +11,13 @@ import { getDb } from "./db/connection";
 import { readAccountAccess } from "./accountAccess";
 import { mailboxGroupDomain } from "./senderIdentity";
 import { getFolderRecords } from "./db/folders";
-import { getLoadedDateGroups, listThreads, type GroupMeta } from "./db/messages/query";
+import {
+  getLoadedDateGroups,
+  hydrateFolderThreadsForList,
+  listFolderThreadCandidates,
+  listThreads,
+  type GroupMeta
+} from "./db/messages/query";
 import { listLinkedConversationMessages } from "./db/messages/linkedConversation";
 import type { ThreadDateSource } from "./threadDate";
 import { DOMAIN_FOLDER_ROLES, findDomainRoleFolder, type DomainFolderRole } from "./domainView";
@@ -112,6 +118,162 @@ export async function listDomainThreads(params: {
   const groupBy = params.groupBy ?? "date";
   const offset = (page - 1) * pageSize;
   const windowSize = Math.min(page * pageSize, DOMAIN_THREAD_WINDOW_MAX);
+  const targetEnd = Math.min(offset + pageSize, windowSize);
+  const trimmedQuery = params.query?.trim() ?? "";
+
+  // Fast two-phase merge for standard date-grouped domain views (no search query):
+  // Phase 1 reads only lightweight thread headers + folder counts per mailbox,
+  // Phase 2 hydrates only the winning threads needed for the requested page.
+  if (!trimmedQuery && groupBy === "date") {
+    const perAccount = await Promise.all(
+      params.accounts.map(async (account) => {
+        const folder = await resolveDomainRoleFolder(account.id, params.role);
+        if (!folder) return null;
+        const data = await listFolderThreadCandidates({
+          accountId: account.id,
+          folderId: folder.id,
+          limit: windowSize,
+          groupBy,
+          threadDateSource: params.threadDateSource
+        });
+        return { account, folder, data };
+      })
+    );
+    const results = perAccount.filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+    const total = results.reduce((sum, { data }) => sum + data.total, 0);
+    const folders = results.map(({ account, folder }) => ({ accountId: account.id, folderId: folder.id }));
+
+    if (offset >= targetEnd || results.length === 0) {
+      return {
+        items: [] as Message[],
+        groups: getLoadedDateGroups([]),
+        total,
+        baseCount: 0,
+        hasMore: false,
+        folders
+      };
+    }
+
+    const ownerByThreadId = new Map<
+      string,
+      {
+        accountIndex: number;
+        accountId: string;
+        threadId: string;
+        sortDateValue: number;
+        messageCount: number;
+        rowid: number;
+      }
+    >();
+    results.forEach(({ account, data }, accountIndex) => {
+      for (const candidate of data.candidates) {
+        const existing = ownerByThreadId.get(candidate.threadId);
+        if (!existing || candidate.sortDateValue > existing.sortDateValue) {
+          ownerByThreadId.set(candidate.threadId, {
+            accountIndex,
+            accountId: account.id,
+            threadId: candidate.threadId,
+            sortDateValue: candidate.sortDateValue,
+            messageCount: candidate.messageCount,
+            rowid: candidate.rowid
+          });
+        }
+      }
+    });
+    // Order winning threads deterministically by (sortDateValue DESC, accountIndex ASC, rowid ASC, threadId ASC)
+    // so prefix slices across pages never reorder equal-timestamp threads.
+    const winningThreads = Array.from(ownerByThreadId.values()).sort(
+      (a, b) =>
+        b.sortDateValue - a.sortDateValue ||
+        a.accountIndex - b.accountIndex ||
+        a.rowid - b.rowid ||
+        a.threadId.localeCompare(b.threadId)
+    );
+    const threadRank = new Map<string, number>();
+    winningThreads.forEach((entry, index) => {
+      threadRank.set(`${entry.accountId}\0${entry.threadId}`, index);
+    });
+
+    // Hydrate only enough top threads to cover `targetEnd` rows (+1 to determine `hasMore`).
+    // Deduplicate message ids in global `winningThreads` rank order so ownership is
+    // identical regardless of batch boundaries or requested page size.
+    const neededRows = targetEnd + 1;
+    const seen = new Set<string>();
+    const merged: Message[] = [];
+    let cursor = 0;
+    while (merged.length < neededRows && cursor < winningThreads.length) {
+      const remainingRows = neededRows - merged.length;
+      const batch: typeof winningThreads = [];
+      let estimated = 0;
+      while (cursor < winningThreads.length && estimated < remainingRows) {
+        const next = winningThreads[cursor++];
+        batch.push(next);
+        estimated += Math.max(1, next.messageCount);
+      }
+      const byAccount = new Map<number, Array<{ threadId: string; sortDateValue: number }>>();
+      for (const entry of batch) {
+        const list = byAccount.get(entry.accountIndex) ?? [];
+        list.push({ threadId: entry.threadId, sortDateValue: entry.sortDateValue });
+        byAccount.set(entry.accountIndex, list);
+      }
+      const hydrated = await Promise.all(
+        Array.from(byAccount.entries()).map(async ([accountIndex, threads]) => ({
+          accountId: results[accountIndex].account.id,
+          items: await hydrateFolderThreadsForList({
+            accountId: results[accountIndex].account.id,
+            threads,
+            groupBy
+          })
+        }))
+      );
+      const itemsByThreadKey = new Map<string, Message[]>();
+      for (const { accountId, items: accountItems } of hydrated) {
+        for (const item of accountItems) {
+          const key = `${accountId}\0${item.threadId}`;
+          const list = itemsByThreadKey.get(key) ?? [];
+          list.push(item);
+          itemsByThreadKey.set(key, list);
+        }
+      }
+      for (const entry of batch) {
+        const threadItems = itemsByThreadKey.get(`${entry.accountId}\0${entry.threadId}`) ?? [];
+        threadItems.sort((a, b) => b.dateValue - a.dateValue || a.id.localeCompare(b.id));
+        for (const item of threadItems) {
+          if (seen.has(item.id)) continue;
+          seen.add(item.id);
+          merged.push(item);
+        }
+      }
+    }
+
+    merged.sort(
+      (a, b) =>
+        threadSortValue(b) - threadSortValue(a) ||
+        (threadRank.get(`${a.accountId}\0${a.threadId}`) ?? 0) -
+          (threadRank.get(`${b.accountId}\0${b.threadId}`) ?? 0) ||
+        b.dateValue - a.dateValue ||
+        a.id.localeCompare(b.id)
+    );
+    const items = merged.slice(offset, targetEnd);
+    const roleFolderKeys = new Set(folders.map((entry) => `${entry.accountId}\0${entry.folderId}`));
+    const baseCount = items.reduce(
+      (count, item) => count + (roleFolderKeys.has(`${item.accountId}\0${item.folderId}`) ? 1 : 0),
+      0
+    );
+    const hasMore =
+      offset + pageSize < DOMAIN_THREAD_WINDOW_MAX &&
+      (merged.length > targetEnd || cursor < winningThreads.length || results.some(({ data }) => data.hasMore));
+
+    return {
+      items,
+      groups: getLoadedDateGroups(items),
+      total,
+      baseCount,
+      hasMore,
+      folders
+    };
+  }
+
   const perAccount = await Promise.all(
     params.accounts.map(async (account) => {
       const folder = await resolveDomainRoleFolder(account.id, params.role);
@@ -147,9 +309,15 @@ export async function listDomainThreads(params: {
   }
   const merged = rows.filter((item) => threadOwner.get(item.threadId)?.accountId === item.accountId);
   merged.sort((a, b) => threadSortValue(b) - threadSortValue(a) || b.dateValue - a.dateValue || a.id.localeCompare(b.id));
-  const items = merged.slice(offset, Math.min(offset + pageSize, windowSize));
+  const items = merged.slice(offset, targetEnd);
   const total = results.reduce((sum, { data }) => sum + (data.total ?? 0), 0);
-  const baseCount = results.reduce((sum, { data }) => sum + (data.baseCount ?? 0), 0);
+  const roleFolderKeys = new Set(results.map(({ account, folder }) => `${account.id}\0${folder.id}`));
+  const roleFolderItemCount = items.reduce(
+    (count, item) => count + (roleFolderKeys.has(`${item.accountId}\0${item.folderId}`) ? 1 : 0),
+    0
+  );
+  const rawBaseCount = results.reduce((sum, { data }) => sum + (data.baseCount ?? 0), 0);
+  const baseCount = Math.min(roleFolderItemCount, rawBaseCount, total);
   const hasMore = offset + pageSize < DOMAIN_THREAD_WINDOW_MAX &&
     (merged.length > offset + pageSize || results.some(({ data }) => data.hasMore));
   let groups: GroupMeta[];

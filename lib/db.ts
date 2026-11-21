@@ -204,6 +204,7 @@ export {
 } from "./db/inviteCodes";
 
 export {
+  getFolderRecords,
   getFolders,
   getMailboxState,
   saveFoldersForAccount,
