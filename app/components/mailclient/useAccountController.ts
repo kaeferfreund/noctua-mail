@@ -13,6 +13,7 @@ import {
 } from "@/lib/accountApiPaths";
 import type { Account, Folder, Message } from "@/lib/data";
 import { findDomainRoleFolder, type DomainFolderRole } from "@/lib/domainView";
+import { mailboxGroupDomain } from "@/lib/senderIdentity";
 import { findInboxFolder } from "@/lib/specialFolders";
 import { createAuthClient, type AuthMe, type AuthUser, type AuthSecurity, type MailboxState } from "@/lib/authClient";
 import type {
@@ -85,7 +86,10 @@ export type UseAccountControllerParams = {
   setDeletingFolderIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   // Optional: request the next mailbox's first list page alongside the switch.
   prefetchFirstPage?: (accountId: string) => void;
-  prefetchDomainFirstPage?: (domainView: { domain: string; role: DomainFolderRole }) => void;
+  prefetchDomainFirstPage?: (
+    domainView: { domain: string; role: DomainFolderRole },
+    memberAccountIds?: readonly string[]
+  ) => void;
   dropFirstPagePrefetch?: () => void;
   setDomainView?: React.Dispatch<React.SetStateAction<{ domain: string; role: DomainFolderRole } | null>>;
   // Optional: show a mailbox visited earlier from its cached folders at once.
@@ -219,6 +223,8 @@ export function useAccountController({
           if (me.status === 401) {
             publishLocalePreference(null);
             clearPrincipalViews();
+            dropFirstPagePrefetch?.();
+            setDomainView?.(null);
             switchVersion.current++; lastIdentity.current = null; instanceAdmin.current = false;
             setMessages([]); setViewMessage(null); setActiveMessageId("");
             setAuthState("unauth"); setCurrentUser(null); setAccounts([]);
@@ -230,6 +236,8 @@ export function useAccountController({
         if (version !== loadVersion.current) return;
         publishLocalePreference(data.user?.uiLocale);
         if (lastIdentity.current !== data.user?.id) {
+          dropFirstPagePrefetch?.();
+          setDomainView?.(null);
           setMessages([]); setViewMessage(null); setActiveMessageId(""); setMessagesPage(1);
           setHasMoreMessages(true); setTotalMessages(null); setActiveFolderId("");
           // Another person signed in on this mounted client: nothing of the previous one stays open.
@@ -277,7 +285,7 @@ export function useAccountController({
         if (version === loadVersion.current) setBootstrapError("Failed to load mailbox data. Please retry.");
       }
     },
-    [apiFetch, settleDeferredBootstrap, clearPrincipalViews, readErrorMessage, reportError, setAccounts, setActiveAccountId, setAuthState,
+    [apiFetch, settleDeferredBootstrap, clearPrincipalViews, dropFirstPagePrefetch, setDomainView, readErrorMessage, reportError, setAccounts, setActiveAccountId, setAuthState,
       setCurrentUser, setFolders, setInitialDataReady, setInitialFoldersLoadedAccountId, setSessionTtlSeconds,
       setMessages, setViewMessage, setActiveMessageId, setMessagesPage, setHasMoreMessages, setTotalMessages, setActiveFolderId, setLastFolderId]
   );
@@ -286,6 +294,8 @@ export function useAccountController({
     try {
       await createAuthClient(apiFetch).logout();
       clearPrincipalViews();
+      dropFirstPagePrefetch?.();
+      setDomainView?.(null);
       loadVersion.current++; switchVersion.current++; lastIdentity.current = null; instanceAdmin.current = false;
       setAuthState("unauth"); setCurrentUser(null); setAccounts([]); setFolders([]);
       setActiveAccountId(""); setMailboxState(null); setSecurity(null);
@@ -313,7 +323,19 @@ export function useAccountController({
     ) => {
       const normalizedAccountId = nextAccountId.trim();
       if (!normalizedAccountId) return;
-      const targetDomainView = options?.domainView ?? null;
+      const requestedDomainView = options?.domainView ?? null;
+      const targetAccount = accounts.find((account) => account.id === normalizedAccountId);
+      const targetDomainView =
+        requestedDomainView &&
+        targetAccount &&
+        mailboxGroupDomain(targetAccount.email) === requestedDomainView.domain
+          ? requestedDomainView
+          : null;
+      const targetDomainMemberIds = targetDomainView
+        ? accounts
+            .filter((account) => mailboxGroupDomain(account.email) === targetDomainView.domain)
+            .map((account) => account.id)
+        : [];
       const reselect = normalizedAccountId === shownAccount.current;
       if (reselect && switchesInFlight.current === 0) return;
       const version = ++switchVersion.current;
@@ -365,9 +387,11 @@ export function useAccountController({
         // Runs concurrently like the folder read; the list takes it only after the commit.
         // A reselect commits nothing; the finally block drops a pending page. A cached
         // view commits now, and its list reads its first page right away.
-        if (cachedFolders) commitMailboxView(cachedFolders);
-        else if (!reselect) {
-          if (targetDomainView) prefetchDomainFirstPage?.(targetDomainView);
+        if (cachedFolders) {
+          dropFirstPagePrefetch?.();
+          commitMailboxView(cachedFolders);
+        } else if (!reselect) {
+          if (targetDomainView) prefetchDomainFirstPage?.(targetDomainView, targetDomainMemberIds);
           else prefetchFirstPage?.(normalizedAccountId);
         }
         const response = await persisted;
@@ -402,9 +426,16 @@ export function useAccountController({
           // The cached view stays; fresh folders and counts replace the cached ones, and
           // a folder opened meanwhile stays open while it still exists.
           setFolders(nextFolders);
+          const fallbackFolderId =
+            (targetDomainView
+              ? findDomainRoleFolder(nextFolders, normalizedAccountId, targetDomainView.role)?.id
+              : null) ??
+            findInboxFolder(nextFolders, normalizedAccountId)?.id ??
+            nextFolders[0]?.id ??
+            "";
           setActiveFolderId(current => nextFolders.some(folder => folder.id === current)
             ? current
-            : findInboxFolder(nextFolders, normalizedAccountId)?.id ?? nextFolders[0]?.id ?? "");
+            : fallbackFolderId);
         }
       } catch {
         if (version === switchVersion.current) {
@@ -418,11 +449,15 @@ export function useAccountController({
         if (switchesInFlight.current === 0) setSwitchPending?.(false);
         const deferred = switchesInFlight.current === 0 ? deferredSelection.current : null;
         if (deferred) deferredSelection.current = null;
-        if (rebootstrap) await loadInitialData();
+        if (rebootstrap) {
+          setDomainView?.(null);
+          await loadInitialData();
+        }
         else if (deferred) settleDeferredBootstrap(deferred, loadInitialData);
       }
     },
     [
+      accounts,
       apiFetch,
       loadInitialData,
       persistSelection,

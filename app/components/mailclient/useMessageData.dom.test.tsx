@@ -19,6 +19,7 @@ type Props = {
   folderId?: string;
   query?: string;
   threads?: boolean;
+  authState?: "loading" | "ok" | "unauth";
   domainView?: { domain: string; role: "inbox" | "sent" | "drafts" | "archive" | "trash" | "spam" } | null;
   listAccountIds?: ReadonlySet<string>;
 };
@@ -34,17 +35,19 @@ function mount(initialProps: Props = { accountId: "account-a" }, viewCache?: Mai
     folderId = `${accountId}:INBOX`,
     query = "",
     threads = true,
+    authState = "ok",
     domainView = null,
     listAccountIds
   }: Props) => {
-    const messagesKey = `${domainView ? `domain:${domainView.domain}:${domainView.role}|` : ""}${accountId}|folder|${folderId}|${query}`;
+    const memberIdsKey = domainView && listAccountIds ? [...listAccountIds].sort().join(",") : "";
+    const messagesKey = `${domainView ? `domain:${domainView.domain}:${domainView.role}:${memberIdsKey}|` : ""}${accountId}|folder|${folderId}|${query}`;
     const currentKeyRef = useRef(messagesKey);
     currentKeyRef.current = messagesKey;
     return useMessageData({
       messagesKey, activeAccountId: accountId, searchScope: "folder", activeFolderId: folderId,
       isRelatedSearch: false, relatedQueryId: "", selectedSearchFields: [], searchBadges: DEFAULT_SEARCH_BADGES,
       effectiveSearchBadges: [], currentSearchExcludedFolderIds: [], supportsThreads: threads, groupBy: "date",
-      threadDateSource: "latestReceivedDateValue", sortBy: "date", query, authState: "ok", apiFetch,
+      threadDateSource: "latestReceivedDateValue", sortBy: "date", query, authState, apiFetch,
       readErrorMessage: async () => "Error", reportError: message => { errors.push(message); },
       setRelatedContext: () => {}, relatedContext: null, setCollapsedGroups: () => {}, setCollapsedThreads: () => {},
       currentKeyRef, viewCache, domainView, listAccountIds
@@ -475,7 +478,7 @@ describe("mailbox view cache lifetime", () => {
     await waitFor(() => expect(h.result.current.loadingMessages).toBe(false));
 
     const target = { domain: "example.test", role: "inbox" as const };
-    act(() => { h.result.current.prefetchDomainFirstPage(target); });
+    act(() => { h.result.current.prefetchDomainFirstPage(target, ["account-b"]); });
     const domainReqs = () => h.held.filter(item => item.url.startsWith("/api/domains/example.test/threads"));
     expect(domainReqs()).toHaveLength(1);
     const prefetched = domainReqs()[0];
@@ -483,8 +486,113 @@ describe("mailbox view cache lifetime", () => {
     h.rerender({ accountId: "account-b", domainView: target, listAccountIds: new Set(["account-b"]) });
     await act(async () => { await Promise.resolve(); });
     expect(domainReqs()).toEqual([prefetched]);
-    await h.release(prefetched, Response.json({ items: [row("account-b", 9)], hasMore: false, total: 1, baseCount: 1 }));
+    await h.release(prefetched, Response.json({ items: [row("account-b", 9)], hasMore: false, total: 1, baseCount: 1, accounts: ["account-b"] }));
     await waitFor(() => expect(h.result.current.messages.map(m => m.id)).toEqual(["account-b-m9"]));
     expect(prefetched.signal?.aborted).toBe(false);
+  });
+
+  it("drops a domain prefetch on auth loss and rejects a prefetch whose member accounts changed", async () => {
+    const h = mount({ accountId: "account-a" });
+    await waitFor(() => expect(h.pending("account-a")).toHaveLength(1));
+    await h.release(h.pending("account-a")[0], page("account-a", 1, false));
+    await waitFor(() => expect(h.result.current.loadingMessages).toBe(false));
+
+    const target = { domain: "example.test", role: "inbox" as const };
+    act(() => { h.result.current.prefetchDomainFirstPage(target, ["account-b"]); });
+    const domainReqs = () => h.held.filter(item => item.url.startsWith("/api/domains/example.test/threads"));
+    expect(domainReqs()).toHaveLength(1);
+    const firstPrefetch = domainReqs()[0];
+
+    // Auth loss aborts and discards the prefetch so another user signing in cannot adopt it.
+    h.rerender({ accountId: "account-a", authState: "unauth" });
+    expect(firstPrefetch.signal?.aborted).toBe(true);
+    h.rerender({ accountId: "account-b", authState: "ok", domainView: target, listAccountIds: new Set(["account-b"]) });
+    await waitFor(() => expect(domainReqs().filter(req => req !== firstPrefetch)).toHaveLength(1));
+    await h.release(domainReqs().find(req => req !== firstPrefetch)!, Response.json({ items: [row("account-b", 1)], hasMore: false, total: 1, baseCount: 1, accounts: ["account-b"] }));
+    await waitFor(() => expect(h.result.current.messages.map(m => m.id)).toEqual(["account-b-m1"]));
+
+    // A prefetch scoped to ["account-b"] is not adopted when the view renders with ["account-b", "account-c"].
+    act(() => { h.result.current.prefetchDomainFirstPage({ domain: "other.example.test", role: "inbox" }, ["account-b"]); });
+    const otherReqs = () => h.held.filter(item => item.url.startsWith("/api/domains/other.example.test/threads"));
+    expect(otherReqs()).toHaveLength(1);
+    const mismatched = otherReqs()[0];
+    h.rerender({
+      accountId: "account-b",
+      authState: "ok",
+      domainView: { domain: "other.example.test", role: "inbox" },
+      listAccountIds: new Set(["account-b", "account-c"])
+    });
+    await waitFor(() => expect(otherReqs().filter(req => req !== mismatched)).toHaveLength(1));
+    expect(mismatched.signal?.aborted).toBe(true);
+  });
+
+  it("evicts revoked accounts across cached domain roles when a 200 domain response returns fewer accounts", async () => {
+    const cache = new MailboxViewCache();
+    const members = new Set(["account-a", "account-b"]);
+    const inboxView = { domain: "example.test", role: "inbox" as const };
+    const sentView = { domain: "example.test", role: "sent" as const };
+
+    // Pre-populate Sent with rows from both account-a and account-b.
+    const h = mount({ accountId: "account-a", domainView: sentView, listAccountIds: members }, cache);
+    await waitFor(() => expect(h.held.some(item => item.url.includes("role=sent"))).toBe(true));
+    await h.release(
+      h.held.find(item => item.url.includes("role=sent"))!,
+      Response.json({
+        items: [row("account-a", 1), row("account-b", 2)],
+        hasMore: false,
+        total: 2,
+        baseCount: 2,
+        accounts: ["account-a", "account-b"],
+        folders: [{ accountId: "account-a", folderId: "account-a:Sent" }, { accountId: "account-b", folderId: "account-b:Sent" }]
+      })
+    );
+    await waitFor(() => expect(h.result.current.messages.map(m => m.id)).toEqual(["account-a-m1", "account-b-m2"]));
+
+    // Switch to Inbox while local member list still contains account-b, but server responds with accounts: ["account-a"].
+    h.rerender({ accountId: "account-a", domainView: inboxView, listAccountIds: members });
+    await waitFor(() => expect(h.held.some(item => item.url.includes("role=inbox"))).toBe(true));
+    await h.release(
+      h.held.find(item => item.url.includes("role=inbox"))!,
+      Response.json({
+        items: [row("account-a", 3)],
+        hasMore: false,
+        total: 1,
+        baseCount: 1,
+        accounts: ["account-a"],
+        folders: [{ accountId: "account-a", folderId: "account-a:INBOX" }]
+      })
+    );
+    await waitFor(() => expect(h.result.current.messages.map(m => m.id)).toEqual(["account-a-m3"]));
+
+    // Switching back to Sent must NOT resurrect account-b's cached rows even before local accounts refresh.
+    h.rerender({ accountId: "account-a", domainView: sentView, listAccountIds: members });
+    expect(h.result.current.messages).toEqual([]);
+  });
+
+  it("clears domainFolderIds when a domain view receives 404", async () => {
+    const cache = new MailboxViewCache();
+    const members = new Set(["account-a"]);
+    const inboxView = { domain: "example.test", role: "inbox" as const };
+    const h = mount({ accountId: "account-a", domainView: inboxView, listAccountIds: members }, cache);
+    await waitFor(() => expect(h.held.some(item => item.url.includes("role=inbox"))).toBe(true));
+    await h.release(
+      h.held.find(item => item.url.includes("role=inbox"))!,
+      Response.json({
+        items: [row("account-a", 1)],
+        hasMore: false,
+        total: 1,
+        baseCount: 1,
+        accounts: ["account-a"],
+        folders: [{ accountId: "account-a", folderId: "account-a:INBOX" }]
+      })
+    );
+    await waitFor(() => expect(h.result.current.domainFolderIds).toEqual(["account-a:INBOX"]));
+
+    // Refresh returns 404 (access revoked): messages and domainFolderIds are both cleared.
+    act(() => { void h.result.current.refreshMailboxData(); });
+    await waitFor(() => expect(h.held.some(item => item.url.includes("role=inbox"))).toBe(true));
+    await h.release(h.held.find(item => item.url.includes("role=inbox"))!, Response.json({ error: "Not found" }, { status: 404 }));
+    await waitFor(() => expect(h.result.current.messages).toEqual([]));
+    expect(h.result.current.domainFolderIds).toEqual([]);
   });
 });

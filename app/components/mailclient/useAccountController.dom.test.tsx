@@ -754,3 +754,93 @@ describe("switch to a mailbox visited earlier", () => {
     });
   }
 });
+
+describe("domain switch validation and prefetch lifecycle", () => {
+  const domainAccounts = [
+    { id: "account-a", email: "a@alpha.example.test" },
+    { id: "account-b", email: "b@beta.example.test" },
+    { id: "account-b2", email: "b2@beta.example.test" }
+  ] as Account[];
+
+  it("ignores a mismatched domainView, passes target domain members to prefetch, and clears domainView/prefetch on logout", async () => {
+    const prefetched: Array<{ domain: string; role: string; members?: readonly string[] }> = [];
+    let dropped = 0;
+    const emptyDeletingIds = new Set<string>();
+    const refreshFolders = async () => null;
+    const runSyncJob = async () => ({ count: 0 });
+    const readErrorMessage = async (res: Response) => `HTTP ${res.status}`;
+    const prefetchDomainFirstPage: UseAccountControllerParams["prefetchDomainFirstPage"] = (view, members) => {
+      prefetched.push({ ...view, members });
+    };
+    const dropFirstPagePrefetch = () => {
+      dropped += 1;
+    };
+    const apiFetch: UseAccountControllerParams["apiFetch"] = async (input) => {
+      const url = String(input);
+      if (url === "/api/auth/me") {
+        return json({ user: { id: "u-1" }, accounts: domainAccounts, accountId: "account-a", mailboxState: "selected" });
+      }
+      if (url === "/api/auth/switch-account") return json({ ok: true });
+      if (url === "/api/auth/logout") return json({ ok: true });
+      const acc = /^\/api\/accounts\/([^/]+)\/folders$/.exec(url)?.[1] ?? "account-a";
+      return json([
+        { id: `${acc}:INBOX`, accountId: acc, name: "INBOX", specialUse: "\\Inbox", count: 0 },
+        { id: `${acc}:Sent`, accountId: acc, name: "Sent", specialUse: "\\Sent", count: 0 }
+      ]);
+    };
+
+    const hook = renderHook(() => {
+      const [activeAccountId, setActiveAccountId] = useState("");
+      const [loadedAccounts, setAccounts] = useState<Account[]>([]);
+      const [activeFolderId, setActiveFolderId] = useState("");
+      const [folders, setFolders] = useState<Folder[]>([]);
+      const [authState, setAuthState] = useState<"loading" | "ok" | "unauth">("loading");
+      const [ready, setInitialDataReady] = useState(false);
+      const [domainView, setDomainView] = useState<{ domain: string; role: "inbox" | "sent" | "drafts" | "archive" | "trash" | "spam" } | null>(null);
+      const controller = useAccountController({
+        activeAccountId, accounts: loadedAccounts, accountFolders: folders, activeFolderId,
+        deletingFolderIds: emptyDeletingIds, refreshFolders, runSyncJob,
+        defaultSearchFields: DEFAULT_SEARCH_FIELDS, defaultSearchBadges: DEFAULT_SEARCH_BADGES,
+        apiFetch, reportError: noop, readErrorMessage,
+        setAccounts, setActiveAccountId, setFolders, setAuthState, setCurrentUser: noop,
+        setInitialDataReady, setInitialFoldersLoadedAccountId: noop, setSessionTtlSeconds: noop,
+        setMessages: noop, setMessagesPage: noop, setHasMoreMessages: noop, setTotalMessages: noop,
+        setActiveMessageId: noop, setViewMessage: noop, setActiveFolderId, setQuery: noop,
+        setSearchScope: noop, setSearchFields: noop, setSearchBadges: noop, setActiveVirtualFolderId: noop,
+        setLastFolderId: noop, setMessageListError: noop, setExceptionEntries: noop,
+        setManageOpen: noop, setManageTab: noop, setEditingAccount: noop, setDeletingFolderIds: noop,
+        setDomainView, prefetchDomainFirstPage, dropFirstPagePrefetch
+      });
+      return { ...controller, ready, authState, activeAccountId, activeFolderId, domainView };
+    }, { wrapper: ({ children }) => <I18nTestProvider locale="en">{children}</I18nTestProvider> });
+
+    await waitFor(() => expect(hook.result.current.ready).toBe(true));
+
+    // Mismatched domainView for account-b (beta.example.test != alpha.example.test) is ignored.
+    await act(async () => {
+      await hook.result.current.switchAccount("account-b", {
+        domainView: { domain: "alpha.example.test", role: "sent" }
+      });
+    });
+    expect(prefetched).toEqual([]);
+    expect(hook.result.current.domainView).toBeNull();
+
+    // Valid domainView for account-b passes all beta.example.test member ids to prefetch.
+    await act(async () => {
+      await hook.result.current.switchAccount("account-b2", {
+        domainView: { domain: "beta.example.test", role: "sent" }
+      });
+    });
+    expect(prefetched).toEqual([
+      { domain: "beta.example.test", role: "sent", members: ["account-b", "account-b2"] }
+    ]);
+    expect(hook.result.current.domainView).toEqual({ domain: "beta.example.test", role: "sent" });
+    expect(hook.result.current.activeFolderId).toBe("account-b2:Sent");
+
+    // Logout clears domainView and drops any pending prefetch.
+    const dropsBeforeLogout = dropped;
+    await act(async () => { await hook.result.current.logout(); });
+    expect(hook.result.current.domainView).toBeNull();
+    expect(dropped).toBeGreaterThan(dropsBeforeLogout);
+  });
+});

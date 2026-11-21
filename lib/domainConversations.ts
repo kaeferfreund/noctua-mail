@@ -156,7 +156,14 @@ export async function listDomainThreads(params: {
 
     const ownerByThreadId = new Map<
       string,
-      { accountIndex: number; accountId: string; threadId: string; sortDateValue: number; messageCount: number }
+      {
+        accountIndex: number;
+        accountId: string;
+        threadId: string;
+        sortDateValue: number;
+        messageCount: number;
+        rowid: number;
+      }
     >();
     results.forEach(({ account, data }, accountIndex) => {
       for (const candidate of data.candidates) {
@@ -167,19 +174,29 @@ export async function listDomainThreads(params: {
             accountId: account.id,
             threadId: candidate.threadId,
             sortDateValue: candidate.sortDateValue,
-            messageCount: candidate.messageCount
+            messageCount: candidate.messageCount,
+            rowid: candidate.rowid
           });
         }
       }
     });
+    // Order winning threads deterministically by (sortDateValue DESC, accountIndex ASC, rowid ASC, threadId ASC)
+    // so prefix slices across pages never reorder equal-timestamp threads.
     const winningThreads = Array.from(ownerByThreadId.values()).sort(
       (a, b) =>
         b.sortDateValue - a.sortDateValue ||
         a.accountIndex - b.accountIndex ||
+        a.rowid - b.rowid ||
         a.threadId.localeCompare(b.threadId)
     );
+    const threadRank = new Map<string, number>();
+    winningThreads.forEach((entry, index) => {
+      threadRank.set(`${entry.accountId}\0${entry.threadId}`, index);
+    });
 
     // Hydrate only enough top threads to cover `targetEnd` rows (+1 to determine `hasMore`).
+    // Deduplicate message ids in global `winningThreads` rank order so ownership is
+    // identical regardless of batch boundaries or requested page size.
     const neededRows = targetEnd + 1;
     const seen = new Set<string>();
     const merged: Message[] = [];
@@ -193,24 +210,15 @@ export async function listDomainThreads(params: {
         batch.push(next);
         estimated += Math.max(1, next.messageCount);
       }
-      // Include all threads tied at the cutoff sortDateValue so cross-account
-      // tie-breaking by message dateValue/id matches a full merge exactly.
-      if (batch.length > 0) {
-        const cutoffSort = batch[batch.length - 1].sortDateValue;
-        while (cursor < winningThreads.length && winningThreads[cursor].sortDateValue === cutoffSort) {
-          batch.push(winningThreads[cursor++]);
-        }
-      }
       const byAccount = new Map<number, Array<{ threadId: string; sortDateValue: number }>>();
       for (const entry of batch) {
         const list = byAccount.get(entry.accountIndex) ?? [];
         list.push({ threadId: entry.threadId, sortDateValue: entry.sortDateValue });
         byAccount.set(entry.accountIndex, list);
       }
-      const orderedAccounts = Array.from(byAccount.entries()).sort((a, b) => a[0] - b[0]);
       const hydrated = await Promise.all(
-        orderedAccounts.map(async ([accountIndex, threads]) => ({
-          accountIndex,
+        Array.from(byAccount.entries()).map(async ([accountIndex, threads]) => ({
+          accountId: results[accountIndex].account.id,
           items: await hydrateFolderThreadsForList({
             accountId: results[accountIndex].account.id,
             threads,
@@ -218,8 +226,19 @@ export async function listDomainThreads(params: {
           })
         }))
       );
-      for (const { items: accountItems } of hydrated) {
+      const itemsByThreadKey = new Map<string, Message[]>();
+      for (const { accountId, items: accountItems } of hydrated) {
         for (const item of accountItems) {
+          const key = `${accountId}\0${item.threadId}`;
+          const list = itemsByThreadKey.get(key) ?? [];
+          list.push(item);
+          itemsByThreadKey.set(key, list);
+        }
+      }
+      for (const entry of batch) {
+        const threadItems = itemsByThreadKey.get(`${entry.accountId}\0${entry.threadId}`) ?? [];
+        threadItems.sort((a, b) => b.dateValue - a.dateValue || a.id.localeCompare(b.id));
+        for (const item of threadItems) {
           if (seen.has(item.id)) continue;
           seen.add(item.id);
           merged.push(item);
@@ -227,10 +246,20 @@ export async function listDomainThreads(params: {
       }
     }
 
-    merged.sort((a, b) => threadSortValue(b) - threadSortValue(a) || b.dateValue - a.dateValue || a.id.localeCompare(b.id));
+    merged.sort(
+      (a, b) =>
+        threadSortValue(b) - threadSortValue(a) ||
+        (threadRank.get(`${a.accountId}\0${a.threadId}`) ?? 0) -
+          (threadRank.get(`${b.accountId}\0${b.threadId}`) ?? 0) ||
+        b.dateValue - a.dateValue ||
+        a.id.localeCompare(b.id)
+    );
     const items = merged.slice(offset, targetEnd);
-    const roleFolderIds = new Set(folders.map((entry) => entry.folderId));
-    const baseCount = items.reduce((count, item) => count + (roleFolderIds.has(item.folderId) ? 1 : 0), 0);
+    const roleFolderKeys = new Set(folders.map((entry) => `${entry.accountId}\0${entry.folderId}`));
+    const baseCount = items.reduce(
+      (count, item) => count + (roleFolderKeys.has(`${item.accountId}\0${item.folderId}`) ? 1 : 0),
+      0
+    );
     const hasMore =
       offset + pageSize < DOMAIN_THREAD_WINDOW_MAX &&
       (merged.length > targetEnd || cursor < winningThreads.length || results.some(({ data }) => data.hasMore));
@@ -282,8 +311,13 @@ export async function listDomainThreads(params: {
   merged.sort((a, b) => threadSortValue(b) - threadSortValue(a) || b.dateValue - a.dateValue || a.id.localeCompare(b.id));
   const items = merged.slice(offset, targetEnd);
   const total = results.reduce((sum, { data }) => sum + (data.total ?? 0), 0);
-  const roleFolderIds = new Set(results.map(({ folder }) => folder.id));
-  const baseCount = items.reduce((count, item) => count + (roleFolderIds.has(item.folderId) ? 1 : 0), 0);
+  const roleFolderKeys = new Set(results.map(({ account, folder }) => `${account.id}\0${folder.id}`));
+  const roleFolderItemCount = items.reduce(
+    (count, item) => count + (roleFolderKeys.has(`${item.accountId}\0${item.folderId}`) ? 1 : 0),
+    0
+  );
+  const rawBaseCount = results.reduce((sum, { data }) => sum + (data.baseCount ?? 0), 0);
+  const baseCount = Math.min(roleFolderItemCount, rawBaseCount, total);
   const hasMore = offset + pageSize < DOMAIN_THREAD_WINDOW_MAX &&
     (merged.length > offset + pageSize || results.some(({ data }) => data.hasMore));
   let groups: GroupMeta[];

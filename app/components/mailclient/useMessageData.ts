@@ -115,9 +115,14 @@ export function useMessageData({
   // The page-1 URL that read was made with. Thread support is part of the URL but not
   // of the key; rows read in one row format are never cached under the other's URL.
   const shownPageUrlRef = useRef<string | null>(null);
+  // Authoritative member account set confirmed by the last successful domain response.
+  const authoritativeDomainAccountsRef = useRef<Set<string> | null>(null);
   const firstPagePrefetchRef = useRef<{
     kind: "account" | "domain";
     accountId: string;
+    domain?: string;
+    role?: DomainFolderRole;
+    accountIdsKey?: string;
     url: string;
     response: Promise<Response>;
     controller: AbortController;
@@ -213,6 +218,7 @@ export function useMessageData({
   // would push the visited mailboxes out. Domain views are cached keyed by their
   // exact granted member-account set and pruned synchronously when any member is
   // revoked, on session changes, or on 401/403/404.
+  const listAccountIdsKey = listAccountIds ? Array.from(listAccountIds).sort().join(",") : activeAccountId;
   const cacheableSingleView = Boolean(viewCache) && !query.trim() && !domainView;
   const cacheableDomainView =
     Boolean(viewCache) && !query.trim() && Boolean(domainView) && Boolean(listAccountIds && listAccountIds.size > 0);
@@ -244,6 +250,7 @@ export function useMessageData({
     // Nothing for the new key is on screen from a read yet.
     shownPageKeyRef.current = null;
     shownPageUrlRef.current = null;
+    authoritativeDomainAccountsRef.current = null;
     setGroupMeta(cached?.groupMeta ?? []);
     setMessageListError(null);
     if (cached) {
@@ -279,7 +286,12 @@ export function useMessageData({
       ...(domainView ? { domainRoleFolders } : {})
     };
     if (cacheableDomainView && listAccountIds) {
-      viewCache.writeDomainList(firstPageUrl, entry, listAccountIds);
+      const targetAccounts = authoritativeDomainAccountsRef.current;
+      // Only write if the current granted set still matches what the server confirmed.
+      if (targetAccounts && targetAccounts.size === listAccountIds.size &&
+        Array.from(targetAccounts).every((id) => listAccountIds.has(id))) {
+        viewCache.writeDomainList(firstPageUrl, entry, targetAccounts);
+      }
     } else {
       viewCache.writeList(firstPageUrl, entry);
     }
@@ -295,9 +307,26 @@ export function useMessageData({
     viewCache?.dropList(firstPageUrl);
     if (!showsList) return;
     setMessages([]);
+    setDomainRoleFolders(NO_DOMAIN_ROLE_FOLDERS);
     setGroupMeta([]);
     setLoadedMessageCount(0);
     setTotalMessages(null);
+  };
+
+  // Prune any domain member the server no longer returned from the shared view cache
+  // so other cached roles of the same domain never show revoked mailboxes before the
+  // client's account list refreshes.
+  const reconcileDomainServerAccounts = (serverAccounts?: string[]) => {
+    if (!domainView || !listAccountIds) return;
+    if (!Array.isArray(serverAccounts)) {
+      authoritativeDomainAccountsRef.current = new Set(listAccountIds);
+      return;
+    }
+    const allowed = new Set(serverAccounts.filter((id) => listAccountIds.has(id)));
+    for (const id of listAccountIds) {
+      if (!allowed.has(id)) viewCache?.dropAccount(id);
+    }
+    authoritativeDomainAccountsRef.current = allowed;
   };
 
   const dropFirstPagePrefetch = useCallback(() => {
@@ -307,6 +336,11 @@ export function useMessageData({
     window.clearTimeout(prefetch.timer);
     prefetch.controller.abort();
   }, []);
+
+  // Drop any in-flight or resolved prefetch immediately when the session ends.
+  useLayoutEffect(() => {
+    if (authState !== "ok") dropFirstPagePrefetch();
+  }, [authState, dropFirstPagePrefetch]);
 
   // The plain inbox view carries over to the next mailbox unchanged (a switch resets
   // search, badges and scope), so its page-1 URL is known before the switch commits.
@@ -329,11 +363,12 @@ export function useMessageData({
       searchBadges: { attachments: false },
       effectiveSearchBadges: []
     });
+  // Cross-domain navigation resets grouping to "date" via emptyDeepLink().
   const buildDomainFirstPageUrl = (target: { domain: string; role: DomainFolderRole }) =>
     buildMessageListQueryUrl({
       accountId: activeAccountId,
       page: 1,
-      groupBy,
+      groupBy: "date",
       searchScope: "folder",
       activeFolderId: "",
       currentSearchExcludedFolderIds: [],
@@ -361,6 +396,7 @@ export function useMessageData({
     activeAccountId,
     apiFetch,
     plainInboxView,
+    listAccountIdsKey,
     buildInboxFirstPageUrl,
     buildDomainFirstPageUrl
   });
@@ -369,12 +405,22 @@ export function useMessageData({
       activeAccountId,
       apiFetch,
       plainInboxView,
+      listAccountIdsKey,
       buildInboxFirstPageUrl,
       buildDomainFirstPageUrl
     };
   });
   const startFirstPagePrefetch = useCallback(
-    (kind: "account" | "domain", accountId: string, url: string) => {
+    (
+      meta: {
+        kind: "account" | "domain";
+        accountId: string;
+        domain?: string;
+        role?: DomainFolderRole;
+        accountIdsKey?: string;
+      },
+      url: string
+    ) => {
       const controller = new AbortController();
       const response = prefetchInputsRef.current.apiFetch(url, { signal: controller.signal });
       // A prefetch that is dropped before anyone awaits it must not surface as unhandled.
@@ -382,7 +428,7 @@ export function useMessageData({
       const timer = window.setTimeout(() => {
         if (firstPagePrefetchRef.current?.controller === controller) dropFirstPagePrefetch();
       }, 10_000);
-      firstPagePrefetchRef.current = { kind, accountId, url, response, controller, timer };
+      firstPagePrefetchRef.current = { ...meta, url, response, controller, timer };
     },
     [dropFirstPagePrefetch]
   );
@@ -390,20 +436,37 @@ export function useMessageData({
     dropFirstPagePrefetch();
     const inputs = prefetchInputsRef.current;
     if (!inputs.plainInboxView || !accountId || accountId === inputs.activeAccountId) return;
-    startFirstPagePrefetch("account", accountId, inputs.buildInboxFirstPageUrl(accountId));
+    startFirstPagePrefetch({ kind: "account", accountId }, inputs.buildInboxFirstPageUrl(accountId));
   }, [dropFirstPagePrefetch, startFirstPagePrefetch]);
 
-  const prefetchDomainFirstPage = useCallback((target: { domain: string; role: DomainFolderRole }) => {
-    dropFirstPagePrefetch();
-    if (!target.domain) return;
-    startFirstPagePrefetch("domain", "", prefetchInputsRef.current.buildDomainFirstPageUrl(target));
-  }, [dropFirstPagePrefetch, startFirstPagePrefetch]);
+  const prefetchDomainFirstPage = useCallback(
+    (target: { domain: string; role: DomainFolderRole }, memberAccountIds?: readonly string[]) => {
+      dropFirstPagePrefetch();
+      if (!target.domain) return;
+      const accountIdsKey = memberAccountIds
+        ? [...memberAccountIds].sort().join(",")
+        : prefetchInputsRef.current.listAccountIdsKey;
+      if (!accountIdsKey) return;
+      startFirstPagePrefetch(
+        { kind: "domain", accountId: "", domain: target.domain, role: target.role, accountIdsKey },
+        prefetchInputsRef.current.buildDomainFirstPageUrl(target)
+      );
+    },
+    [dropFirstPagePrefetch, startFirstPagePrefetch]
+  );
 
   const takeFirstPagePrefetch = (url: string) => {
     const prefetch = firstPagePrefetchRef.current;
     if (!prefetch) return null;
-    if (prefetch.kind === "account" && (Boolean(domainView) || prefetch.accountId !== activeAccountId)) return null;
-    if (prefetch.kind === "domain" && !domainView) return null;
+    if (prefetch.kind === "account") {
+      if (Boolean(domainView) || prefetch.accountId !== activeAccountId) return null;
+    } else {
+      if (!domainView || prefetch.domain !== domainView.domain || prefetch.role !== domainView.role) return null;
+      if (prefetch.accountIdsKey !== listAccountIdsKey) {
+        dropFirstPagePrefetch();
+        return null;
+      }
+    }
     if (prefetch.url !== url) {
       dropFirstPagePrefetch();
       return null;
@@ -457,6 +520,7 @@ export function useMessageData({
             baseCount?: number;
             relatedSubject?: string;
             role?: string;
+            accounts?: string[];
             folders?: Array<{ accountId: string; folderId: string }>;
           };
           const items = Array.isArray(data?.items) ? data.items.filter(Boolean) : [];
@@ -512,6 +576,7 @@ export function useMessageData({
           setHasMoreMessages(Boolean(data?.hasMore));
           setTotalMessages(typeof data?.total === "number" ? data.total : null);
           if (page === 1) {
+            reconcileDomainServerAccounts(data.accounts);
             setDomainRoleFolders(readDomainRoleFolders(data));
             shownPageKeyRef.current = requestKey;
             shownPageUrlRef.current = url;
@@ -587,6 +652,7 @@ export function useMessageData({
         baseCount?: number;
         relatedSubject?: string;
         role?: string;
+        accounts?: string[];
         folders?: Array<{ accountId: string; folderId: string }>;
       };
       const nextMessages = Array.isArray(messageData?.items)
@@ -609,6 +675,7 @@ export function useMessageData({
       if (messageMutationVersionRef.current !== requestMutationVersion) {
         return false;
       }
+      reconcileDomainServerAccounts(messageData.accounts);
       setDomainRoleFolders(readDomainRoleFolders(messageData));
       shownPageKeyRef.current = requestKey;
       shownPageUrlRef.current = requestUrl;

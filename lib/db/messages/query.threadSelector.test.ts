@@ -401,10 +401,10 @@ describe("thread selector flagged EXISTS differential", () => {
     try {
       const page1 = await listThreads({ accountId: acc, folderId: `${acc}:INBOX`, page: 1, pageSize: 10 });
       const page2 = await listThreads({ accountId: acc, folderId: `${acc}:INBOX`, page: 2, pageSize: 10 });
-      // No redundant threadTotal COUNT(*) FROM threads query.
-      expect(sqls.some((sql) => /SELECT COUNT\(\*\).*FROM threads\b/s.test(sql))).toBe(false);
-      // Total count uses the covering folder-thread index, and the unflagged walk uses the threads date index.
-      expect(plans.some((plan) => plan.includes("COVERING INDEX idx_messages_account_folder_thread_deleted"))).toBe(true);
+      // No unconstrained threadTotal COUNT(*) scan over all folder threads (the small flagged-set count is allowed).
+      expect(sqls.some((sql) => /SELECT COUNT\(\*\).*FROM threads t\b.*EXISTS/s.test(sql) && !sql.includes("mf.flagged = 1"))).toBe(false);
+      // Total count uses the partial folder-thread index, and the unflagged walk uses the threads date index.
+      expect(plans.some((plan) => plan.includes("idx_messages_live_account_folder_thread"))).toBe(true);
       expect(plans.some((plan) => plan.includes("USING INDEX idx_threads_account_latest_received"))).toBe(true);
       expect(plans.some((plan) => plan.includes("COVERING INDEX idx_messages_flagged_thread_deleted"))).toBe(true);
       // The 3 flagged inbox threads are selected onto page 1 ahead of older unflagged threads
@@ -420,6 +420,121 @@ describe("thread selector flagged EXISTS differential", () => {
       expect(page1.baseCount).toBe(10);
       expect(page2.items).toHaveLength(10);
       expect(new Set([...page1.items, ...page2.items].map((item) => item.id)).size).toBe(20);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("partial folder index preserves (accountId, threadId) seeks in hot thread-open queries", async () => {
+    const check = await createSharedShardFixture();
+    const acc = check.a.accountId;
+    await check.a.api.saveFoldersForAccount(acc, [
+      { id: `${acc}:INBOX`, accountId: acc, name: "INBOX", count: 0, specialUse: "\\Inbox" }
+    ]);
+    await check.a.api.upsertMessages(acc, null, [
+      check.a.message("<plan-t-1@example.test>", {
+        id: "plan-m-1",
+        messageId: "<plan-m-1@example.test>",
+        folderId: `${acc}:INBOX`,
+        dateValue: Date.UTC(2026, 4, 1, 10, 0, 0)
+      })
+    ]);
+    const explain = (sql: string, ...args: unknown[]) =>
+      (check.db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args) as Array<{ detail: string }>)
+        .map((row) => row.detail)
+        .join(" | ");
+    const threadCountPlan = explain(
+      "SELECT COUNT(*) AS total FROM messages m WHERE m.accountId = ? AND m.threadId = ? AND COALESCE(m.deleted, 0) = 0",
+      acc,
+      "<plan-t-1@example.test>"
+    );
+    const threadExistsPlan = explain(
+      "SELECT 1 FROM messages WHERE accountId=? AND threadId=? AND COALESCE(deleted,0)=0 LIMIT 1",
+      acc,
+      "<plan-t-1@example.test>"
+    );
+    expect(threadCountPlan).toContain("threadId=?");
+    expect(threadCountPlan).not.toContain("idx_messages_live_account_folder_thread");
+    expect(threadExistsPlan).toContain("threadId=?");
+    expect(threadExistsPlan).not.toContain("idx_messages_live_account_folder_thread");
+  });
+
+  test("equal-timestamp large folders paginate without duplicates or gaps across pages", async () => {
+    const tied = await createSharedShardFixture();
+    const acc = tied.a.accountId;
+    await tied.a.api.saveFoldersForAccount(acc, [
+      { id: `${acc}:INBOX`, accountId: acc, name: "INBOX", count: 0, specialUse: "\\Inbox" }
+    ]);
+    const sameTime = Date.UTC(2026, 4, 2, 12, 0, 0);
+    // Insert with descending lexicographical threadIds so PK order differs from rowid order.
+    const TOTAL = 260;
+    const msgs = Array.from({ length: TOTAL }, (_, i) => {
+      const label = String(TOTAL - i).padStart(4, "0");
+      return tied.a.message(`<tie-${label}@example.test>`, {
+        id: `tie-m-${label}`,
+        messageId: `<tie-m-${label}@example.test>`,
+        folderId: `${acc}:INBOX`,
+        dateValue: sameTime,
+        date: new Date(sameTime).toISOString(),
+        flagged: i === 2 || i === 150
+      });
+    });
+    await tied.a.api.upsertMessages(acc, null, msgs);
+
+    const seen: string[] = [];
+    for (let page = 1; page <= 6; page++) {
+      const res = await listThreads({ accountId: acc, folderId: `${acc}:INBOX`, page, pageSize: 50 });
+      seen.push(...res.items.map((item) => item.id));
+      expect(res.hasMore).toBe(page < 6);
+    }
+    expect(seen).toHaveLength(TOTAL);
+    expect(new Set(seen).size).toBe(TOTAL);
+  });
+
+  test("sparse folders skip the threads date walk and use the direct folder-thread path", async () => {
+    const sparse = await createSharedShardFixture();
+    const acc = sparse.a.accountId;
+    await sparse.a.api.saveFoldersForAccount(acc, [
+      { id: `${acc}:INBOX`, accountId: acc, name: "INBOX", count: 0, specialUse: "\\Inbox" },
+      { id: `${acc}:Old`, accountId: acc, name: "Old", count: 0 }
+    ]);
+    const baseTime = Date.UTC(2026, 4, 3, 0, 0, 0);
+    // 210 old threads in Old + 900 newer threads in INBOX => Old is <25% of account threads.
+    const msgs: ReturnType<typeof sparse.a.message>[] = [];
+    for (let i = 0; i < 210; i++) {
+      const t = baseTime + i * 60_000;
+      msgs.push(sparse.a.message(`<old-${i}@example.test>`, {
+        id: `old-m-${i}`,
+        messageId: `<old-m-${i}@example.test>`,
+        folderId: `${acc}:Old`,
+        dateValue: t,
+        date: new Date(t).toISOString()
+      }));
+    }
+    for (let i = 0; i < 900; i++) {
+      const t = baseTime + (300 + i) * 60_000;
+      msgs.push(sparse.a.message(`<inbox-${i}@example.test>`, {
+        id: `inbox-m-${i}`,
+        messageId: `<inbox-m-${i}@example.test>`,
+        folderId: `${acc}:INBOX`,
+        dateValue: t,
+        date: new Date(t).toISOString()
+      }));
+    }
+    await sparse.a.api.upsertMessages(acc, null, msgs);
+
+    const prepare = sparse.db.prepare.bind(sparse.db);
+    const sqls: string[] = [];
+    const spy = spyOn(sparse.db, "prepare").mockImplementation((sql: string) => {
+      sqls.push(sql);
+      return prepare(sql);
+    });
+    try {
+      const page1 = await listThreads({ accountId: acc, folderId: `${acc}:Old`, page: 1, pageSize: 20 });
+      expect(page1.items).toHaveLength(20);
+      expect(page1.total).toBe(210);
+      // Did not force the full threads date-index walk via INDEXED BY idx_threads_account_latest*.
+      expect(sqls.some((sql) => sql.includes("INDEXED BY idx_threads_account_latest"))).toBe(false);
     } finally {
       spy.mockRestore();
     }
