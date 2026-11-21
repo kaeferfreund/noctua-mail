@@ -11,3 +11,13 @@
   gap: 4px;
   cursor: pointer;
 }
+
+/* Attachment marker: a bare muted paperclip (as in Apple Mail / Outlook), not a filled badge. */
+.attachmentIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--gray-10);
+  line-height: 0;
+}
