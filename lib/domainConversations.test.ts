@@ -266,17 +266,49 @@ describe("domain view thread list", () => {
 
   test("deep pages read at most the bounded window from each mailbox", async () => {
     const accounts = await listReadableDomainAccounts(base.principal.user.id, base.domain);
+    const listCandidates = spyOn(messageQuery, "listFolderThreadCandidates");
+    const hydrate = spyOn(messageQuery, "hydrateFolderThreadsForList");
     const listThreads = spyOn(messageQuery, "listThreads");
     try {
       const deep = await listDomainThreads({ accounts, role: "inbox", page: 1000, pageSize: 600, viewerUserId: base.principal.user.id });
-      expect(listThreads.mock.calls.length).toBeGreaterThan(0);
-      expect(listThreads.mock.calls.every(([call]) => call.pageSize <= DOMAIN_THREAD_WINDOW_MAX)).toBe(true);
+      expect(listCandidates.mock.calls.length).toBeGreaterThan(0);
+      expect(listCandidates.mock.calls.every(([call]) => call.limit <= DOMAIN_THREAD_WINDOW_MAX)).toBe(true);
+      // Beyond the window, no message rows are hydrated at all.
+      expect(hydrate.mock.calls.length).toBe(0);
       expect(deep.items).toEqual([]);
       expect(deep.hasMore).toBe(false);
       // The last page inside the window never announces more.
       const last = await listDomainThreads({ accounts, role: "inbox", page: DOMAIN_THREAD_WINDOW_MAX, pageSize: 1, viewerUserId: base.principal.user.id });
       expect(last.hasMore).toBe(false);
-    } finally { listThreads.mockRestore(); }
+      // Search queries still bound listThreads to DOMAIN_THREAD_WINDOW_MAX.
+      const deepSearch = await listDomainThreads({
+        accounts, role: "inbox", page: 1000, pageSize: 600, query: "Synthetic", viewerUserId: base.principal.user.id
+      });
+      expect(listThreads.mock.calls.length).toBeGreaterThan(0);
+      expect(listThreads.mock.calls.every(([call]) => call.pageSize <= DOMAIN_THREAD_WINDOW_MAX)).toBe(true);
+      expect(deepSearch.items).toEqual([]);
+      expect(deepSearch.hasMore).toBe(false);
+    } finally {
+      listCandidates.mockRestore();
+      hydrate.mockRestore();
+      listThreads.mockRestore();
+    }
+  });
+
+  test("two-phase domain merge hydrates only winning threads for the page and counts role-folder items in baseCount", async () => {
+    const accounts = await listReadableDomainAccounts(base.principal.user.id, base.domain);
+    const hydrate = spyOn(messageQuery, "hydrateFolderThreadsForList");
+    try {
+      const first = await listDomainThreads({ accounts, role: "inbox", page: 1, pageSize: 1, viewerUserId: base.principal.user.id });
+      expect(first.items.map((item) => item.id)).toEqual([`u-${base.tag}`]);
+      expect(first.baseCount).toBe(1);
+      expect(first.hasMore).toBe(true);
+      const hydratedThreadCount = hydrate.mock.calls.reduce((sum, [call]) => sum + call.threads.length, 0);
+      // Only the winning threads needed for page 1 (+1 hasMore check) were hydrated, not every thread of every mailbox.
+      expect(hydratedThreadCount).toBeLessThanOrEqual(2);
+    } finally {
+      hydrate.mockRestore();
+    }
   });
 
   test("route: only readable mailboxes; a domain without access answers 404", async () => {

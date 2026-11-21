@@ -15,7 +15,10 @@ type Options = {
   state: DeepLinkState;
   accountIds: string[];
   messages: Message[];
-  switchAccount: (id: string) => Promise<void>;
+  switchAccount: (
+    id: string,
+    options?: { domainView?: { domain: string; role: DeepLinkState["domainRole"] } | null }
+  ) => Promise<void>;
   applyPlace: (state: DeepLinkState) => DeepLinkState;
   resolveMessage: (accountId: string, messageId: string, signal: AbortSignal) => Promise<MessageResolution>;
   onUnauthenticated?: () => void;
@@ -152,10 +155,15 @@ export function useDeepLinks(options: Options) {
       // New-message links may arrive before the user selects a mailbox at the gate.
       if (!work.target.accountId && !work.target.admin && !work.target.security) return;
       work.phase = "switching";
+      const targetDomainView = work.target.domain
+        ? { domain: work.target.domain, role: work.target.domainRole }
+        : null;
       // Even reselecting the currently visible mailbox cancels an older in-flight switch.
-      void options.switchAccount(work.target.accountId).then(() => {
-        if (current()) setSwitched(signal);
-      });
+      void options
+        .switchAccount(work.target.accountId, targetDomainView ? { domainView: targetDomainView } : undefined)
+        .then(() => {
+          if (current()) setSwitched(signal);
+        });
     } else if (work.phase === "account") {
       if (options.state.accountId !== work.target.accountId) {
         // The switch was denied or failed and the controller kept or reloaded another mailbox.

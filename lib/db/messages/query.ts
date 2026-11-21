@@ -1254,6 +1254,16 @@ function getThreadDateColumn(
   return threadDateSource === "latestDateValue" ? "latestDateValue" : "latestReceivedDateValue";
 }
 
+function getThreadDateIndex(threadDateColumn: "latestDateValue" | "latestReceivedDateValue") {
+  return threadDateColumn === "latestDateValue"
+    ? "idx_threads_account_latest"
+    : "idx_threads_account_latest_received";
+}
+
+// Above this folder/account size, walking `threads` in date order with covering-index
+// existence checks beats materializing and temp-B-tree-sorting every thread in scope.
+const THREAD_WALK_MIN_TOTAL = 200;
+
 function applyBadgeFilters(where: string, args: any[], badges?: string[] | null, options: { viewerUserId?: string | null } = {}) {
   const normalized = (badges ?? []).map((badge) => badge.toLowerCase());
   const todoFlagPattern = `%"${TODO_FLAG.toLowerCase()}"%`;
@@ -2813,8 +2823,23 @@ export async function listThreads(params: {
     !attachmentsFilter &&
     normalizedExcludedFolderIds.length === 0;
 
+  const isPlainFolderThreadList =
+    Boolean(folderId) &&
+    !hasQuery &&
+    !hasInviteUidQuery &&
+    !hasIdQuery &&
+    !hasAttachmentFilenameQuery &&
+    !hasAddressSearchFilters(addressFilters) &&
+    inTerms.length === 0 &&
+    threadTerms.length === 0 &&
+    topicTerms.length === 0 &&
+    !noTopicFilter &&
+    (badges?.length ?? 0) === 0 &&
+    !attachmentsFilter;
+
+  const threadDateIndex = getThreadDateIndex(threadDateColumn);
   let threadRows: any[] = [];
-  let threadTotal = 0;
+  let hasMore = false;
   let total = 0;
   let baseCount = 0;
   const inviteDeckSummaryPromise =
@@ -2828,68 +2853,6 @@ export async function listThreads(params: {
       : null;
 
   if (isUnfilteredThreadList) {
-    if (shouldPrioritizeFlaggedThreads) {
-      threadRows = db
-        .prepare(
-          `
-          SELECT t.*, t.${threadDateColumn} as effectiveThreadDateValue
-          FROM threads t
-          WHERE t.accountId = ?
-            AND EXISTS (
-              SELECT 1
-              FROM messages m
-              WHERE m.accountId = t.accountId
-                AND m.threadId = t.threadId
-                AND COALESCE(m.deleted, 0) = 0
-            )
-          ORDER BY
-            EXISTS (
-              SELECT 1 FROM messages mf
-              WHERE mf.accountId = t.accountId AND mf.flagged = 1
-                AND mf.threadId = t.threadId AND COALESCE(mf.deleted, 0) = 0
-            ) DESC,
-            t.${threadDateColumn} DESC
-          LIMIT ? OFFSET ?
-        `
-        )
-        .all(accountId, pageSize, offset) as any[];
-    } else {
-      threadRows = db
-        .prepare(
-          `
-          SELECT t.*, t.${threadDateColumn} as effectiveThreadDateValue
-          FROM threads t
-          WHERE t.accountId = ?
-            AND EXISTS (
-              SELECT 1
-              FROM messages m
-              WHERE m.accountId = t.accountId
-                AND m.threadId = t.threadId
-                AND COALESCE(m.deleted, 0) = 0
-            )
-          ORDER BY t.${threadDateColumn} DESC
-          LIMIT ? OFFSET ?
-        `
-        )
-        .all(accountId, pageSize, offset) as any[];
-    }
-
-    const threadTotalRow = db
-      .prepare(
-        `SELECT COUNT(*) as count
-         FROM threads t
-         WHERE t.accountId = ?
-           AND EXISTS (
-             SELECT 1
-             FROM messages m
-             WHERE m.accountId = t.accountId
-               AND m.threadId = t.threadId
-               AND COALESCE(m.deleted, 0) = 0
-           )`
-      )
-      .get(accountId) as { count: number } | undefined;
-    threadTotal = threadTotalRow?.count ?? 0;
-
     const totalRow = db
       .prepare(
         `SELECT COUNT(*) as count
@@ -2898,6 +2861,115 @@ export async function listThreads(params: {
       )
       .get(accountId) as { count: number } | undefined;
     total = totalRow?.count ?? 0;
+
+    if (total === 0) {
+      threadRows = [];
+      hasMore = false;
+    } else if (shouldPrioritizeFlaggedThreads && total > Math.max(THREAD_WALK_MIN_TOTAL, (offset + pageSize) * 2)) {
+      const flaggedRows = db
+        .prepare(
+          `
+          SELECT t.*, t.${threadDateColumn} as effectiveThreadDateValue
+          FROM threads t
+          WHERE t.accountId = ?
+            AND t.threadId IN (
+              SELECT mf.threadId FROM messages mf
+              WHERE mf.accountId = ? AND mf.flagged = 1 AND COALESCE(mf.deleted, 0) = 0
+            )
+            AND EXISTS (
+              SELECT 1
+              FROM messages m
+              WHERE m.accountId = t.accountId
+                AND m.threadId = t.threadId
+                AND COALESCE(m.deleted, 0) = 0
+            )
+          ORDER BY +t.${threadDateColumn} DESC
+        `
+        )
+        .all(accountId, accountId) as any[];
+      const flaggedSlice = offset < flaggedRows.length ? flaggedRows.slice(offset, offset + pageSize + 1) : [];
+      const remaining = pageSize + 1 - flaggedSlice.length;
+      const unflaggedRows =
+        remaining > 0
+          ? (db
+              .prepare(
+                `
+                SELECT t.*, t.${threadDateColumn} as effectiveThreadDateValue
+                FROM threads t INDEXED BY ${threadDateIndex}
+                WHERE t.accountId = ?
+                  AND EXISTS (
+                    SELECT 1
+                    FROM messages m
+                    WHERE m.accountId = t.accountId
+                      AND m.threadId = t.threadId
+                      AND COALESCE(m.deleted, 0) = 0
+                  )
+                  ${
+                    flaggedRows.length > 0
+                      ? `AND NOT EXISTS (
+                          SELECT 1 FROM messages mf
+                          WHERE mf.accountId = t.accountId AND mf.flagged = 1
+                            AND mf.threadId = t.threadId AND COALESCE(mf.deleted, 0) = 0
+                        )`
+                      : ""
+                  }
+                ORDER BY t.${threadDateColumn} DESC
+                LIMIT ? OFFSET ?
+              `
+              )
+              .all(accountId, remaining, Math.max(0, offset - flaggedRows.length)) as any[])
+          : [];
+      const combined = [...flaggedSlice, ...unflaggedRows];
+      hasMore = combined.length > pageSize;
+      threadRows = hasMore ? combined.slice(0, pageSize) : combined;
+    } else {
+      const rawThreadRows = shouldPrioritizeFlaggedThreads
+        ? (db
+            .prepare(
+              `
+              SELECT t.*, t.${threadDateColumn} as effectiveThreadDateValue
+              FROM threads t
+              WHERE t.accountId = ?
+                AND EXISTS (
+                  SELECT 1
+                  FROM messages m
+                  WHERE m.accountId = t.accountId
+                    AND m.threadId = t.threadId
+                    AND COALESCE(m.deleted, 0) = 0
+                )
+              ORDER BY
+                EXISTS (
+                  SELECT 1 FROM messages mf
+                  WHERE mf.accountId = t.accountId AND mf.flagged = 1
+                    AND mf.threadId = t.threadId AND COALESCE(mf.deleted, 0) = 0
+                ) DESC,
+                t.${threadDateColumn} DESC
+              LIMIT ? OFFSET ?
+            `
+            )
+            .all(accountId, pageSize + 1, offset) as any[])
+        : (db
+            .prepare(
+              `
+              SELECT t.*, t.${threadDateColumn} as effectiveThreadDateValue
+              FROM threads t
+              WHERE t.accountId = ?
+                AND EXISTS (
+                  SELECT 1
+                  FROM messages m
+                  WHERE m.accountId = t.accountId
+                    AND m.threadId = t.threadId
+                    AND COALESCE(m.deleted, 0) = 0
+                )
+              ORDER BY t.${threadDateColumn} DESC
+              LIMIT ? OFFSET ?
+            `
+            )
+            .all(accountId, pageSize + 1, offset) as any[]);
+      hasMore = rawThreadRows.length > pageSize;
+      threadRows = hasMore ? rawThreadRows.slice(0, pageSize) : rawThreadRows;
+    }
+
     const threadIdsForBaseCount = threadRows.map((row) => row.threadId);
     const baseCountRow =
       threadIdsForBaseCount.length > 0
@@ -2913,47 +2985,6 @@ export async function listThreads(params: {
         : { count: 0 };
     baseCount = baseCountRow?.count ?? 0;
   } else {
-    const threadFilterSql = `SELECT DISTINCT m.threadId FROM messages m WHERE ${where}`;
-    const flaggedOrderArgs: any[] = [];
-    let threadOrderSql = `t.${threadDateColumn} DESC`;
-    if (shouldPrioritizeFlaggedThreads) {
-      let flaggedWhere = "mf.accountId = t.accountId AND mf.flagged = 1 AND mf.threadId = t.threadId";
-      flaggedWhere = applyVisibleMessageFilters(flaggedWhere, "mf");
-      flaggedWhere = applyExcludedFolderFilters(
-        flaggedWhere,
-        flaggedOrderArgs,
-        excludedFolderIds,
-        "mf"
-      );
-      threadOrderSql =
-        `EXISTS (SELECT 1 FROM messages mf WHERE ${flaggedWhere}) DESC, t.${threadDateColumn} DESC`;
-    }
-
-    threadRows = db
-      .prepare(
-        `
-        SELECT t.*, t.${threadDateColumn} as effectiveThreadDateValue
-        FROM threads t
-        WHERE t.accountId = ?
-          AND t.threadId IN (${threadFilterSql})
-        ORDER BY ${threadOrderSql}
-        LIMIT ? OFFSET ?
-      `
-      )
-      .all(accountId, ...args, ...flaggedOrderArgs, pageSize, offset) as any[];
-
-    const threadTotalRow = db
-      .prepare(
-        `
-        SELECT COUNT(*) as count
-        FROM threads t
-        WHERE t.accountId = ?
-          AND t.threadId IN (${threadFilterSql})
-      `
-      )
-      .get(accountId, ...args) as { count: number };
-    threadTotal = threadTotalRow?.count ?? 0;
-
     if (groupBy !== INVITE_DECK_GROUP_BY) {
       total = await getTotalCount({
         accountId,
@@ -2969,6 +3000,119 @@ export async function listThreads(params: {
         participants,
         searchCandidates
       });
+    }
+
+    const usePlainFolderWalk =
+      isPlainFolderThreadList &&
+      Boolean(folderId) &&
+      groupBy !== INVITE_DECK_GROUP_BY &&
+      !normalizedExcludedFolderIds.includes(folderId!) &&
+      total > Math.max(THREAD_WALK_MIN_TOTAL, (offset + pageSize) * 2);
+
+    if (isPlainFolderThreadList && groupBy !== INVITE_DECK_GROUP_BY && total === 0) {
+      threadRows = [];
+      hasMore = false;
+    } else if (usePlainFolderWalk) {
+      const flaggedSubqueryArgs: any[] = [accountId];
+      let flaggedSubqueryWhere = "mf.accountId = ? AND mf.flagged = 1 AND COALESCE(mf.deleted, 0) = 0";
+      flaggedSubqueryWhere = applyExcludedFolderFilters(
+        flaggedSubqueryWhere,
+        flaggedSubqueryArgs,
+        excludedFolderIds,
+        "mf"
+      );
+      const flaggedRows = db
+        .prepare(
+          `
+          SELECT t.*, t.${threadDateColumn} as effectiveThreadDateValue
+          FROM threads t
+          WHERE t.accountId = ?
+            AND t.threadId IN (
+              SELECT mf.threadId FROM messages mf
+              WHERE ${flaggedSubqueryWhere}
+            )
+            AND EXISTS (
+              SELECT 1 FROM messages m
+              WHERE m.accountId = t.accountId
+                AND m.folderId = ?
+                AND m.threadId = t.threadId
+                AND COALESCE(m.deleted, 0) = 0
+            )
+          ORDER BY +t.${threadDateColumn} DESC
+        `
+        )
+        .all(accountId, ...flaggedSubqueryArgs, folderId) as any[];
+      const flaggedSlice = offset < flaggedRows.length ? flaggedRows.slice(offset, offset + pageSize + 1) : [];
+      const remaining = pageSize + 1 - flaggedSlice.length;
+      let unflaggedRows: any[] = [];
+      if (remaining > 0) {
+        const unflaggedArgs: any[] = [accountId, folderId];
+        let notFlaggedSql = "";
+        if (flaggedRows.length > 0) {
+          let notFlaggedWhere = "mf.accountId = t.accountId AND mf.flagged = 1 AND mf.threadId = t.threadId";
+          notFlaggedWhere = applyVisibleMessageFilters(notFlaggedWhere, "mf");
+          notFlaggedWhere = applyExcludedFolderFilters(
+            notFlaggedWhere,
+            unflaggedArgs,
+            excludedFolderIds,
+            "mf"
+          );
+          notFlaggedSql = `AND NOT EXISTS (SELECT 1 FROM messages mf WHERE ${notFlaggedWhere})`;
+        }
+        unflaggedRows = db
+          .prepare(
+            `
+            SELECT t.*, t.${threadDateColumn} as effectiveThreadDateValue
+            FROM threads t INDEXED BY ${threadDateIndex}
+            WHERE t.accountId = ?
+              AND EXISTS (
+                SELECT 1 FROM messages m
+                WHERE m.accountId = t.accountId
+                  AND m.folderId = ?
+                  AND m.threadId = t.threadId
+                  AND COALESCE(m.deleted, 0) = 0
+              )
+              ${notFlaggedSql}
+            ORDER BY t.${threadDateColumn} DESC
+            LIMIT ? OFFSET ?
+          `
+          )
+          .all(...unflaggedArgs, remaining, Math.max(0, offset - flaggedRows.length)) as any[];
+      }
+      const combined = [...flaggedSlice, ...unflaggedRows];
+      hasMore = combined.length > pageSize;
+      threadRows = hasMore ? combined.slice(0, pageSize) : combined;
+    } else {
+      const threadFilterSql = `SELECT DISTINCT m.threadId FROM messages m WHERE ${where}`;
+      const flaggedOrderArgs: any[] = [];
+      let threadOrderSql = `t.${threadDateColumn} DESC`;
+      if (shouldPrioritizeFlaggedThreads) {
+        let flaggedWhere = "mf.accountId = t.accountId AND mf.flagged = 1 AND mf.threadId = t.threadId";
+        flaggedWhere = applyVisibleMessageFilters(flaggedWhere, "mf");
+        flaggedWhere = applyExcludedFolderFilters(
+          flaggedWhere,
+          flaggedOrderArgs,
+          excludedFolderIds,
+          "mf"
+        );
+        threadOrderSql =
+          `EXISTS (SELECT 1 FROM messages mf WHERE ${flaggedWhere}) DESC, t.${threadDateColumn} DESC`;
+      }
+
+      const rawThreadRows = db
+        .prepare(
+          `
+          SELECT t.*, t.${threadDateColumn} as effectiveThreadDateValue
+          FROM threads t
+          WHERE t.accountId = ?
+            AND t.threadId IN (${threadFilterSql})
+          ORDER BY ${threadOrderSql}
+          LIMIT ? OFFSET ?
+        `
+        )
+        .all(accountId, ...args, ...flaggedOrderArgs, pageSize + 1, offset) as any[];
+      hasMore = rawThreadRows.length > pageSize;
+      threadRows = hasMore ? rawThreadRows.slice(0, pageSize) : rawThreadRows;
     }
 
     const threadIdsForBaseCount = threadRows.map((row) => row.threadId);
@@ -2990,7 +3134,6 @@ export async function listThreads(params: {
     baseCount = baseCountRow?.count ?? 0;
   }
 
-  const threadIds = threadRows.map((row) => row.threadId);
   const threadDateValueByThreadId = new Map<string, number>();
   threadRows.forEach((row) => {
     const value =
@@ -3004,25 +3147,139 @@ export async function listThreads(params: {
     threadDateValueByThreadId.set(row.threadId, value);
   });
 
+  const shouldExpandTopicMatchedThreads = topicTerms.length > 0 || noTopicFilter;
+  const items = await hydrateThreadListMessages({
+    db,
+    accountId,
+    threadIds: threadRows.map((row) => row.threadId),
+    threadDateValueByThreadId,
+    groupBy,
+    excludedFolderIds: shouldExpandTopicMatchedThreads ? undefined : excludedFolderIds
+  });
+  const inviteDeckSummary = inviteDeckSummaryPromise
+    ? await inviteDeckSummaryPromise
+    : null;
+
+  const groups =
+    inviteDeckSummary?.groups ??
+    (await (groupBy === EVENT_GROUP_BY
+      ? getEventGroupCounts({ db, where, args }).then((rows) => groupsFromRows(rows, groupBy))
+      : groupBy === "date"
+        ? getLoadedDateGroups(items)
+        : isThreadDateSensitiveGroupBy(groupBy)
+          ? getThreadGroupCounts({
+              db,
+              accountId,
+              where,
+              args,
+              groupBy,
+              threadDateColumn
+            })
+          : getGroupCounts({
+              accountId,
+              folderId,
+              query: query ?? undefined,
+              groupBy,
+              fields,
+              badges,
+              viewerUserId,
+              attachmentsOnly,
+              excludedFolderIds,
+              from,
+              recipients,
+              participants,
+              searchCandidates
+            })));
+
+  return { items, groups, total: inviteDeckSummary?.total ?? total, hasMore, baseCount };
+}
+
+async function hydrateThreadListMessages(params: {
+  db: any;
+  accountId: string;
+  threadIds: string[];
+  threadDateValueByThreadId: Map<string, number>;
+  groupBy: string;
+  excludedFolderIds?: string[] | null;
+}): Promise<Message[]> {
+  const { db, accountId, threadIds, threadDateValueByThreadId, groupBy, excludedFolderIds } = params;
+  if (threadIds.length === 0) return [];
   const threadMessageArgs: any[] = [accountId];
   let threadMessageWhere = applyVisibleMessageFilters("m.accountId = ?");
-  const shouldExpandTopicMatchedThreads = topicTerms.length > 0 || noTopicFilter;
-  if (!shouldExpandTopicMatchedThreads) {
-    threadMessageWhere = applyExcludedFolderFilters(
-      threadMessageWhere,
-      threadMessageArgs,
-      excludedFolderIds
-    );
-  }
+  threadMessageWhere = applyExcludedFolderFilters(
+    threadMessageWhere,
+    threadMessageArgs,
+    excludedFolderIds
+  );
 
   // Seek the page's threads instead of walking the account's date index; the
   // rowid tie-break keeps the order that walk produced for equal dates.
-  const messagesRows =
-    threadIds.length > 0
-      ? (db
+  const QUERY_BATCH_SIZE = 400;
+  const messagesRows: any[] = [];
+  if (threadIds.length <= QUERY_BATCH_SIZE) {
+    messagesRows.push(
+      ...(db
+        .prepare(
+          `
+          SELECT
+            m.id,
+            m.accountId,
+            m.folderId,
+            m.mailboxPath,
+            m.imapUid,
+            m.threadId,
+            m.parentId,
+            m.messageId,
+            m.inReplyTo,
+            m."references" as "references",
+            m.xForwardedMessageId,
+            m.subject,
+            m.fromAddr,
+            m.senderKey,
+            m.replyToAddr,
+            m.toAddr,
+            m.ccAddr,
+            m.bccAddr,
+            m.preview,
+            m.date,
+            m.dateValue,
+            m.priority,
+            m.hasSource,
+            m.sizeBytes, m.deliveredTo, m.originalTo, m.senderIdentityId,
+            m.unread,
+            m.flags,
+            m.seen,
+            m.answered,
+            m.flagged,
+            m.deleted,
+            m.draft,
+            m.recent,
+            m.category,
+            m.categoryScore,
+            m.categorySignals,
+            m.spamVerdict,
+            m.spamConfidence,
+            m.spamReasons,
+            ${buildMeaningfulAttachmentExistsSql("m")} as hasAttachments,
+            EXISTS(SELECT 1 FROM attachments a WHERE a.accountId = m.accountId AND a.messageId = m.id AND a.inline = 1)
+              as hasInlineAttachments
+          FROM messages m INDEXED BY idx_messages_account_thread_date
+          WHERE ${threadMessageWhere}
+            AND m.threadId IN (${threadIds.map(() => "?").join(",")})
+          ORDER BY m.dateValue DESC, m.rowid ASC
+        `
+        )
+        .all(...threadMessageArgs, ...threadIds) as any[])
+    );
+  } else {
+    for (let start = 0; start < threadIds.length; start += QUERY_BATCH_SIZE) {
+      const chunk = threadIds.slice(start, start + QUERY_BATCH_SIZE);
+      messagesRows.push(
+        ...(db
           .prepare(
             `
             SELECT
+              m.rowid as _rowid,
               m.id,
               m.accountId,
               m.folderId,
@@ -3066,15 +3323,15 @@ export async function listThreads(params: {
                 as hasInlineAttachments
             FROM messages m INDEXED BY idx_messages_account_thread_date
             WHERE ${threadMessageWhere}
-              AND m.threadId IN (${threadIds.map(() => "?").join(",")})
-            ORDER BY m.dateValue DESC, m.rowid ASC
+              AND m.threadId IN (${chunk.map(() => "?").join(",")})
           `
           )
-          .all(...threadMessageArgs, ...threadIds) as any[])
-      : [];
-  const inviteDeckSummary = inviteDeckSummaryPromise
-    ? await inviteDeckSummaryPromise
-    : null;
+          .all(...threadMessageArgs, ...chunk) as any[])
+      );
+    }
+    messagesRows.sort((a, b) => b.dateValue - a.dateValue || a._rowid - b._rowid);
+  }
+
   const eventGroupsByMessageId =
     groupBy === EVENT_GROUP_BY
       ? await getEventGroupInfoByMessageId(
@@ -3100,7 +3357,7 @@ export async function listThreads(params: {
   // Date-sensitive keys depend only on the thread date: derive them once per thread.
   const threadDateGroupKeyByThreadId = new Map<string, string>();
   const displayDays = createDisplayDayContext();
-  const items: Message[] = messagesRows.map((row) => {
+  return messagesRows.map((row) => {
     const calendarInviteData = calendarInviteDataByMessageId.get(row.id);
     const message: Message = {
       id: row.id,
@@ -3132,7 +3389,7 @@ export async function listThreads(params: {
       priority: row.priority ?? undefined,
       hasSource: Boolean(row.hasSource),
       ...hydrateIdentityMetadata(row),
-    sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
+      sizeBytes: typeof row.sizeBytes === "number" ? row.sizeBytes : undefined,
       hasAttachments: Boolean(row.hasAttachments),
       hasInlineAttachments: Boolean(row.hasInlineAttachments),
       attachments: [],
@@ -3170,40 +3427,139 @@ export async function listThreads(params: {
       buildGroupKey(message, groupBy, undefined, displayDays);
     return message;
   });
+}
 
-  const groups =
-    inviteDeckSummary?.groups ??
-    (await (groupBy === EVENT_GROUP_BY
-      ? getEventGroupCounts({ db, where, args }).then((rows) => groupsFromRows(rows, groupBy))
-      : groupBy === "date"
-        ? getLoadedDateGroups(items)
-        : isThreadDateSensitiveGroupBy(groupBy)
-          ? getThreadGroupCounts({
-              db,
-              accountId,
-              where,
-              args,
-              groupBy,
-              threadDateColumn
-            })
-          : getGroupCounts({
-              accountId,
-              folderId,
-              query: query ?? undefined,
-              groupBy,
-              fields,
-              badges,
-              viewerUserId,
-              attachmentsOnly,
-              excludedFolderIds,
-              from,
-              recipients,
-              participants,
-              searchCandidates
-            })));
+export type FolderThreadCandidate = {
+  threadId: string;
+  sortDateValue: number;
+  messageCount: number;
+};
 
-  const hasMore = offset + threadRows.length < threadTotal;
-  return { items, groups, total: inviteDeckSummary?.total ?? total, hasMore, baseCount };
+/**
+ * Lightweight Phase-1 candidate read for multi-mailbox domain merges: reads
+ * only `(threadId, sortDateValue, messageCount)` and the folder's live message
+ * count without touching `messages` rows or body overflow pages.
+ */
+export async function listFolderThreadCandidates(params: {
+  accountId: string;
+  folderId: string;
+  limit: number;
+  groupBy?: string;
+  threadDateSource?: ThreadDateSource;
+}): Promise<{ candidates: FolderThreadCandidate[]; total: number; hasMore: boolean }> {
+  const {
+    accountId,
+    folderId,
+    limit,
+    groupBy = "date",
+    threadDateSource = DEFAULT_THREAD_DATE_SOURCE
+  } = params;
+  const db = await getAccountDb(accountId);
+  const totalRow = db
+    .prepare(
+      `SELECT COUNT(*) as count
+       FROM messages m
+       WHERE m.accountId = ? AND m.folderId = ? AND COALESCE(m.deleted, 0) = 0`
+    )
+    .get(accountId, folderId) as { count: number } | undefined;
+  const total = totalRow?.count ?? 0;
+  if (total === 0 || limit <= 0) {
+    return { candidates: [], total, hasMore: total > 0 };
+  }
+
+  const normalizedThreadDateSource = normalizeThreadDateSource(threadDateSource);
+  const threadDateColumn = getThreadDateColumn(groupBy, normalizedThreadDateSource);
+  const threadDateIndex = getThreadDateIndex(threadDateColumn);
+  const rawRows =
+    total > Math.max(THREAD_WALK_MIN_TOTAL, limit * 2)
+      ? (db
+          .prepare(
+            `
+            SELECT t.threadId, t.${threadDateColumn} as effectiveThreadDateValue, t.latestDateValue, t.messageCount
+            FROM threads t INDEXED BY ${threadDateIndex}
+            WHERE t.accountId = ?
+              AND EXISTS (
+                SELECT 1 FROM messages m
+                WHERE m.accountId = t.accountId
+                  AND m.folderId = ?
+                  AND m.threadId = t.threadId
+                  AND COALESCE(m.deleted, 0) = 0
+              )
+            ORDER BY t.${threadDateColumn} DESC
+            LIMIT ?
+          `
+          )
+          .all(accountId, folderId, limit + 1) as Array<{
+          threadId: string;
+          effectiveThreadDateValue: number | null;
+          latestDateValue: number | null;
+          messageCount: number | null;
+        }>)
+      : (db
+          .prepare(
+            `
+            SELECT t.threadId, t.${threadDateColumn} as effectiveThreadDateValue, t.latestDateValue, t.messageCount
+            FROM threads t
+            WHERE t.accountId = ?
+              AND t.threadId IN (
+                SELECT DISTINCT m.threadId FROM messages m
+                WHERE m.accountId = ? AND m.folderId = ? AND COALESCE(m.deleted, 0) = 0
+              )
+            ORDER BY t.${threadDateColumn} DESC
+            LIMIT ?
+          `
+          )
+          .all(accountId, accountId, folderId, limit + 1) as Array<{
+          threadId: string;
+          effectiveThreadDateValue: number | null;
+          latestDateValue: number | null;
+          messageCount: number | null;
+        }>);
+
+  const hasMore = rawRows.length > limit;
+  const rows = hasMore ? rawRows.slice(0, limit) : rawRows;
+  const candidates: FolderThreadCandidate[] = rows.map((row) => ({
+    threadId: row.threadId,
+    sortDateValue:
+      typeof row.effectiveThreadDateValue === "number" && Number.isFinite(row.effectiveThreadDateValue)
+        ? row.effectiveThreadDateValue
+        : typeof row.latestDateValue === "number" && Number.isFinite(row.latestDateValue)
+          ? row.latestDateValue
+          : 0,
+    messageCount:
+      typeof row.messageCount === "number" && Number.isFinite(row.messageCount) && row.messageCount > 0
+        ? row.messageCount
+        : 1
+  }));
+  return { candidates, total, hasMore };
+}
+
+/**
+ * Phase-2 hydration for winning threads selected by `listDomainThreads`:
+ * reuses the exact same row query and enrichment as `listThreads`.
+ */
+export async function hydrateFolderThreadsForList(params: {
+  accountId: string;
+  threads: Array<{ threadId: string; sortDateValue: number }>;
+  groupBy?: string;
+}): Promise<Message[]> {
+  if (params.threads.length === 0) return [];
+  const db = await getAccountDb(params.accountId);
+  const threadDateValueByThreadId = new Map<string, number>();
+  const threadIds: string[] = [];
+  for (const thread of params.threads) {
+    if (!threadDateValueByThreadId.has(thread.threadId)) {
+      threadIds.push(thread.threadId);
+      threadDateValueByThreadId.set(thread.threadId, thread.sortDateValue);
+    }
+  }
+  return hydrateThreadListMessages({
+    db,
+    accountId: params.accountId,
+    threadIds,
+    threadDateValueByThreadId,
+    groupBy: params.groupBy ?? "date"
+  });
 }
 
 export type ThreadMessageProjection = "full" | "headers";

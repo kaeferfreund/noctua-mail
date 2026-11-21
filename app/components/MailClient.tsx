@@ -1337,6 +1337,7 @@ export default function MailClient({
     markMessagesMutated,
     authoritativeRevision,
     prefetchFirstPage,
+    prefetchDomainFirstPage,
     dropFirstPagePrefetch,
     domainFolderIds,
     domainRoleFolders,
@@ -1713,7 +1714,9 @@ export default function MailClient({
     setEditingAccount,
     setDeletingFolderIds,
     prefetchFirstPage,
+    prefetchDomainFirstPage,
     dropFirstPagePrefetch,
+    setDomainView,
     viewCache,
     setSwitchPending
   });

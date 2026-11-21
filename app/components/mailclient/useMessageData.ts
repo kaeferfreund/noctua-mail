@@ -116,6 +116,7 @@ export function useMessageData({
   // of the key; rows read in one row format are never cached under the other's URL.
   const shownPageUrlRef = useRef<string | null>(null);
   const firstPagePrefetchRef = useRef<{
+    kind: "account" | "domain";
     accountId: string;
     url: string;
     response: Promise<Response>;
@@ -209,9 +210,13 @@ export function useMessageData({
     });
 
   // Free-text and related searches are not cached: every query is a new key and
-  // would push the visited mailboxes out. The domain view is never cached: its rows
-  // come from several mailboxes and are re-read with each visit's access.
-  const cacheableView = Boolean(viewCache) && !query.trim() && !domainView;
+  // would push the visited mailboxes out. Domain views are cached keyed by their
+  // exact granted member-account set and pruned synchronously when any member is
+  // revoked, on session changes, or on 401/403/404.
+  const cacheableSingleView = Boolean(viewCache) && !query.trim() && !domainView;
+  const cacheableDomainView =
+    Boolean(viewCache) && !query.trim() && Boolean(domainView) && Boolean(listAccountIds && listAccountIds.size > 0);
+  const cacheableView = cacheableSingleView || cacheableDomainView;
   const firstPageUrl = buildQueryUrl(1);
 
   // Reset list state when the query key changes; a list visited earlier starts from
@@ -222,9 +227,14 @@ export function useMessageData({
       window.clearTimeout(filteredSearchRefreshTimerRef.current);
       filteredSearchRefreshTimerRef.current = null;
     }
-    const cached = cacheableView ? viewCache?.readList(firstPageUrl, activeAccountId) ?? null : null;
+    const cached = cacheableDomainView && listAccountIds
+      ? viewCache?.readDomainList(firstPageUrl, listAccountIds) ?? null
+      : cacheableSingleView
+        ? viewCache?.readList(firstPageUrl, activeAccountId) ?? null
+        : null;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Restore the external view cache and abort the superseded request atomically before paint.
     setMessages(cached?.rows ?? []);
+    setDomainRoleFolders(domainView ? (cached?.domainRoleFolders ?? NO_DOMAIN_ROLE_FOLDERS) : NO_DOMAIN_ROLE_FOLDERS);
     setMessagesPage(1);
     setHasMoreMessages(cached?.hasMore ?? true);
     setLoadedMessageCount(cached?.loadedCount ?? 0);
@@ -259,22 +269,29 @@ export function useMessageData({
     const firstPage = firstPageSizeRef.current?.key === messagesKey ? firstPageSizeRef.current : null;
     if (messagesPage > 1 && !firstPage) return;
     const pagedFurther = messagesPage > 1 && firstPage !== null;
-    viewCache.writeList(firstPageUrl, {
+    const entry = {
       accountId: activeAccountId,
       rows: pagedFurther ? messages.slice(0, firstPage.itemCount) : messages,
       groupMeta,
       hasMore: pagedFurther || hasMoreMessages,
       total: totalMessages,
-      loadedCount: pagedFurther ? firstPage.loadedCount : loadedMessageCount
-    });
-  }, [viewCache, cacheableView, messagesKey, firstPageUrl, activeAccountId, messages, groupMeta, hasMoreMessages,
+      loadedCount: pagedFurther ? firstPage.loadedCount : loadedMessageCount,
+      ...(domainView ? { domainRoleFolders } : {})
+    };
+    if (cacheableDomainView && listAccountIds) {
+      viewCache.writeDomainList(firstPageUrl, entry, listAccountIds);
+    } else {
+      viewCache.writeList(firstPageUrl, entry);
+    }
+  }, [viewCache, cacheableView, cacheableDomainView, listAccountIds, domainView, domainRoleFolders, messagesKey, firstPageUrl, activeAccountId, messages, groupMeta, hasMoreMessages,
     totalMessages, loadedMessageCount, messagesPage]);
 
   // The server denied the list: nothing it showed stays on screen or in the cache. Only
   // this list's entry is dropped; a signed-out session clears the whole cache and a
   // revoked mailbox is pruned with the account list.
   const dropDeniedList = (status: number, showsList: boolean, firstPageUrl: string) => {
-    if (status !== 401 && status !== 403) return;
+    const denied = status === 401 || status === 403 || (status === 404 && Boolean(domainView));
+    if (!denied) return;
     viewCache?.dropList(firstPageUrl);
     if (!showsList) return;
     setMessages([]);
@@ -312,6 +329,25 @@ export function useMessageData({
       searchBadges: { attachments: false },
       effectiveSearchBadges: []
     });
+  const buildDomainFirstPageUrl = (target: { domain: string; role: DomainFolderRole }) =>
+    buildMessageListQueryUrl({
+      accountId: activeAccountId,
+      page: 1,
+      groupBy,
+      searchScope: "folder",
+      activeFolderId: "",
+      currentSearchExcludedFolderIds: [],
+      supportsThreads: true,
+      threadDateSource,
+      sortBy: "date",
+      isRelatedSearch: false,
+      relatedQueryId: "",
+      query: "",
+      selectedSearchFields,
+      searchBadges: { attachments: false },
+      effectiveSearchBadges: [],
+      domainView: target
+    });
   const plainInboxView =
     !domainView &&
     searchScope === "folder" &&
@@ -321,28 +357,53 @@ export function useMessageData({
     effectiveSearchBadges.length === 0 &&
     Boolean(activeAccountId) &&
     activeFolderId === `${activeAccountId}:INBOX`;
-  const prefetchInputsRef = useRef({ activeAccountId, apiFetch, plainInboxView, buildInboxFirstPageUrl });
-  useLayoutEffect(() => {
-    prefetchInputsRef.current = { activeAccountId, apiFetch, plainInboxView, buildInboxFirstPageUrl };
+  const prefetchInputsRef = useRef({
+    activeAccountId,
+    apiFetch,
+    plainInboxView,
+    buildInboxFirstPageUrl,
+    buildDomainFirstPageUrl
   });
+  useLayoutEffect(() => {
+    prefetchInputsRef.current = {
+      activeAccountId,
+      apiFetch,
+      plainInboxView,
+      buildInboxFirstPageUrl,
+      buildDomainFirstPageUrl
+    };
+  });
+  const startFirstPagePrefetch = useCallback(
+    (kind: "account" | "domain", accountId: string, url: string) => {
+      const controller = new AbortController();
+      const response = prefetchInputsRef.current.apiFetch(url, { signal: controller.signal });
+      // A prefetch that is dropped before anyone awaits it must not surface as unhandled.
+      response.catch(() => {});
+      const timer = window.setTimeout(() => {
+        if (firstPagePrefetchRef.current?.controller === controller) dropFirstPagePrefetch();
+      }, 10_000);
+      firstPagePrefetchRef.current = { kind, accountId, url, response, controller, timer };
+    },
+    [dropFirstPagePrefetch]
+  );
   const prefetchFirstPage = useCallback((accountId: string) => {
     dropFirstPagePrefetch();
     const inputs = prefetchInputsRef.current;
     if (!inputs.plainInboxView || !accountId || accountId === inputs.activeAccountId) return;
-    const url = inputs.buildInboxFirstPageUrl(accountId);
-    const controller = new AbortController();
-    const response = inputs.apiFetch(url, { signal: controller.signal });
-    // A prefetch that is dropped before anyone awaits it must not surface as unhandled.
-    response.catch(() => {});
-    const timer = window.setTimeout(() => {
-      if (firstPagePrefetchRef.current?.controller === controller) dropFirstPagePrefetch();
-    }, 10_000);
-    firstPagePrefetchRef.current = { accountId, url, response, controller, timer };
-  }, [dropFirstPagePrefetch]);
+    startFirstPagePrefetch("account", accountId, inputs.buildInboxFirstPageUrl(accountId));
+  }, [dropFirstPagePrefetch, startFirstPagePrefetch]);
+
+  const prefetchDomainFirstPage = useCallback((target: { domain: string; role: DomainFolderRole }) => {
+    dropFirstPagePrefetch();
+    if (!target.domain) return;
+    startFirstPagePrefetch("domain", "", prefetchInputsRef.current.buildDomainFirstPageUrl(target));
+  }, [dropFirstPagePrefetch, startFirstPagePrefetch]);
 
   const takeFirstPagePrefetch = (url: string) => {
     const prefetch = firstPagePrefetchRef.current;
-    if (!prefetch || prefetch.accountId !== activeAccountId) return null;
+    if (!prefetch) return null;
+    if (prefetch.kind === "account" && (Boolean(domainView) || prefetch.accountId !== activeAccountId)) return null;
+    if (prefetch.kind === "domain" && !domainView) return null;
     if (prefetch.url !== url) {
       dropFirstPagePrefetch();
       return null;
@@ -621,6 +682,7 @@ export function useMessageData({
     currentKeyRef,
     markMessagesMutated,
     prefetchFirstPage,
+    prefetchDomainFirstPage,
     dropFirstPagePrefetch,
     domainFolderIds: domainRoleFolders.folderIds,
     domainRoleFolders

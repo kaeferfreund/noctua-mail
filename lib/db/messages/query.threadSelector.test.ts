@@ -39,8 +39,8 @@ async function captureList(db: Awaited<ReturnType<typeof createSharedShardFixtur
           const filterEnd = args.length - 2 - excludedArgs;
           args = [params.accountId, ...args.slice(filterEnd, -2), ...args.slice(0, filterEnd), ...args.slice(-2)];
         }
-        selected = statement.all(...args) as ThreadRow[];
-        return selected;
+        selected = (statement.all(...args) as ThreadRow[]).slice(0, params.pageSize);
+        return statement.all(...args);
       }
     };
   });
@@ -344,6 +344,84 @@ describe("thread selector flagged EXISTS differential", () => {
       }
       await differential({ query: "needle" }, false, accountId);
       await differential({ badges: ["assigned-to-me"], viewerUserId }, false, accountId);
+    }
+  });
+
+  test("large folders use the covering folder-thread index and two-pass threads walk without a threadTotal scan", async () => {
+    const large = await createSharedShardFixture();
+    const acc = large.a.accountId;
+    await large.a.api.saveFoldersForAccount(acc, [
+      { id: `${acc}:INBOX`, accountId: acc, name: "INBOX", count: 0, specialUse: "\\Inbox" },
+      { id: `${acc}:Archive`, accountId: acc, name: "Archive", count: 0 }
+    ]);
+    const TOTAL = 260;
+    const baseTime = Date.UTC(2026, 4, 1, 0, 0, 0);
+    const msgs = Array.from({ length: TOTAL }, (_, i) => {
+      const dateValue = baseTime + i * 60_000;
+      const inInbox = i % 10 !== 0; // 234 inbox threads (> 200 walk threshold)
+      return large.a.message(`<large-t-${i}@example.test>`, {
+        id: `large-m-${i}`,
+        messageId: `<large-m-${i}@example.test>`,
+        folderId: inInbox ? `${acc}:INBOX` : `${acc}:Archive`,
+        dateValue,
+        date: new Date(dateValue).toISOString(),
+        flagged: i === 5 || i === 15 || i === 25 // 3 flagged inbox threads
+      });
+    });
+    await large.a.api.upsertMessages(acc, null, msgs);
+
+    const prepare = large.db.prepare.bind(large.db);
+    const sqls: string[] = [];
+    const plans: string[] = [];
+    const spy = spyOn(large.db, "prepare").mockImplementation((sql: string) => {
+      sqls.push(sql);
+      const stmt = prepare(sql);
+      if (sql.includes("FROM threads t") || (sql.includes("COUNT(*)") && !sql.includes("threadId IN"))) {
+        return {
+          all(...args: unknown[]) {
+            plans.push(
+              (prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args) as Array<{ detail: string }>)
+                .map((row) => row.detail)
+                .join(" | ")
+            );
+            return stmt.all(...args);
+          },
+          get(...args: unknown[]) {
+            plans.push(
+              (prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args) as Array<{ detail: string }>)
+                .map((row) => row.detail)
+                .join(" | ")
+            );
+            return stmt.get(...args);
+          }
+        };
+      }
+      return stmt;
+    });
+    try {
+      const page1 = await listThreads({ accountId: acc, folderId: `${acc}:INBOX`, page: 1, pageSize: 10 });
+      const page2 = await listThreads({ accountId: acc, folderId: `${acc}:INBOX`, page: 2, pageSize: 10 });
+      // No redundant threadTotal COUNT(*) FROM threads query.
+      expect(sqls.some((sql) => /SELECT COUNT\(\*\).*FROM threads\b/s.test(sql))).toBe(false);
+      // Total count uses the covering folder-thread index, and the unflagged walk uses the threads date index.
+      expect(plans.some((plan) => plan.includes("COVERING INDEX idx_messages_account_folder_thread_deleted"))).toBe(true);
+      expect(plans.some((plan) => plan.includes("USING INDEX idx_threads_account_latest_received"))).toBe(true);
+      expect(plans.some((plan) => plan.includes("COVERING INDEX idx_messages_flagged_thread_deleted"))).toBe(true);
+      // The 3 flagged inbox threads are selected onto page 1 ahead of older unflagged threads
+      // (the hydrated `items` array itself is ordered by message dateValue DESC).
+      const page1Ids = new Set(page1.items.map((item) => item.id));
+      expect(page1Ids.has("large-m-25")).toBe(true);
+      expect(page1Ids.has("large-m-15")).toBe(true);
+      expect(page1Ids.has("large-m-5")).toBe(true);
+      expect(page1.items[0].id).toBe("large-m-259");
+      expect(page1.items).toHaveLength(10);
+      expect(page1.total).toBe(234);
+      expect(page1.hasMore).toBe(true);
+      expect(page1.baseCount).toBe(10);
+      expect(page2.items).toHaveLength(10);
+      expect(new Set([...page1.items, ...page2.items].map((item) => item.id)).size).toBe(20);
+    } finally {
+      spy.mockRestore();
     }
   });
 });

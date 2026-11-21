@@ -14,7 +14,14 @@ const row = (accountId: string, n: number) => ({ id: `${accountId}-m${n}`, accou
 const page = (accountId: string, from: number, hasMore: boolean) =>
   Response.json({ items: [row(accountId, from), row(accountId, from + 1)], hasMore, total: 6 });
 
-type Props = { accountId: string; folderId?: string; query?: string; threads?: boolean };
+type Props = {
+  accountId: string;
+  folderId?: string;
+  query?: string;
+  threads?: boolean;
+  domainView?: { domain: string; role: "inbox" | "sent" | "drafts" | "archive" | "trash" | "spam" } | null;
+  listAccountIds?: ReadonlySet<string>;
+};
 
 function mount(initialProps: Props = { accountId: "account-a" }, viewCache?: MailboxViewCache) {
   const held: Held[] = [];
@@ -22,8 +29,15 @@ function mount(initialProps: Props = { accountId: "account-a" }, viewCache?: Mai
   const apiFetch: UseMessageDataParams["apiFetch"] = (input, init) => new Promise<Response>(resolve => {
     held.push({ url: String(input), signal: init?.signal ?? undefined, resolve });
   });
-  const view = renderHook(({ accountId, folderId = `${accountId}:INBOX`, query = "", threads = true }: Props) => {
-    const messagesKey = `${accountId}|folder|${folderId}|${query}`;
+  const view = renderHook(({
+    accountId,
+    folderId = `${accountId}:INBOX`,
+    query = "",
+    threads = true,
+    domainView = null,
+    listAccountIds
+  }: Props) => {
+    const messagesKey = `${domainView ? `domain:${domainView.domain}:${domainView.role}|` : ""}${accountId}|folder|${folderId}|${query}`;
     const currentKeyRef = useRef(messagesKey);
     currentKeyRef.current = messagesKey;
     return useMessageData({
@@ -33,7 +47,7 @@ function mount(initialProps: Props = { accountId: "account-a" }, viewCache?: Mai
       threadDateSource: "latestReceivedDateValue", sortBy: "date", query, authState: "ok", apiFetch,
       readErrorMessage: async () => "Error", reportError: message => { errors.push(message); },
       setRelatedContext: () => {}, relatedContext: null, setCollapsedGroups: () => {}, setCollapsedThreads: () => {},
-      currentKeyRef, viewCache
+      currentKeyRef, viewCache, domainView, listAccountIds
     });
   }, { initialProps: initialProps as Props });
   const pending = (accountId: string, pageNumber = 1) =>
@@ -420,5 +434,57 @@ describe("mailbox view cache lifetime", () => {
     expect(cache.readList("/mixed", "account-b")).toBeNull();
     cache.writeList("/mixed", { ...listEntry("account-a"), rows: [] });
     expect(cache.readList("/mixed", "account-a")).toBeNull();
+  });
+
+  it("caches domain views keyed by the granted member set and drops them immediately when any member is revoked", async () => {
+    const cache = new MailboxViewCache();
+    const members = new Set(["account-a", "account-b"]);
+    const domainView = { domain: "example.test", role: "inbox" as const };
+    const h = mount({ accountId: "account-a", domainView, listAccountIds: members }, cache);
+    await waitFor(() => expect(h.held.filter(item => item.url.startsWith("/api/domains/example.test/threads"))).toHaveLength(1));
+    await h.release(
+      h.held[0],
+      Response.json({
+        items: [row("account-a", 1), row("account-b", 2)],
+        hasMore: true,
+        total: 10,
+        baseCount: 2,
+        role: "inbox",
+        folders: [{ accountId: "account-a", folderId: "account-a:INBOX" }, { accountId: "account-b", folderId: "account-b:INBOX" }]
+      })
+    );
+    await waitFor(() => expect(h.result.current.messages.map(m => m.id)).toEqual(["account-a-m1", "account-b-m2"]));
+
+    // Switch away to a single mailbox, then back to the domain view: cached rows appear immediately.
+    h.rerender({ accountId: "account-a", domainView: null, listAccountIds: new Set(["account-a"]) });
+    h.rerender({ accountId: "account-a", domainView, listAccountIds: members });
+    expect(h.result.current.messages.map(m => m.id)).toEqual(["account-a-m1", "account-b-m2"]);
+    expect(h.result.current.domainFolderIds).toContain("account-b:INBOX");
+
+    // Revoking any member account removes the cached domain entry immediately.
+    cache.retainAccounts(new Set(["account-a"]));
+    h.rerender({ accountId: "account-a", domainView: null, listAccountIds: new Set(["account-a"]) });
+    h.rerender({ accountId: "account-a", domainView, listAccountIds: new Set(["account-a"]) });
+    expect(h.result.current.messages).toEqual([]);
+  });
+
+  it("adopts prefetchDomainFirstPage without sending a duplicate domain request", async () => {
+    const h = mount({ accountId: "account-a" });
+    await waitFor(() => expect(h.pending("account-a")).toHaveLength(1));
+    await h.release(h.pending("account-a")[0], page("account-a", 1, false));
+    await waitFor(() => expect(h.result.current.loadingMessages).toBe(false));
+
+    const target = { domain: "example.test", role: "inbox" as const };
+    act(() => { h.result.current.prefetchDomainFirstPage(target); });
+    const domainReqs = () => h.held.filter(item => item.url.startsWith("/api/domains/example.test/threads"));
+    expect(domainReqs()).toHaveLength(1);
+    const prefetched = domainReqs()[0];
+
+    h.rerender({ accountId: "account-b", domainView: target, listAccountIds: new Set(["account-b"]) });
+    await act(async () => { await Promise.resolve(); });
+    expect(domainReqs()).toEqual([prefetched]);
+    await h.release(prefetched, Response.json({ items: [row("account-b", 9)], hasMore: false, total: 1, baseCount: 1 }));
+    await waitFor(() => expect(h.result.current.messages.map(m => m.id)).toEqual(["account-b-m9"]));
+    expect(prefetched.signal?.aborted).toBe(false);
   });
 });

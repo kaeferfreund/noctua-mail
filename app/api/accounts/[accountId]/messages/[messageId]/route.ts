@@ -7,7 +7,7 @@ import {
   getAccountIdFromParams,
   requireAccountContext
 } from "@/app/api/_helpers/accountContext";
-import { getAccountOwnAddresses, getFolders, getMessageById } from "@/lib/db";
+import { getAccountOwnAddresses, getFolderRecords, getMessageById } from "@/lib/db";
 import { messageSenderVerified } from "@/lib/html/remoteContentSender.server";
 import { getTopicSuggestionsForThread, getTopicsForThread } from "@/lib/topics";
 import { appendMessageIdToError } from "@/app/api/_helpers/message/errorFormatting";
@@ -51,7 +51,10 @@ export async function GET(request: Request, { params }: Params) {
       }
     }
     // The reader's "Nicht bestätigt" badge: computed for the opened message only.
-    const [ownAddresses, folders] = await Promise.all([getAccountOwnAddresses(context.accountId), getFolders(context.accountId)]);
+    const [ownAddresses, folders] = await Promise.all([
+      getAccountOwnAddresses(context.accountId),
+      getFolderRecords(context.accountId)
+    ]);
     message.senderVerified = await messageSenderVerified(context.accountId, message, { ownAddresses, folders });
     return NextResponse.json({ ok: true, message });
   });

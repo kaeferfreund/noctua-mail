@@ -1530,6 +1530,17 @@ function initAccountSchemaBody(db: any, inTransaction: boolean) {
     -- so counting reads this index instead of every message row and its bodies.
     CREATE INDEX IF NOT EXISTS idx_messages_account_flags
       ON messages(accountId, flags, folderId, unread, deleted);
+    -- Thread-list folder selection and folder counts: covering on
+    -- (accountId, folderId, threadId, deleted) so SELECT DISTINCT threadId,
+    -- EXISTS (...) and folder totals avoid scanning message rows and body
+    -- overflow pages.
+    CREATE INDEX IF NOT EXISTS idx_messages_account_folder_thread_deleted
+      ON messages(accountId, folderId, threadId, deleted);
+    -- Partial covering index for flagged-thread prioritization: visits only
+    -- flagged rows without reading message bodies or unflagged rows.
+    CREATE INDEX IF NOT EXISTS idx_messages_flagged_thread_deleted
+      ON messages(accountId, flagged, threadId, deleted, folderId)
+      WHERE flagged = 1;
   `);
   ensureThreadOptionalColumns(db);
   ensureTopicOptionalColumns(db);
