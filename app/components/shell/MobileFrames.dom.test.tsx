@@ -116,7 +116,7 @@ function threadListProps(onSelect = noop): MessageThreadListProps {
       supportsThreads: true, includeThreadAcrossFolders: true, searchScope: "folder",
       activeFolderId: message.folderId!, messageById: new Map([[message.id, message]]), messageTopicsById: new Map(),
       suggestedThreadIds: new Set(), pendingSuggestedThreadIds: new Set(), sortDir: "desc",
-      showMessageSize: false, listIsNarrow: true, preferToDisplay: false, activeTopic: null, senderIconsEnabled: false
+      showMessageSize: false, listIsNarrow: true, showRecipientsFor: () => false, activeTopic: null, senderIconsEnabled: false
     },
     refs: { scrollRef: createRef() },
     actions: {

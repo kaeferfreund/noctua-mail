@@ -83,4 +83,10 @@ describe("getImapFlagBadges", () => {
       .toEqual(["seen:Gelesen", "answered:Beantwortet", "deleted:Gelöscht", "draft:Entwurf", "custom:$Custom"]);
     expect(getImapFlagBadges(message, "en").map(({ label }) => label)).toEqual(["Seen", "Answered", "Deleted", "Draft", "$Custom"]);
   });
+
+  it("shows one badge per meaning when several raw flags map to it", () => {
+    const duplicate = { id: "m2", seen: false, flags: ["\\Recent", "$Forwarded", "Forwarded", "$Custom", "$custom"] } as unknown as Message;
+    expect(getImapFlagBadges(duplicate, "de").map(({ kind, label }) => `${kind}:${label}`))
+      .toEqual(["new:Neu", "forwarded:Weitergeleitet", "custom:$Custom"]);
+  });
 });

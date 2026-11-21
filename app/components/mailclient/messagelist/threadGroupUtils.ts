@@ -24,7 +24,6 @@ export type FromDisplayInfo = {
   text: string;
   tooltip: string;
   participants?: FromParticipant[];
-  isFromUser?: boolean;
   showRecipientIcon?: boolean;
   iconFrom?: string;
   iconFromEmail?: string | null;
@@ -174,21 +173,23 @@ const getOtherRecipientParticipant = (fields?: RecipientFields, userEmail?: OwnA
   return null;
 };
 
+/**
+ * Name column of one message row (single rows, expanded thread members, compact
+ * reader cards). `showRecipients` is decided per message by the folder it lies
+ * in (Sent / Drafts of its own mailbox, see `collectRecipientListFolderIds`):
+ * then the recipients are listed with the arrow icon; otherwise the sender is
+ * shown as-is, own addresses included.
+ */
 export function getMessageFromDisplay(
   fromValue: string,
   recipients?: RecipientFields,
-  userEmail?: OwnAddressInput,
-  isInExpandedThread?: boolean,
-  forceRecipientDisplay?: boolean,
+  showRecipients?: boolean,
   findRecipientAlias?: FindRecipientAlias,
   locale: UiLocale = "de"
 ): FromDisplayInfo {
   const normalized = normalizeWhitespace(fromValue);
-  if (!normalized && !forceRecipientDisplay) return { text: "", tooltip: "" };
 
-  const isFromUser = normalized ? isMessageFromUser(normalized, userEmail) : false;
-
-  if (forceRecipientDisplay) {
+  if (showRecipients) {
     const recipientsDisplay = extractRecipientsDisplay(recipients, findRecipientAlias);
     const recipientEntries = getRecipientParticipantEntries(
       recipients,
@@ -199,45 +200,34 @@ export function getMessageFromDisplay(
       text: recipientsDisplay || getTranslator(locale)("List.noRecipients"),
       tooltip: recipientTooltip(recipients),
       participants: recipientEntries.map(({ displayName, email }) => ({ displayName, email })),
-      isFromUser,
       showRecipientIcon: true
     };
   }
 
   if (!normalized) return { text: "", tooltip: "" };
-
-  // For single messages or messages in expanded threads: show "To: ..." if from user
-  // isInExpandedThread = false means it's a collapsed thread header (show "Me")
-  // isInExpandedThread = true means it's an expanded thread or single message (show "To: ...")
-  if (isFromUser && isInExpandedThread && recipients) {
-    const recipientsDisplay = extractRecipientsDisplay(recipients, findRecipientAlias);
-    const recipientEntries = getRecipientParticipantEntries(
-      recipients,
-      undefined,
-      findRecipientAlias
-    );
-    return {
-      text: recipientsDisplay || getTranslator(locale)("List.noRecipients"),
-      tooltip: recipientTooltip(recipients),
-      participants: recipientEntries.map(({ displayName, email }) => ({ displayName, email })),
-      isFromUser: true,
-      showRecipientIcon: true
-    };
-  }
-
-  const displayName = extractDisplayName(normalized);
-  const displayText = isFromUser ? getTranslator(locale)("List.me") : (displayName || normalized);
-
+  const displayText = extractDisplayName(normalized) || normalized;
   return {
     text: displayText,
     tooltip: normalized,
     participants: [buildParticipant(normalized, displayText)],
-    isFromUser,
     showRecipientIcon: false,
     iconFrom: normalized,
     iconFromEmail: recipientEmail(normalized)
   };
 }
+
+/** Sender entry of the collapsed thread header, where own mail reads "Ich". */
+const getCollapsedThreadSenderEntry = (
+  normalized: string,
+  userEmail: OwnAddressInput | undefined,
+  locale: UiLocale
+) => {
+  const isFromUser = isMessageFromUser(normalized, userEmail);
+  const text = isFromUser
+    ? getTranslator(locale)("List.me")
+    : extractDisplayName(normalized) || normalized;
+  return { text, isFromUser };
+};
 
 export function getCollapsedThreadIconParticipant(
   fullFlat: Array<{ message: Message; depth: number }>,
@@ -297,8 +287,6 @@ export function getCollapsedThreadFromDisplay(
       const entry = getMessageFromDisplay(
         normalized,
         { to: message.to, cc: message.cc, bcc: message.bcc },
-        userEmail,
-        true,
         true,
         findRecipientAlias,
         locale
@@ -322,18 +310,10 @@ export function getCollapsedThreadFromDisplay(
       return;
     }
 
-    const senderEntry = getMessageFromDisplay(
-      normalized,
-      undefined,
-      userEmail,
-      true,
-      false,
-      findRecipientAlias,
-      locale
-    );
+    const senderEntry = getCollapsedThreadSenderEntry(normalized, userEmail, locale);
     pushParticipant({
       text: senderEntry.text,
-      tooltip: senderEntry.tooltip,
+      tooltip: normalized,
       key: senderEntry.isFromUser ? "participant:self" : `display:${senderEntry.text.toLowerCase()}`,
       displayName: extractDisplayName(normalized) || senderEntry.text,
       email: recipientEmail(normalized) ?? ""

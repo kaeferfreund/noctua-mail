@@ -20,7 +20,7 @@ function props(scope: "folder" | "all", searchActive: boolean): MessageListOrche
       includeThreadAcrossFolders: false, searchScope: scope, activeFolderId: "synthetic:INBOX",
       messageById: new Map(), messageTopicsById: new Map(), suggestedThreadIds: new Set(),
       pendingSuggestedThreadIds: new Set(), sortDir: "desc", showMessageSize: false,
-      listIsNarrow: false, preferToDisplay: false, activeTopic: null
+      listIsNarrow: false, showRecipientsFor: () => false, activeTopic: null
     },
     listViewActions: {
       setSortKey: noop, setSortDir: noop, setCollapsedGroups: noop, setCollapsedThreads: noop,

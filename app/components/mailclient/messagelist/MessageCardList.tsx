@@ -53,7 +53,7 @@ export default function MessageCardList({
     pendingSuggestedThreadIds,
     isCompactView,
     listIsNarrow,
-    preferToDisplay,
+    showRecipientsFor,
     activeTopic,
     userEmail,
     findRecipientAlias,
@@ -130,7 +130,7 @@ export default function MessageCardList({
     flattenThread,
     getThreadLatestDate,
     userEmail,
-    preferToDisplay,
+    showRecipientsFor,
     findRecipientAlias,
     mode: isCompactView ? "nested" : "flat",
     collapsedNestedMessages
