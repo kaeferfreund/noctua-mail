@@ -2,7 +2,8 @@ import { options } from "./cli";
 import { startImapServer } from "./imap-server";
 import { startSmtpSink } from "./smtp-sink";
 const args = options();
-const imap = await startImapServer({ host: args.host, port: Number(args.port ?? 3789), controlPort: Number(args["control-port"]), user: args.user, pass: args.pass, seed: args.seed, date: args.date ? new Date(args.date) : undefined });
+const count = args.count ? Number(args.count) : undefined;
+const imap = await startImapServer({ host: args.host, port: Number(args.port ?? 3789), controlPort: Number(args["control-port"]), user: args.user, pass: args.pass, seed: args.seed, date: args.date ? new Date(args.date) : undefined, count });
 let smtp: Awaited<ReturnType<typeof startSmtpSink>>;
 try {
   smtp = await startSmtpSink({ host: args.host, port: Number(args["smtp-port"]), user: args.user, pass: args.pass, out: args.out, deliver: source => { imap.store.append("INBOX", source); } });

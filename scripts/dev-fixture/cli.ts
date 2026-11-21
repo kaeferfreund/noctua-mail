@@ -5,7 +5,7 @@ export function options() {
     "control-port": { type: "string", default: "3788" }, "smtp-port": { type: "string", default: "3787" },
     user: { type: "string", default: "demo@demo-praxis.test" }, pass: { type: "string", default: "demo" },
     seed: { type: "string", default: "demo-praxis" }, date: { type: "string" }, out: { type: "string" },
-    "imap-control": { type: "string" }
+    count: { type: "string" }, "imap-control": { type: "string" }
   }, strict: true });
   return values;
 }

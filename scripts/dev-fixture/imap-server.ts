@@ -68,7 +68,7 @@ function searchPredicate(args: string[], box: Mailbox) {
   return (m: FixtureMessage, seq: number) => predicates.every(test => test(m, seq));
 }
 export type ImapOptions = {
-  host?: string; port?: number; user?: string; pass?: string; store?: MailStore; controlPort?: number; seed?: string; date?: Date;
+  host?: string; port?: number; user?: string; pass?: string; store?: MailStore; controlPort?: number; seed?: string; date?: Date; count?: number;
   /** Observes every authenticated command (upper-case name and its arguments), for tests. */
   onCommand?: (command: string, args: string[]) => void;
 };
@@ -76,7 +76,7 @@ export async function startImapServer(config: ImapOptions = {}) {
   const host = config.host ?? "127.0.0.1";
   const user = config.user ?? demoUser;
   const pass = config.pass ?? demoPass;
-  const store = config.store ?? new MailStore(config.seed, config.date);
+  const store = config.store ?? new MailStore(config.seed, config.date, undefined, config.count);
   const sockets = new Set<Socket>();
   const server = createServer(socket => {
     sockets.add(socket);
@@ -350,7 +350,7 @@ export async function startImapServer(config: ImapOptions = {}) {
 }
 if (import.meta.main) {
   const args = options();
-  const server = await startImapServer({ host: args.host, port: Number(args.port ?? 3789), user: args.user, pass: args.pass, seed: args.seed, date: args.date ? new Date(args.date) : undefined, controlPort: Number(args["control-port"]) });
+  const server = await startImapServer({ host: args.host, port: Number(args.port ?? 3789), user: args.user, pass: args.pass, seed: args.seed, date: args.date ? new Date(args.date) : undefined, count: args.count ? Number(args.count) : undefined, controlPort: Number(args["control-port"]) });
   console.log(`IMAP fixture: ${args.host}:${server.port}; control: ${server.controlPort}`);
   for (const signal of ["SIGINT", "SIGTERM"] as const) process.on(signal, async () => { await server.stop(); process.exit(0); });
 }

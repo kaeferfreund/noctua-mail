@@ -8,7 +8,12 @@ export type FixtureMessage = { uid: number; flags: Set<string>; date: Date; mime
 export type Mailbox = { path: string; special?: string; uidValidity: number; uidNext: number; subscribed: boolean; messages: FixtureMessage[] };
 export class MailStore extends EventEmitter {
   readonly boxes = new Map<string, Mailbox>();
-  constructor(readonly seed = "demo-praxis", readonly anchor = new Date(), readonly uidValidityPath = join(process.env.NOCTUA_DATA_DIR ?? ".data", "fixture-uidvalidity.sqlite")) { super(); this.reset(); }
+  constructor(
+    readonly seed = "demo-praxis",
+    readonly anchor = new Date(),
+    readonly uidValidityPath = join(process.env.NOCTUA_DATA_DIR ?? ".data", "fixture-uidvalidity.sqlite"),
+    readonly count?: number
+  ) { super(); this.reset(); }
   private nextUidValidity(): number {
     // Persist only this high-water mark, never mailbox contents. SQLite serializes
     // allocations across fixture processes, including restarts in the same second.
@@ -49,8 +54,17 @@ export class MailStore extends EventEmitter {
   }
   reset() {
     this.boxes.clear();
-    for (const [path, special] of [["INBOX"], ["Sent", "\\Sent"], ["Drafts", "\\Drafts"], ["Trash", "\\Trash"], ["Junk", "\\Junk"], ["Archive", "\\Archive"], ["Projekte"], ["Projekte/Website"]]) this.create(path, special);
-    for (const message of createSeed(this.seed, this.anchor)) this.append(message.folder, message.source, message.flags, message.date);
+    const folders: Array<[string, string?]> = [
+      ["INBOX"], ["Sent", "\\Sent"], ["Drafts", "\\Drafts"], ["Trash", "\\Trash"],
+      ["Junk", "\\Junk"], ["Archive", "\\Archive"], ["Projekte"], ["Projekte/Website"],
+      ...(this.count && this.count > 90
+        ? ([["Projekte/Praxisumbau"], ["Buchhaltung"], ["Buchhaltung/2026"], ["Lieferanten"]] as Array<[string, string?]>)
+        : [])
+    ];
+    for (const [path, special] of folders) this.create(path, special);
+    for (const message of createSeed(this.seed, this.anchor, this.count ? { count: this.count } : undefined)) {
+      this.append(message.folder, message.source, message.flags, message.date);
+    }
     this.emit("reset");
   }
 }
