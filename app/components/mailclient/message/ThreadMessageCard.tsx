@@ -19,7 +19,8 @@ import {
   appendUnreferencedInlineImages,
   replaceInlineImageSources,
   stripRedundantInlineImageFallbacks,
-  stripRemovedInlineImages
+  stripRemovedInlineImages,
+  type HtmlColorSchemeOverride
 } from "@/lib/html";
 import { countRecipientEntries } from "@/lib/recipientLists";
 import type {
@@ -220,6 +221,12 @@ function ThreadMessageCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [pendingRemoval, setPendingRemoval] = useState<Attachment | null>(null);
   const [removingAttachment, setRemovingAttachment] = useState(false);
+  const [htmlColorSchemeState, setHtmlColorSchemeState] = useState<{
+    messageId: string;
+    scheme: HtmlColorSchemeOverride;
+  }>({ messageId: message.id, scheme: "auto" });
+  const htmlColorScheme: HtmlColorSchemeOverride =
+    htmlColorSchemeState.messageId === message.id ? htmlColorSchemeState.scheme : "auto";
 
   const canRemoveAttachments = Boolean(onRemoveAttachment);
 
@@ -399,7 +406,16 @@ function ThreadMessageCard({
 
     return (
       <div>
-        <HtmlMessage accountId={message.accountId} senderKey={message.senderKey} messageId={message.id} html={html} darkMode={darkMode} fontScale={fontScale} zoom={zoomValue} />
+        <HtmlMessage
+          accountId={message.accountId}
+          senderKey={message.senderKey}
+          messageId={message.id}
+          html={html}
+          darkMode={darkMode}
+          colorSchemeOverride={htmlColorScheme}
+          fontScale={fontScale}
+          zoom={zoomValue}
+        />
       </div>
     );
   };
@@ -837,6 +853,8 @@ function ThreadMessageCard({
                       zoom={zoomValue}
                       onAdjustZoom={(delta) => adjustMessageZoom(message.id, delta)}
                       onResetZoom={() => resetMessageZoom(message.id)}
+                      colorScheme={htmlColorScheme}
+                      onColorSchemeChange={(scheme) => setHtmlColorSchemeState({ messageId: message.id, scheme })}
                     />
                   </>
                 ) : null}

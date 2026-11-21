@@ -481,6 +481,12 @@ describe("extractBodyContent", () => {
 
     expect(result.body).toContain("Terms of service body text");
     expect(result.bodyAttrs.style).toBe("margin:0");
+    expect(result.bodyAttrs.bgcolor).toBe("#FFFFFF");
+  });
+
+  it("preserves quoted and unquoted body bgcolor attributes", () => {
+    expect(extractBodyContent('<body bgcolor="#101010"><p>Dark</p></body>').bodyAttrs.bgcolor).toBe("#101010");
+    expect(extractBodyContent("<body bgcolor=black><p>Dark</p></body>").bodyAttrs.bgcolor).toBe("black");
   });
 });
 

@@ -6,6 +6,7 @@ import type { ComponentProps } from "react";
 import { Theme } from "@radix-ui/themes";
 import MessageDisplayOptionsMenu from "./MessageDisplayOptionsMenu";
 import type { MessageTab } from "./types";
+import type { HtmlColorSchemeOverride } from "@/lib/html";
 
 const originalWidth = window.innerWidth;
 afterEach(() => {
@@ -18,6 +19,7 @@ type Props = ComponentProps<typeof MessageDisplayOptionsMenu>;
 function setup(overrides: Partial<Props> = {}) {
   const calls = {
     format: [] as MessageTab[],
+    colorScheme: [] as HtmlColorSchemeOverride[],
     textScale: [] as number[],
     textReset: 0,
     zoom: [] as number[],
@@ -28,6 +30,8 @@ function setup(overrides: Partial<Props> = {}) {
     format: "html",
     defaultFormat: "html",
     onFormatChange: (format) => calls.format.push(format),
+    colorScheme: "auto",
+    onColorSchemeChange: (scheme) => calls.colorScheme.push(scheme),
     textScale: 1,
     onAdjustTextScale: (delta) => calls.textScale.push(delta),
     onResetTextScale: () => {
@@ -121,5 +125,24 @@ describe("MessageDisplayOptionsMenu", () => {
     const item = page.getByRole("menuitemradio", { name: "Markdown" });
     expect(item.getAttribute("data-slot")).toBe("dropdown-menu-radio-item");
     expect(item.closest(".radix-themes")).toBeTruthy();
+  });
+
+  it("offers HTML appearance override only in HTML view and reports non-auto in the summary chip", async () => {
+    const htmlView = setup({ colorScheme: "auto" });
+    await htmlView.open();
+    const appearance = htmlView.page.getByRole("group", { name: "Appearance" });
+    expect(within(appearance).getByRole("menuitemradio", { name: "Automatic" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(within(appearance).getByRole("menuitemradio", { name: "Light" }));
+    expect(htmlView.calls.colorScheme).toEqual(["light"]);
+    cleanup();
+
+    const overridden = setup({ colorScheme: "light" });
+    expect(overridden.page.getByRole("button", { name: "Display options (Light)" })).toBeTruthy();
+    expect(overridden.page.container.textContent).toBe("Light");
+    cleanup();
+
+    const plainText = setup({ formats: ["html", "text"], format: "text", defaultFormat: "html", colorScheme: "light" });
+    await plainText.open(/^Display options/);
+    expect(plainText.page.queryByRole("group", { name: "Appearance" })).toBeNull();
   });
 });
