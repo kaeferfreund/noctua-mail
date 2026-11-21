@@ -8,6 +8,7 @@ import FullSyncConfirmDialog from "./FullSyncConfirmDialog";
 import ThreadMessageCard from "./ThreadMessageCard";
 import MessageDisplayOptionsMenu from "./MessageDisplayOptionsMenu";
 import { reviewReaderProps } from "@/tests/helpers/i18nSlice2b";
+import { getImapFlagBadges } from "@/lib/ui/messageView";
 
 const originalWidth = window.innerWidth;
 afterEach(() => { cleanup(); window.innerWidth = originalWidth; });
@@ -28,12 +29,20 @@ for (const [locale, kind, name] of [
 
 test("320 px German reader uses Neu for Recent and spaces the priority value beside long badges", () => {
   window.innerWidth = 320;
-  const page = render(<I18nTestProvider locale="de"><Theme><ThreadMessageCard {...reviewReaderProps()} /></Theme></I18nTestProvider>);
-  expect(page.getByText("Neu", { exact: true })).toBeTruthy();
+  const props = reviewReaderProps();
+  const unread = { ...props.message, seen: false, flags: ["\\Recent"], category: "transactional" };
+  const page = render(<I18nTestProvider locale="de"><Theme><ThreadMessageCard {...props} message={unread} getImapFlagBadges={getImapFlagBadges} /></Theme></I18nTestProvider>);
+  // One "Neu" only: \Recent used to render a second, hard-coded badge.
+  expect(page.getAllByText("Neu", { exact: true })).toHaveLength(1);
   expect(page.getByText("Priorität: high", { exact: true })).toBeTruthy();
   expect(page.getByText(/Transaktions-E-Mails/)).toBeTruthy();
   expect(page.queryByText("Zuletzt verwendet")).toBeNull();
   expect(page.container.querySelector('[data-message-action="menu"]')).toBeTruthy();
+});
+
+test("German reader shows no Neu badge for a read message that still carries Recent", () => {
+  const page = render(<I18nTestProvider locale="de"><Theme><ThreadMessageCard {...reviewReaderProps()} getImapFlagBadges={getImapFlagBadges} /></Theme></I18nTestProvider>);
+  expect(page.queryByText("Neu", { exact: true })).toBeNull();
 });
 
 test("German full-sync action and cancel remain separate actionable buttons", () => {
